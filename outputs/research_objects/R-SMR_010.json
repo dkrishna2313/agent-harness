@@ -1,7 +1,7 @@
 {
   "research_id": "R-SMR_010",
-  "created_at": "2026-06-18T20:53:07.854343+00:00",
-  "updated_at": "2026-06-18T20:53:07.854807+00:00",
+  "created_at": "2026-06-19T11:30:35.994058+00:00",
+  "updated_at": "2026-06-19T11:30:35.994126+00:00",
   "status": "completed",
   "question": "What construction duration should be expected for a BWRX-300 or similar light-water SMR from first concrete to commercial operation, and how does this compare to recent large reactor projects?",
   "profile": "smr",
@@ -14,139 +14,14 @@
   },
   "subquestions": [],
   "retrieval_plan": {
-    "web_search": {
-      "dependency_status": {
-        "duckduckgo_search": "ok (ddgs)",
-        "requests": "ok",
-        "trafilatura": "ok",
-        "all_available": true
-      },
-      "query": "What construction duration should be expected for a BWRX-300 or similar light-water SMR from first concrete to commercial operation, and how does this compare to recent large reactor projects?",
-      "provider": "DuckDuckGoSearchProvider",
-      "search_error": null,
-      "search_results_returned": 5,
-      "search_results": [
-        {
-          "title": "BWRX-300 Small Modular Reactor | GE Vernova Hitachi Nuclear",
-          "url": "https://www.gevernova.com/nuclear/carbon-free-power/bwrx-300-small-modular-reactor",
-          "snippet": "Construction of the first unit is estimated to be completed by the end of 2029 and in commercial operation by the end of 2030. The BWRX-300 small modular ..."
-        },
-        {
-          "title": "First U.S. Small Modular Boiling Water Reactor Under Development",
-          "url": "https://www.energy.gov/ne/articles/first-us-small-modular-boiling-water-reactor-under-development",
-          "snippet": "Feb 19, 2020 ... GEH is expecting an expedited licensing process, since the SMR is based on the ESBWR design, which has already been cleared. The company ..."
-        },
-        {
-          "title": "NUCLEAR 101: Advanced light-water small modular reactors are ...",
-          "url": "https://www.facebook.com/NuclearEnergyGov/posts/nuclear-101-advanced-light-water-small-modular-reactors-are-simply-smaller-manuf/1246648074252155/",
-          "snippet": "Apr 2, 2026 ... Charlie Hentz How quickly can a big nuclear power plant be built and online versus the mini nuclear power plants? 10w. Charlie Hentz."
-        },
-        {
-          "title": "Small modular reactors in the Australian context",
-          "url": "https://minerals.org.au/wp-content/uploads/2022/12/Small-modular-reactors-in-the-Australian-context_Ben-Heard_2022-update.pdf",
-          "snippet": "SMR construction time and capital costs are considerably less than large scale nuclear reactors or equivalent energy production methods. Configurability."
-        },
-        {
-          "title": "An Overview of the BWRX-300 Reactor Building Design - Preprints.org",
-          "url": "https://www.preprints.org/manuscript/202505.1533",
-          "snippet": "May 19, 2025 ... The BWRX-300 project was recently granted a construction permit in Canada for the first nuclear power plant featuring a light-water small ..."
-        }
-      ],
-      "pages_attempted": 5,
-      "downloaded_urls": [
-        "https://www.gevernova.com/nuclear/carbon-free-power/bwrx-300-small-modular-reactor",
-        "https://www.energy.gov/ne/articles/first-us-small-modular-boiling-water-reactor-under-development"
-      ],
-      "failed_urls": [
-        {
-          "url": "https://www.facebook.com/NuclearEnergyGov/posts/nuclear-101-advanced-light-water-small-modular-reactors-are-simply-smaller-manuf/1246648074252155/",
-          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)"
-        },
-        {
-          "url": "https://minerals.org.au/wp-content/uploads/2022/12/Small-modular-reactors-in-the-Australian-context_Ben-Heard_2022-update.pdf",
-          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)"
-        },
-        {
-          "url": "https://www.preprints.org/manuscript/202505.1533",
-          "error": "fetch error: HTTPError: 403 Client Error: Forbidden for url: https://www.preprints.org/manuscript/202505.1533"
-        }
-      ],
-      "cache_hits": 2,
-      "documents_fetched": 2,
-      "extracted_characters": 4106,
-      "download_details": [
-        {
-          "url": "https://www.gevernova.com/nuclear/carbon-free-power/bwrx-300-small-modular-reactor",
-          "title": "BWRX-300 Small Modular Reactor | GE Vernova Hitachi Nuclear",
-          "source": "cache",
-          "error": null,
-          "chars": 1252
-        },
-        {
-          "url": "https://www.energy.gov/ne/articles/first-us-small-modular-boiling-water-reactor-under-development",
-          "title": "First U.S. Small Modular Boiling Water Reactor Under Development",
-          "source": "cache",
-          "error": null,
-          "chars": 2854
-        },
-        {
-          "url": "https://www.facebook.com/NuclearEnergyGov/posts/nuclear-101-advanced-light-water-small-modular-reactors-are-simply-smaller-manuf/1246648074252155/",
-          "title": "NUCLEAR 101: Advanced light-water small modular reactors are ...",
-          "source": "live",
-          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)",
-          "chars": 0
-        },
-        {
-          "url": "https://minerals.org.au/wp-content/uploads/2022/12/Small-modular-reactors-in-the-Australian-context_Ben-Heard_2022-update.pdf",
-          "title": "Small modular reactors in the Australian context",
-          "source": "live",
-          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)",
-          "chars": 0
-        },
-        {
-          "url": "https://www.preprints.org/manuscript/202505.1533",
-          "title": "An Overview of the BWRX-300 Reactor Building Design - Preprints.org",
-          "source": "live",
-          "error": "fetch error: HTTPError: 403 Client Error: Forbidden for url: https://www.preprints.org/manuscript/202505.1533",
-          "chars": 0
-        }
-      ],
-      "chunks_created": 2
-    },
-    "source_count": 2
+    "source_count": 1
   },
   "evidence_ids": [
-    "E001",
-    "E002",
-    "E003",
-    "E005",
-    "E004"
+    "E001"
   ],
-  "evidence_topics": {
-    "BWRX-300": 5,
-    "SMR": 2,
-    "reactor design": 1,
-    "construction cost": 1,
-    "commercial operation": 1,
-    "deployment timeline": 1,
-    "licensing": 1,
-    "construction": 1,
-    "modular design": 1,
-    "factory-built": 1,
-    "concrete reduction": 1,
-    "deployment": 1,
-    "construction program": 1,
-    "Poland": 1,
-    "passive safety": 1,
-    "simplified design": 1,
-    "construction scope": 1
-  },
+  "evidence_topics": {},
   "findings": [
-    "The BWRX-300 is a 300 MWe light-water SMR based on the already-licensed ESBWR boiling water reactor technology, designed to reduce plant size by 90% compared to traditional large-scale BWRs in order to significantly reduce construction costs.",
-    "GEH anticipated the BWRX-300 to enter commercial operation as early as 2027 and expected an expedited licensing process because the design is derivative of the already-cleared ESBWR.",
-    "The BWRX-300 design features underground containment, reduced concrete requirements, factory-built systems, proven technology, common construction methods, and an established supply chain, all cited as mechanisms to accelerate development and improve construction turnaround.",
-    "The BWRX-300 incorporates a passive isolation condenser safety system capable of maintaining optimal reactor pressure and temperature for at least seven days without power or operator intervention, enabling a simplified and reduced-footprint plant design.",
-    "Poland's ORLEN Synthos Green Energy plans to build approximately 24 BWRX-300 SMRs across six locations, backed by the Polish government and up to $4 billion in signed letters of interest from US financing institutions."
+    "The only supplied evidence item originates from an NVIDIA GTC AI conference document and contains no nuclear energy or SMR construction data."
   ],
   "contradictions": [],
   "research_gaps": [],
@@ -154,11 +29,11 @@
     "question_id": "SMR_010"
   },
   "summary": {
-    "evidence_count": 5,
-    "citation_count": 5,
+    "evidence_count": 1,
+    "citation_count": 1,
     "contradictions_found": 0,
     "research_gaps_found": 0,
-    "coverage_score": 0.12
+    "coverage_score": 0.0
   },
   "owner": null,
   "assigned_agent": null,

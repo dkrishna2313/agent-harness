@@ -2,8 +2,8 @@ import json
 
 from typer.testing import CliRunner
 
-from dc_power_agent.claude_client import ClaudeClient, MockClaudeClient
-from dc_power_agent.cli import _build_client, app
+from research_agent.claude_client import ClaudeClient, MockClaudeClient
+from research_agent.cli import _build_client, app
 
 
 def test_cli_writes_markdown(tmp_path):

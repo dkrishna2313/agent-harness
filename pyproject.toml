@@ -26,12 +26,12 @@ dev = [
 ]
 
 [project.scripts]
-dc-power-agent = "dc_power_agent.cli:app"
-dc-power-agent-eval = "dc_power_agent.eval_runner:app"
+dc-power-agent = "research_agent.cli:app"
+dc-power-agent-eval = "research_agent.eval_runner:app"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["dc_power_agent*"]
+include = ["research_agent*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

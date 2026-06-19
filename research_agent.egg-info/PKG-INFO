@@ -11,9 +11,9 @@ Requires-Dist: typer>=0.12.5
 Provides-Extra: dev
 Requires-Dist: pytest>=8.3.0; extra == "dev"
 
-# dc_power_agent
+# research_agent
 
-`dc_power_agent` is a local research harness for AI data center infrastructure documents. It loads `.pdf`, `.md`, and `.txt` sources, uses Claude when configured, evaluates the memo in warning mode, and writes Markdown output.
+`research_agent` is a local research harness for AI data center infrastructure documents. It loads `.pdf`, `.md`, and `.txt` sources, uses Claude when configured, evaluates the memo in warning mode, and writes Markdown output.
 
 By default the harness uses Claude when `ANTHROPIC_API_KEY` is set. Use `--mock`
 for deterministic local testing. If `ANTHROPIC_API_KEY` is not configured or
@@ -29,7 +29,7 @@ python -m pip install -e ".[dev]"
 ## Run
 
 ```bash
-python -m dc_power_agent.cli \
+python -m research_agent.cli \
   "Explain NVIDIA Rubin architecture and implications for AI data centers" \
   --sources ./sources \
   --out ./outputs/rubin.md
@@ -45,7 +45,7 @@ Use `--debug` to print a concise terminal summary of loaded documents, evidence
 counts, memo sections, warnings, and the trace path:
 
 ```bash
-python -m dc_power_agent.cli \
+python -m research_agent.cli \
   "Explain NVIDIA Rubin architecture and implications for AI data centers" \
   --sources ./sources \
   --out ./outputs/rubin.md \
@@ -59,13 +59,13 @@ Set `ANTHROPIC_API_KEY` to use Claude. The default model is Claude Sonnet
 
 ```bash
 export ANTHROPIC_API_KEY="..."
-python -m dc_power_agent.cli "Question" --sources ./sources --out ./outputs/memo.md
+python -m research_agent.cli "Question" --sources ./sources --out ./outputs/memo.md
 ```
 
 For deterministic local testing without Claude:
 
 ```bash
-python -m dc_power_agent.cli "Question" --sources ./sources --out ./outputs/memo.md --mock
+python -m research_agent.cli "Question" --sources ./sources --out ./outputs/memo.md --mock
 ```
 
 ## Memo Sections
@@ -94,7 +94,7 @@ pytest
 Run the lightweight regression questions:
 
 ```bash
-python -m dc_power_agent.eval_runner \
+python -m research_agent.eval_runner \
   --sources ./sources \
   --evals ./evals/questions.yaml \
   --out ./outputs/eval_report.md

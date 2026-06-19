@@ -1,4 +1,4 @@
-"""Tests for dc_power_agent.evaluation (J2.2)."""
+"""Tests for research_agent.evaluation (J2.2)."""
 
 from __future__ import annotations
 
@@ -6,21 +6,21 @@ from pathlib import Path
 
 import pytest
 
-from dc_power_agent.evaluation.loader import (
+from research_agent.evaluation.loader import (
     QAQuestion,
     ContradictionCase,
     load_qa_questions,
     load_contradiction_cases,
     _str_list,
 )
-from dc_power_agent.evaluation.scorer import (
+from research_agent.evaluation.scorer import (
     score_qa_response,
     score_contradiction_result,
     _collect_answer_text,
 )
-from dc_power_agent.evaluation.runner import EvaluationRunner, _compute_aggregates, EvaluationRun
-from dc_power_agent.evaluation.report import build_json_report, build_md_report
-from dc_power_agent.schemas import (
+from research_agent.evaluation.runner import EvaluationRunner, _compute_aggregates, EvaluationRun
+from research_agent.evaluation.report import build_json_report, build_md_report
+from research_agent.schemas import (
     ResearchMemo,
     EvidenceItem,
     Contradiction,
@@ -271,7 +271,7 @@ def test_contradiction_score_suppression_fired_correctly():
 # ---------------------------------------------------------------------------
 
 def _qa_score(passed: bool, domain: str = "nvidia", coverage: float = 1.0, citation: float = 1.0):
-    from dc_power_agent.evaluation.scorer import QAScore
+    from research_agent.evaluation.scorer import QAScore
     s = QAScore(
         question_id="Q",
         domain=domain,
@@ -288,7 +288,7 @@ def _qa_score(passed: bool, domain: str = "nvidia", coverage: float = 1.0, citat
 
 
 def _contra_score(correct: bool, domain: str = "smr"):
-    from dc_power_agent.evaluation.scorer import ContradictionScore
+    from research_agent.evaluation.scorer import ContradictionScore
     return ContradictionScore(
         contradiction_id="C",
         domain=domain,
@@ -424,7 +424,7 @@ def test_build_md_report_no_failed_section_when_all_pass():
 
 def test_benchmark_cli_mock_mode(tmp_path):
     from typer.testing import CliRunner
-    from dc_power_agent.eval_runner import app
+    from research_agent.eval_runner import app
 
     # Minimal eval structure
     nvidia_dir = tmp_path / "eval" / "nvidia"

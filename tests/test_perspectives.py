@@ -1,4 +1,4 @@
-"""Tests for dc_power_agent.perspectives (J3.2).
+"""Tests for research_agent.perspectives (J3.2).
 
 Covers:
   - Domain detection from source document filenames (J3.2.1)
@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 
-from dc_power_agent.perspectives import (
+from research_agent.perspectives import (
     PERSPECTIVES_AI_DC,
     PERSPECTIVES_SMR,
     build_diversity_metrics,
@@ -151,7 +151,7 @@ class TestClassifyPerspective:
 class TestComputePerspectiveCoverage:
     def _make_item(self, perspective: str, eid: str = ""):
         """Minimal dict-like object for testing."""
-        from dc_power_agent.schemas import EvidenceItem
+        from research_agent.schemas import EvidenceItem
         return EvidenceItem(
             evidence_id=eid or perspective,
             claim=f"Test claim for {perspective}",
@@ -179,7 +179,7 @@ class TestComputePerspectiveCoverage:
         assert compute_perspective_coverage([]) == {}
 
     def test_general_fallback_counted(self):
-        from dc_power_agent.schemas import EvidenceItem
+        from research_agent.schemas import EvidenceItem
         item = EvidenceItem(
             evidence_id="e1",
             claim="generic claim",
@@ -200,7 +200,7 @@ class TestComputePerspectiveCoverage:
 
 class TestComputeDiversityScore:
     def _make_item(self, perspective: str):
-        from dc_power_agent.schemas import EvidenceItem
+        from research_agent.schemas import EvidenceItem
         return EvidenceItem(
             evidence_id=perspective,
             claim=f"claim for {perspective}",
@@ -230,7 +230,7 @@ class TestComputeDiversityScore:
 
     def test_general_excluded_from_numerator(self):
         # All items are "general" — no real perspectives → score = 0
-        from dc_power_agent.schemas import EvidenceItem
+        from research_agent.schemas import EvidenceItem
         items = [
             EvidenceItem(
                 evidence_id="e1",
@@ -252,7 +252,7 @@ class TestComputeDiversityScore:
 
 class TestBuildDiversityMetrics:
     def _make_items(self, perspectives: list[str]):
-        from dc_power_agent.schemas import EvidenceItem
+        from research_agent.schemas import EvidenceItem
         return [
             EvidenceItem(
                 evidence_id=f"e{i}",
@@ -294,7 +294,7 @@ class TestBuildDiversityMetrics:
 
 class TestSelectDiverseEvidence:
     def _make_item(self, perspective: str, eid: str, score: float = 3.0):
-        from dc_power_agent.schemas import EvidenceItem
+        from research_agent.schemas import EvidenceItem
         return EvidenceItem(
             evidence_id=eid,
             claim=f"claim {eid}",
@@ -366,8 +366,8 @@ class TestSelectDiverseEvidence:
 
 class TestEnricherIntegration:
     def test_enricher_sets_perspective(self):
-        from dc_power_agent.evidence_enricher import enrich_evidence_with_metadata
-        from dc_power_agent.schemas import EvidenceItem
+        from research_agent.evidence_enricher import enrich_evidence_with_metadata
+        from research_agent.schemas import EvidenceItem
 
         item = EvidenceItem(
             evidence_id="E001",
@@ -383,8 +383,8 @@ class TestEnricherIntegration:
         assert enriched[0].perspective == "networking"
 
     def test_enricher_sets_smr_perspective(self):
-        from dc_power_agent.evidence_enricher import enrich_evidence_with_metadata
-        from dc_power_agent.schemas import EvidenceItem
+        from research_agent.evidence_enricher import enrich_evidence_with_metadata
+        from research_agent.schemas import EvidenceItem
 
         item = EvidenceItem(
             evidence_id="E002",
@@ -399,8 +399,8 @@ class TestEnricherIntegration:
         assert enriched[0].perspective == "licensing"
 
     def test_enricher_preserves_existing_perspective(self):
-        from dc_power_agent.evidence_enricher import enrich_evidence_with_metadata
-        from dc_power_agent.schemas import EvidenceItem
+        from research_agent.evidence_enricher import enrich_evidence_with_metadata
+        from research_agent.schemas import EvidenceItem
 
         item = EvidenceItem(
             evidence_id="E003",
@@ -422,9 +422,9 @@ class TestEnricherIntegration:
 
 class TestScorerDiversityIntegration:
     def test_retrieval_diversity_in_score(self):
-        from dc_power_agent.evaluation.scorer import score_qa_response
-        from dc_power_agent.evaluation.loader import QAQuestion
-        from dc_power_agent.schemas import ResearchMemo
+        from research_agent.evaluation.scorer import score_qa_response
+        from research_agent.evaluation.loader import QAQuestion
+        from research_agent.schemas import ResearchMemo
 
         question = QAQuestion(
             question_id="DIV_001",
@@ -455,9 +455,9 @@ class TestScorerDiversityIntegration:
         assert "perspective_coverage" in score.retrieval_diversity
 
     def test_missing_diversity_metadata_returns_empty_dict(self):
-        from dc_power_agent.evaluation.scorer import score_qa_response
-        from dc_power_agent.evaluation.loader import QAQuestion
-        from dc_power_agent.schemas import ResearchMemo
+        from research_agent.evaluation.scorer import score_qa_response
+        from research_agent.evaluation.loader import QAQuestion
+        from research_agent.schemas import ResearchMemo
 
         question = QAQuestion(
             question_id="DIV_002",

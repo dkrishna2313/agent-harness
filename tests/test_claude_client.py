@@ -4,10 +4,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from dc_power_agent.agent import DcPowerAgent
-from dc_power_agent.claude_client import ClaudeClient, parse_or_repair_json
-from dc_power_agent.schemas import SourceDocument
-from dc_power_agent.trace import build_trace
+from research_agent.agent import DcPowerAgent
+from research_agent.claude_client import ClaudeClient, parse_or_repair_json
+from research_agent.schemas import SourceDocument
+from research_agent.trace import build_trace
 
 
 def test_claude_client_successful_structured_responses():
@@ -481,8 +481,8 @@ def test_evidence_reaches_ranking_and_synthesis_via_claude_path():
 
 def test_top_evidence_5_passes_exactly_5_items_when_more_exist():
     """Regression: top_evidence=5 must pass exactly 5 items to synthesis, not more or fewer."""
-    from dc_power_agent.agent import select_top_evidence
-    from dc_power_agent.schemas import EvidenceItem
+    from research_agent.agent import select_top_evidence
+    from research_agent.schemas import EvidenceItem
 
     # Scores range 1.0–5.0 in 0.4 increments across 10 items.
     scores = [round(1.0 + i * 0.4, 1) for i in range(10)]  # 1.0, 1.4, … 4.6

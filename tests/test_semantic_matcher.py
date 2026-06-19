@@ -1,4 +1,4 @@
-"""Tests for dc_power_agent.evaluation.semantic_matcher (J3.1b).
+"""Tests for research_agent.evaluation.semantic_matcher (J3.1b).
 
 Covers:
   - Three-tier matching (exact → synonym → token_overlap)
@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-from dc_power_agent.evaluation.semantic_matcher import (
+from research_agent.evaluation.semantic_matcher import (
     SemanticMatch,
     compute_match_stats,
     score_term_coverage,
@@ -427,9 +427,9 @@ class TestComputeMatchStats:
 class TestScorerIntegration:
     def test_smr_008_economy_of_scale(self):
         """SMR_008: answer uses 'economics-of-scale', benchmark requires 'economy of scale'."""
-        from dc_power_agent.evaluation.scorer import score_qa_response
-        from dc_power_agent.evaluation.loader import QAQuestion
-        from dc_power_agent.schemas import ResearchMemo
+        from research_agent.evaluation.scorer import score_qa_response
+        from research_agent.evaluation.loader import QAQuestion
+        from research_agent.schemas import ResearchMemo
 
         question = QAQuestion(
             question_id="SMR_008_SEM",
@@ -460,9 +460,9 @@ class TestScorerIntegration:
 
     def test_smr_009_load_following(self):
         """SMR_009: answer uses 'grid flexibility', benchmark requires 'load following'."""
-        from dc_power_agent.evaluation.scorer import score_qa_response
-        from dc_power_agent.evaluation.loader import QAQuestion
-        from dc_power_agent.schemas import ResearchMemo
+        from research_agent.evaluation.scorer import score_qa_response
+        from research_agent.evaluation.loader import QAQuestion
+        from research_agent.schemas import ResearchMemo
 
         question = QAQuestion(
             question_id="SMR_009_SEM",
@@ -494,9 +494,9 @@ class TestScorerIntegration:
 
     def test_must_not_include_stays_exact(self):
         """must_not_include uses exact matching — a synonym must NOT trigger it."""
-        from dc_power_agent.evaluation.scorer import score_qa_response
-        from dc_power_agent.evaluation.loader import QAQuestion
-        from dc_power_agent.schemas import ResearchMemo
+        from research_agent.evaluation.scorer import score_qa_response
+        from research_agent.evaluation.loader import QAQuestion
+        from research_agent.schemas import ResearchMemo
 
         question = QAQuestion(
             question_id="EXACT_001",
@@ -519,9 +519,9 @@ class TestScorerIntegration:
 
     def test_semantic_matches_include_audit_fields(self):
         """QAScore.semantic_matches contains confidence and reason per term."""
-        from dc_power_agent.evaluation.scorer import score_qa_response
-        from dc_power_agent.evaluation.loader import QAQuestion
-        from dc_power_agent.schemas import ResearchMemo
+        from research_agent.evaluation.scorer import score_qa_response
+        from research_agent.evaluation.loader import QAQuestion
+        from research_agent.schemas import ResearchMemo
 
         question = QAQuestion(
             question_id="AUDIT_001",
@@ -548,9 +548,9 @@ class TestScorerIntegration:
 
     def test_learning_rate_not_counted_as_economy_of_scale_hit(self):
         """J3.1b.8: 'learning rate' must not satisfy 'economy of scale'."""
-        from dc_power_agent.evaluation.scorer import score_qa_response
-        from dc_power_agent.evaluation.loader import QAQuestion
-        from dc_power_agent.schemas import ResearchMemo
+        from research_agent.evaluation.scorer import score_qa_response
+        from research_agent.evaluation.loader import QAQuestion
+        from research_agent.schemas import ResearchMemo
 
         question = QAQuestion(
             question_id="ANTI_001",
@@ -578,9 +578,9 @@ class TestScorerIntegration:
 
     def test_baseload_not_counted_as_load_following_hit(self):
         """J3.1b.8: 'baseload' must not satisfy 'load following'."""
-        from dc_power_agent.evaluation.scorer import score_qa_response
-        from dc_power_agent.evaluation.loader import QAQuestion
-        from dc_power_agent.schemas import ResearchMemo
+        from research_agent.evaluation.scorer import score_qa_response
+        from research_agent.evaluation.loader import QAQuestion
+        from research_agent.schemas import ResearchMemo
 
         question = QAQuestion(
             question_id="ANTI_002",

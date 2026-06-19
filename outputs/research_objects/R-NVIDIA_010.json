@@ -1,7 +1,7 @@
 {
   "research_id": "R-NVIDIA_010",
-  "created_at": "2026-06-18T20:26:12.142983+00:00",
-  "updated_at": "2026-06-18T20:26:12.143171+00:00",
+  "created_at": "2026-06-19T11:20:42.573692+00:00",
+  "updated_at": "2026-06-19T11:20:42.573791+00:00",
   "status": "completed",
   "question": "What are the practical limits on how many GB200 NVL72 racks can be deployed in a single data centre pod, and what are the constraining factors?",
   "profile": "ai_data_centers",
@@ -14,179 +14,86 @@
   },
   "subquestions": [],
   "retrieval_plan": {
-    "web_search": {
-      "dependency_status": {
-        "duckduckgo_search": "ok (ddgs)",
-        "requests": "ok",
-        "trafilatura": "ok",
-        "all_available": true
-      },
-      "query": "What are the practical limits on how many GB200 NVL72 racks can be deployed in a single data centre pod, and what are the constraining factors?",
-      "provider": "DuckDuckGoSearchProvider",
-      "search_error": null,
-      "search_results_returned": 5,
-      "search_results": [
-        {
-          "title": "GB200 NVL72 | NVIDIA",
-          "url": "https://www.nvidia.com/en-us/data-center/gb200-nvl72/",
-          "snippet": "Liquid-cooled GB200 NVL72 racks reduce a data center’s carbon footprint and energy consumption. Liquid cooling increases compute density, reduces the amount of floor space used, and facilitates high-b"
-        },
-        {
-          "title": "NVIDIA GB200 NVL72 Guide: Specs, Pricing & Architecture",
-          "url": "https://www.spheron.network/blog/nvidia-gb200-nvl72-guide/",
-          "snippet": "Mar 22, 2026 · The GB200 NVL72 packs 72 B200 GPUs, 36 Grace ARM CPUs, 13.4 TB of unified GPU memory, and 1.44 exaflops of FP4 compute into a single liquid-cooled rack. Cloud providers sell access at t"
-        },
-        {
-          "title": "Velox™ NVIDIA GB200 Deployment hardware example",
-          "url": "https://velox-dci.com/velox-nvidia-gb200-deployment-hardware-example/",
-          "snippet": "Sep 2, 2025 · Rack-by-rack AI network design using NVIDIA GB200 NVL72 as the accelerator platform, optimized to pack the maximum number of GB200 GPUs into exactly 18 racks (1pod) while remaining fully"
-        },
-        {
-          "title": "Supermicro NVIDIA GB200 NVL72 Datasheet",
-          "url": "https://www.supermicro.com/datasheet/datasheet_SuperCluster_GB200_NVL72.pdf",
-          "snippet": "The NVIDIA GB200 NVL72 delivers exascale computing capabilities in a single rack with fully integrated liquid-cooling. It incorporates 72 NVIDIA Blackwell GPUs and 36 Grace CPUs interconnected by NVID"
-        },
-        {
-          "title": "NVIDIA GB200 NVL72 - Continuum Labs",
-          "url": "https://training.continuumlabs.ai/infrastructure/servers-and-chips/nvidia-gb200-nvl72",
-          "snippet": "Eight DGX GB200 NVL72 racks can be networked together to form a DGX Superpod, housing an impressive 576 GPUs for tackling even larger training workloads. If more power is required, additional Superpod"
-        }
-      ],
-      "pages_attempted": 5,
-      "downloaded_urls": [
-        "https://www.nvidia.com/en-us/data-center/gb200-nvl72/",
-        "https://www.spheron.network/blog/nvidia-gb200-nvl72-guide/",
-        "https://velox-dci.com/velox-nvidia-gb200-deployment-hardware-example/",
-        "https://training.continuumlabs.ai/infrastructure/servers-and-chips/nvidia-gb200-nvl72"
-      ],
-      "failed_urls": [
-        {
-          "url": "https://www.supermicro.com/datasheet/datasheet_SuperCluster_GB200_NVL72.pdf",
-          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)"
-        }
-      ],
-      "cache_hits": 4,
-      "documents_fetched": 4,
-      "extracted_characters": 39173,
-      "download_details": [
-        {
-          "url": "https://www.nvidia.com/en-us/data-center/gb200-nvl72/",
-          "title": "GB200 NVL72 | NVIDIA",
-          "source": "cache",
-          "error": null,
-          "chars": 3403
-        },
-        {
-          "url": "https://www.spheron.network/blog/nvidia-gb200-nvl72-guide/",
-          "title": "NVIDIA GB200 NVL72 Guide: Specs, Pricing & Architecture",
-          "source": "cache",
-          "error": null,
-          "chars": 20631
-        },
-        {
-          "url": "https://velox-dci.com/velox-nvidia-gb200-deployment-hardware-example/",
-          "title": "Velox™ NVIDIA GB200 Deployment hardware example",
-          "source": "cache",
-          "error": null,
-          "chars": 9287
-        },
-        {
-          "url": "https://www.supermicro.com/datasheet/datasheet_SuperCluster_GB200_NVL72.pdf",
-          "title": "Supermicro NVIDIA GB200 NVL72 Datasheet",
-          "source": "live",
-          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)",
-          "chars": 0
-        },
-        {
-          "url": "https://training.continuumlabs.ai/infrastructure/servers-and-chips/nvidia-gb200-nvl72",
-          "title": "NVIDIA GB200 NVL72 - Continuum Labs",
-          "source": "cache",
-          "error": null,
-          "chars": 5852
-        }
-      ],
-      "chunks_created": 4
-    },
     "source_count": 5
   },
   "evidence_ids": [
+    "E006",
+    "E007",
     "E009",
     "E010",
-    "E011",
     "E012",
-    "E017",
+    "E013",
     "E001",
     "E002",
     "E003",
     "E004",
+    "E011",
+    "E016",
     "E005",
-    "E015",
-    "E006",
-    "E007",
     "E008",
     "E014",
-    "E016",
-    "E013",
-    "E018"
+    "E017",
+    "E018",
+    "E015"
   ],
   "evidence_topics": {
-    "power consumption": 3,
-    "data centre limits": 1,
-    "rack density": 3,
-    "deployment limits": 9,
-    "SuperPOD": 2,
-    "pod design": 4,
-    "rack count": 3,
-    "scalability": 1,
-    "liquid cooling": 1,
-    "CDU": 1,
-    "cooling infrastructure": 1,
-    "power delivery": 1,
-    "power shelves": 1,
-    "copper cabling": 1,
-    "rack design": 1,
-    "rack specification": 1,
-    "NVLink domain": 1,
-    "GPU count": 1,
-    "cooling": 1,
+    "power efficiency": 1,
+    "parasitic energy": 1,
+    "data centre power": 1,
     "direct liquid cooling": 1,
-    "floor load": 1,
-    "facility requirements": 1,
-    "structural": 1,
-    "rack form factor": 1,
-    "physical space": 1,
-    "OCP Open Rack V3": 1,
-    "scale-out networking": 2,
-    "InfiniBand": 1,
-    "ConnectX": 1,
-    "multi-rack deployment": 1,
+    "DLC": 1,
+    "45°C": 1,
+    "GB200 NVL72": 6,
+    "cooling infrastructure": 1,
     "power smoothing": 1,
     "energy buffering": 1,
-    "GPU capacity": 1,
-    "power envelope": 1,
-    "maximum GPUs": 1,
-    "pod power": 1,
-    "total load": 1,
-    "leaf-spine fabric": 1,
-    "port count": 1,
-    "factory scale": 1,
-    "power limits": 1,
-    "grid integration": 1,
-    "deployment scale": 2,
-    "parasitic power": 1,
-    "power efficiency": 1,
-    "facility power": 1,
-    "operations": 1,
-    "Mission Control": 1,
-    "cooling management": 1,
-    "power management": 1
+    "GPU density per MW": 1,
+    "AI factory scale": 1,
+    "100 MW": 1,
+    "gigawatt": 1,
+    "facility": 1,
+    "reference design": 1,
+    "NVLink": 2,
+    "Spectrum-X": 3,
+    "scale-out": 1,
+    "pod networking": 1,
+    "NVL72": 6,
+    "DGX SuperPOD": 3,
+    "NVL72 racks": 2,
+    "tens of thousands of GPUs": 1,
+    "rack architecture": 1,
+    "liquid cooling": 2,
+    "CDU": 1,
+    "networking": 1,
+    "power": 1,
+    "power shelves": 1,
+    "pod architecture": 1,
+    "power management": 1,
+    "GPU capacity per MW": 1,
+    "DSX": 1,
+    "roadmap": 1,
+    "rack footprint": 1,
+    "generational continuity": 1,
+    "pod size": 1,
+    "power spikes": 1,
+    "grid constraints": 1,
+    "pod power limits": 1,
+    "co-packaged optics": 2,
+    "signal integrity": 1,
+    "scale-out networking": 1,
+    "rack power": 2,
+    "120 kW": 1,
+    "180 kW": 1,
+    "networking power": 1,
+    "GPU count per watt": 1,
+    "pod scaling": 1
   },
   "findings": [
-    "The DGX GB200 NVL72 consumes 120 kW and weighs 1.36 metric tons (3,000 lbs); many data centres can only support a maximum of 60 kW per rack, making full deployment impossible in those facilities without infrastructure upgrades.",
-    "Eight DGX GB200 NVL72 racks can be networked together to form a DGX SuperPOD housing 576 GPUs; additional SuperPODs can be added for further scalability.",
-    "The GB200 NVL72 uses direct liquid cooling with coolant entering the rack at 25 °C and exiting 20 °C warmer, requiring in-rack or in-row CDU infrastructure; low-power peripherals are cooled with conventional 40 mm fans.",
-    "The GB200 NVL72 rack is equipped with six power shelves (three at top, three at bottom) to supply 120 kW; copper cabling is used internally instead of optical connections to reduce power draw by an additional 20 kW.",
-    "The GB200 NVL72 connects 36 Grace CPUs and 72 Blackwell GPUs in a rack-scale, liquid-cooled design with a 72-GPU NVLink domain acting as a single massive GPU."
+    "Each GB200 NVL72 rack is a fully liquid-cooled, rack-scale design containing 36 Grace CPUs, 72 Blackwell GPUs, up to 13.5 TB HBM3E, and a 130 TB/s NVLink domain.",
+    "The GB200 NVL72 rack is equipped with six 1U 33 kW power shelves (three front, three rear), implying a total rack power draw on the order of ~100 kW per rack.",
+    "Each GB200 NVL72 compute tray uses 4 × 400 Gb/s OSFP ConnectX-7 NICs and 2 × BlueField-3 DPUs for networking, and is compatible with an in-rack or in-row CDU for liquid cooling.",
+    "The DGX SuperPOD for the Vera Rubin generation is built with eight DGX Vera Rubin NVL72 systems and is defined as the minimum unit at which AI factory economics, reliability, and performance converge in production environments.",
+    "AI factories can draw hundreds of megawatts of power, and roughly 30% of power is lost to conversion, distribution, and cooling before reaching the GPUs, representing a key constraint on how much compute can be deployed per megawatt."
   ],
   "contradictions": [
     {
@@ -202,41 +109,11 @@
     {
       "contradiction_id": "C003",
       "severity": "high",
-      "topic": "networking"
+      "topic": "power"
     },
     {
       "contradiction_id": "C004",
-      "severity": "high",
-      "topic": "power"
-    },
-    {
-      "contradiction_id": "C005",
-      "severity": "high",
-      "topic": "power"
-    },
-    {
-      "contradiction_id": "C006",
-      "severity": "high",
-      "topic": "power"
-    },
-    {
-      "contradiction_id": "C007",
-      "severity": "high",
-      "topic": "power"
-    },
-    {
-      "contradiction_id": "C008",
-      "severity": "high",
-      "topic": "power"
-    },
-    {
-      "contradiction_id": "C009",
-      "severity": "high",
-      "topic": "power"
-    },
-    {
-      "contradiction_id": "C010",
-      "severity": "high",
+      "severity": "medium",
       "topic": "power"
     }
   ],
@@ -247,9 +124,9 @@
   "summary": {
     "evidence_count": 18,
     "citation_count": 18,
-    "contradictions_found": 17,
+    "contradictions_found": 4,
     "research_gaps_found": 0,
-    "coverage_score": 0.76
+    "coverage_score": 0.64
   },
   "owner": null,
   "assigned_agent": null,

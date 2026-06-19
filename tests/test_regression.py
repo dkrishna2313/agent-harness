@@ -1,4 +1,4 @@
-"""Tests for dc_power_agent.evaluation.regression (J2.3)."""
+"""Tests for research_agent.evaluation.regression (J2.3)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from dc_power_agent.evaluation.regression import (
+from research_agent.evaluation.regression import (
     compare_reports,
     build_regression_json,
     build_regression_md,
@@ -327,7 +327,7 @@ def _write_report(path: Path, **kwargs) -> None:
 
 def test_save_baseline_cli(tmp_path):
     from typer.testing import CliRunner
-    from dc_power_agent.eval_runner import app
+    from research_agent.eval_runner import app
 
     report_path = tmp_path / "outputs" / "evaluation_report.json"
     _write_report(report_path, overall=0.91)
@@ -347,7 +347,7 @@ def test_save_baseline_cli(tmp_path):
 
 def test_regress_cli_pass(tmp_path):
     from typer.testing import CliRunner
-    from dc_power_agent.eval_runner import app
+    from research_agent.eval_runner import app
 
     current_path = tmp_path / "outputs" / "evaluation_report.json"
     baseline_path = tmp_path / "baseline" / "evaluation_report.json"
@@ -373,7 +373,7 @@ def test_regress_cli_pass(tmp_path):
 
 def test_regress_cli_fail_exits_1(tmp_path):
     from typer.testing import CliRunner
-    from dc_power_agent.eval_runner import app
+    from research_agent.eval_runner import app
 
     current_path = tmp_path / "outputs" / "evaluation_report.json"
     baseline_path = tmp_path / "baseline" / "evaluation_report.json"
@@ -396,7 +396,7 @@ def test_regress_cli_fail_exits_1(tmp_path):
 
 def test_regress_cli_question_regression_exits_1(tmp_path):
     from typer.testing import CliRunner
-    from dc_power_agent.eval_runner import app
+    from research_agent.eval_runner import app
 
     current_path = tmp_path / "outputs" / "evaluation_report.json"
     baseline_path = tmp_path / "baseline" / "evaluation_report.json"
@@ -423,7 +423,7 @@ def test_regress_cli_question_regression_exits_1(tmp_path):
 
 def test_regress_cli_custom_threshold(tmp_path):
     from typer.testing import CliRunner
-    from dc_power_agent.eval_runner import app
+    from research_agent.eval_runner import app
 
     current_path = tmp_path / "current.json"
     baseline_path = tmp_path / "baseline.json"

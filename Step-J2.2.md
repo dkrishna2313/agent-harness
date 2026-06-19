@@ -46,7 +46,7 @@ The evaluation runner should execute all benchmark questions and score the respo
 Create:
 
 ```text
-dc_power_agent/evaluation/
+research_agent/evaluation/
 ```
 
 and:
@@ -240,7 +240,7 @@ coverage metrics
 Create:
 
 ```bash
-python3 -m dc_power_agent.eval_runner
+python3 -m research_agent.eval_runner
 ```
 
 Options:
@@ -255,7 +255,7 @@ Options:
 Example:
 
 ```bash
-python3 -m dc_power_agent.eval_runner \
+python3 -m research_agent.eval_runner \
   --eval-dir ./eval \
   --web-search
 ```
@@ -267,7 +267,7 @@ python3 -m dc_power_agent.eval_runner \
 Running:
 
 ```bash
-python3 -m dc_power_agent.eval_runner \
+python3 -m research_agent.eval_runner \
   --eval-dir ./eval \
   --web-search
 ```

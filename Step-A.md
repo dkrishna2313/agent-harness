@@ -1,4 +1,4 @@
-Add observability and trace generation to the existing dc_power_agent project.
+Add observability and trace generation to the existing research_agent project.
 
 Goal:
 Before integrating Claude, improve visibility into each harness step.
@@ -9,7 +9,7 @@ Requirements:
 
 Example:
 
-python -m dc_power_agent.cli \
+python -m research_agent.cli \
   "Explain NVIDIA Rubin architecture and implications for AI data centers" \
   --sources ./sources \
   --out ./outputs/rubin.md \

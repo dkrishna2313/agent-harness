@@ -15,7 +15,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch
 
-from dc_power_agent.profile import (
+from research_agent.profile import (
     DomainProfile,
     GapCheck,
     DEFAULT_PROFILE_NAME,
@@ -23,10 +23,10 @@ from dc_power_agent.profile import (
     list_available_profiles,
     load_profile,
 )
-from dc_power_agent.evaluator import classify_question_topics
-from dc_power_agent.gap_detector import detect_gaps
-from dc_power_agent.coverage import compute_coverage_matrix
-from dc_power_agent.schemas import EvidenceItem
+from research_agent.evaluator import classify_question_topics
+from research_agent.gap_detector import detect_gaps
+from research_agent.coverage import compute_coverage_matrix
+from research_agent.schemas import EvidenceItem
 
 
 # ---------------------------------------------------------------------------
@@ -432,19 +432,19 @@ class TestCoverageMatrixFromProfile:
 
 class TestAgentWithProfile:
     def test_agent_accepts_profile(self):
-        from dc_power_agent.agent import DcPowerAgent
+        from research_agent.agent import DcPowerAgent
         p = load_profile("ai_data_centers")
         agent = DcPowerAgent(profile=p)
         assert agent.profile.name == "ai_data_centers"
 
     def test_agent_defaults_to_ai_data_centers(self):
-        from dc_power_agent.agent import DcPowerAgent
+        from research_agent.agent import DcPowerAgent
         agent = DcPowerAgent()
         assert agent.profile.name == "ai_data_centers"
 
     def test_agent_analyze_with_smr_profile(self):
-        from dc_power_agent.agent import DcPowerAgent
-        from dc_power_agent.schemas import SourceDocument
+        from research_agent.agent import DcPowerAgent
+        from research_agent.schemas import SourceDocument
         from pathlib import Path
 
         p = load_profile("smr")
@@ -468,8 +468,8 @@ class TestAgentWithProfile:
         assert "licensing" in cm_topics or "economics" in cm_topics
 
     def test_metadata_includes_domain_profile(self):
-        from dc_power_agent.agent import DcPowerAgent
-        from dc_power_agent.schemas import SourceDocument
+        from research_agent.agent import DcPowerAgent
+        from research_agent.schemas import SourceDocument
         from pathlib import Path
 
         p = load_profile("ai_data_centers")
@@ -493,7 +493,7 @@ class TestCLIProfileOption:
     def test_cli_help_includes_profile(self):
         """--profile appears in CLI help output."""
         from typer.testing import CliRunner
-        from dc_power_agent.cli import app
+        from research_agent.cli import app
         runner = CliRunner()
         result = runner.invoke(app, ["--help"])
         assert "--profile" in result.output
@@ -501,7 +501,7 @@ class TestCLIProfileOption:
     def test_cli_default_profile_works(self, tmp_path):
         """Running without --profile uses ai_data_centers and succeeds."""
         from typer.testing import CliRunner
-        from dc_power_agent.cli import app
+        from research_agent.cli import app
 
         src = tmp_path / "sources"
         src.mkdir()
@@ -520,7 +520,7 @@ class TestCLIProfileOption:
 
     def test_cli_explicit_ai_data_centers_profile(self, tmp_path):
         from typer.testing import CliRunner
-        from dc_power_agent.cli import app
+        from research_agent.cli import app
 
         src = tmp_path / "sources"
         src.mkdir()
@@ -538,7 +538,7 @@ class TestCLIProfileOption:
 
     def test_cli_smr_profile(self, tmp_path):
         from typer.testing import CliRunner
-        from dc_power_agent.cli import app
+        from research_agent.cli import app
 
         src = tmp_path / "sources"
         src.mkdir()
@@ -559,7 +559,7 @@ class TestCLIProfileOption:
     def test_cli_invalid_profile_falls_back(self, tmp_path):
         """Unknown profile name triggers a warning but does not crash."""
         from typer.testing import CliRunner
-        from dc_power_agent.cli import app
+        from research_agent.cli import app
 
         src = tmp_path / "sources"
         src.mkdir()
@@ -578,7 +578,7 @@ class TestCLIProfileOption:
 
     def test_cli_debug_shows_profile(self, tmp_path):
         from typer.testing import CliRunner
-        from dc_power_agent.cli import app
+        from research_agent.cli import app
 
         src = tmp_path / "sources"
         src.mkdir()
@@ -619,14 +619,14 @@ class TestBackwardCompatibility:
         assert len(areas) > 0
 
     def test_agent_no_profile_arg(self):
-        from dc_power_agent.agent import DcPowerAgent
+        from research_agent.agent import DcPowerAgent
         agent = DcPowerAgent()
         # Should not raise; default profile is ai_data_centers
         assert agent.profile is not None
         assert agent.profile.name == "ai_data_centers"
 
     def test_score_evidence_no_profile(self):
-        from dc_power_agent.agent import score_evidence_items
+        from research_agent.agent import score_evidence_items
         items = [_make_evidence("Rack power draw is 120kW.")]
         scored = score_evidence_items("power requirements", items)
         assert len(scored) == 1
@@ -634,8 +634,8 @@ class TestBackwardCompatibility:
 
     def test_existing_tests_unchanged(self):
         """Smoke test: existing ai_data_centers question still produces valid results."""
-        from dc_power_agent.agent import DcPowerAgent
-        from dc_power_agent.schemas import SourceDocument
+        from research_agent.agent import DcPowerAgent
+        from research_agent.schemas import SourceDocument
         from pathlib import Path
 
         agent = DcPowerAgent()

@@ -1,7 +1,7 @@
 {
   "research_id": "R-SMR_004",
-  "created_at": "2026-06-18T20:40:03.820583+00:00",
-  "updated_at": "2026-06-18T20:40:03.820767+00:00",
+  "created_at": "2026-06-19T11:27:35.227610+00:00",
+  "updated_at": "2026-06-19T11:27:35.227794+00:00",
   "status": "completed",
   "question": "What are the major sources of uncertainty in SMR construction schedule estimates, and what historical evidence exists for nuclear construction delays?",
   "profile": "smr",
@@ -14,165 +14,14 @@
   },
   "subquestions": [],
   "retrieval_plan": {
-    "web_search": {
-      "dependency_status": {
-        "duckduckgo_search": "ok (ddgs)",
-        "requests": "ok",
-        "trafilatura": "ok",
-        "all_available": true
-      },
-      "query": "What are the major sources of uncertainty in SMR construction schedule estimates, and what historical evidence exists for nuclear construction delays?",
-      "provider": "DuckDuckGoSearchProvider",
-      "search_error": null,
-      "search_results_returned": 5,
-      "search_results": [
-        {
-          "title": "Small modular reactors are still too expensive, too slow, and ...",
-          "url": "https://ieefa.org/articles/small-modular-reactors-are-still-too-expensive-too-slow-and-too-risky",
-          "snippet": "May 29, 2024 · For years proponents of SMRs have claimed that the price and construction time of these power plants will be quicker and cheaper than previous nuclear projects. The new IEEFA report fin"
-        },
-        {
-          "title": "Small modular nuclear reactors (SMR): New report raises ...",
-          "url": "https://technewsday.com/small-modular-nuclear-reactors-smr-new-report-raises-concerns-about-feasibility/",
-          "snippet": "The report notes that despite optimistic timelines from SMR advocates, historical evidence suggests these projects will continue to face significant delays, making them an unreliable solution for urge"
-        },
-        {
-          "title": "Nuclear Energy Agency (NEA) - NEA Small Modular Reactor (SMR ...",
-          "url": "https://www.oecd-nea.org/jcms/pl_73678/nea-small-modular-reactor-smr-dashboard",
-          "snippet": "Looking beyond technical feasibility, the NEA SMR Dashboard defines new criteria for assessing real progress in six additional dimensions of readiness: licensing, siting, financing, supply chain, enga"
-        },
-        {
-          "title": "Small Modular Reactors: Still too expensive, too slow and too ...",
-          "url": "https://ieefa.org/resources/small-modular-reactors-still-too-expensive-too-slow-and-too-risky",
-          "snippet": "May 29, 2024 · Significant construction delays are still the norm and costs have continued to climb. IEEFA has taken a close look at the data available from the four SMRs currently in operation or und"
-        },
-        {
-          "title": "IEEFA Report Finds That Small Modular Reactors are Still Too ...",
-          "url": "https://www.energy-xprt.com/news/ieefa-report-finds-that-small-modular-reactors-are-still-too-expensive-too-slow-and-too-risky-1147343",
-          "snippet": "May 30, 2024 · For years proponents of SMRs have claimed that the price and construction time of these power plants will be quicker and cheaper than previous nuclear projects. The new IEEFA report fin"
-        }
-      ],
-      "pages_attempted": 5,
-      "downloaded_urls": [
-        "https://ieefa.org/articles/small-modular-reactors-are-still-too-expensive-too-slow-and-too-risky",
-        "https://technewsday.com/small-modular-nuclear-reactors-smr-new-report-raises-concerns-about-feasibility/",
-        "https://www.oecd-nea.org/jcms/pl_73678/nea-small-modular-reactor-smr-dashboard",
-        "https://ieefa.org/resources/small-modular-reactors-still-too-expensive-too-slow-and-too-risky",
-        "https://www.energy-xprt.com/news/ieefa-report-finds-that-small-modular-reactors-are-still-too-expensive-too-slow-and-too-risky-1147343"
-      ],
-      "failed_urls": [],
-      "cache_hits": 5,
-      "documents_fetched": 5,
-      "extracted_characters": 13874,
-      "download_details": [
-        {
-          "url": "https://ieefa.org/articles/small-modular-reactors-are-still-too-expensive-too-slow-and-too-risky",
-          "title": "Small modular reactors are still too expensive, too slow, and ...",
-          "source": "cache",
-          "error": null,
-          "chars": 2270
-        },
-        {
-          "url": "https://technewsday.com/small-modular-nuclear-reactors-smr-new-report-raises-concerns-about-feasibility/",
-          "title": "Small modular nuclear reactors (SMR): New report raises ...",
-          "source": "cache",
-          "error": null,
-          "chars": 2284
-        },
-        {
-          "url": "https://www.oecd-nea.org/jcms/pl_73678/nea-small-modular-reactor-smr-dashboard",
-          "title": "Nuclear Energy Agency (NEA) - NEA Small Modular Reactor (SMR ...",
-          "source": "cache",
-          "error": null,
-          "chars": 3170
-        },
-        {
-          "url": "https://ieefa.org/resources/small-modular-reactors-still-too-expensive-too-slow-and-too-risky",
-          "title": "Small Modular Reactors: Still too expensive, too slow and too ...",
-          "source": "cache",
-          "error": null,
-          "chars": 1766
-        },
-        {
-          "url": "https://www.energy-xprt.com/news/ieefa-report-finds-that-small-modular-reactors-are-still-too-expensive-too-slow-and-too-risky-1147343",
-          "title": "IEEFA Report Finds That Small Modular Reactors are Still Too ...",
-          "source": "cache",
-          "error": null,
-          "chars": 4384
-        }
-      ],
-      "chunks_created": 5
-    },
-    "source_count": 5
+    "source_count": 1
   },
   "evidence_ids": [
-    "E002",
-    "E011",
-    "E013",
-    "E003",
-    "E004",
-    "E001",
-    "E005",
-    "E006",
-    "E007",
-    "E008",
-    "E009",
-    "E012",
-    "E010"
+    "E001"
   ],
-  "evidence_topics": {
-    "SMR cost overruns": 1,
-    "construction schedule delays": 1,
-    "SMR risk": 1,
-    "SMR licensing delays": 1,
-    "construction funding uncertainty": 1,
-    "schedule risk": 1,
-    "SMR global pipeline": 1,
-    "SMR deployment": 1,
-    "schedule tracking": 1,
-    "SMR economic competitiveness": 1,
-    "cost estimates vs. reality": 1,
-    "construction experience": 1,
-    "SMR schedule delays": 1,
-    "cost overruns": 2,
-    "proponent claims vs. actuals": 1,
-    "SMR construction delays": 2,
-    "schedule uncertainty": 4,
-    "historical nuclear construction": 1,
-    "NuScale cancellation": 1,
-    "SMR cost escalation": 1,
-    "Shidao Bay": 1,
-    "China": 1,
-    "Russia": 1,
-    "Argentina": 1,
-    "historical schedule overruns": 1,
-    "SMR schedule uncertainty": 2,
-    "optimistic timelines": 1,
-    "historical evidence of delays": 1,
-    "SMR technology risk": 1,
-    "untested designs": 1,
-    "standardization risk": 1,
-    "cost unpredictability": 1,
-    "SMR cost transparency": 1,
-    "schedule disclosure": 1,
-    "regulatory policy": 1,
-    "financial risk": 1,
-    "SMR readiness dimensions": 1,
-    "licensing": 1,
-    "siting": 1,
-    "financing": 1,
-    "supply chain": 1,
-    "fuel": 1,
-    "utility risk": 1,
-    "completion date uncertainty": 1,
-    "regulatory safeguards": 1
-  },
+  "evidence_topics": {},
   "findings": [
-    "SMR proponents claim new designs will avoid the cost overruns and schedule delays of large reactors, but the few SMRs built or started show a pattern strikingly similar to the past, with significant construction delays still the norm and costs continuing to climb.",
-    "IEEFA's analysis of the four SMRs currently in operation or under construction, plus projected cost data from leading U.S. SMR developers, shows SMRs are still too expensive, too slow to build, and too risky, with little change from previous assessments.",
-    "On-the-ground experience with initial SMRs that have been built or are under construction shows they are not economically competitive, despite proponents claiming otherwise.",
-    "Experience with operating and proposed SMRs shows that reactors continue to cost far more and take much longer to build than promised by proponents, with cost overruns and schedule delays remaining the industry norm.",
-    "The NuScale SMR project in Idaho saw its costs nearly double from initial projections, ultimately leading to its cancellation, illustrating how SMR cost and schedule estimates can be severely understated."
+    "The only available evidence item contains no information about SMR construction schedules, nuclear construction uncertainty, or historical nuclear delays — it describes NVIDIA's AI capabilities and events."
   ],
   "contradictions": [],
   "research_gaps": [],
@@ -180,11 +29,11 @@
     "question_id": "SMR_004"
   },
   "summary": {
-    "evidence_count": 13,
-    "citation_count": 13,
+    "evidence_count": 1,
+    "citation_count": 1,
     "contradictions_found": 0,
     "research_gaps_found": 0,
-    "coverage_score": 0.08
+    "coverage_score": 0.0
   },
   "owner": null,
   "assigned_agent": null,

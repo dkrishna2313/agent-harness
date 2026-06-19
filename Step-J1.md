@@ -172,14 +172,14 @@ Add CLI option:
 
 Examples:
 
-python3 -m dc_power_agent.cli \
+python3 -m research_agent.cli \
   "What are the DC power and cooling implications of NVIDIA Rubin NVL72 racks?" \
   --sources ./sources \
   --profile ai_data_centers \
   --out ./outputs/rubin.md \
   --debug
 
-python3 -m dc_power_agent.cli \
+python3 -m research_agent.cli \
   "What are the deployment challenges and infrastructure implications of SMRs?" \
   --sources ./smr_sources \
   --profile smr \

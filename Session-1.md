@@ -1,4 +1,4 @@
-Build a Python CLI application named `dc_power_agent`.
+Build a Python CLI application named `research_agent`.
 
 Purpose:
 The application analyzes local documents related to AI data center infrastructure and produces a Markdown research memo.
@@ -16,8 +16,8 @@ Technology:
 
 Project structure:
 
-dc_power_agent/
-├── dc_power_agent/
+research_agent/
+├── research_agent/
 │   ├── cli.py
 │   ├── agent.py
 │   ├── claude_client.py
@@ -35,7 +35,7 @@ dc_power_agent/
 
 CLI Example:
 
-python -m dc_power_agent.cli 
+python -m research_agent.cli 
 "Explain NVIDIA Rubin architecture and implications for AI data centers" 
 --sources ./sources 
 --out ./outputs/rubin.md

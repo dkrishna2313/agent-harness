@@ -6,18 +6,18 @@ from pathlib import Path
 
 import pytest
 
-from dc_power_agent.contradiction import detect_contradictions
-from dc_power_agent.agent import DcPowerAgent
-from dc_power_agent.claude_client import MockClaudeClient
-from dc_power_agent.markdown import memo_to_markdown
-from dc_power_agent.schemas import (
+from research_agent.contradiction import detect_contradictions
+from research_agent.agent import DcPowerAgent
+from research_agent.claude_client import MockClaudeClient
+from research_agent.markdown import memo_to_markdown
+from research_agent.schemas import (
     Contradiction,
     EvidenceItem,
     ResearchMemo,
     SourceDocument,
     assign_evidence_ids,
 )
-from dc_power_agent.trace import build_trace
+from research_agent.trace import build_trace
 
 
 # ---------------------------------------------------------------------------
@@ -283,7 +283,7 @@ def test_memo_metadata_includes_contradictions():
 
 def test_evaluator_warns_on_high_severity_contradiction():
     """evaluate_memo should produce a high_severity_contradiction warning."""
-    from dc_power_agent.evaluator import evaluate_memo
+    from research_agent.evaluator import evaluate_memo
 
     contradiction = Contradiction(
         contradiction_id="C001",
@@ -327,7 +327,7 @@ def test_evaluator_warns_on_high_severity_contradiction():
 
 def test_evaluator_no_contradiction_warning_when_none():
     """evaluate_memo must not produce a contradiction warning when list is empty."""
-    from dc_power_agent.evaluator import evaluate_memo
+    from research_agent.evaluator import evaluate_memo
 
     ev = assign_evidence_ids([_ev("Claim.", "a.pdf")])
     docs = [
@@ -479,8 +479,8 @@ def test_120kw_vs_180kw_severity_is_medium():
 # content.
 
 
-from dc_power_agent.claude_client import LLMClient  # noqa: E402 (after the comment block)
-from dc_power_agent.schemas import ResearchPlan  # noqa: E402
+from research_agent.claude_client import LLMClient  # noqa: E402 (after the comment block)
+from research_agent.schemas import ResearchPlan  # noqa: E402
 
 
 class _ConflictingEvidenceClient:
@@ -792,50 +792,50 @@ class TestMetricTypeNormalisation:
     # ---- _metric_types_compatible unit tests ---------------------------------
 
     def test_compatible_same_type(self):
-        from dc_power_agent.contradiction import _metric_types_compatible
+        from research_agent.contradiction import _metric_types_compatible
         assert _metric_types_compatible("kw_level", "kw_level")
 
     def test_incompatible_rate_vs_level(self):
-        from dc_power_agent.contradiction import _metric_types_compatible
+        from research_agent.contradiction import _metric_types_compatible
         assert not _metric_types_compatible("gw_rate", "gw_level")
         assert not _metric_types_compatible("gw_rate", "gw_target")
         assert not _metric_types_compatible("kw_rate", "kw_level")
 
     def test_compatible_rate_vs_rate(self):
-        from dc_power_agent.contradiction import _metric_types_compatible
+        from research_agent.contradiction import _metric_types_compatible
         assert _metric_types_compatible("gw_rate", "gw_rate")
 
     def test_compatible_target_vs_level(self):
-        from dc_power_agent.contradiction import _metric_types_compatible
+        from research_agent.contradiction import _metric_types_compatible
         assert _metric_types_compatible("gw_target", "gw_level")
         assert _metric_types_compatible("gw_target", "gw_current")
 
     def test_incompatible_event_year_vs_product(self):
-        from dc_power_agent.contradiction import _metric_types_compatible
+        from research_agent.contradiction import _metric_types_compatible
         assert not _metric_types_compatible("year_event", "year_product")
         assert not _metric_types_compatible("year_event", "year_deployment")
         assert not _metric_types_compatible("year_product", "year_event")
 
     def test_compatible_product_vs_deployment_year(self):
-        from dc_power_agent.contradiction import _metric_types_compatible
+        from research_agent.contradiction import _metric_types_compatible
         assert _metric_types_compatible("year_product", "year_deployment")
 
     def test_incompatible_lifecycle_milestones(self):
         # J1.6.4 – construction_approval vs commercial_operation are different
         # lifecycle phases (progression), not contradictory values.
-        from dc_power_agent.contradiction import _metric_types_compatible
+        from research_agent.contradiction import _metric_types_compatible
         assert not _metric_types_compatible("year_deployment", "year_construction")
         assert not _metric_types_compatible("year_construction", "year_deployment")
 
     def test_incompatible_generic_year(self):
-        from dc_power_agent.contradiction import _metric_types_compatible
+        from research_agent.contradiction import _metric_types_compatible
         assert not _metric_types_compatible("year_generic", "year_product")
         assert not _metric_types_compatible("year_generic", "year_deployment")
 
 
 def test_pipeline_high_severity_triggers_evaluator_warning():
     """If a high-severity contradiction is detected, evaluate_memo must warn."""
-    from dc_power_agent.evaluator import evaluate_memo
+    from research_agent.evaluator import evaluate_memo
 
     # 100 kW vs 200 kW → 50 % difference → high severity
     class _HighSeverityClient(_ConflictingEvidenceClient):
@@ -869,7 +869,7 @@ class TestJ16ScopeAwareContradiction:
     """J1.6 acceptance tests: ensure false positives are suppressed."""
 
     def _make(self, claim: str, eid: str = "E001") -> "EvidenceItem":
-        from dc_power_agent.schemas import EvidenceItem
+        from research_agent.schemas import EvidenceItem
         return EvidenceItem(
             evidence_id=eid,
             claim=claim,
@@ -882,7 +882,7 @@ class TestJ16ScopeAwareContradiction:
 
     def test_example_a_rack_vs_component_power(self):
         """GB200 NVL72 rack power (120 kW) vs power shelf (33 kW) should NOT be flagged."""
-        from dc_power_agent.contradiction import detect_contradictions
+        from research_agent.contradiction import detect_contradictions
         a = self._make("The GB200 NVL72 rack total power is 120 kW.", "E001")
         b = self._make("Each power shelf in the rack draws 33 kW.", "E002")
         suppressed: list = []
@@ -896,7 +896,7 @@ class TestJ16ScopeAwareContradiction:
 
     def test_example_b_rack_vs_component_cooling(self):
         """Rack liquid cooling vs power shelf air cooling should NOT be flagged."""
-        from dc_power_agent.contradiction import detect_contradictions
+        from research_agent.contradiction import detect_contradictions
         a = self._make("The GB200 NVL72 rack uses liquid cooling (DLC).", "E001")
         b = self._make("The power shelf uses air-cooled PSUs.", "E002")
         suppressed: list = []
@@ -910,7 +910,7 @@ class TestJ16ScopeAwareContradiction:
 
     def test_example_c_construction_vs_deployment_year(self):
         """Construction approval year vs commercial operation year should NOT be flagged."""
-        from dc_power_agent.contradiction import detect_contradictions
+        from research_agent.contradiction import detect_contradictions
         a = self._make("Construction was approved and began in 2025.", "E001")
         b = self._make("Commercial operation begins in 2030.", "E002")
         suppressed: list = []
@@ -920,34 +920,34 @@ class TestJ16ScopeAwareContradiction:
         )
 
     def test_scope_extract_component(self):
-        from dc_power_agent.contradiction import _extract_scope
+        from research_agent.contradiction import _extract_scope
         assert _extract_scope("each power shelf draws 33 kw") == "component"
         assert _extract_scope("the psu is rated at 3 kw") == "component"
 
     def test_scope_extract_rack(self):
-        from dc_power_agent.contradiction import _extract_scope
+        from research_agent.contradiction import _extract_scope
         assert _extract_scope("the nvl72 rack total power is 120 kw") == "rack"
         assert _extract_scope("each rack in the data center") == "rack"
 
     def test_scopes_compatible_same(self):
-        from dc_power_agent.contradiction import _scopes_compatible
+        from research_agent.contradiction import _scopes_compatible
         assert _scopes_compatible("rack", "rack")
         assert _scopes_compatible("component", "component")
 
     def test_scopes_incompatible_rack_component(self):
-        from dc_power_agent.contradiction import _scopes_compatible
+        from research_agent.contradiction import _scopes_compatible
         assert not _scopes_compatible("rack", "component")
         assert not _scopes_compatible("component", "rack")
 
     def test_scopes_unknown_always_compatible(self):
-        from dc_power_agent.contradiction import _scopes_compatible
+        from research_agent.contradiction import _scopes_compatible
         assert _scopes_compatible("unknown", "rack")
         assert _scopes_compatible("rack", "unknown")
         assert _scopes_compatible("unknown", "unknown")
 
     def test_same_scope_contradiction_still_fires(self):
         """Two rack-level power claims with conflicting values SHOULD still be flagged."""
-        from dc_power_agent.contradiction import detect_contradictions
+        from research_agent.contradiction import detect_contradictions
         a = self._make("The GB200 NVL72 rack requires 120 kW of power.", "E001")
         b = self._make("The GB200 NVL72 rack requires 200 kW of power.", "E002")
         suppressed: list = []

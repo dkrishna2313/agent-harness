@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from dc_power_agent.schemas import EvidenceItem
+from research_agent.schemas import EvidenceItem
 
 
 def test_evidence_item_schema_accepts_expected_fields():

@@ -1,15 +1,15 @@
 from pathlib import Path
 
-from dc_power_agent.agent import (
+from research_agent.agent import (
     DcPowerAgent,
     extract_evidence,
     rank_evidence_items,
     score_evidence_items,
     select_top_evidence,
 )
-from dc_power_agent.claude_client import MockClaudeClient
-from dc_power_agent.markdown import memo_to_markdown
-from dc_power_agent.schemas import EvidenceItem, ResearchMemo, ResearchPlan, SourceDocument
+from research_agent.claude_client import MockClaudeClient
+from research_agent.markdown import memo_to_markdown
+from research_agent.schemas import EvidenceItem, ResearchMemo, ResearchPlan, SourceDocument
 
 
 def test_agent_generates_required_memo_sections():

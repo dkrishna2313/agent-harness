@@ -1,7 +1,7 @@
 {
   "research_id": "R-SMR_006",
-  "created_at": "2026-06-18T20:43:27.042455+00:00",
-  "updated_at": "2026-06-18T20:43:27.042628+00:00",
+  "created_at": "2026-06-19T11:28:33.390630+00:00",
+  "updated_at": "2026-06-19T11:28:33.390717+00:00",
   "status": "completed",
   "question": "What are the main barriers to large-scale commercial SMR deployment by 2035?",
   "profile": "smr",
@@ -14,159 +14,14 @@
   },
   "subquestions": [],
   "retrieval_plan": {
-    "web_search": {
-      "dependency_status": {
-        "duckduckgo_search": "ok (ddgs)",
-        "requests": "ok",
-        "trafilatura": "ok",
-        "all_available": true
-      },
-      "query": "What are the main barriers to large-scale commercial SMR deployment by 2035?",
-      "provider": "DuckDuckGoSearchProvider",
-      "search_error": null,
-      "search_results_returned": 5,
-      "search_results": [
-        {
-          "title": "What is holding up progress on small modular reactors? - GIS Reports",
-          "url": "https://www.gisreportsonline.com/r/smrs/",
-          "snippet": "Nov 25, 2025 · Unlikely: Rapid global SMR scale-up. Several SMR designs receive regulatory approval and reach commercial readiness by the early 2030s."
-        },
-        {
-          "title": "[PDF] Nuclear Small Modular Reactors: Key Considerations for Deployment",
-          "url": "https://www.ief.org/_resources/files/events/nuclear-small-modular-reactors-smrs-key-considerations-for-deployment/smr-report.pdf",
-          "snippet": "The high-temperatures permit Generation IV reactors to be used both for standard low-emission electricity production, as well as for chemical manufacturing, ..."
-        },
-        {
-          "title": "Review The challenge of community acceptance of small nuclear reactors",
-          "url": "https://www.sciencedirect.com/science/article/abs/pii/S2214629624004225",
-          "snippet": "Energy infrastructure anticipated for large-scale deployment includes solar generation systems, wind farms, nuclear power plants, battery storage facilities, ..."
-        },
-        {
-          "title": "[PDF] Advances in SMR Developments 2024",
-          "url": "https://www-pub.iaea.org/MTCD/Publications/PDF/p15790-PUB9062_web.pdf",
-          "snippet": "Oct 21, 2024 · collaboration on key aspects of SMR development and deployment, including high level requirements, regulatory frameworks and safety. IAEA ..."
-        },
-        {
-          "title": "What are the main obstacles preventing the widespread use of ...",
-          "url": "https://www.quora.com/What-are-the-main-obstacles-preventing-the-widespread-use-of-small-modular-nuclear-reactors-SMRs-on-land",
-          "snippet": "Apr 17, 2026 · Fuel Enrichment Limitations: Nuclear weapons require highly enriched uranium (typically over 90% U-235). SMRs run on Low Enriched Uranium (LEU) ..."
-        }
-      ],
-      "pages_attempted": 5,
-      "downloaded_urls": [
-        "https://www.gisreportsonline.com/r/smrs/"
-      ],
-      "failed_urls": [
-        {
-          "url": "https://www.ief.org/_resources/files/events/nuclear-small-modular-reactors-smrs-key-considerations-for-deployment/smr-report.pdf",
-          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)"
-        },
-        {
-          "url": "https://www.sciencedirect.com/science/article/abs/pii/S2214629624004225",
-          "error": "fetch error: HTTPError: 403 Client Error: Forbidden for url: https://www.sciencedirect.com/science/article/abs/pii/S2214629624004225"
-        },
-        {
-          "url": "https://www-pub.iaea.org/MTCD/Publications/PDF/p15790-PUB9062_web.pdf",
-          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)"
-        },
-        {
-          "url": "https://www.quora.com/What-are-the-main-obstacles-preventing-the-widespread-use-of-small-modular-nuclear-reactors-SMRs-on-land",
-          "error": "fetch error: HTTPError: 403 Client Error: Forbidden for url: https://www.quora.com/What-are-the-main-obstacles-preventing-the-widespread-use-of-small-modular-nuclear-reactors-SMRs-on-land"
-        }
-      ],
-      "cache_hits": 1,
-      "documents_fetched": 1,
-      "extracted_characters": 18060,
-      "download_details": [
-        {
-          "url": "https://www.gisreportsonline.com/r/smrs/",
-          "title": "What is holding up progress on small modular reactors? - GIS Reports",
-          "source": "cache",
-          "error": null,
-          "chars": 18060
-        },
-        {
-          "url": "https://www.ief.org/_resources/files/events/nuclear-small-modular-reactors-smrs-key-considerations-for-deployment/smr-report.pdf",
-          "title": "[PDF] Nuclear Small Modular Reactors: Key Considerations for Deployment",
-          "source": "live",
-          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)",
-          "chars": 0
-        },
-        {
-          "url": "https://www.sciencedirect.com/science/article/abs/pii/S2214629624004225",
-          "title": "Review The challenge of community acceptance of small nuclear reactors",
-          "source": "live",
-          "error": "fetch error: HTTPError: 403 Client Error: Forbidden for url: https://www.sciencedirect.com/science/article/abs/pii/S2214629624004225",
-          "chars": 0
-        },
-        {
-          "url": "https://www-pub.iaea.org/MTCD/Publications/PDF/p15790-PUB9062_web.pdf",
-          "title": "[PDF] Advances in SMR Developments 2024",
-          "source": "live",
-          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)",
-          "chars": 0
-        },
-        {
-          "url": "https://www.quora.com/What-are-the-main-obstacles-preventing-the-widespread-use-of-small-modular-nuclear-reactors-SMRs-on-land",
-          "title": "What are the main obstacles preventing the widespread use of ...",
-          "source": "live",
-          "error": "fetch error: HTTPError: 403 Client Error: Forbidden for url: https://www.quora.com/What-are-the-main-obstacles-preventing-the-widespread-use-of-small-modular-nuclear-reactors-SMRs-on-land",
-          "chars": 0
-        }
-      ],
-      "chunks_created": 1
-    },
     "source_count": 1
   },
   "evidence_ids": [
-    "E001",
-    "E008",
-    "E009",
-    "E010",
-    "E011",
-    "E005",
-    "E007",
-    "E002",
-    "E003",
-    "E004",
-    "E006"
+    "E001"
   ],
-  "evidence_topics": {
-    "SMR commercialization": 3,
-    "technology readiness": 1,
-    "deployment barriers": 1,
-    "supply chains": 1,
-    "siting": 2,
-    "licensing": 2,
-    "SMR deployment timeline": 2,
-    "commercialization scenarios": 1,
-    "2035 outlook": 1,
-    "commercialization barriers": 2,
-    "2030s outlook": 1,
-    "SMR economics": 1,
-    "LCOE": 1,
-    "cost uncertainty": 1,
-    "investment risk": 2,
-    "cost overruns": 1,
-    "nuclear waste": 1,
-    "waste management": 1,
-    "SMR technical challenges": 1,
-    "regulatory approval": 1,
-    "SMR barriers": 4,
-    "financing": 1,
-    "capital costs": 1,
-    "fuel supply": 1,
-    "HALEU": 1,
-    "supply chain": 1,
-    "public acceptance": 1,
-    "community opposition": 1
-  },
+  "evidence_topics": {},
   "findings": [
-    "Of more than 80 SMR designs tracked by the IAEA, only two plants are currently in commercial operation — Russia's Akademik Lomonosov (2×35 MWe, since 2020) and China's HTR-PM (200 MWe, since December 2023) — leaving the technology largely untested at commercial scale.",
-    "Established regulatory approval pathways for SMRs do not yet exist, making licensing processes likely to be both time-consuming and uncertain, posing a potential bottleneck to deployment.",
-    "SMR projects require large upfront capital, long lead times, and face regulatory and political risks that deter investment; regulatory progress toward faster deployment is described as slow and uneven.",
-    "Many SMR designs require HALEU, currently produced only in the U.S. and Russia, with slow expansion of capacity; the U.S. nuclear industry has warned that certain SMR deployments could be delayed by years due to limited HALEU availability.",
-    "The U.S. Department of Energy (2023) identified that perceived risks of uncontrolled cost overruns and project abandonment have limited committed orders for new reactors, deterring risk-averse investors."
+    "No supplied source chunk addresses SMR deployment barriers; all evidence covers NVIDIA GPU architectures, AI infrastructure platforms, and related computing topics."
   ],
   "contradictions": [],
   "research_gaps": [],
@@ -174,11 +29,11 @@
     "question_id": "SMR_006"
   },
   "summary": {
-    "evidence_count": 11,
-    "citation_count": 11,
+    "evidence_count": 1,
+    "citation_count": 1,
     "contradictions_found": 0,
     "research_gaps_found": 0,
-    "coverage_score": 0.24
+    "coverage_score": 0.0
   },
   "owner": null,
   "assigned_agent": null,

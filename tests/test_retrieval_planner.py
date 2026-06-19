@@ -1,10 +1,10 @@
-"""Tests for dc_power_agent.retrieval_planner and select_top_chunks_multi (J3.0/J3.0a)."""
+"""Tests for research_agent.retrieval_planner and select_top_chunks_multi (J3.0/J3.0a)."""
 
 from __future__ import annotations
 
 import pytest
 
-from dc_power_agent.retrieval_planner import (
+from research_agent.retrieval_planner import (
     RetrievalPlanner,
     RetrievalPlan,
     QueryMode,
@@ -13,8 +13,8 @@ from dc_power_agent.retrieval_planner import (
     detect_metric_lock,
     _content_words,
 )
-from dc_power_agent.retrieval import select_top_chunks_multi
-from dc_power_agent.schemas import Chunk
+from research_agent.retrieval import select_top_chunks_multi
+from research_agent.schemas import Chunk
 
 
 # ---------------------------------------------------------------------------
@@ -296,7 +296,7 @@ class TestPlanToDict:
 
 class TestProfileAwarePlan:
     def test_smr_profile_no_ai_dc_terms(self):
-        from dc_power_agent.profile import load_profile
+        from research_agent.profile import load_profile
         profile = load_profile("smr")
         plan = RetrievalPlanner(profile=profile).plan("What factors drive SMR LCOE?")
         ai_dc_terms = ["NVL72", "GB200", "PDU", "CDU"]
@@ -304,7 +304,7 @@ class TestProfileAwarePlan:
         assert not any(t in all_text for t in ai_dc_terms)
 
     def test_ai_dc_profile_cool_terms(self):
-        from dc_power_agent.profile import load_profile
+        from research_agent.profile import load_profile
         profile = load_profile("ai_data_centers")
         plan = RetrievalPlanner(profile=profile).plan("Why does NVL72 need liquid cooling?")
         all_text = " ".join(plan.queries).lower()
@@ -377,7 +377,7 @@ def test_multi_empty_queries():
 
 
 def test_multi_single_query_matches_select_top_chunks():
-    from dc_power_agent.retrieval import select_top_chunks
+    from research_agent.retrieval import select_top_chunks
     chunks = _make_chunks()
     query = "rack power consumption"
     single, single_scores = select_top_chunks(chunks, query, top_n=3)
@@ -400,9 +400,9 @@ def test_multi_output_is_sorted_by_doc_chunk_order():
 
 def test_agent_mock_trace_has_retrieval_plan(tmp_path):
     """ResearchMemo.metadata should include retrieval_plan when using MockClaudeClient."""
-    from dc_power_agent.agent import DcPowerAgent
-    from dc_power_agent.claude_client import MockClaudeClient
-    from dc_power_agent.schemas import SourceDocument
+    from research_agent.agent import DcPowerAgent
+    from research_agent.claude_client import MockClaudeClient
+    from research_agent.schemas import SourceDocument
 
     doc_text = "The NVL72 rack consumes 120 kW total rack power. Liquid cooling is required."
     source_file = tmp_path / "test_doc.txt"
@@ -428,9 +428,9 @@ def test_agent_mock_trace_has_retrieval_plan(tmp_path):
 
 def test_agent_mock_trace_exploratory_plan(tmp_path):
     """EXPLORATORY_RESEARCH question should produce an unlocked plan."""
-    from dc_power_agent.agent import DcPowerAgent
-    from dc_power_agent.claude_client import MockClaudeClient
-    from dc_power_agent.schemas import SourceDocument
+    from research_agent.agent import DcPowerAgent
+    from research_agent.claude_client import MockClaudeClient
+    from research_agent.schemas import SourceDocument
 
     doc_text = "SMR economics depend on construction cost, LCOE, and financing."
     source_file = tmp_path / "smr_doc.txt"

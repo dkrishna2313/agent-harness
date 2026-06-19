@@ -1,6 +1,6 @@
 from typer.testing import CliRunner
 
-from dc_power_agent.eval_runner import app, load_eval_questions
+from research_agent.eval_runner import app, load_eval_questions
 
 
 def test_load_eval_questions_reads_simple_yaml(tmp_path):

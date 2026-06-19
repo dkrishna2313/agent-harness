@@ -1,4 +1,4 @@
-"""Command-line interface for dc_power_agent."""
+"""Command-line interface for research_agent."""
 
 from __future__ import annotations
 

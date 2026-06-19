@@ -1,10 +1,10 @@
-"""Tests for dc_power_agent.chunker."""
+"""Tests for research_agent.chunker."""
 
 from pathlib import Path
 
 import pytest
 
-from dc_power_agent.chunker import (
+from research_agent.chunker import (
     CHUNK_MAX,
     CHUNK_TARGET,
     CHUNK_SELECTION_BUDGET,
@@ -17,10 +17,10 @@ from dc_power_agent.chunker import (
     score_chunk_relevance,
     select_relevant_chunks,
 )
-from dc_power_agent.agent import DcPowerAgent
-from dc_power_agent.claude_client import MockClaudeClient
-from dc_power_agent.schemas import Chunk, ChunkDiagnostic, EvidenceItem, SourceDocument
-from dc_power_agent.trace import build_trace
+from research_agent.agent import DcPowerAgent
+from research_agent.claude_client import MockClaudeClient
+from research_agent.schemas import Chunk, ChunkDiagnostic, EvidenceItem, SourceDocument
+from research_agent.trace import build_trace
 
 
 def _make_doc(text: str, name: str = "test.txt") -> SourceDocument:

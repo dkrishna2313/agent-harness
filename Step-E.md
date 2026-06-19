@@ -3,7 +3,7 @@ Add a lightweight regression evaluation suite.
 Create evals/questions.yaml with 5 sample data center infrastructure questions.
 
 Add a CLI command or script:
-python -m dc_power_agent.eval_runner --sources ./sources --evals ./evals/questions.yaml --out ./outputs/eval_report.md
+python -m research_agent.eval_runner --sources ./sources --evals ./evals/questions.yaml --out ./outputs/eval_report.md
 
 For each question:
 - run the agent

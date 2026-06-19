@@ -315,7 +315,7 @@ def benchmark(
 
     Example:
 
-        python3 -m dc_power_agent.eval_runner benchmark --eval-dir ./eval --web-search
+        python3 -m research_agent.eval_runner benchmark --eval-dir ./eval --web-search
     """
     import logging
 
@@ -448,7 +448,7 @@ def save_baseline(
 
     Example:
 
-        python3 -m dc_power_agent.eval_runner save-baseline \\
+        python3 -m research_agent.eval_runner save-baseline \\
           --report outputs/evaluation_report.json \\
           --baseline-dir baseline
     """
@@ -532,7 +532,7 @@ def regress(
 
     Example:
 
-        python3 -m dc_power_agent.eval_runner regress \\
+        python3 -m research_agent.eval_runner regress \\
           --current outputs/evaluation_report.json \\
           --baseline baseline/evaluation_report.json \\
           --fail-threshold 0.03
@@ -625,7 +625,7 @@ def audit(
 
     Example:
 
-        python3 -m dc_power_agent.eval_runner audit --eval-dir ./eval
+        python3 -m research_agent.eval_runner audit --eval-dir ./eval
     """
     from .evaluation.loader import load_qa_questions, load_contradiction_cases
     from .evaluation.validator import validate_benchmark

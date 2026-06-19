@@ -6,14 +6,14 @@ from pathlib import Path
 
 import pytest
 
-from dc_power_agent.source_quality import classify_source_quality, build_source_quality_map, classify_source_quality_with_profile
-from dc_power_agent.schemas import EvidenceItem, SourceQuality, assign_evidence_ids
-from dc_power_agent.retrieval import score_retrieval, select_top_chunks, classify_document_priority
-from dc_power_agent.schemas import Chunk
-from dc_power_agent.contradiction import detect_contradictions
-from dc_power_agent.agent import DcPowerAgent, score_evidence_items, rank_evidence_items
-from dc_power_agent.claude_client import MockClaudeClient
-from dc_power_agent.trace import build_trace
+from research_agent.source_quality import classify_source_quality, build_source_quality_map, classify_source_quality_with_profile
+from research_agent.schemas import EvidenceItem, SourceQuality, assign_evidence_ids
+from research_agent.retrieval import score_retrieval, select_top_chunks, classify_document_priority
+from research_agent.schemas import Chunk
+from research_agent.contradiction import detect_contradictions
+from research_agent.agent import DcPowerAgent, score_evidence_items, rank_evidence_items
+from research_agent.claude_client import MockClaudeClient
+from research_agent.trace import build_trace
 
 
 # ---------------------------------------------------------------------------
@@ -21,7 +21,7 @@ from dc_power_agent.trace import build_trace
 # ---------------------------------------------------------------------------
 
 def _doc(text: str, name: str):
-    from dc_power_agent.schemas import SourceDocument
+    from research_agent.schemas import SourceDocument
     return SourceDocument(
         path=Path(f"sources/{name}"),
         title=name,
@@ -222,7 +222,7 @@ class TestRetrievalWeighting:
 class TestEvidenceRankingQuality:
 
     def test_nvidia_source_scores_higher_than_test_file(self):
-        from dc_power_agent.source_quality import build_source_quality_map
+        from research_agent.source_quality import build_source_quality_map
         sq_map = build_source_quality_map([
             "Inside the NVIDIA Vera Rubin Platform.pdf",
             "test_power_a.txt",
@@ -274,7 +274,7 @@ class TestEvidenceRankingQuality:
         assert scored[0].source_quality_class == "synthetic"
 
     def test_rank_prefers_higher_quality_with_equal_relevance(self):
-        from dc_power_agent.source_quality import build_source_quality_map
+        from research_agent.source_quality import build_source_quality_map
         sq_map = build_source_quality_map([
             "Inside the NVIDIA Vera Rubin Platform.pdf",
             "test_power_a.txt",
@@ -465,11 +465,11 @@ class TestProfileAwareSourceQuality:
 
     @pytest.fixture()
     def smr_profile(self):
-        from dc_power_agent.profile import load_profile
+        from research_agent.profile import load_profile
         return load_profile("smr")
 
     def test_doe_liftoff_scores_5(self, smr_profile):
-        from dc_power_agent.source_quality import classify_source_quality_with_profile
+        from research_agent.source_quality import classify_source_quality_with_profile
         sq = classify_source_quality_with_profile(
             "DOE Liftoff Report Advanced Nuclear.pdf", smr_profile
         )
@@ -477,7 +477,7 @@ class TestProfileAwareSourceQuality:
         assert sq.source_type == "authoritative_primary"
 
     def test_iaea_scores_5(self, smr_profile):
-        from dc_power_agent.source_quality import classify_source_quality_with_profile
+        from research_agent.source_quality import classify_source_quality_with_profile
         sq = classify_source_quality_with_profile(
             "IAEA SMR Catalogue 2024.pdf", smr_profile
         )
@@ -485,7 +485,7 @@ class TestProfileAwareSourceQuality:
         assert sq.source_type == "authoritative_primary"
 
     def test_nrc_scores_5(self, smr_profile):
-        from dc_power_agent.source_quality import classify_source_quality_with_profile
+        from research_agent.source_quality import classify_source_quality_with_profile
         sq = classify_source_quality_with_profile(
             "NRC Licensing Guidance.pdf", smr_profile
         )
@@ -493,7 +493,7 @@ class TestProfileAwareSourceQuality:
         assert sq.source_type == "authoritative_primary"
 
     def test_nea_scores_5(self, smr_profile):
-        from dc_power_agent.source_quality import classify_source_quality_with_profile
+        from research_agent.source_quality import classify_source_quality_with_profile
         sq = classify_source_quality_with_profile(
             "NEA Small Modular Reactor Dashboard.pdf", smr_profile
         )
@@ -501,7 +501,7 @@ class TestProfileAwareSourceQuality:
         assert sq.source_type == "authoritative_primary"
 
     def test_inl_scores_5(self, smr_profile):
-        from dc_power_agent.source_quality import classify_source_quality_with_profile
+        from research_agent.source_quality import classify_source_quality_with_profile
         sq = classify_source_quality_with_profile(
             "INL Small Reactors in Microgrids.pdf", smr_profile
         )
@@ -509,7 +509,7 @@ class TestProfileAwareSourceQuality:
         assert sq.source_type == "authoritative_primary"
 
     def test_nuscale_scores_4(self, smr_profile):
-        from dc_power_agent.source_quality import classify_source_quality_with_profile
+        from research_agent.source_quality import classify_source_quality_with_profile
         sq = classify_source_quality_with_profile(
             "NuScale Power Module Design Overview.pdf", smr_profile
         )
@@ -517,7 +517,7 @@ class TestProfileAwareSourceQuality:
         assert sq.source_type == "industry_vendor"
 
     def test_terrapower_scores_4(self, smr_profile):
-        from dc_power_agent.source_quality import classify_source_quality_with_profile
+        from research_agent.source_quality import classify_source_quality_with_profile
         sq = classify_source_quality_with_profile(
             "TerraPower Natrium Reactor Overview.pdf", smr_profile
         )
@@ -525,7 +525,7 @@ class TestProfileAwareSourceQuality:
         assert sq.source_type == "industry_vendor"
 
     def test_wna_scores_4(self, smr_profile):
-        from dc_power_agent.source_quality import classify_source_quality_with_profile
+        from research_agent.source_quality import classify_source_quality_with_profile
         sq = classify_source_quality_with_profile(
             "World Nuclear Association SMR Report.pdf", smr_profile
         )
@@ -533,7 +533,7 @@ class TestProfileAwareSourceQuality:
         assert sq.source_type == "industry_vendor"
 
     def test_analysis_scores_3(self, smr_profile):
-        from dc_power_agent.source_quality import classify_source_quality_with_profile
+        from research_agent.source_quality import classify_source_quality_with_profile
         sq = classify_source_quality_with_profile(
             "Nuclear Economics Analysis 2024.pdf", smr_profile
         )
@@ -541,13 +541,13 @@ class TestProfileAwareSourceQuality:
         assert sq.source_type == "independent_technical"
 
     def test_synthetic_test_file_scores_1(self, smr_profile):
-        from dc_power_agent.source_quality import classify_source_quality_with_profile
+        from research_agent.source_quality import classify_source_quality_with_profile
         sq = classify_source_quality_with_profile("test_smr_data.txt", smr_profile)
         assert sq.source_quality_score == 1
         assert sq.source_type == "synthetic"
 
     def test_unknown_smr_doc_falls_back_to_base(self, smr_profile):
-        from dc_power_agent.source_quality import classify_source_quality_with_profile
+        from research_agent.source_quality import classify_source_quality_with_profile
         sq = classify_source_quality_with_profile(
             "random_document_no_signals.pdf", smr_profile
         )
@@ -582,14 +582,14 @@ class TestProfileAwareSourceQuality:
         assert sq_map["Inside the NVIDIA Vera Rubin Platform.pdf"].source_quality_score == 5
 
     def test_rationale_includes_profile_name(self, smr_profile):
-        from dc_power_agent.source_quality import classify_source_quality_with_profile
+        from research_agent.source_quality import classify_source_quality_with_profile
         sq = classify_source_quality_with_profile(
             "DOE Liftoff Report Advanced Nuclear.pdf", smr_profile
         )
         assert "smr" in sq.rationale.lower()
 
     def test_case_insensitive_matching(self, smr_profile):
-        from dc_power_agent.source_quality import classify_source_quality_with_profile
+        from research_agent.source_quality import classify_source_quality_with_profile
         lower = classify_source_quality_with_profile(
             "doe liftoff report.pdf", smr_profile
         )
@@ -601,7 +601,7 @@ class TestProfileAwareSourceQuality:
 
     def test_synthetic_takes_priority_over_primary(self, smr_profile):
         """A test file named with 'nrc' should be synthetic, not authoritative."""
-        from dc_power_agent.source_quality import classify_source_quality_with_profile
+        from research_agent.source_quality import classify_source_quality_with_profile
         sq = classify_source_quality_with_profile("test_nrc_fixture.txt", smr_profile)
         assert sq.source_quality_score == 1
         assert sq.source_type == "synthetic"

@@ -8,7 +8,7 @@ gap_detector.py, and agent.py.
 
 Usage::
 
-    from dc_power_agent.profile import load_profile, get_default_profile
+    from research_agent.profile import load_profile, get_default_profile
 
     profile = load_profile("ai_data_centers")   # by name from profiles/ dir
     profile = load_profile("./my_profile.yaml")  # by relative path

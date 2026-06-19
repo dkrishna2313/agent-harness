@@ -1,4 +1,4 @@
-from dc_power_agent.loaders import load_sources
+from research_agent.loaders import load_sources
 
 
 def test_load_sources_reads_supported_text_files(tmp_path):

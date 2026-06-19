@@ -1,16 +1,16 @@
-"""Tests for dc_power_agent.evidence_enricher (J3.1)."""
+"""Tests for research_agent.evidence_enricher (J3.1)."""
 
 from __future__ import annotations
 
 import pytest
 
-from dc_power_agent.evidence_enricher import (
+from research_agent.evidence_enricher import (
     classify_evidence_type,
     tag_evidence_topics,
     enrich_evidence_with_metadata,
     build_evidence_density_stats,
 )
-from dc_power_agent.schemas import EvidenceItem
+from research_agent.schemas import EvidenceItem
 
 
 # ---------------------------------------------------------------------------
@@ -103,37 +103,37 @@ class TestTagEvidenceTopics:
         assert tag_evidence_topics("Any text about nuclear power", None) == []
 
     def test_smr_economics_tagged(self):
-        from dc_power_agent.profile import load_profile
+        from research_agent.profile import load_profile
         profile = load_profile("smr")
         topics = tag_evidence_topics("SMR LCOE is driven by construction cost and financing.", profile)
         assert "economics" in topics
 
     def test_smr_construction_tagged(self):
-        from dc_power_agent.profile import load_profile
+        from research_agent.profile import load_profile
         profile = load_profile("smr")
         topics = tag_evidence_topics("Construction duration is 3-4 years for BWRX-300.", profile)
         assert "construction" in topics
 
     def test_smr_grid_integration_tagged(self):
-        from dc_power_agent.profile import load_profile
+        from research_agent.profile import load_profile
         profile = load_profile("smr")
         topics = tag_evidence_topics("SMRs can perform load following on the grid.", profile)
         assert "grid integration" in topics
 
     def test_ai_dc_power_tagged(self):
-        from dc_power_agent.profile import load_profile
+        from research_agent.profile import load_profile
         profile = load_profile("ai_data_centers")
         topics = tag_evidence_topics("Rack power consumption reaches 120 kW.", profile)
         assert "power" in topics
 
     def test_ai_dc_cooling_tagged(self):
-        from dc_power_agent.profile import load_profile
+        from research_agent.profile import load_profile
         profile = load_profile("ai_data_centers")
         topics = tag_evidence_topics("Liquid cooling via CDU is required for NVL72.", profile)
         assert "cooling" in topics
 
     def test_multiple_topics_tagged(self):
-        from dc_power_agent.profile import load_profile
+        from research_agent.profile import load_profile
         profile = load_profile("smr")
         topics = tag_evidence_topics(
             "Construction costs and licensing delays affect LCOE.", profile
@@ -158,7 +158,7 @@ class TestEnrichEvidenceWithMetadata:
         assert enriched[0].evidence_type == "comparison"
 
     def test_sets_topics_with_profile(self):
-        from dc_power_agent.profile import load_profile
+        from research_agent.profile import load_profile
         profile = load_profile("smr")
         items = [_item("SMR construction takes 3-4 years from first concrete to commercial operation.")]
         enriched = enrich_evidence_with_metadata(items, profile)
@@ -241,10 +241,10 @@ class TestBuildEvidenceDensityStats:
 
 class TestAgentJ31Integration:
     def test_smr_extraction_produces_typed_items(self, tmp_path):
-        from dc_power_agent.agent import DcPowerAgent
-        from dc_power_agent.claude_client import MockClaudeClient
-        from dc_power_agent.profile import load_profile
-        from dc_power_agent.schemas import SourceDocument
+        from research_agent.agent import DcPowerAgent
+        from research_agent.claude_client import MockClaudeClient
+        from research_agent.profile import load_profile
+        from research_agent.schemas import SourceDocument
 
         doc_text = (
             "HALEU supply is limited due to insufficient domestic production. "
@@ -276,10 +276,10 @@ class TestAgentJ31Integration:
         assert "evidence_type_distribution" in density
 
     def test_smr_economy_of_scale_extracted(self, tmp_path):
-        from dc_power_agent.agent import DcPowerAgent
-        from dc_power_agent.claude_client import MockClaudeClient
-        from dc_power_agent.profile import load_profile
-        from dc_power_agent.schemas import SourceDocument
+        from research_agent.agent import DcPowerAgent
+        from research_agent.claude_client import MockClaudeClient
+        from research_agent.profile import load_profile
+        from research_agent.schemas import SourceDocument
 
         doc_text = (
             "SMRs suffer a diseconomy of scale relative to large reactors. "
@@ -306,10 +306,10 @@ class TestAgentJ31Integration:
         )
 
     def test_smr_load_following_extracted(self, tmp_path):
-        from dc_power_agent.agent import DcPowerAgent
-        from dc_power_agent.claude_client import MockClaudeClient
-        from dc_power_agent.profile import load_profile
-        from dc_power_agent.schemas import SourceDocument
+        from research_agent.agent import DcPowerAgent
+        from research_agent.claude_client import MockClaudeClient
+        from research_agent.profile import load_profile
+        from research_agent.schemas import SourceDocument
 
         doc_text = (
             "SMR designs include load following capability to match grid demand. "

@@ -1,4 +1,4 @@
-"""Tests for dc_power_agent.evaluation.prohibited_term_checker (J3.1c).
+"""Tests for research_agent.evaluation.prohibited_term_checker (J3.1c).
 
 Covers:
   - Context detection: negation before term (J3.1c.2)
@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import pytest
 
-from dc_power_agent.evaluation.prohibited_term_checker import (
+from research_agent.evaluation.prohibited_term_checker import (
     ProhibitedTermResult,
     build_prohibition_stats,
     check_all_prohibited_terms,
@@ -392,9 +392,9 @@ class TestBatchAndStats:
 class TestScorerIntegration:
     def test_nvidia_011_pcie_contextual_mention_no_penalty(self):
         """NVIDIA_011: 'PCIe connection' in answer that explains elimination → no penalty."""
-        from dc_power_agent.evaluation.scorer import score_qa_response
-        from dc_power_agent.evaluation.loader import QAQuestion
-        from dc_power_agent.schemas import ResearchMemo
+        from research_agent.evaluation.scorer import score_qa_response
+        from research_agent.evaluation.loader import QAQuestion
+        from research_agent.schemas import ResearchMemo
 
         question = QAQuestion(
             question_id="NVIDIA_011",
@@ -429,9 +429,9 @@ class TestScorerIntegration:
 
     def test_smr_010_6months_negated_no_penalty(self):
         """SMR_010: '6 months' appears but is explicitly negated → no penalty."""
-        from dc_power_agent.evaluation.scorer import score_qa_response
-        from dc_power_agent.evaluation.loader import QAQuestion
-        from dc_power_agent.schemas import ResearchMemo
+        from research_agent.evaluation.scorer import score_qa_response
+        from research_agent.evaluation.loader import QAQuestion
+        from research_agent.schemas import ResearchMemo
 
         question = QAQuestion(
             question_id="SMR_010",
@@ -465,9 +465,9 @@ class TestScorerIntegration:
 
     def test_hard_prohibited_still_fails(self):
         """A plain prohibited claim (no negating context) still triggers penalty."""
-        from dc_power_agent.evaluation.scorer import score_qa_response
-        from dc_power_agent.evaluation.loader import QAQuestion
-        from dc_power_agent.schemas import ResearchMemo
+        from research_agent.evaluation.scorer import score_qa_response
+        from research_agent.evaluation.loader import QAQuestion
+        from research_agent.schemas import ResearchMemo
 
         question = QAQuestion(
             question_id="HARD_001",
@@ -491,9 +491,9 @@ class TestScorerIntegration:
 
     def test_prohibited_term_audit_in_score(self):
         """QAScore.prohibited_term_audit contains per-term detail dicts (J3.1c.4)."""
-        from dc_power_agent.evaluation.scorer import score_qa_response
-        from dc_power_agent.evaluation.loader import QAQuestion
-        from dc_power_agent.schemas import ResearchMemo
+        from research_agent.evaluation.scorer import score_qa_response
+        from research_agent.evaluation.loader import QAQuestion
+        from research_agent.schemas import ResearchMemo
 
         question = QAQuestion(
             question_id="AUDIT_011",
@@ -522,9 +522,9 @@ class TestScorerIntegration:
 
     def test_context_allowed_count_in_score(self):
         """QAScore.context_allowed_count reflects number of exempted terms."""
-        from dc_power_agent.evaluation.scorer import score_qa_response
-        from dc_power_agent.evaluation.loader import QAQuestion
-        from dc_power_agent.schemas import ResearchMemo
+        from research_agent.evaluation.scorer import score_qa_response
+        from research_agent.evaluation.loader import QAQuestion
+        from research_agent.schemas import ResearchMemo
 
         question = QAQuestion(
             question_id="COUNT_001",

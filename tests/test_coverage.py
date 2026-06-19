@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from dc_power_agent.coverage import (
+from research_agent.coverage import (
     compute_coverage_matrix,
     _coverage_level,
     _build_rationale,
@@ -14,17 +14,17 @@ from dc_power_agent.coverage import (
     STRONG_MIN_EVIDENCE,
     STRONG_MIN_SOURCES,
 )
-from dc_power_agent.schemas import (
+from research_agent.schemas import (
     CoverageArea,
     EvidenceItem,
     ResearchGap,
     SourceQuality,
     assign_evidence_ids,
 )
-from dc_power_agent.agent import DcPowerAgent
-from dc_power_agent.claude_client import MockClaudeClient
-from dc_power_agent.markdown import memo_to_markdown
-from dc_power_agent.trace import build_trace
+from research_agent.agent import DcPowerAgent
+from research_agent.claude_client import MockClaudeClient
+from research_agent.markdown import memo_to_markdown
+from research_agent.trace import build_trace
 
 
 # ---------------------------------------------------------------------------
@@ -32,7 +32,7 @@ from dc_power_agent.trace import build_trace
 # ---------------------------------------------------------------------------
 
 def _doc(text: str, name: str):
-    from dc_power_agent.schemas import SourceDocument
+    from research_agent.schemas import SourceDocument
     return SourceDocument(
         path=Path(f"sources/{name}"),
         title=name,
@@ -171,7 +171,7 @@ class TestCoverageScoringRules:
         assert "high-quality" in r.lower()
 
     def test_rationale_gap_note_appended_for_high_gaps(self):
-        from dc_power_agent.schemas import ResearchGap
+        from research_agent.schemas import ResearchGap
         gaps = [ResearchGap(
             gap_id="G001", topic="PDU topology", priority="high",
             description="Missing PDU info.", rationale="Needed.",
@@ -185,7 +185,7 @@ class TestCoverageScoringRules:
 
     def test_rationale_strong_with_gap_still_starts_with_strong(self):
         """Gap note is appended; the lead sentence stays Strong."""
-        from dc_power_agent.schemas import ResearchGap
+        from research_agent.schemas import ResearchGap
         gaps = [ResearchGap(
             gap_id="G001", topic="PDU topology", priority="high",
             description="x", rationale="y",
@@ -448,7 +448,7 @@ class TestCoverageMarkdown:
         assert any(label in md for label in ("Strong", "Moderate", "Weak", "None"))
 
     def test_empty_coverage_matrix_renders_gracefully(self):
-        from dc_power_agent.schemas import ResearchMemo
+        from research_agent.schemas import ResearchMemo
         memo = ResearchMemo(
             title="Test",
             question="What?",
@@ -487,7 +487,7 @@ class TestCoverageMarkdown:
 class TestCoverageEvaluatorMetrics:
 
     def test_evaluator_emits_coverage_matrix_metrics_info(self):
-        from dc_power_agent.evaluator import evaluate_memo
+        from research_agent.evaluator import evaluate_memo
         doc = _doc("Rack power is 132 kW.", "Inside the NVIDIA Vera Rubin Platform.pdf")
         memo = DcPowerAgent(client=MockClaudeClient()).analyze(
             "What is rack power?", [doc]
@@ -497,7 +497,7 @@ class TestCoverageEvaluatorMetrics:
         assert "coverage_matrix_metrics" in codes
 
     def test_coverage_metrics_warning_is_info_severity(self):
-        from dc_power_agent.evaluator import evaluate_memo
+        from research_agent.evaluator import evaluate_memo
         doc = _doc("Rack power is 132 kW.", "Inside the NVIDIA Vera Rubin Platform.pdf")
         memo = DcPowerAgent(client=MockClaudeClient()).analyze(
             "What is rack power?", [doc]
@@ -508,7 +508,7 @@ class TestCoverageEvaluatorMetrics:
 
     def test_no_warning_for_weak_coverage(self):
         """Weak coverage must NOT generate a blocking warning (only informational)."""
-        from dc_power_agent.evaluator import evaluate_memo
+        from research_agent.evaluator import evaluate_memo
         doc = _doc("Single power note.", "test.txt")
         memo = DcPowerAgent(client=MockClaudeClient()).analyze("What is rack power?", [doc])
         warnings = evaluate_memo(memo, [doc], mock_llm=True)

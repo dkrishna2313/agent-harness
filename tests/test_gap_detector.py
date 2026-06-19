@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dc_power_agent.gap_detector import detect_gaps, _corpus_has_coverage
-from dc_power_agent.agent import DcPowerAgent
-from dc_power_agent.claude_client import MockClaudeClient
-from dc_power_agent.markdown import memo_to_markdown
-from dc_power_agent.schemas import EvidenceItem, ResearchGap, ResearchMemo, SourceDocument, assign_evidence_ids
-from dc_power_agent.trace import build_trace
+from research_agent.gap_detector import detect_gaps, _corpus_has_coverage
+from research_agent.agent import DcPowerAgent
+from research_agent.claude_client import MockClaudeClient
+from research_agent.markdown import memo_to_markdown
+from research_agent.schemas import EvidenceItem, ResearchGap, ResearchMemo, SourceDocument, assign_evidence_ids
+from research_agent.trace import build_trace
 
 
 # ---------------------------------------------------------------------------
@@ -299,7 +299,7 @@ def test_trace_research_gaps_have_required_fields():
 
 def test_evaluator_research_gap_metrics_info_entry():
     """evaluate_memo must emit research_gap_metrics info entry when gaps exist."""
-    from dc_power_agent.evaluator import evaluate_memo
+    from research_agent.evaluator import evaluate_memo
 
     gaps = [
         ResearchGap(gap_id="G001", topic="Rack Power", priority="high",
@@ -324,7 +324,7 @@ def test_evaluator_research_gap_metrics_info_entry():
 
 def test_evaluator_no_gap_warning_when_no_gaps():
     """evaluate_memo must not emit research_gap_metrics when there are no gaps."""
-    from dc_power_agent.evaluator import evaluate_memo
+    from research_agent.evaluator import evaluate_memo
 
     doc = SourceDocument(path=Path("a.pdf"), title="a", extension=".pdf",
                          text="power cooling rack.")

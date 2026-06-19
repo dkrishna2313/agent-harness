@@ -1,7 +1,7 @@
 {
   "research_id": "R-NVIDIA_012",
-  "created_at": "2026-06-18T20:31:47.492360+00:00",
-  "updated_at": "2026-06-18T20:31:47.492531+00:00",
+  "created_at": "2026-06-19T11:25:23.819115+00:00",
+  "updated_at": "2026-06-19T11:25:23.819250+00:00",
   "status": "completed",
   "question": "What power management or efficiency features does NVIDIA GB200 NVL72 incorporate to handle its high thermal design point?",
   "profile": "ai_data_centers",
@@ -14,177 +14,80 @@
   },
   "subquestions": [],
   "retrieval_plan": {
-    "web_search": {
-      "dependency_status": {
-        "duckduckgo_search": "ok (ddgs)",
-        "requests": "ok",
-        "trafilatura": "ok",
-        "all_available": true
-      },
-      "query": "What power management or efficiency features does NVIDIA GB200 NVL72 incorporate to handle its high thermal design point?",
-      "provider": "DuckDuckGoSearchProvider",
-      "search_error": null,
-      "search_results_returned": 5,
-      "search_results": [
-        {
-          "title": "NVIDIA GB200 NVL72 Guide: Specs, Pricing & Architecture | Spheron Blog",
-          "url": "https://www.spheron.network/blog/nvidia-gb200-nvl72-guide/",
-          "snippet": "March 22, 2026 - Deploying a GB200 NVL72 requires dedicated 3-phase power circuits rated for the full load, typically a dedicated PDU with 200A+ capacity. Cooling: Air cooling is not viable at 120 kW "
-        },
-        {
-          "title": "NVIDIA GB200 NVL72: PCB & System Architecture Explained",
-          "url": "https://www.nextpcb.com/blog/nvidia-gb200-nvl72-architecture",
-          "snippet": "1 week ago - Liquid cooling (direct liquid cooling to cold plates on each GPU) is the only thermal management approach that can sustain B200 GPUs at full compute load continuously. Can a GB200 NVL72 r"
-        },
-        {
-          "title": "GB200 NVL72 | NVIDIA",
-          "url": "https://www.nvidia.com/en-us/data-center/gb200-nvl72/",
-          "snippet": "Liquid-cooled GB200 NVL72 racks reduce a data center’s carbon footprint and energy consumption. Liquid cooling increases compute density, reduces the amount of floor space used, and facilitates high-b"
-        },
-        {
-          "title": "NVIDIA Contributes NVIDIA GB200 NVL72 Designs to Open Compute Project | NVIDIA Technical Blog",
-          "url": "https://developer.nvidia.com/blog/nvidia-contributes-nvidia-gb200-nvl72-designs-to-open-compute-project/",
-          "snippet": "November 26, 2024 - The new reference architecture eliminates the need for data centers to develop their own power, cooling, and spacing designs for GB200 NVL72 from scratch. By leveraging Vertiv’s ex"
-        },
-        {
-          "title": "Power and Thermals — NVIDIA GB200 NVL Multi-Node Tuning Guide",
-          "url": "https://docs.nvidia.com/multi-node-nvlink-systems/multi-node-tuning-guide/power-thermals.html",
-          "snippet": "April 21, 2025 - Power Smoothing has been implemented to handle these situations, and customers can refer to the application note for more information. Power Balancing/Sloshing: In the data center des"
-        }
-      ],
-      "pages_attempted": 5,
-      "downloaded_urls": [
-        "https://www.spheron.network/blog/nvidia-gb200-nvl72-guide/",
-        "https://www.nextpcb.com/blog/nvidia-gb200-nvl72-architecture",
-        "https://www.nvidia.com/en-us/data-center/gb200-nvl72/",
-        "https://developer.nvidia.com/blog/nvidia-contributes-nvidia-gb200-nvl72-designs-to-open-compute-project/",
-        "https://docs.nvidia.com/multi-node-nvlink-systems/multi-node-tuning-guide/power-thermals.html"
-      ],
-      "failed_urls": [],
-      "cache_hits": 5,
-      "documents_fetched": 5,
-      "extracted_characters": 62791,
-      "download_details": [
-        {
-          "url": "https://www.spheron.network/blog/nvidia-gb200-nvl72-guide/",
-          "title": "NVIDIA GB200 NVL72 Guide: Specs, Pricing & Architecture | Spheron Blog",
-          "source": "cache",
-          "error": null,
-          "chars": 20631
-        },
-        {
-          "url": "https://www.nextpcb.com/blog/nvidia-gb200-nvl72-architecture",
-          "title": "NVIDIA GB200 NVL72: PCB & System Architecture Explained",
-          "source": "cache",
-          "error": null,
-          "chars": 24390
-        },
-        {
-          "url": "https://www.nvidia.com/en-us/data-center/gb200-nvl72/",
-          "title": "GB200 NVL72 | NVIDIA",
-          "source": "cache",
-          "error": null,
-          "chars": 3403
-        },
-        {
-          "url": "https://developer.nvidia.com/blog/nvidia-contributes-nvidia-gb200-nvl72-designs-to-open-compute-project/",
-          "title": "NVIDIA Contributes NVIDIA GB200 NVL72 Designs to Open Compute Project | NVIDIA Technical Blog",
-          "source": "cache",
-          "error": null,
-          "chars": 11752
-        },
-        {
-          "url": "https://docs.nvidia.com/multi-node-nvlink-systems/multi-node-tuning-guide/power-thermals.html",
-          "title": "Power and Thermals — NVIDIA GB200 NVL Multi-Node Tuning Guide",
-          "source": "cache",
-          "error": null,
-          "chars": 2615
-        }
-      ],
-      "chunks_created": 5
-    },
-    "source_count": 6
+    "source_count": 3
   },
   "evidence_ids": [
-    "E009",
-    "E010",
-    "E005",
     "E008",
     "E011",
-    "E006",
-    "E007",
-    "E013",
     "E001",
     "E002",
     "E003",
-    "E014",
     "E004",
-    "E012"
+    "E005",
+    "E007",
+    "E010",
+    "E009",
+    "E006"
   ],
   "evidence_topics": {
-    "liquid cooling": 3,
-    "blind mate manifold": 1,
-    "cooling manifold": 1,
-    "tray cooling": 1,
-    "thermal management": 2,
-    "bus bar": 1,
-    "ampacity": 1,
-    "power delivery": 3,
-    "rack power": 2,
-    "high current": 1,
-    "TDP": 2,
-    "48V bus": 2,
-    "DC bus": 1,
-    "current management": 1,
-    "power architecture": 1,
+    "direct liquid cooling": 1,
+    "45°C supply temperature": 1,
+    "thermal management": 4,
+    "power efficiency": 1,
+    "parasitic power": 1,
+    "cooling efficiency": 1,
+    "power conversion losses": 1,
+    "liquid cooling": 4,
     "energy efficiency": 2,
-    "LLM inference": 2,
-    "performance per watt": 3,
-    "GPU power draw": 1,
-    "Superchip power": 1,
-    "thermal design point": 2,
-    "DLC": 1,
-    "cooling requirement": 1,
-    "infrastructure": 1,
     "cold plate": 1,
     "CDU": 1,
-    "compute tray cooling": 1,
-    "power profiles": 1,
-    "Max-Q": 1,
-    "Max-P": 1,
-    "TGP": 1,
-    "GPU clocks": 1,
-    "power management": 3,
-    "power smoothing": 1,
-    "power swings": 1,
-    "workload synchronization": 1,
-    "power balancing": 1,
-    "power sloshing": 1,
-    "power efficiency": 1,
-    "rack power management": 1,
-    "power tuning": 1,
-    "DL inference": 1,
-    "power profile configuration": 1,
-    "DCGM": 1,
-    "NVSMI": 1,
-    "Redfish": 1,
-    "power management interfaces": 1
+    "power delivery": 1,
+    "power shelves": 1,
+    "rack architecture": 2,
+    "NVLink": 2,
+    "interconnect bandwidth": 1,
+    "memory capacity": 1,
+    "efficiency": 2,
+    "DPU offload": 1,
+    "GPU utilization": 1,
+    "architecture": 1,
+    "air cooling": 1,
+    "serviceability": 1,
+    "rack-scale architecture": 1,
+    "co-design": 1,
+    "performance per watt": 1,
+    "thermal design": 1
   },
   "findings": [
-    "The GB200 NVL72 incorporates pretuned GPU power workload profiles for LLM training and inference that automatically optimize TGP, GPC clocks, and Mem clocks based on customer Max-Q vs Max-P requirements, eliminating manual power tuning.",
-    "The GB200 NVL72 implements Power Smoothing to manage large power swings from bulk synchronous workloads that start/stop simultaneously at the data center level, preventing failures at the utility, transformer, and UPS level.",
-    "The GB200 NVL72 features Power Balancing/Sloshing, which allows GPUs to efficiently consume unused power from other rack/cluster components, enhancing GPU performance within provisioned power limits.",
-    "The GB200 NVL72 provides a new set of power tuning features to achieve the best performance per watt for common workloads such as DL inference and training, reducing application tuning steps.",
-    "Power profiles can be configured via BCM, DCGMI, NVSMI, or OOB (Redfish APIs on the HMC), with priority-based selection and automatic conflict resolution."
+    "The GB200 NVL72 is a fully liquid-cooled, rack-scale design that delivers 25x energy efficiency compared to NVIDIA HGX H100 for LLM inference.",
+    "Each GB200 NVL72 compute tray uses 2 superchip cold plate loops for liquid cooling and 8 fans (40×40×56 mm) per tray, and is compatible with in-rack CDU or in-row CDU.",
+    "The GB200 NVL72 rack configuration includes 3 × 1U 33 kW power shelves, reflecting a rack-level approach to high-power delivery.",
+    "The GB200 NVL72 integrates 72 Blackwell GPUs and 36 Grace CPUs with up to 30.5 TB of fast-access memory and 5th Gen NVLink providing 130 TB/s of low-latency GPU communication.",
+    "Each GB200 NVL72 compute tray includes 2 NVIDIA BlueField-3 DPUs and 4 × 400 Gb/s ConnectX-7 NICs, offloading networking and infrastructure tasks from the GPUs."
   ],
   "contradictions": [
     {
       "contradiction_id": "C001",
       "severity": "high",
-      "topic": "power"
+      "topic": "cooling"
     },
     {
       "contradiction_id": "C002",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C003",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C004",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C005",
       "severity": "high",
       "topic": "power"
     }
@@ -193,8 +96,8 @@
     {
       "gap_id": "G001",
       "priority": "medium",
-      "topic": "Water Temperature and Flow Rate",
-      "description": "No coolant supply temperature or flow rate specifications found."
+      "topic": "UPS and Backup Power",
+      "description": "No UPS or battery backup requirements found."
     },
     {
       "gap_id": "G002",
@@ -207,11 +110,11 @@
     "question_id": "NVIDIA_012"
   },
   "summary": {
-    "evidence_count": 14,
-    "citation_count": 14,
-    "contradictions_found": 2,
+    "evidence_count": 11,
+    "citation_count": 11,
+    "contradictions_found": 5,
     "research_gaps_found": 2,
-    "coverage_score": 0.52
+    "coverage_score": 0.48
   },
   "owner": null,
   "assigned_agent": null,

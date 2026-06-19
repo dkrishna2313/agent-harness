@@ -1,7 +1,7 @@
 {
   "research_id": "R-NVIDIA_003",
-  "created_at": "2026-06-18T20:04:33.663753+00:00",
-  "updated_at": "2026-06-18T20:04:33.664024+00:00",
+  "created_at": "2026-06-19T11:03:23.455428+00:00",
+  "updated_at": "2026-06-19T11:03:23.455648+00:00",
   "status": "completed",
   "question": "How many GPUs are integrated into a single GB200 NVL72 rack?",
   "profile": "ai_data_centers",
@@ -14,124 +14,57 @@
   },
   "subquestions": [],
   "retrieval_plan": {
-    "web_search": {
-      "dependency_status": {
-        "duckduckgo_search": "ok (ddgs)",
-        "requests": "ok",
-        "trafilatura": "ok",
-        "all_available": true
-      },
-      "query": "How many GPUs are integrated into a single GB200 NVL72 rack?",
-      "provider": "DuckDuckGoSearchProvider",
-      "search_error": null,
-      "search_results_returned": 5,
-      "search_results": [
-        {
-          "title": "NVIDIA GB200 NVL72 Delivers Trillion-Parameter LLM",
-          "url": "https://developer.nvidia.com/blog/nvidia-gb200-nvl72-delivers-trillion-parameter-llm-training-and-real-time-inference/",
-          "snippet": "The GB200 NVL72 is configured with 72 GPUs in one rack and 18 dual GB200 compute nodes—or 72 GPUs in two racks with 18 single GB200 compute nodes."
-        },
-        {
-          "title": "GB200 Hardware Architecture - Component Supply Chain & BOM",
-          "url": "https://newsletter.semianalysis.com/p/gb200-hardware-architecture-and-component",
-          "snippet": "Today we are going to go from A to Z on the different form factors of GB200 and how they changed versus the prior 8 GPU HGX baseboard servers."
-        },
-        {
-          "title": "Nvidia’s Optical Boogeyman – NVL72, Infiniband Scale Out,",
-          "url": "https://newsletter.semianalysis.com/p/nvidias-optical-boogeyman-nvl72-infiniband",
-          "snippet": "Rather than the typical 8 GPU server we are accustomed to, it is a single integrated rack with 72 GPUs, 36 CPUs, 18 NVSwitches, 72 InfiniBand NICs ..."
-        },
-        {
-          "title": "News Posts matching 'GB200' | TechPowerUp",
-          "url": "https://www.techpowerup.com/news-tags/GB200",
-          "snippet": "The new build-out will join Stargate I in Abilene, where Oracle delivered the first NVIDIA GB200 racks last month and where OpenAI is already running ..."
-        },
-        {
-          "title": "NVIDIA’s GB200s for up to 27 Trillion Parameter Models:",
-          "url": "https://io-fund.com/artificial-intelligence/semiconductors/nvidia-gb200-27-trillion-parameter-ai-superclusters",
-          "snippet": "Since all components are within proximity in a single rack, communication between components has much lower latency, which is especially beneficial ..."
-        }
-      ],
-      "pages_attempted": 5,
-      "downloaded_urls": [
-        "https://developer.nvidia.com/blog/nvidia-gb200-nvl72-delivers-trillion-parameter-llm-training-and-real-time-inference/",
-        "https://newsletter.semianalysis.com/p/gb200-hardware-architecture-and-component",
-        "https://newsletter.semianalysis.com/p/nvidias-optical-boogeyman-nvl72-infiniband",
-        "https://www.techpowerup.com/news-tags/GB200",
-        "https://io-fund.com/artificial-intelligence/semiconductors/nvidia-gb200-27-trillion-parameter-ai-superclusters"
-      ],
-      "failed_urls": [],
-      "cache_hits": 5,
-      "documents_fetched": 5,
-      "extracted_characters": 56634,
-      "download_details": [
-        {
-          "url": "https://developer.nvidia.com/blog/nvidia-gb200-nvl72-delivers-trillion-parameter-llm-training-and-real-time-inference/",
-          "title": "NVIDIA GB200 NVL72 Delivers Trillion-Parameter LLM",
-          "source": "cache",
-          "error": null,
-          "chars": 9318
-        },
-        {
-          "url": "https://newsletter.semianalysis.com/p/gb200-hardware-architecture-and-component",
-          "title": "GB200 Hardware Architecture - Component Supply Chain & BOM",
-          "source": "cache",
-          "error": null,
-          "chars": 31823
-        },
-        {
-          "url": "https://newsletter.semianalysis.com/p/nvidias-optical-boogeyman-nvl72-infiniband",
-          "title": "Nvidia’s Optical Boogeyman – NVL72, Infiniband Scale Out,",
-          "source": "cache",
-          "error": null,
-          "chars": 3622
-        },
-        {
-          "url": "https://www.techpowerup.com/news-tags/GB200",
-          "title": "News Posts matching 'GB200' | TechPowerUp",
-          "source": "cache",
-          "error": null,
-          "chars": 1474
-        },
-        {
-          "url": "https://io-fund.com/artificial-intelligence/semiconductors/nvidia-gb200-27-trillion-parameter-ai-superclusters",
-          "title": "NVIDIA’s GB200s for up to 27 Trillion Parameter Models:",
-          "source": "cache",
-          "error": null,
-          "chars": 10397
-        }
-      ],
-      "chunks_created": 5
-    },
-    "source_count": 5
+    "source_count": 4
   },
   "evidence_ids": [
+    "E007",
     "E001",
     "E002",
     "E003",
+    "E004",
     "E008",
-    "E006",
-    "E007",
     "E005",
-    "E004"
+    "E006"
   ],
   "evidence_topics": {
-    "GPU count": 8,
-    "rack architecture": 8,
-    "GB200 NVL72": 2,
-    "NVLink": 3,
-    "compute trays": 1,
-    "GB200": 5,
-    "compute tray": 2
+    "GPU count": 5,
+    "NVL72 naming": 1,
+    "generational comparison": 1,
+    "rack architecture": 4,
+    "GB200 NVL72": 4,
+    "compute tray": 1,
+    "rack composition": 1,
+    "NVLink": 1,
+    "interconnect bandwidth": 1,
+    "Blackwell NVL72": 1,
+    "rack-scale design": 1,
+    "platform overview": 1,
+    "Blackwell ecosystem": 1
   },
   "findings": [
-    "The GB200 NVL72 is configured with 72 GPUs in one rack and 18 dual GB200 compute nodes.",
-    "72 NVLink-connected Blackwell GPUs with 30 TB of unified memory over a 130 TB/s compute fabric create an exaFLOP AI supercomputer in a single GB200 NVL72 rack.",
-    "The GB200 NVL72 rack consists of 18 1U compute trays and 9 NVSwitch trays; each compute tray contains 2 Bianca boards (1 Grace CPU + 2 Blackwell GPUs each), totalling 72 GPUs per rack.",
-    "The DGX GB200 NVL72 is a single integrated rack with 72 GPUs, 36 CPUs, 18 NVSwitches, 72 InfiniBand NICs for the back-end network, and 36 BlueField-3 Ethernet NICs for the front-end network.",
-    "The NVIDIA GB200 NVL72 product listing specifies 72 NVIDIA Blackwell GPUs and 36 NVIDIA Grace CPUs as part of the rack configuration."
+    "The GB200 NVL72 rack integrates 72 NVIDIA Blackwell GPUs alongside 36 NVIDIA Grace CPUs.",
+    "The GB200 NVL72 compute tray houses 4 NVIDIA Blackwell GPUs per 1U node, and the rack contains 10 compute trays to yield 72 Blackwell GPUs total.",
+    "The GB200 NVL72 is a fully liquid-cooled rack-scale design that interconnects all nodes with NVIDIA NVLink technology and delivers the performance of 'one big GPU', with 36 Grace CPUs and 72 Blackwell GPUs.",
+    "The GB200 NVL72 rack includes 5th Gen NVIDIA NVLink technology and an NVLink domain delivering 130 TB/s of low-latency GPU communication across its 72 Blackwell GPUs.",
+    "The NVIDIA Blackwell NVL72 was identified as the first rack-scale architecture, elevating the rack to the primary unit of integration, and is the predecessor platform to Vera Rubin NVL72."
   ],
-  "contradictions": [],
+  "contradictions": [
+    {
+      "contradiction_id": "C001",
+      "severity": "medium",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C002",
+      "severity": "medium",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C003",
+      "severity": "medium",
+      "topic": "power"
+    }
+  ],
   "research_gaps": [],
   "outputs": {
     "question_id": "NVIDIA_003"
@@ -139,7 +72,7 @@
   "summary": {
     "evidence_count": 8,
     "citation_count": 8,
-    "contradictions_found": 0,
+    "contradictions_found": 3,
     "research_gaps_found": 0,
     "coverage_score": 0.2
   },

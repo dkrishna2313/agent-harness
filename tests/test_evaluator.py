@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from dc_power_agent.evaluator import classify_question_topics, evaluate_memo
-from dc_power_agent.schemas import EvidenceItem, ResearchMemo, SourceDocument, assign_evidence_ids
+from research_agent.evaluator import classify_question_topics, evaluate_memo
+from research_agent.schemas import EvidenceItem, ResearchMemo, SourceDocument, assign_evidence_ids
 
 
 def test_evaluator_warns_when_no_sources_or_content():
@@ -348,7 +348,7 @@ def _citation(item: EvidenceItem) -> str:
 
 def test_citation_regex_matches_filename_with_commas():
     """_CITATION_RE must match source names that contain commas (e.g. real NVIDIA PDF titles)."""
-    from dc_power_agent.evaluator import _CITATION_RE  # type: ignore[attr-defined]
+    from research_agent.evaluator import _CITATION_RE  # type: ignore[attr-defined]
 
     comma_filename = (
         "Inside the NVIDIA Vera Rubin Platform_ Six New Chips, One AI Supercomputer "

@@ -1,7 +1,7 @@
 {
   "research_id": "R-NVIDIA_004",
-  "created_at": "2026-06-18T20:07:22.483863+00:00",
-  "updated_at": "2026-06-18T20:07:22.484146+00:00",
+  "created_at": "2026-06-19T11:05:40.418224+00:00",
+  "updated_at": "2026-06-19T11:05:40.418343+00:00",
   "status": "completed",
   "question": "What role does NVLink play in the GB200 NVL72 architecture, and how does it differ from PCIe-based GPU communication?",
   "profile": "ai_data_centers",
@@ -14,216 +14,94 @@
   },
   "subquestions": [],
   "retrieval_plan": {
-    "web_search": {
-      "dependency_status": {
-        "duckduckgo_search": "ok (ddgs)",
-        "requests": "ok",
-        "trafilatura": "ok",
-        "all_available": true
-      },
-      "query": "What role does NVLink play in the GB200 NVL72 architecture, and how does it differ from PCIe-based GPU communication?",
-      "provider": "DuckDuckGoSearchProvider",
-      "search_error": null,
-      "search_results_returned": 5,
-      "search_results": [
-        {
-          "title": "GB200 NVL72 | NVIDIA",
-          "url": "https://www.nvidia.com/en-us/data-center/gb200-nvl72/",
-          "snippet": "Additionally, the GB200 NVL72 uses NVLink and liquid cooling to create a single massive 72-GPU rack that can overcome communication bottlenecks. Massive ..."
-        },
-        {
-          "title": "NVIDIA GB200 Interconnect Architecture Analysis: NVLink ...",
-          "url": "https://www.naddod.com/blog/nvidia-gb200-interconnect-architecture-analysis-nvlink-infiniband-and-future-trends?srsltid=AfmBOoqnm0u3Kn3KV6RC3bN8grFr6WkXORiTfexgoTg9JSJjGoPnXq0J",
-          "snippet": "Apr 5, 2024 ... NVLINK is a proprietary interconnect technology developed by NVIDIA for its GPU accelerators, while GB200 is a GPU chip built based on NVLINK."
-        },
-        {
-          "title": "NVIDIA NVLink and NVLink Switch: Redefining GPU Interconnects",
-          "url": "https://uvation.com/articles/unlocking-ultra-fast-gpu-communication-with-nvidia-nvlink-nvlink-switch",
-          "snippet": "Sep 9, 2025 ... NVLink is a high-bandwidth GPU-to-GPU interconnect that allows GPUs to communicate directly at speeds far beyond PCIe. It creates a unified ..."
-        },
-        {
-          "title": "GB200 Hardware Architecture - Component Supply Chain & BOM",
-          "url": "https://newsletter.semianalysis.com/p/gb200-hardware-architecture-and-component",
-          "snippet": "Jul 16, 2024 ... Since there are 72 GPUs per NVL72 rack, that would mean there is 5184 differential pairs. Each NVLink cable contains 1 differential pair thus ..."
-        },
-        {
-          "title": "NVIDIA GB200 Supply Chain: The Global Ecosystem Explained",
-          "url": "https://intuitionlabs.ai/articles/nvidia-gb200-supply-chain",
-          "snippet": "Apr 18, 2026 ... In total, the NVL72 rack houses 36 such modules (72 GPUs, 36 72-core CPUs) in 18 1U servers, all bridged by NVLink switch systems to form a ..."
-        }
-      ],
-      "pages_attempted": 5,
-      "downloaded_urls": [
-        "https://www.nvidia.com/en-us/data-center/gb200-nvl72/",
-        "https://www.naddod.com/blog/nvidia-gb200-interconnect-architecture-analysis-nvlink-infiniband-and-future-trends?srsltid=AfmBOoqnm0u3Kn3KV6RC3bN8grFr6WkXORiTfexgoTg9JSJjGoPnXq0J",
-        "https://uvation.com/articles/unlocking-ultra-fast-gpu-communication-with-nvidia-nvlink-nvlink-switch",
-        "https://newsletter.semianalysis.com/p/gb200-hardware-architecture-and-component",
-        "https://intuitionlabs.ai/articles/nvidia-gb200-supply-chain"
-      ],
-      "failed_urls": [],
-      "cache_hits": 4,
-      "documents_fetched": 5,
-      "extracted_characters": 92601,
-      "download_details": [
-        {
-          "url": "https://www.nvidia.com/en-us/data-center/gb200-nvl72/",
-          "title": "GB200 NVL72 | NVIDIA",
-          "source": "cache",
-          "error": null,
-          "chars": 3403
-        },
-        {
-          "url": "https://www.naddod.com/blog/nvidia-gb200-interconnect-architecture-analysis-nvlink-infiniband-and-future-trends?srsltid=AfmBOoqnm0u3Kn3KV6RC3bN8grFr6WkXORiTfexgoTg9JSJjGoPnXq0J",
-          "title": "NVIDIA GB200 Interconnect Architecture Analysis: NVLink, InfiniBand, and Future Trends - NADDOD Blog",
-          "source": "live",
-          "error": null,
-          "chars": 1640
-        },
-        {
-          "url": "https://uvation.com/articles/unlocking-ultra-fast-gpu-communication-with-nvidia-nvlink-nvlink-switch",
-          "title": "NVIDIA NVLink and NVLink Switch: Redefining GPU Interconnects",
-          "source": "cache",
-          "error": null,
-          "chars": 771
-        },
-        {
-          "url": "https://newsletter.semianalysis.com/p/gb200-hardware-architecture-and-component",
-          "title": "GB200 Hardware Architecture - Component Supply Chain & BOM",
-          "source": "cache",
-          "error": null,
-          "chars": 31823
-        },
-        {
-          "url": "https://intuitionlabs.ai/articles/nvidia-gb200-supply-chain",
-          "title": "NVIDIA GB200 Supply Chain: The Global Ecosystem Explained",
-          "source": "cache",
-          "error": null,
-          "chars": 54964
-        }
-      ],
-      "chunks_created": 5
-    },
     "source_count": 6
   },
   "evidence_ids": [
-    "E001",
     "E011",
-    "E014",
-    "E012",
-    "E015",
+    "E008",
+    "E009",
+    "E013",
+    "E004",
+    "E001",
     "E002",
     "E003",
-    "E010",
-    "E004",
-    "E005",
     "E007",
-    "E008",
-    "E013",
-    "E006",
-    "E009"
+    "E012",
+    "E005",
+    "E010",
+    "E006"
   ],
   "evidence_topics": {
-    "NVLink": 12,
-    "GB200 NVL72": 11,
-    "GPU domain": 1,
-    "LLM inference": 1,
+    "NVLink": 13,
+    "GB200 NVL72": 9,
     "bandwidth": 3,
-    "NVLink-C2C": 2,
-    "GB200": 2,
-    "Grace CPU": 2,
-    "Blackwell GPU": 1,
-    "superchip": 1,
+    "GPU interconnect": 5,
+    "all-to-all topology": 1,
+    "rack architecture": 3,
+    "scale-up": 2,
+    "scale-out": 1,
+    "networking architecture": 1,
+    "SHARP": 1,
+    "collective operations": 1,
+    "in-network compute": 1,
+    "GB300 NVL72": 1,
+    "switch trays": 1,
+    "PCIe": 3,
+    "ConnectX": 1,
+    "networking": 1,
+    "roadmap": 1,
+    "architecture": 1,
+    "SuperPOD": 1,
     "rack-scale architecture": 1,
     "scale-up bandwidth": 1,
-    "Vera Rubin NVL72": 1,
-    "bandwidth comparison": 1,
-    "GPU interconnect": 3,
-    "rack architecture": 1,
-    "NVSwitch": 2,
-    "performance": 1,
-    "PCB": 1,
-    "topology": 1,
-    "Hopper comparison": 1,
-    "copper cables": 1,
-    "power": 1,
-    "cost": 1,
-    "PCIe": 4,
-    "CPU-GPU bandwidth": 1,
-    "x86": 1,
-    "InfiniBand": 1,
-    "backend networking": 1,
-    "memory access": 1,
-    "Bianca board": 1,
-    "CPU-GPU integration": 1
+    "tray design": 1,
+    "memory transfer": 1
   },
   "findings": [
-    "The GB200 NVL72 connects 36 Grace CPUs and 72 Blackwell GPUs in a rack-scale, liquid-cooled design forming a 72-GPU NVLink domain that acts as a single, massive GPU and delivers 30x faster real-time trillion-parameter LLM inference with 10x greater MoE performance.",
-    "The GB200 NVL72 rack-level NVLink domain provides 130 TB/s of total NVLink bandwidth, with each GPU contributing 3.6 TB/s of NVLink bandwidth per rack-level specification.",
-    "The GB200 NVL72 uses fifth-generation NVLink technology with 1.8 TB/s GPU-to-GPU interconnect per GPU and 130 TB/s aggregate rack-level bandwidth, delivered via NVLink Switch Trays with 144 NVLink ports per tray.",
-    "The GB200 NVL72 rack contains 10 compute trays and 9 NVLink Switch Trays that provide the all-to-all GPU-to-GPU interconnect fabric within the rack.",
-    "The GB200 NVL72 uses NVLink to interconnect all nodes within the rack, delivering the performance of 'one big GPU' with exceptional interconnect bandwidth and energy efficiency for AI and HPC workloads."
+    "The GB200 NVL72 uses fifth-generation NVLink technology to provide 130 TB/s of low-latency GPU-to-GPU communication across the rack, interconnecting all nodes and delivering the performance of 'one big GPU.'",
+    "The GB200 NVL72 compute tray uses fifth-generation NVLink with 1.8 TB/s GPU-to-GPU interconnect bandwidth per switch tray, with 9 NVLink Switch Trays each having 144 NVLink ports.",
+    "The GB200 NVL72 compute tray's networking uses ConnectX-7 NICs at 400 Gb/s for scale-out, while NVLink provides the high-bandwidth intra-rack GPU-to-GPU communication.",
+    "The GTC 2025 roadmap confirms the GB200 NVL72 uses 5th-generation NVLink at 1800 GB/s scale-up bandwidth and is liquid-cooled.",
+    "The NVIDIA GB200 NVL72 platform uses NVLink to interconnect all 72 Blackwell GPUs and 36 Grace CPUs into a rack-scale system, alongside ConnectX-7 NICs for scale-out, and scales out with Quantum-X800 InfiniBand or Spectrum-X Ethernet."
   ],
   "contradictions": [
     {
       "contradiction_id": "C001",
       "severity": "high",
-      "topic": "power"
+      "topic": "networking"
     },
     {
       "contradiction_id": "C002",
       "severity": "high",
-      "topic": "power"
+      "topic": "networking"
     },
     {
       "contradiction_id": "C003",
       "severity": "high",
-      "topic": "power"
+      "topic": "networking"
     },
     {
       "contradiction_id": "C004",
       "severity": "high",
       "topic": "power"
-    },
-    {
-      "contradiction_id": "C005",
-      "severity": "high",
-      "topic": "power"
-    },
-    {
-      "contradiction_id": "C006",
-      "severity": "high",
-      "topic": "power"
-    },
-    {
-      "contradiction_id": "C007",
-      "severity": "high",
-      "topic": "power"
-    },
-    {
-      "contradiction_id": "C008",
-      "severity": "high",
-      "topic": "power"
-    },
-    {
-      "contradiction_id": "C009",
-      "severity": "high",
-      "topic": "power"
-    },
-    {
-      "contradiction_id": "C010",
-      "severity": "high",
-      "topic": "power"
     }
   ],
-  "research_gaps": [],
+  "research_gaps": [
+    {
+      "gap_id": "G001",
+      "priority": "medium",
+      "topic": "Optical Transceivers",
+      "description": "No optical transceiver or cabling specifications found."
+    }
+  ],
   "outputs": {
     "question_id": "NVIDIA_004"
   },
   "summary": {
-    "evidence_count": 15,
-    "citation_count": 15,
-    "contradictions_found": 15,
-    "research_gaps_found": 0,
+    "evidence_count": 13,
+    "citation_count": 13,
+    "contradictions_found": 4,
+    "research_gaps_found": 1,
     "coverage_score": 0.2
   },
   "owner": null,

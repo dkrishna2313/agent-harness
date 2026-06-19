@@ -12,10 +12,10 @@ from pathlib import Path
 
 import pytest
 
-from dc_power_agent.agent import DcPowerAgent, MAX_SYNTHESIS_EVIDENCE
-from dc_power_agent.claude_client import MockClaudeClient
-from dc_power_agent.schemas import SourceDocument
-from dc_power_agent.trace import build_trace
+from research_agent.agent import DcPowerAgent, MAX_SYNTHESIS_EVIDENCE
+from research_agent.claude_client import MockClaudeClient
+from research_agent.schemas import SourceDocument
+from research_agent.trace import build_trace
 
 
 # ---------------------------------------------------------------------------

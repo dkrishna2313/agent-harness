@@ -14,9 +14,9 @@ from __future__ import annotations
 
 import pytest
 
-from dc_power_agent.contradiction import detect_contradictions
-from dc_power_agent.profile import DomainProfile, load_profile
-from dc_power_agent.schemas import EvidenceItem, assign_evidence_ids
+from research_agent.contradiction import detect_contradictions
+from research_agent.profile import DomainProfile, load_profile
+from research_agent.schemas import EvidenceItem, assign_evidence_ids
 
 # ---------------------------------------------------------------------------
 # Helpers

@@ -2,7 +2,7 @@
 
 All external network calls are mocked so these tests run offline.
 Module-level sentinel names (_DDGS, _requests, _trafilatura) in
-dc_power_agent.web_search are patched via unittest.mock.patch.
+research_agent.web_search are patched via unittest.mock.patch.
 
 API note (post-instrumentation):
   DuckDuckGoSearchProvider.search() -> (list[SearchResult], error | None)
@@ -20,8 +20,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from dc_power_agent.web_cache import WebPageCache
-from dc_power_agent.web_search import (
+from research_agent.web_cache import WebPageCache
+from research_agent.web_search import (
     DuckDuckGoSearchProvider,
     SearchResult,
     WebDocument,
@@ -112,7 +112,7 @@ class TestDuckDuckGoSearchProvider:
     def test_returns_results_when_library_available(self):
         mock_ddgs_class, _ = self._make_ddgs_mock(_FAKE_SEARCH_RESULTS)
 
-        with patch("dc_power_agent.web_search._DDGS", mock_ddgs_class):
+        with patch("research_agent.web_search._DDGS", mock_ddgs_class):
             results, error = DuckDuckGoSearchProvider().search(
                 "SMR construction timeline", max_results=5
             )
@@ -123,7 +123,7 @@ class TestDuckDuckGoSearchProvider:
         assert results[0].url == "https://example.com/smr"
 
     def test_returns_error_when_library_missing(self):
-        with patch("dc_power_agent.web_search._DDGS", None):
+        with patch("research_agent.web_search._DDGS", None):
             results, error = DuckDuckGoSearchProvider().search("anything")
         assert results == []
         assert error is not None
@@ -133,7 +133,7 @@ class TestDuckDuckGoSearchProvider:
         mock_ddgs_class, mock_instance = self._make_ddgs_mock(None)
         mock_instance.text.side_effect = RuntimeError("rate limited")
 
-        with patch("dc_power_agent.web_search._DDGS", mock_ddgs_class):
+        with patch("research_agent.web_search._DDGS", mock_ddgs_class):
             results, error = DuckDuckGoSearchProvider().search("SMR", max_results=3)
 
         assert results == []
@@ -147,7 +147,7 @@ class TestDuckDuckGoSearchProvider:
             {"title": "NoHref", "body": "s"},
         ])
 
-        with patch("dc_power_agent.web_search._DDGS", mock_ddgs_class):
+        with patch("research_agent.web_search._DDGS", mock_ddgs_class):
             results, error = DuckDuckGoSearchProvider().search("q")
 
         assert len(results) == 1
@@ -177,8 +177,8 @@ class TestDownloadWebDocument:
         mock_trafilatura.extract.return_value = _FAKE_EXTRACTED_TEXT
 
         with (
-            patch("dc_power_agent.web_search._requests", mock_requests),
-            patch("dc_power_agent.web_search._trafilatura", mock_trafilatura),
+            patch("research_agent.web_search._requests", mock_requests),
+            patch("research_agent.web_search._trafilatura", mock_trafilatura),
         ):
             doc, error = download_web_document("https://example.com/smr", timeout=5)
 
@@ -190,7 +190,7 @@ class TestDownloadWebDocument:
         assert doc.fetched_at != ""
 
     def test_returns_error_when_requests_missing(self):
-        with patch("dc_power_agent.web_search._requests", None):
+        with patch("research_agent.web_search._requests", None):
             doc, error = download_web_document("https://example.com")
         assert doc is None
         assert error is not None
@@ -199,8 +199,8 @@ class TestDownloadWebDocument:
     def test_returns_error_when_trafilatura_missing(self):
         mock_requests = self._make_mock_requests()
         with (
-            patch("dc_power_agent.web_search._requests", mock_requests),
-            patch("dc_power_agent.web_search._trafilatura", None),
+            patch("research_agent.web_search._requests", mock_requests),
+            patch("research_agent.web_search._trafilatura", None),
         ):
             doc, error = download_web_document("https://example.com")
         assert doc is None
@@ -213,8 +213,8 @@ class TestDownloadWebDocument:
         mock_trafilatura = MagicMock()
 
         with (
-            patch("dc_power_agent.web_search._requests", mock_requests),
-            patch("dc_power_agent.web_search._trafilatura", mock_trafilatura),
+            patch("research_agent.web_search._requests", mock_requests),
+            patch("research_agent.web_search._trafilatura", mock_trafilatura),
         ):
             doc, error = download_web_document("https://example.com")
 
@@ -228,8 +228,8 @@ class TestDownloadWebDocument:
         mock_trafilatura.extract.return_value = ""
 
         with (
-            patch("dc_power_agent.web_search._requests", mock_requests),
-            patch("dc_power_agent.web_search._trafilatura", mock_trafilatura),
+            patch("research_agent.web_search._requests", mock_requests),
+            patch("research_agent.web_search._trafilatura", mock_trafilatura),
         ):
             doc, error = download_web_document("https://example.com")
 
@@ -242,8 +242,8 @@ class TestDownloadWebDocument:
         mock_trafilatura.extract.side_effect = Exception("parse error")
 
         with (
-            patch("dc_power_agent.web_search._requests", mock_requests),
-            patch("dc_power_agent.web_search._trafilatura", mock_trafilatura),
+            patch("research_agent.web_search._requests", mock_requests),
+            patch("research_agent.web_search._trafilatura", mock_trafilatura),
         ):
             doc, error = download_web_document("https://example.com")
 
@@ -276,8 +276,8 @@ class TestWebRetrieve:
         mock_provider_class.return_value.search.return_value = (sr, None)
 
         with (
-            patch("dc_power_agent.web_search.DuckDuckGoSearchProvider", mock_provider_class),
-            patch("dc_power_agent.web_search.download_web_document", return_value=(doc, None)),
+            patch("research_agent.web_search.DuckDuckGoSearchProvider", mock_provider_class),
+            patch("research_agent.web_search.download_web_document", return_value=(doc, None)),
         ):
             docs, trace = web_retrieve("SMR construction", max_results=3, max_pages=3)
 
@@ -306,7 +306,7 @@ class TestWebRetrieve:
         mock_provider_class = MagicMock(return_value=MagicMock())
         mock_provider_class.return_value.search.return_value = ([], "rate limited")
 
-        with patch("dc_power_agent.web_search.DuckDuckGoSearchProvider", mock_provider_class):
+        with patch("research_agent.web_search.DuckDuckGoSearchProvider", mock_provider_class):
             docs, trace = web_retrieve("anything")
 
         assert docs == []
@@ -330,8 +330,8 @@ class TestWebRetrieve:
         mock_provider_class.return_value.search.return_value = (sr, None)
 
         with (
-            patch("dc_power_agent.web_search.DuckDuckGoSearchProvider", mock_provider_class),
-            patch("dc_power_agent.web_search.download_web_document", side_effect=fake_download),
+            patch("research_agent.web_search.DuckDuckGoSearchProvider", mock_provider_class),
+            patch("research_agent.web_search.download_web_document", side_effect=fake_download),
         ):
             docs, trace = web_retrieve("q", max_pages=5)
 
@@ -343,8 +343,8 @@ class TestWebRetrieve:
 
     def test_dep_status_in_trace_when_missing(self):
         with (
-            patch("dc_power_agent.web_search._DDGS", None),
-            patch("dc_power_agent.web_search._dep_status", {
+            patch("research_agent.web_search._DDGS", None),
+            patch("research_agent.web_search._dep_status", {
                 "duckduckgo_search": "missing: No module named 'duckduckgo_search'",
                 "requests": "ok",
                 "trafilatura": "ok",
@@ -374,8 +374,8 @@ class TestWebRetrieve:
         mock_download = MagicMock(return_value=(None, "should not be called"))
 
         with (
-            patch("dc_power_agent.web_search.DuckDuckGoSearchProvider", mock_provider_class),
-            patch("dc_power_agent.web_search.download_web_document", mock_download),
+            patch("research_agent.web_search.DuckDuckGoSearchProvider", mock_provider_class),
+            patch("research_agent.web_search.download_web_document", mock_download),
         ):
             docs, trace = web_retrieve("q", cache=FakeCache())
 
@@ -401,8 +401,8 @@ class TestWebRetrieve:
         mock_provider_class.return_value.search.return_value = (sr, None)
 
         with (
-            patch("dc_power_agent.web_search.DuckDuckGoSearchProvider", mock_provider_class),
-            patch("dc_power_agent.web_search.download_web_document", return_value=(doc, None)),
+            patch("research_agent.web_search.DuckDuckGoSearchProvider", mock_provider_class),
+            patch("research_agent.web_search.download_web_document", return_value=(doc, None)),
         ):
             web_retrieve("q", cache=FakeCache())
 
@@ -426,8 +426,8 @@ class TestWebRetrieve:
         mock_provider_class.return_value.search.return_value = (sr, None)
 
         with (
-            patch("dc_power_agent.web_search.DuckDuckGoSearchProvider", mock_provider_class),
-            patch("dc_power_agent.web_search.download_web_document", side_effect=fake_dl),
+            patch("research_agent.web_search.DuckDuckGoSearchProvider", mock_provider_class),
+            patch("research_agent.web_search.download_web_document", side_effect=fake_dl),
         ):
             docs, trace = web_retrieve("pipeline test", max_results=5, max_pages=5)
 
@@ -529,7 +529,7 @@ class TestWebPageCache:
 class TestChunkSourceFields:
 
     def test_default_source_type_is_local(self):
-        from dc_power_agent.schemas import Chunk
+        from research_agent.schemas import Chunk
 
         c = Chunk(
             chunk_id="c001",
@@ -543,7 +543,7 @@ class TestChunkSourceFields:
         assert c.source_url == ""
 
     def test_web_chunk_source_fields(self):
-        from dc_power_agent.schemas import Chunk
+        from research_agent.schemas import Chunk
 
         c = Chunk(
             chunk_id="web_0000_0000",
@@ -567,8 +567,8 @@ class TestChunkSourceFields:
 class TestWebDocsToChunks:
 
     def test_converts_doc_to_chunk(self):
-        from dc_power_agent.agent import _web_docs_to_chunks
-        from dc_power_agent.web_search import WebDocument
+        from research_agent.agent import _web_docs_to_chunks
+        from research_agent.web_search import WebDocument
 
         docs = [WebDocument(url="https://example.com/p", title="T", text="content here")]
         chunks = _web_docs_to_chunks(docs)
@@ -580,8 +580,8 @@ class TestWebDocsToChunks:
         assert c.text == "content here"
 
     def test_skips_empty_text_docs(self):
-        from dc_power_agent.agent import _web_docs_to_chunks
-        from dc_power_agent.web_search import WebDocument
+        from research_agent.agent import _web_docs_to_chunks
+        from research_agent.web_search import WebDocument
 
         docs = [
             WebDocument(url="https://a.com", title="A", text="content"),
@@ -600,7 +600,7 @@ class TestWebDocsToChunks:
 class TestWebSearchConfigProfile:
 
     def test_default_web_search_disabled(self):
-        from dc_power_agent.profile import load_profile
+        from research_agent.profile import load_profile
 
         profile = load_profile("smr")
         assert profile.web_search.enabled is False
@@ -618,7 +618,7 @@ web_search:
         profile_file = tmp_path / "test_ws.yaml"
         profile_file.write_text(yaml_content)
 
-        from dc_power_agent.profile import load_profile
+        from research_agent.profile import load_profile
 
         profile = load_profile(str(profile_file))
         assert profile.web_search.enabled is True

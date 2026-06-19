@@ -22,9 +22,9 @@ from __future__ import annotations
 
 import pytest
 
-from dc_power_agent.contradiction import detect_contradictions
-from dc_power_agent.evidence_filter import is_source_local, sanitize_evidence_items
-from dc_power_agent.schemas import EvidenceItem, assign_evidence_ids
+from research_agent.contradiction import detect_contradictions
+from research_agent.evidence_filter import is_source_local, sanitize_evidence_items
+from research_agent.schemas import EvidenceItem, assign_evidence_ids
 
 
 # ---------------------------------------------------------------------------
@@ -212,7 +212,7 @@ class TestSanitizeEvidenceItems:
     def test_stage_label_in_log(self, caplog):
         import logging
         items = [_ev("This contradicts everything.", "doc.pdf")]
-        with caplog.at_level(logging.WARNING, logger="dc_power_agent.evidence_filter"):
+        with caplog.at_level(logging.WARNING, logger="research_agent.evidence_filter"):
             sanitize_evidence_items(items, stage="test_stage")
         assert "test_stage" in caplog.text
 
@@ -220,7 +220,7 @@ class TestSanitizeEvidenceItems:
         import logging
         bad_claim = "This contradicts the earlier estimate."
         items = [_ev(bad_claim, "bad_doc.pdf")]
-        with caplog.at_level(logging.WARNING, logger="dc_power_agent.evidence_filter"):
+        with caplog.at_level(logging.WARNING, logger="research_agent.evidence_filter"):
             sanitize_evidence_items(items)
         assert "bad_doc.pdf" in caplog.text
 

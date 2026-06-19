@@ -1,4 +1,4 @@
-"""Tests for dc_power_agent.retrieval."""
+"""Tests for research_agent.retrieval."""
 
 from __future__ import annotations
 
@@ -6,16 +6,16 @@ from pathlib import Path
 
 import pytest
 
-from dc_power_agent.retrieval import (
+from research_agent.retrieval import (
     DEFAULT_TOP_CHUNKS,
     classify_document_priority,
     score_retrieval,
     select_top_chunks,
 )
-from dc_power_agent.schemas import Chunk, SourceDocument
-from dc_power_agent.agent import DcPowerAgent
-from dc_power_agent.claude_client import MockClaudeClient
-from dc_power_agent.trace import build_trace
+from research_agent.schemas import Chunk, SourceDocument
+from research_agent.agent import DcPowerAgent
+from research_agent.claude_client import MockClaudeClient
+from research_agent.trace import build_trace
 
 
 def _make_chunk(text: str, doc_name: str = "test.txt", chunk_number: int = 1) -> Chunk:
@@ -157,7 +157,7 @@ def test_coverage_guarantee_selects_short_synthetic_documents():
     to work when test_power_a.txt / test_power_b.txt are loaded alongside real
     NVIDIA source PDFs.
     """
-    from dc_power_agent.retrieval import MIN_COVERAGE_SCORE, select_top_chunks
+    from research_agent.retrieval import MIN_COVERAGE_SCORE, select_top_chunks
 
     # Build many high-priority NVIDIA-named docs to fill the top-N slots
     nvidia_docs = [
@@ -177,7 +177,7 @@ def test_coverage_guarantee_selects_short_synthetic_documents():
         "test_power_b.txt",
     )
 
-    from dc_power_agent.chunker import chunk_documents
+    from research_agent.chunker import chunk_documents
 
     all_chunks = chunk_documents(nvidia_docs + [test_doc_a, test_doc_b])
     question = "What are the DC power implications of the NVIDIA NVL72 rack?"
@@ -202,8 +202,8 @@ def test_coverage_guarantee_excludes_irrelevant_documents():
     so that the agile doc is excluded from phase-1 selection and the coverage
     guarantee is actually exercised.
     """
-    from dc_power_agent.retrieval import DEFAULT_TOP_CHUNKS, MIN_COVERAGE_SCORE, select_top_chunks
-    from dc_power_agent.chunker import CHUNK_MAX, chunk_documents
+    from research_agent.retrieval import DEFAULT_TOP_CHUNKS, MIN_COVERAGE_SCORE, select_top_chunks
+    from research_agent.chunker import CHUNK_MAX, chunk_documents
 
     # Each NVIDIA doc produces ~2 chunks; 10 docs → ~20 chunks > top_n=15
     sentence = "NVIDIA Rubin NVL72 rack power cooling liquid networking infrastructure architecture. "

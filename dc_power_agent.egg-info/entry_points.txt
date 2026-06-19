@@ -1,3 +1,0 @@
-[console_scripts]
-dc-power-agent = dc_power_agent.cli:app
-dc-power-agent-eval = dc_power_agent.eval_runner:app
