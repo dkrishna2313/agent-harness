@@ -919,6 +919,12 @@ def _build_topic_term_sets(profile: DomainProfile | None) -> dict[str, set[str]]
             for topic, keywords in profile.topic_keywords.items()
             if keywords
         }
+    if profile is not None and profile.required_topic_terms:
+        return {
+            topic: {kw.lower() for kw in terms if kw}
+            for topic, terms in profile.required_topic_terms.items()
+            if terms
+        }
     return _REQUIRED_TOPIC_TERMS
 
 

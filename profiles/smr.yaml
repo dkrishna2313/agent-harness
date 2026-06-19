@@ -399,3 +399,118 @@ memo_section_hints:
   - Fuel Cycle Implications
   - Research Gaps
   - Coverage Matrix
+
+evaluator_topic_terms:
+  "reactor design": [reactor, smr, nuclear, design, thermal, core, coolant]
+  licensing: [license, nrc, regulatory, approval, permit, certification, cnsc, iaea]
+  safety: [safety, passive, shutdown, containment, accident, decay heat]
+  economics: [economics, cost, lcoe, capex, financi, levelized, overnight]
+  construction: [construction, build, schedule, timeline, modular, fabricat]
+  "grid integration": [grid, dispatch, baseload, load follow, flexible, mwe, mwh]
+  "fuel cycle": [fuel, uranium, haleu, enrichment, spent fuel, refuel]
+  "waste management": [waste, spent fuel, repository, disposal, radioactive]
+  cooling: [cooling, coolant, water, heat exchanger, passive cooling]
+  "deployment timeline": [deployment, timeline, commercial operation, cod, first unit]
+
+topic_section_checks: {}
+
+coverage_gap_keywords:
+  "reactor design": [thermal output, core design, passive safety, pressure vessel]
+  licensing: [nrc, design certification, construction permit, regulatory approval]
+  economics: [lcoe, overnight cost, capital cost, foak, noak]
+  construction: [construction timeline, modular, civil works, first concrete]
+  "grid integration": [load following, capacity factor, ancillary services]
+  "fuel cycle": [haleu, enrichment, spent fuel, fuel supply]
+
+perspectives:
+  licensing: [license, nrc, cnsc, regulatory, approval, permit, certification, review, iaea, "standard design", "design certification", "licensing process", "regulatory approval", dcd]
+  construction: [construct, build, concrete, erect, install, timeline, schedule, "first concrete", commissioning, modular, fabricat, assembly, "site preparation", "construction period", "build time", "years to build"]
+  economics: [cost, capex, lcoe, financi, dollar, million, billion, price, economics, tco, investment, revenue, "overnight cost", levelized, "capital cost", "project cost"]
+  fuel: [fuel, uranium, haleu, enrichment, fissile, pellet, rod, assembly, burnup, cycle, enriched, u-235, "fuel cycle", "spent fuel", "fresh fuel", refuel, reload]
+  grid_integration: [grid, dispatch, flexible, "load follow", baseload, peaking, integration, ancillary, frequency, "capacity factor", mwh, mwe, "load following", variable, intermittent]
+  supply_chain: ["supply chain", manufacture, component, vendor, procurement, forging, "pressure vessel", shortage, domestic, international, tier-1, "industrial base", "qualified supplier"]
+  deployment: [deploy, site, location, commissioning, "first unit", project, contract, mou, loi, "commercial operation", cod, "planned site"]
+  public_acceptance: [public, community, acceptance, opposition, sentiment, opinion, trust, stakeholder, local, "social licence", consultation, engagement, perception, support, protest]
+
+domain_signals: [smr, nuclear, reactor, bwrx, nuscale, nrc, haleu, moltex, terrestrial, kairos, x-energy, usnc, cnsc, thorcon, newcleo, holtec]
+
+entity_patterns:
+  - name: "BWRX-300"
+    signals: ["BWRX-300", "BWRX300", "bwrx-300", "bwrx300"]
+  - name: "NuScale VOYGR"
+    signals: [NuScale, VOYGR, nuscale, voygr]
+  - name: "AP300"
+    signals: [AP300, ap300]
+  - name: "SMR-160"
+    signals: ["SMR-160", "smr-160"]
+  - name: "NuwardSMR"
+    signals: [Nuward, nuward]
+
+metric_patterns:
+  lcoe:
+    - "\\blcoe\\b"
+    - "\\blevelized\\s+cost\\b"
+    - "\\bcost\\s+of\\s+electricity\\b"
+  construction_cost:
+    - "\\bconstruction\\s+cost\\b"
+    - "\\bcapital\\s+cost\\b"
+    - "\\bevernight\\s+cost\\b"
+  electric_output:
+    - "\\belectric(?:al)?\\s+output\\b"
+    - "\\bmwe\\b|\\bkwe\\b"
+    - "\\bpower\\s+output\\b|\\boutput\\s+capacity\\b"
+
+metric_anchor_queries:
+  lcoe: ["{e} levelized cost electricity LCOE", "{e} construction cost economics"]
+  construction_cost: ["{e} construction capital cost overnight", "{e} cost schedule economics"]
+  electric_output: ["{e} electrical output capacity MWe", "{e} power generation specifications"]
+
+topic_query_expansions:
+  economics: ["SMR levelized cost electricity LCOE", "nuclear construction cost overrun", "FOAK first-of-a-kind cost premium", "NOAK nth-of-a-kind cost reduction", "economy of scale factory manufacturing", "nuclear financing interest rates overnight capital"]
+  construction: ["SMR construction duration schedule timeline", "modular construction factory fabrication", "construction risk contingency workforce", "civil works concrete steel cost"]
+  licensing: ["NRC design certification application", "nuclear regulatory approval process", "construction permit operating license", "SMR licensing pathway timeline risk"]
+  "reactor design": ["SMR core design thermal output MWe", "passive safety system design", "reactor coolant loop pressure vessel"]
+  "grid integration": ["grid flexibility load following baseload", "capacity factor ancillary services", "SMR dispatch flexibility hybrid energy"]
+  "fuel cycle": ["uranium fuel enrichment supply chain", "HALEU high-assay low-enriched uranium", "fuel cost nuclear operations"]
+  "deployment timeline": ["SMR commercial operation date commissioning", "deployment timeline first plant schedule"]
+  safety: ["passive safety shutdown decay heat", "containment design accident scenario"]
+  "waste management": ["spent nuclear fuel storage disposal", "radioactive waste high-level repository"]
+  bwrx: ["BWRX-300 design specifications GE Hitachi", "BWRX-300 construction cost licensing"]
+
+source_quality_rules:
+  - signals: [doe, "department of energy"]
+    type: authoritative_primary
+    score: 5
+    label: "US Department of Energy"
+  - signals: [iaea]
+    type: authoritative_primary
+    score: 5
+    label: "IAEA authoritative source"
+  - signals: [nrc, "nuclear regulatory"]
+    type: authoritative_primary
+    score: 5
+    label: "NRC regulatory document"
+  - signals: [nuscale]
+    type: industry_vendor
+    score: 4
+    label: "NuScale vendor document"
+  - signals: [terrapower]
+    type: industry_vendor
+    score: 4
+    label: "TerraPower vendor document"
+  - signals: ["ge hitachi"]
+    type: industry_vendor
+    score: 4
+    label: "GE Hitachi vendor document"
+  - signals: [bwrx]
+    type: industry_vendor
+    score: 4
+    label: "BWRX-300 vendor document"
+
+required_topic_terms:
+  "reactor design": [reactor, smr, nuclear, thermal, core, design, coolant]
+  licensing: [license, nrc, regulatory, approval, certification]
+  economics: [cost, lcoe, capex, financi, levelized, overnight]
+  construction: [construction, build, schedule, modular]
+  "grid integration": [grid, dispatch, baseload, flexible, mwe]
+  "fuel cycle": [fuel, uranium, haleu, enrichment]

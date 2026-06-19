@@ -1,7 +1,7 @@
 {
   "research_id": "R-NVIDIA_001",
-  "created_at": "2026-06-19T11:00:25.109587+00:00",
-  "updated_at": "2026-06-19T11:00:25.109801+00:00",
+  "created_at": "2026-06-19T19:30:04.296753+00:00",
+  "updated_at": "2026-06-19T19:30:04.297010+00:00",
   "status": "completed",
   "question": "What is the rack-level DC power requirement of the NVIDIA GB200 NVL72?",
   "profile": "ai_data_centers",
@@ -20,39 +20,45 @@
     "E001",
     "E002",
     "E003",
-    "E004"
+    "E004",
+    "E005"
   ],
   "evidence_topics": {
     "rack power": 2,
-    "power shelves": 2,
-    "GB200 NVL72": 4,
-    "rack architecture": 1,
-    "configuration": 1,
+    "power shelves": 1,
+    "DC power": 2,
+    "GB200 NVL72": 5,
+    "rack architecture": 3,
+    "system configuration": 1,
+    "compute tray": 1,
     "cooling": 1,
-    "compute tray": 1
+    "NVLink switch": 1,
+    "compute trays": 1,
+    "power shelf": 1
   },
   "findings": [
-    "The GB200 NVL72 rack configuration includes two groupings of 3x 1U 33kW Power Shelves, for a total of six 33kW shelves depicted in the rack diagram.",
-    "The source documents do not state an explicit rack-level DC power figure (e.g., total kW draw or requirement) for the GB200 NVL72; only the power shelf configuration is listed.",
-    "The GB200 NVL72 is a fully liquid-cooled rack-scale design featuring 36 NVIDIA Grace CPUs and 72 NVIDIA Blackwell GPUs, up to 13.5 TB of HBM3E, and a 130 TB/s NVLink domain.",
-    "Each GB200 NVL72 compute tray is a 1U liquid-cooled server node with 2x Grace CPUs and 4x Blackwell GPUs, equipped with 2x Superchip cold plate loops for liquid cooling."
+    "The GB200 NVL72 rack uses three 1U 33 kW power shelves per half-rack section, with this configuration repeated twice in the rack, yielding six 33 kW power shelves total.",
+    "The GB200 NVL72 is a fully liquid-cooled rack-scale design housing 36 NVIDIA Grace CPUs, 72 NVIDIA Blackwell GPUs, up to 17 TB of LPDDR5X memory, and 5th Gen NVLink technology delivering 130 TB/s GPU communication bandwidth.",
+    "The GB200 NVL72 compute tray (GIGABYTE XN14-CB0-LA01) is a 1U liquid-cooled server node housing 2 Grace CPUs and 4 Blackwell GPUs, cooled via 8x 40x40x56mm fans and 2 superchip cold plate loops.",
+    "The GB200 NVL72 rack contains 10 compute trays and 9 NVLink Switch Trays; each NVLink Switch Tray provides 144 NVLink ports and 5th-generation NVLink with 1.8 TB/s GPU-GPU interconnect.",
+    "The source documents do not state an explicit total rack-level DC power figure for the GB200 NVL72; only the individual power shelf rating of 33 kW per shelf is provided."
   ],
-  "contradictions": [],
+  "contradictions": [
+    {
+      "contradiction_id": "C001",
+      "severity": "high",
+      "topic": "power"
+    }
+  ],
   "research_gaps": [
     {
       "gap_id": "G001",
-      "priority": "high",
-      "topic": "Power Delivery Infrastructure",
-      "description": "No power delivery or PDU infrastructure guidance found."
-    },
-    {
-      "gap_id": "G002",
       "priority": "medium",
       "topic": "UPS and Backup Power",
       "description": "No UPS or battery backup requirements found."
     },
     {
-      "gap_id": "G003",
+      "gap_id": "G002",
       "priority": "low",
       "topic": "Power Quality",
       "description": "No power quality specifications found."
@@ -62,11 +68,11 @@
     "question_id": "NVIDIA_001"
   },
   "summary": {
-    "evidence_count": 4,
-    "citation_count": 4,
-    "contradictions_found": 0,
-    "research_gaps_found": 3,
-    "coverage_score": 0.32
+    "evidence_count": 5,
+    "citation_count": 5,
+    "contradictions_found": 1,
+    "research_gaps_found": 2,
+    "coverage_score": 0.4
   },
   "owner": null,
   "assigned_agent": null,

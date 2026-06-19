@@ -64,6 +64,7 @@ def evaluate_memo(
     documents: Sequence[SourceDocument],
     *,
     mock_llm: bool = False,
+    profile: "DomainProfile | None" = None,
 ) -> list[EvaluationWarning]:
     """Return non-fatal warnings about memo completeness and source support."""
 
@@ -187,9 +188,9 @@ def evaluate_memo(
             )
         )
 
-    question_topics = classify_question_topics(memo.question)
-    warnings.extend(_topic_section_warnings(memo, question_topics))
-    warnings.extend(_citation_warnings(memo, evidence, question_topics))
+    question_topics = classify_question_topics(memo.question, profile)
+    warnings.extend(_topic_section_warnings(memo, question_topics, profile))
+    warnings.extend(_citation_warnings(memo, evidence, question_topics, profile))
 
     # Informational chunk retrieval metrics (not warnings)
     chunk_count = memo.metadata.get("chunk_count", 0)
@@ -273,7 +274,14 @@ def classify_question_topics(
     identically.
     """
     if profile is not None:
-        return profile.classify_question_topics(question)
+        # Use evaluator-specific topic terms when available, otherwise fall back to profile's topic_keywords
+        evaluator_terms = profile.get_evaluator_topic_terms()
+        normalized = question.lower()
+        return {
+            topic
+            for topic, terms in evaluator_terms.items()
+            if any(term in normalized for term in terms)
+        }
 
     # Legacy fallback: hard-coded AI data-center topic terms
     normalized = question.lower()
@@ -288,13 +296,21 @@ def _evidence_items(memo: ResearchMemo) -> list[EvidenceItem]:
     return memo.source_notes or memo.evidence
 
 
-def _topic_section_warnings(memo: ResearchMemo, question_topics: set[str]) -> list[EvaluationWarning]:
+def _topic_section_warnings(
+    memo: ResearchMemo,
+    question_topics: set[str],
+    profile: "DomainProfile | None" = None,
+) -> list[EvaluationWarning]:
+    section_checks = (
+        profile.topic_section_checks if profile is not None and profile.topic_section_checks
+        else _TOPIC_SECTION_CHECKS
+    )
     warnings: list[EvaluationWarning] = []
     for topic in sorted(question_topics):
-        if topic not in _TOPIC_SECTION_CHECKS:
+        if topic not in section_checks:
             continue
-        field_name, section_name, missing_code, _citation_code = _TOPIC_SECTION_CHECKS[topic]
-        if not getattr(memo, field_name):
+        field_name, section_name, missing_code, _citation_code = section_checks[topic]
+        if not getattr(memo, field_name, None):
             warnings.append(
                 EvaluationWarning(
                     code=missing_code,
@@ -308,13 +324,18 @@ def _citation_warnings(
     memo: ResearchMemo,
     evidence: list[EvidenceItem],
     question_topics: set[str],
+    profile: "DomainProfile | None" = None,
 ) -> list[EvaluationWarning]:
+    section_checks = (
+        profile.topic_section_checks if profile is not None and profile.topic_section_checks
+        else _TOPIC_SECTION_CHECKS
+    )
     warnings: list[EvaluationWarning] = []
     citation_checks = [("confirmed_facts", "Confirmed Facts", "missing_confirmed_fact_citations")]
     for topic in sorted(question_topics):
-        if topic not in _TOPIC_SECTION_CHECKS:
+        if topic not in section_checks:
             continue
-        field_name, section_name, _missing_code, citation_code = _TOPIC_SECTION_CHECKS[topic]
+        field_name, section_name, _missing_code, citation_code = section_checks[topic]
         citation_checks.append((field_name, section_name, citation_code))
 
     for field_name, section_name, code in citation_checks:

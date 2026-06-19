@@ -92,12 +92,31 @@ _RULES: list[tuple[list[str], SourceType, int, str]] = [
 ]
 
 
-def classify_source_quality(document_name: str) -> SourceQuality:
+def classify_source_quality(
+    document_name: str,
+    profile: "DomainProfile | None" = None,
+) -> SourceQuality:
     """Return a deterministic SourceQuality for *document_name*.
+
+    When *profile* is supplied and has ``source_quality_rules``, those rules are
+    checked FIRST (domain-specific, higher precedence).  The generic ``_RULES``
+    table is used as a fallback.
 
     Classification uses only the filename; no LLM or network calls are made.
     """
     lower = document_name.lower()
+
+    # Profile rules take precedence over generic rules
+    if profile is not None and profile.source_quality_rules:
+        for rule in profile.source_quality_rules:
+            signals = rule.get("signals", [])
+            if all(str(s).lower() in lower for s in signals):
+                return SourceQuality(
+                    source_document=document_name,
+                    source_type=rule.get("type", "unknown"),
+                    source_quality_score=rule.get("score", 2),
+                    rationale=rule.get("label", "Profile rule match"),
+                )
 
     for tokens, source_type, score, rationale in _RULES:
         if all(t in lower for t in tokens):
@@ -158,8 +177,8 @@ def classify_source_quality_with_profile(
                     ),
                 )
 
-    # No profile hint matched — fall back to domain-agnostic rules
-    return classify_source_quality(document_name)
+    # No profile hint matched — fall back to rules (with profile for source_quality_rules)
+    return classify_source_quality(document_name, profile)
 
 
 def build_source_quality_map(
@@ -177,4 +196,4 @@ def build_source_quality_map(
             name: classify_source_quality_with_profile(name, profile)
             for name in document_names
         }
-    return {name: classify_source_quality(name) for name in document_names}
+    return {name: classify_source_quality(name, None) for name in document_names}

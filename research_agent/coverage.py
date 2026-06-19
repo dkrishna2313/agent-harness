@@ -99,9 +99,12 @@ def compute_coverage_matrix(
     for topic in sorted(topics):
         if profile is not None:
             topic_evidence = _evidence_for_topic_profile(evidence, topic, profile)
-            gap_keywords = frozenset(
-                kw.lower() for kw in profile.topic_keywords.get(topic, [topic])
-            )
+            if profile.coverage_gap_keywords and topic in profile.coverage_gap_keywords:
+                gap_keywords = frozenset(kw.lower() for kw in profile.coverage_gap_keywords[topic])
+            else:
+                gap_keywords = frozenset(
+                    kw.lower() for kw in profile.topic_keywords.get(topic, [topic])
+                )
         else:
             categories = _TOPIC_CATEGORIES.get(topic, frozenset({topic}))
             topic_evidence = [item for item in evidence if item.category in categories]

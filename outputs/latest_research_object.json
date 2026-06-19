@@ -1,9 +1,9 @@
 {
-  "research_id": "R-SMR_011",
-  "created_at": "2026-06-19T11:30:59.927286+00:00",
-  "updated_at": "2026-06-19T11:30:59.927422+00:00",
+  "research_id": "R-SMR_001",
+  "created_at": "2026-06-19T19:30:30.672101+00:00",
+  "updated_at": "2026-06-19T19:30:30.672281+00:00",
   "status": "completed",
-  "question": "What is the output capacity of the BWRX-300, and what type of reactor technology does it use?",
+  "question": "What regulatory approvals are required before a small modular reactor can begin commercial operation in the United States?",
   "profile": "smr",
   "profile_source": "benchmark_domain_mapping",
   "run_config": {
@@ -21,12 +21,12 @@
   ],
   "evidence_topics": {},
   "findings": [
-    "The only available evidence item contains no information about the BWRX-300 reactor, its output capacity, or its reactor technology type."
+    "The sole evidence item confirms that none of the supplied source documents contain information about SMR regulatory approvals; all sources exclusively cover NVIDIA GPU architectures, AI computing platforms, and related infrastructure."
   ],
   "contradictions": [],
   "research_gaps": [],
   "outputs": {
-    "question_id": "SMR_011"
+    "question_id": "SMR_001"
   },
   "summary": {
     "evidence_count": 1,

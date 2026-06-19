@@ -95,6 +95,47 @@ class DomainProfile(BaseModel):
     # optional: technical vocabulary used for specificity scoring
     specificity_terms: list[str] | None = None
 
+    # Perspective taxonomy: perspective_name -> list of keyword strings
+    # Used by perspectives.py to classify evidence items
+    perspectives: dict[str, list[str]] = Field(default_factory=dict)
+
+    # Document signals that identify this domain from a filename
+    # Used by perspectives.py detect_domain()
+    domain_signals: list[str] = Field(default_factory=list)
+
+    # Entity patterns for retrieval planning (ordered most-specific first)
+    # Each entry: {name: "GB200 NVL72", signals: ["NVL72", "nvl72"]}
+    entity_patterns: list[dict] = Field(default_factory=list)
+
+    # Metric detection patterns (regex strings, compiled at load time)
+    # metric_key -> list of regex strings
+    metric_patterns: dict[str, list[str]] = Field(default_factory=dict)
+
+    # Metric-anchored query templates: metric_key -> list of query strings with {e} placeholder
+    metric_anchor_queries: dict[str, list[str]] = Field(default_factory=dict)
+
+    # Topic query expansion strings: topic_key -> list of query strings
+    topic_query_expansions: dict[str, list[str]] = Field(default_factory=dict)
+
+    # Source quality rules (ordered, first match wins)
+    # Each entry: {signals: [...], type: "nvidia_technical", score: 5, label: "..."}
+    source_quality_rules: list[dict] = Field(default_factory=list)
+
+    # Topic terms for evaluator.py (topic -> list of keyword strings)
+    # When absent, falls back to topic_keywords
+    evaluator_topic_terms: dict[str, list[str]] = Field(default_factory=dict)
+
+    # Topic section checks for evaluator.py
+    # topic -> [section_key, Section Title, missing_section_code, missing_citations_code]
+    topic_section_checks: dict[str, list[str]] = Field(default_factory=dict)
+
+    # Coverage gap keywords: topic -> list of gap keyword strings
+    coverage_gap_keywords: dict[str, list[str]] = Field(default_factory=dict)
+
+    # Required topic terms for memo quality checks in agent.py
+    # topic -> list of required term strings
+    required_topic_terms: dict[str, list[str]] = Field(default_factory=dict)
+
     # resolved path to the loaded profile file (set by loader, not in YAML)
     profile_path: str = Field(default="", exclude=True)
 
@@ -138,6 +179,10 @@ class DomainProfile(BaseModel):
     def get_specificity_terms(self) -> set[str]:
         """Return the specificity term set."""
         return set(self.specificity_terms) if self.specificity_terms else set()
+
+    def get_evaluator_topic_terms(self) -> dict[str, list[str]]:
+        """Return topic terms for evaluator. Falls back to topic_keywords."""
+        return self.evaluator_topic_terms if self.evaluator_topic_terms else self.topic_keywords
 
     def get_topic_categories(self, topic: str) -> frozenset[str]:
         """Return evidence categories that count toward *topic* coverage.
@@ -222,6 +267,17 @@ def load_profile(name_or_path: str) -> DomainProfile:
         specificity_terms=raw.get("specificity_terms"),
         contradiction_topics=parsed_ct,
         web_search=web_search_cfg,
+        perspectives=raw.get("perspectives", {}),
+        domain_signals=raw.get("domain_signals", []),
+        entity_patterns=raw.get("entity_patterns", []),
+        metric_patterns=raw.get("metric_patterns", {}),
+        metric_anchor_queries=raw.get("metric_anchor_queries", {}),
+        topic_query_expansions=raw.get("topic_query_expansions", {}),
+        source_quality_rules=raw.get("source_quality_rules", []),
+        evaluator_topic_terms=raw.get("evaluator_topic_terms", {}),
+        topic_section_checks=raw.get("topic_section_checks", {}),
+        coverage_gap_keywords=raw.get("coverage_gap_keywords", {}),
+        required_topic_terms=raw.get("required_topic_terms", {}),
         profile_path=str(path),
     )
     return profile

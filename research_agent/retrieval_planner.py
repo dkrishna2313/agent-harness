@@ -232,8 +232,21 @@ _SMR_ENTITY_PATTERNS: list[tuple[str, list[str]]] = [
 _ALL_ENTITY_PATTERNS = _AI_DC_ENTITY_PATTERNS + _SMR_ENTITY_PATTERNS
 
 
-def detect_entity_lock(question: str) -> str | None:
-    """Return the canonical name of the most specific entity found in the question."""
+def detect_entity_lock(
+    question: str,
+    profile: "DomainProfile | None" = None,
+) -> str | None:
+    """Return the canonical name of the most specific entity found in the question.
+
+    When *profile* is supplied and has ``entity_patterns``, those are checked first.
+    Falls back to the hardcoded ``_ALL_ENTITY_PATTERNS`` table.
+    """
+    if profile is not None and profile.entity_patterns:
+        for entry in profile.entity_patterns:
+            name = entry.get("name", "")
+            signals = entry.get("signals", [])
+            if any(str(s) in question for s in signals):
+                return name
     for canonical, triggers in _ALL_ENTITY_PATTERNS:
         if any(t in question for t in triggers):
             return canonical
@@ -289,8 +302,20 @@ _METRIC_DETECTION: dict[str, list[re.Pattern]] = {
 }
 
 
-def detect_metric_lock(question: str) -> str | None:
-    """Return the metric key that best matches the question, or None."""
+def detect_metric_lock(
+    question: str,
+    profile: "DomainProfile | None" = None,
+) -> str | None:
+    """Return the metric key that best matches the question, or None.
+
+    When *profile* is supplied and has ``metric_patterns``, those regex strings
+    are compiled and checked first. Falls back to the hardcoded ``_METRIC_DETECTION``.
+    """
+    if profile is not None and profile.metric_patterns:
+        for metric_key, pattern_strings in profile.metric_patterns.items():
+            compiled = [re.compile(p, re.I) for p in pattern_strings]
+            if any(p.search(question) for p in compiled):
+                return metric_key
     for metric_key, patterns in _METRIC_DETECTION.items():
         if any(p.search(question) for p in patterns):
             return metric_key
@@ -533,8 +558,8 @@ class RetrievalPlanner:
         add(question)
 
         if mode == QueryMode.FACT_LOOKUP:
-            entity_lock = detect_entity_lock(question)
-            metric_lock = detect_metric_lock(question)
+            entity_lock = detect_entity_lock(question, self._profile)
+            metric_lock = detect_metric_lock(question, self._profile)
             self._build_fact_lookup_queries(question, entity_lock, metric_lock, add)
         else:
             entity_lock = None
@@ -578,7 +603,13 @@ class RetrievalPlanner:
         """
         if entity_lock and metric_lock:
             e = entity_lock
-            for template in _METRIC_ANCHOR_QUERIES.get(metric_lock, [])[:2]:
+            # Use profile metric_anchor_queries if available, fall back to hardcoded
+            anchor_queries = (
+                self._profile.metric_anchor_queries
+                if self._profile is not None and self._profile.metric_anchor_queries
+                else _METRIC_ANCHOR_QUERIES
+            )
+            for template in anchor_queries.get(metric_lock, _METRIC_ANCHOR_QUERIES.get(metric_lock, []))[:2]:
                 add(template.format(e=e))
         elif entity_lock:
             e = entity_lock
@@ -639,7 +670,9 @@ class RetrievalPlanner:
         return found
 
     def _pick_expansion_table(self) -> dict[str, list[str]]:
-        """Choose the expansion table based on profile name."""
+        """Choose the expansion table based on profile name or profile topic_query_expansions."""
+        if self._profile is not None and self._profile.topic_query_expansions:
+            return self._profile.topic_query_expansions
         if self._profile is None:
             return {**_AI_DC_TOPIC_EXPANSIONS, **_SMR_TOPIC_EXPANSIONS}
         name = (self._profile.name or "").lower()

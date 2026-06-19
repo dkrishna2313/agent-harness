@@ -1,7 +1,7 @@
 {
   "research_id": "R-SMR_001",
-  "created_at": "2026-06-19T11:25:55.186027+00:00",
-  "updated_at": "2026-06-19T11:25:55.186220+00:00",
+  "created_at": "2026-06-19T19:30:30.672101+00:00",
+  "updated_at": "2026-06-19T19:30:30.672281+00:00",
   "status": "completed",
   "question": "What regulatory approvals are required before a small modular reactor can begin commercial operation in the United States?",
   "profile": "smr",
@@ -21,7 +21,7 @@
   ],
   "evidence_topics": {},
   "findings": [
-    "The only supplied source document contains content related to NVIDIA's GTC AI/developer conference and contains no information about SMR regulatory approvals."
+    "The sole evidence item confirms that none of the supplied source documents contain information about SMR regulatory approvals; all sources exclusively cover NVIDIA GPU architectures, AI computing platforms, and related infrastructure."
   ],
   "contradictions": [],
   "research_gaps": [],

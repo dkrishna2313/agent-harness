@@ -318,3 +318,191 @@ memo_section_hints:
   - Rack Architecture Implications
   - Research Gaps
   - Coverage Matrix
+
+evaluator_topic_terms:
+  power: [power, electrical, voltage, utility, grid, ups, bbu, busway, pdu]
+  cooling: [cooling, liquid, thermal, cdu, heat, "chilled water"]
+  networking: [networking, network, nvlink, infiniband, ethernet, spectrum, connectx]
+  rack architecture: [rack, nvl72, rack-scale, tray, shelf, cabinet]
+  "backup/resiliency": [backup, battery, bbu, ups, resiliency, redundancy]
+  operations: [operations, commissioning, maintenance, monitoring]
+
+topic_section_checks:
+  power: [power_implications, "Power Implications", missing_power_implications, missing_power_citations]
+  cooling: [cooling_implications, "Cooling Implications", missing_cooling_implications, missing_cooling_citations]
+  networking: [networking_implications, "Networking Implications", missing_networking_implications, missing_networking_citations]
+  rack architecture: [rack_architecture_implications, "Rack Architecture Implications", missing_rack_architecture_implications, missing_rack_architecture_citations]
+
+coverage_gap_keywords:
+  power: [rack power, power delivery, ups, backup, generator, power quality]
+  cooling: [cooling technology, cdu, heat rejection, facility integration, water temp]
+  networking: [bandwidth, topology, optics, switch architecture]
+  rack architecture: [rack architecture, rack, architecture]
+  operations: [commissioning, monitoring, maintenance, resiliency]
+  "backup/resiliency": [ups, backup, resiliency, generator]
+
+perspectives:
+  power: [power, watt, kw, mw, tdp, "thermal design power", "power consumption", "power draw", energy, pdu, "power delivery", electrical, ampere, volt, ups, generator, pue, "power usage effectiveness"]
+  cooling: [cool, thermal, heat, temperature, cdu, "liquid cooling", "air cooling", immersion, coolant, btu, hvac, chiller, "rear door", "warm water", "direct liquid", "cold plate", "heat exchanger"]
+  networking: [network, nvlink, infiniband, pcie, bandwidth, latency, interconnect, switch, fabric, rdma, ethernet, "gb/s", "tb/s", port, topology, nvl, c2c, chip-to-chip, roce, osfp]
+  operations: [deploy, install, setup, maintenance, operate, rack, cabling, floor, management, software, driver, firmware, configuration, lifecycle, integration, rollout, skill, staff]
+  economics: [cost, price, price/performance, tco, roi, dollar, usd, revenue, efficiency, "$/", investment, capex, opex, value, margin, payback, return, profitability]
+  deployment: [availability, "lead time", ship, quarter, timeline, schedule, release, launch, product, ramp, roadmap, ga, "general availability", "by 20", planned, next-generation]
+  supply_chain: [supply, manufacture, wafer, tsmc, production, chip, fabrication, shortage, inventory, foundry, packaging, memory, hbm, yield]
+
+domain_signals: [nvidia, blackwell, nvl72, hopper, gb200, dgx, hgx, "data center", gpu, cuda, tensorrt]
+
+entity_patterns:
+  - name: "GB200 NVL72"
+    signals: [NVL72, nvl72]
+  - name: "GB200 NVL36"
+    signals: [NVL36, nvl36]
+  - name: "DGX B200"
+    signals: ["DGX B200", "dgx b200"]
+  - name: "DGX H100"
+    signals: ["DGX H100", "dgx h100"]
+  - name: "DGX H200"
+    signals: ["DGX H200", "dgx h200"]
+  - name: "HGX H100"
+    signals: ["HGX H100", "hgx h100"]
+  - name: "GB200"
+    signals: [GB200, gb200]
+  - name: "GB300"
+    signals: [GB300, gb300]
+  - name: "H100"
+    signals: [H100, h100]
+  - name: "H200"
+    signals: [H200, h200]
+  - name: "B200"
+    signals: ["B200 GPU", "b200 gpu"]
+  - name: "A100"
+    signals: [A100, a100]
+  - name: "Blackwell"
+    signals: [Blackwell, blackwell]
+  - name: "Hopper"
+    signals: ["Hopper GPU", "hopper gpu"]
+
+metric_patterns:
+  gpu_count:
+    - "\\bhow many\\s+(?:b200s?|gpus?|accelerators?)\\b"
+    - "\\b(?:number|count)\\s+of\\s+(?:gpus?|accelerators?)\\b"
+    - "\\bgpus?\\s+(?:integrated|installed|in|per|count)\\b"
+  rack_power:
+    - "\\brack\\s+power\\b"
+    - "\\bpower\\s+(?:consumption|requirement|draw|demand|budget)\\b"
+    - "\\btotal\\s+power\\b"
+    - "\\bhow\\s+much\\s+power\\b"
+    - "\\bwatt[s]?\\b|\\bkilo?watt[s]?\\b|\\bkw\\b"
+  cooling_capacity:
+    - "\\bcooling\\s+(?:capacity|requirement|infrastructure)\\b"
+    - "\\bwhy.+(?:liquid|water)\\s+cool"
+    - "\\bhow\\s+(?:is|does).+cool\\b"
+  memory_capacity:
+    - "\\b(?:gpu\\s+)?memory\\s+(?:capacity|size|bandwidth|per)\\b"
+    - "\\bhbm\\b"
+  network_bandwidth:
+    - "\\bbandwidth\\b"
+    - "\\bnvlink\\b|\\binfiniband\\b"
+
+metric_anchor_queries:
+  gpu_count: ["{e} GPU count accelerators", "{e} 72 GPUs specifications", "{e} number of B200 GPUs"]
+  rack_power: ["{e} total rack power kW", "{e} power consumption requirements"]
+  cooling_capacity: ["{e} cooling requirements CDU", "{e} liquid cooling thermal"]
+  memory_capacity: ["{e} GPU memory HBM capacity", "{e} memory bandwidth specifications"]
+  network_bandwidth: ["{e} NVLink bandwidth fabric", "{e} interconnect bandwidth specifications"]
+
+topic_query_expansions:
+  power: ["rack power consumption total load", "DC power infrastructure distribution", "power distribution unit PDU cooling", "UPS backup power capacity"]
+  cooling: ["liquid cooling direct liquid cooling DLC", "coolant distribution unit CDU capacity", "thermal management heat dissipation", "cooling infrastructure facility design"]
+  networking: ["NVLink switch fabric bandwidth", "InfiniBand networking topology", "network switch interconnect bandwidth latency"]
+  rack architecture: ["rack density form factor design", "compute tray shelf architecture layout", "rack unit U height configuration"]
+  operations: ["deployment commissioning operations", "data center monitoring observability", "maintenance schedule management"]
+  gpu: ["GPU memory bandwidth specifications", "GPU thermal design power TDP", "accelerator performance cluster"]
+  nvl72: ["NVL72 rack system architecture", "NVL72 power infrastructure shelf", "NVL72 liquid cooling design", "NVL72 NVLink switch configuration"]
+  gb200: ["GB200 NVL72 rack specifications", "GB200 power consumption infrastructure", "GB200 deployment design"]
+  facility: ["data center facility upgrade power", "raised floor power density design", "electrical infrastructure capacity"]
+
+source_quality_rules:
+  - signals: [nvidia, "technical blog"]
+    type: nvidia_technical
+    score: 5
+    label: "NVIDIA technical blog"
+  - signals: [nvidia, architecture]
+    type: nvidia_technical
+    score: 5
+    label: "NVIDIA architecture document"
+  - signals: [nvidia, specification]
+    type: nvidia_technical
+    score: 5
+    label: "NVIDIA specification sheet"
+  - signals: [nvidia, spec]
+    type: nvidia_technical
+    score: 5
+    label: "NVIDIA specification sheet"
+  - signals: [nvidia, platform]
+    type: nvidia_technical
+    score: 5
+    label: "NVIDIA platform documentation"
+  - signals: [nvidia, blog]
+    type: nvidia_technical
+    score: 5
+    label: "NVIDIA technical blog"
+  - signals: ["inside the nvidia"]
+    type: nvidia_technical
+    score: 5
+    label: "NVIDIA architecture deep-dive"
+  - signals: [nvidia, inside]
+    type: nvidia_technical
+    score: 5
+    label: "NVIDIA architecture deep-dive"
+  - signals: [nvidia, rubin]
+    type: nvidia_technical
+    score: 5
+    label: "NVIDIA Rubin platform document"
+  - signals: [nvidia, blackwell]
+    type: nvidia_technical
+    score: 5
+    label: "NVIDIA Blackwell platform document"
+  - signals: [nvidia, nvl]
+    type: nvidia_technical
+    score: 5
+    label: "NVIDIA NVL platform document"
+  - signals: [nvidia, vera]
+    type: nvidia_technical
+    score: 5
+    label: "NVIDIA Vera platform document"
+  - signals: [nvidia, datasheet]
+    type: nvidia_technical
+    score: 5
+    label: "NVIDIA datasheet"
+  - signals: [nvidia, "data sheet"]
+    type: nvidia_technical
+    score: 5
+    label: "NVIDIA datasheet"
+  - signals: [nvidia, reference]
+    type: nvidia_technical
+    score: 5
+    label: "NVIDIA reference document"
+  - signals: [nvidia, developer]
+    type: nvidia_technical
+    score: 5
+    label: "NVIDIA developer documentation"
+  - signals: [storagereview]
+    type: independent_technical
+    score: 3
+    label: "StorageReview independent analysis"
+  - signals: [dissecting]
+    type: independent_technical
+    score: 3
+    label: "Independent technical analysis"
+  - signals: [nvidia]
+    type: nvidia_marketing
+    score: 4
+    label: "NVIDIA press or marketing content"
+
+required_topic_terms:
+  architecture: [architecture, compute, gpu, cpu, accelerator, platform, system]
+  power: [power, watt, kilowatt, kw, megawatt, mw, distribution, energy]
+  cooling: [cool, cooling, thermal, liquid, heat]
+  networking: [network, networking, ethernet, infiniband, nvlink, switch]
+  rack architecture: [rack architecture, rack-scale, rack, nvl72, mgx]

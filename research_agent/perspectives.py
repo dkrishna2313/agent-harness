@@ -31,6 +31,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .schemas import EvidenceItem
+    from .profile import DomainProfile
 
 
 # ---------------------------------------------------------------------------
@@ -151,12 +152,19 @@ _SMR_DOC_SIGNALS = frozenset({
 # Domain detection
 # ---------------------------------------------------------------------------
 
-def detect_domain(source_document: str) -> str:
-    """Return 'smr' or 'ai_dc' based on source document filename.
+def detect_domain(source_document: str, profile: "DomainProfile | None" = None) -> str:
+    """Return a domain identifier based on source document filename.
 
-    Falls back to 'ai_dc' when the filename contains no SMR signals.
+    When *profile* is supplied and has ``domain_signals``, those signals are used
+    to detect whether the document belongs to this profile's domain (returns
+    ``profile.name``).  Falls back to the legacy SMR/ai_dc heuristic otherwise.
     """
     doc_lower = source_document.lower()
+    if profile is not None and profile.domain_signals:
+        if any(sig.lower() in doc_lower for sig in profile.domain_signals):
+            return profile.name
+        return "ai_dc"
+    # Legacy fallback
     if any(sig in doc_lower for sig in _SMR_DOC_SIGNALS):
         return "smr"
     return "ai_dc"
@@ -174,14 +182,22 @@ def _perspectives_for_domain(domain: str) -> dict[str, list[str]]:
 # Perspective classification  (J3.2.2)
 # ---------------------------------------------------------------------------
 
-def classify_perspective(claim: str, source_document: str) -> str:
+def classify_perspective(
+    claim: str,
+    source_document: str,
+    profile: "DomainProfile | None" = None,
+) -> str:
     """Classify *claim* into one perspective based on keyword density.
 
-    Uses the domain taxonomy inferred from *source_document*.
+    When *profile* is supplied and has ``perspectives``, those are used.
+    Otherwise the domain taxonomy is inferred from *source_document*.
     Returns 'general' when no keyword matches fire.
     """
-    domain = detect_domain(source_document)
-    perspectives = _perspectives_for_domain(domain)
+    if profile is not None and profile.perspectives:
+        perspectives = profile.perspectives
+    else:
+        domain = detect_domain(source_document)
+        perspectives = _perspectives_for_domain(domain)
     text_lower = (claim or "").lower()
 
     best_perspective = "general"

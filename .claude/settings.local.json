@@ -27,7 +27,8 @@
       "Bash(python -m pytest tests/test_semantic_matcher.py -v --tb=short)",
       "Bash(python -m pytest tests/test_prohibited_term_checker.py -v)",
       "Bash(brew list *)",
-      "Bash(ls ~/.ssh/*.pub 2>/dev/null || echo \"no keys found\")"
+      "Bash(ls ~/.ssh/*.pub 2>/dev/null || echo \"no keys found\")",
+      "Bash(git add *)"
     ]
   }
 }
