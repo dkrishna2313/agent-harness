@@ -1,0 +1,34 @@
+contradiction_id: CONTRA_004
+domain: nvidia
+expected_result: no_contradiction
+severity: null
+category: scope_mismatch
+
+claim_a: >
+  The GB200 NVL72 rack uses direct liquid cooling (DLC) for its compute trays.
+
+claim_b: >
+  The power shelf uses air-cooled PSUs.
+
+entity_a: GB200 NVL72
+entity_b: Power Shelf
+scope_a: rack
+scope_b: component
+metric_a: cooling_method
+metric_b: cooling_method
+
+why_no_contradiction: >
+  These claims describe different subsystems within the rack using different
+  cooling methods.  This is a hybrid cooling architecture — standard practice
+  for high-density racks.  Compute trays use DLC; power shelves use air
+  cooling.  Both facts can be simultaneously true.  Flagging as a
+  contradiction would confuse "the rack uses X" (aggregate) with
+  "one subsystem uses Y" (component).
+
+suppression_should_fire: true
+expected_suppression_reason: scope_mismatch
+
+notes: >
+  Secondary J1.6 false-positive regression test for categorical (cooling method)
+  conflicts.  The suppression must fire on scope_mismatch before the
+  air-cooled vs liquid-cooled exclusive pair triggers.

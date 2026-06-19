@@ -1,0 +1,36 @@
+question_id: NVIDIA_003
+domain: nvidia
+difficulty: easy
+question: >
+  How many GPUs are integrated into a single GB200 NVL72 rack?
+
+must_include:
+  - 72
+
+acceptable_alternatives:
+  - seventy-two
+  - "72 B200"
+  - "72 Blackwell"
+
+must_not_include:
+  - NVL36              # explicitly citing the half-rack variant as the answer
+  - "36 GPUs"          # wrong GPU count for NVL72 (NVL36 count)
+  - "144 GPUs"         # double-rack or incorrect figure
+  - "8 GPUs"           # single-node (DGX) count
+
+expected_topics:
+  - rack architecture
+
+evaluation_tags:
+  - numeric_answer
+  - factual
+
+notes: >
+  NVL72 stands for NVLink 72-GPU.  The rack integrates 72 B200 Blackwell GPUs
+  connected via NVLink Switch chips into a single shared-memory domain.
+  The NVL36 half-rack variant uses 36 GPUs; answers citing 36 as the GPU count
+  for NVL72 should be marked wrong.
+
+  Fix history: original must_not_include used bare numbers ("36", "8") which
+  appeared legitimately in valid answers ("36 Vera CPUs", "FP8 precision").
+  Replaced with specific phrases to avoid false positives.

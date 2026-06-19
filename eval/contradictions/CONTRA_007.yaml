@@ -1,0 +1,50 @@
+contradiction_id: CONTRA_007
+domain: smr
+expected_result: no_contradiction
+severity: null
+category: context_mismatch
+
+claim_a: >
+  Factory fabrication and modular construction reduce SMR construction
+  schedules to 24–36 months for nth-of-a-kind units.
+
+claim_b: >
+  First-of-a-kind nuclear projects historically take 7–12 years from
+  construction start to commercial operation.
+
+entity: null
+scope_a: unit
+scope_b: unit
+metric_a: duration_construction
+metric_b: duration_construction
+
+why_no_contradiction: >
+  These claims describe construction duration in different contexts:
+  one is a vendor projection for nth-of-a-kind (after learning), the other
+  is historical data for first-of-a-kind large nuclear projects.
+  Both can be simultaneously true: FOAK projects do take much longer
+  than mature serial builds.  The claims are not contradictory — they
+  describe different points on the learning curve.
+
+suppression_should_fire: false
+expected_suppression_reason: null
+why_no_suppression: >
+  The entity/scope gates cannot distinguish "nth-of-a-kind" from
+  "first-of-a-kind" context.  These claims will both pass the gates.
+  However, the numeric ranges OVERLAP when the high end of the short
+  estimate (36 months = 3 years) does not overlap with the low end
+  of the long estimate (7 years = 84 months).
+  The duration conflict check will fire here.
+
+known_limitation: >
+  The contradiction engine WILL flag this as a duration conflict
+  (ranges [24, 36] months vs [84, 144] months do not overlap).
+  This is a known limitation: the engine cannot distinguish context
+  (NOAK vs FOAK).  This case documents a FALSE POSITIVE that the
+  engine currently produces.  Resolution requires claim-level context
+  extraction beyond current scope.
+
+notes: >
+  This case is included to document a known engine limitation, not to
+  claim the engine already handles it correctly.  Future work: extract
+  "nth-of-a-kind" vs "first-of-a-kind" context from claims and gate on it.

@@ -1,0 +1,225 @@
+{
+  "research_id": "R-20260617-082446",
+  "created_at": "2026-06-17T08:24:46.751676+00:00",
+  "updated_at": "2026-06-17T08:26:59.478588+00:00",
+  "status": "completed",
+  "question": "What factors drive SMR deployment risk?",
+  "profile": "smr",
+  "run_config": {
+    "sources_dir": "sources",
+    "web_search": true,
+    "mock_mode": false,
+    "model_name": null
+  },
+  "subquestions": [],
+  "retrieval_plan": {
+    "web_search": {
+      "dependency_status": {
+        "duckduckgo_search": "ok (ddgs)",
+        "requests": "ok",
+        "trafilatura": "ok",
+        "all_available": true
+      },
+      "query": "What factors drive SMR deployment risk?",
+      "provider": "DuckDuckGoSearchProvider",
+      "search_error": null,
+      "search_results_returned": 5,
+      "search_results": [
+        {
+          "title": "What Are the Key Factors in SMR Deployment Success?",
+          "url": "https://energy.sustainability-directory.com/question/what-are-the-key-factors-in-smr-deployment-success/",
+          "snippet": "Nov 27, 2025 · Their successful deployment, however, hinges on a complex interplay of technological, economic, regulatory, and social factors. Understanding these key elements is crucial for policymak"
+        },
+        {
+          "title": "What Are the Key Factors for SMR Deployment Success?",
+          "url": "https://energy.sustainability-directory.com/question/what-are-the-key-factors-for-smr-deployment-success/",
+          "snippet": "Nov 23, 2025 · Key factors involve regulatory adaptation, economic viability, and public trust, alongside robust institutional and geopolitical strategies. Small Modular Reactors (SMRs) represent a sh"
+        },
+        {
+          "title": "SMR risk assessment - small-modular-reactors.orgFrom procurement to construction: Key risks and challenges in ...Navigating Challenges in Small Modular Reactors - WTW UKNuclear Small Modular Reactors: Key Considerations for DeploymentOverview on SMR technologies close to deployment",
+          "url": "https://small-modular-reactors.org/smr-risk-assessment/",
+          "snippet": "Small Modular Reactors (SMRs) are gaining popularity as a promising alternative to traditional large-scale nuclear power plants. They offer potential benefits such as reduced construction time, lower "
+        },
+        {
+          "title": "From procurement to construction: Key risks and challenges in ...",
+          "url": "https://www.hsfkramer.com/notes/construction/2025-posts/from-procurement-to-construction-key-risks-and-challenges-in-smr-depolyment-in-the-uk",
+          "snippet": "Jul 7, 2025 · The novelty of SMR designs, offsite fabrication issues, and regulatory frameworks are critical factors that must be addressed to mitigate potential cost overruns and delays."
+        },
+        {
+          "title": "Nuclear Small Modular Reactors: Key Considerations for Deployment",
+          "url": "https://www.ief.org/_resources/files/events/nuclear-small-modular-reactors-smrs-key-considerations-for-deployment/smr-report.pdf",
+          "snippet": "The report presents nineteen key findings for nations considering SMR deployment, exploring technical considerations, regulation and governance, cost, and financing aspects. It also includes a decisio"
+        }
+      ],
+      "pages_attempted": 5,
+      "downloaded_urls": [
+        "https://energy.sustainability-directory.com/question/what-are-the-key-factors-in-smr-deployment-success/",
+        "https://energy.sustainability-directory.com/question/what-are-the-key-factors-for-smr-deployment-success/",
+        "https://small-modular-reactors.org/smr-risk-assessment/"
+      ],
+      "failed_urls": [
+        {
+          "url": "https://www.hsfkramer.com/notes/construction/2025-posts/from-procurement-to-construction-key-risks-and-challenges-in-smr-depolyment-in-the-uk",
+          "error": "fetch error: HTTPError: 403 Client Error: Forbidden for url: https://www.hsfkramer.com/notes/construction/2025-posts/from-procurement-to-construction-key-risks-and-challenges-in-smr-depolyment-in-the-uk"
+        },
+        {
+          "url": "https://www.ief.org/_resources/files/events/nuclear-small-modular-reactors-smrs-key-considerations-for-deployment/smr-report.pdf",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)"
+        }
+      ],
+      "cache_hits": 3,
+      "documents_fetched": 3,
+      "extracted_characters": 32885,
+      "download_details": [
+        {
+          "url": "https://energy.sustainability-directory.com/question/what-are-the-key-factors-in-smr-deployment-success/",
+          "title": "What Are the Key Factors in SMR Deployment Success?",
+          "source": "cache",
+          "error": null,
+          "chars": 13750
+        },
+        {
+          "url": "https://energy.sustainability-directory.com/question/what-are-the-key-factors-for-smr-deployment-success/",
+          "title": "What Are the Key Factors for SMR Deployment Success?",
+          "source": "cache",
+          "error": null,
+          "chars": 13483
+        },
+        {
+          "url": "https://small-modular-reactors.org/smr-risk-assessment/",
+          "title": "SMR risk assessment - small-modular-reactors.orgFrom procurement to construction: Key risks and challenges in ...Navigating Challenges in Small Modular Reactors - WTW UKNuclear Small Modular Reactors: Key Considerations for DeploymentOverview on SMR technologies close to deployment",
+          "source": "cache",
+          "error": null,
+          "chars": 5652
+        },
+        {
+          "url": "https://www.hsfkramer.com/notes/construction/2025-posts/from-procurement-to-construction-key-risks-and-challenges-in-smr-depolyment-in-the-uk",
+          "title": "From procurement to construction: Key risks and challenges in ...",
+          "source": "live",
+          "error": "fetch error: HTTPError: 403 Client Error: Forbidden for url: https://www.hsfkramer.com/notes/construction/2025-posts/from-procurement-to-construction-key-risks-and-challenges-in-smr-depolyment-in-the-uk",
+          "chars": 0
+        },
+        {
+          "url": "https://www.ief.org/_resources/files/events/nuclear-small-modular-reactors-smrs-key-considerations-for-deployment/smr-report.pdf",
+          "title": "Nuclear Small Modular Reactors: Key Considerations for Deployment",
+          "source": "live",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)",
+          "chars": 0
+        }
+      ],
+      "chunks_created": 3
+    },
+    "source_count": 3
+  },
+  "evidence_ids": [
+    "E009",
+    "E010",
+    "E011",
+    "E012",
+    "E001",
+    "E002",
+    "E006",
+    "E015",
+    "E013",
+    "E003",
+    "E004",
+    "E005",
+    "E007",
+    "E014",
+    "E008"
+  ],
+  "evidence_topics": {
+    "FOAK financing risk": 1,
+    "investor hesitancy": 1,
+    "government support": 1,
+    "SMR deployment risk": 14,
+    "regulatory risk": 4,
+    "regulatory framework mismatch": 1,
+    "licensing": 2,
+    "cost competitiveness": 1,
+    "learning-by-doing": 1,
+    "standardization": 1,
+    "economics": 1,
+    "vendor lock-in": 1,
+    "geopolitical risk": 1,
+    "proliferation": 1,
+    "economic viability": 2,
+    "safety": 1,
+    "public acceptance": 3,
+    "regulatory certainty": 1,
+    "capital costs": 1,
+    "financing": 1,
+    "risk perception": 1,
+    "social license": 1,
+    "risk mitigation": 1,
+    "passive safety": 1,
+    "regulatory harmonization": 2,
+    "public engagement": 1,
+    "institutional inertia": 1,
+    "governance": 1,
+    "permitting": 1,
+    "SMR deployment timeline": 1,
+    "international standards": 1,
+    "supply chain risk": 1,
+    "manufacturing": 1,
+    "logistics": 1,
+    "waste management": 1,
+    "environmental risk": 1,
+    "reactor design risk": 1,
+    "technology readiness": 1,
+    "cost overrun": 1,
+    "risk categories": 1,
+    "technical risk": 1,
+    "financial risk": 1,
+    "social risk": 1
+  },
+  "findings": [
+    "SMR deployment success depends on achieving economic viability, robust safety and security, environmental sustainability, public acceptance, and regulatory certainty — all of which are interconnected and influence each other.",
+    "Economic risks — including high capital costs, uncertain operating costs, and difficulty attracting financing for FOAK projects — are a major hurdle for SMR deployment.",
+    "Extended licensing and permitting timelines substantially increase SMR project costs and delay deployment, representing a critical regulatory risk.",
+    "The absence of international harmonization in regulatory standards creates barriers to cross-border SMR deployment and adds to project risk.",
+    "Supply chain weaknesses — including insufficient domestic manufacturing capabilities, supplier qualification gaps, and complex logistics for large modules — pose significant risks to SMR deployment."
+  ],
+  "contradictions": [],
+  "research_gaps": [
+    {
+      "gap_id": "G001",
+      "priority": "high",
+      "topic": "Levelized Cost of Electricity",
+      "description": "No levelized cost of electricity (LCOE) estimate found."
+    },
+    {
+      "gap_id": "G002",
+      "priority": "high",
+      "topic": "NRC Licensing Path",
+      "description": "No NRC licensing pathway or design certification status found."
+    },
+    {
+      "gap_id": "G003",
+      "priority": "medium",
+      "topic": "Operating License",
+      "description": "No operating license timeline found."
+    }
+  ],
+  "outputs": {
+    "memo_path": "outputs/j45b_validation.md",
+    "trace_path": "outputs/j45b_validation.trace.json"
+  },
+  "summary": {
+    "evidence_count": 15,
+    "citation_count": 15,
+    "contradictions_found": 0,
+    "research_gaps_found": 3,
+    "coverage_score": 0.76
+  },
+  "owner": null,
+  "assigned_agent": null,
+  "review_status": "unreviewed",
+  "parent_research_id": null,
+  "child_research_ids": [],
+  "profile_validation": {
+    "expected_profile": "smr",
+    "actual_profile": "smr",
+    "valid": true
+  }
+}

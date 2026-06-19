@@ -1,0 +1,36 @@
+question_id: NVIDIA_004
+domain: nvidia
+difficulty: medium
+question: >
+  What role does NVLink play in the GB200 NVL72 architecture, and how does
+  it differ from PCIe-based GPU communication?
+
+must_include:
+  - bandwidth
+  - NVLink
+
+acceptable_alternatives:
+  - shared memory
+  - high-bandwidth interconnect
+  - GPU-to-GPU
+  - NVLink Switch
+
+must_not_include:
+  - PCIe is faster       # factually wrong; NVLink significantly exceeds PCIe bandwidth
+  - independent GPUs     # NVLink creates a tightly coupled domain
+
+expected_topics:
+  - networking
+  - rack architecture
+
+evaluation_tags:
+  - explanatory
+  - comparative
+
+notes: >
+  NVLink provides GPU-to-GPU bandwidth orders of magnitude higher than PCIe
+  (NVLink 5 offers ~1.8 TB/s bidirectional per GPU vs ~128 GB/s for PCIe Gen 5).
+  In the NVL72, NVLink Switch chips create a non-blocking all-to-all fabric across
+  all 72 GPUs, enabling them to share a unified memory address space.  This is the
+  key architectural feature that allows tensor parallelism at rack scale without
+  the latency penalty of InfiniBand or Ethernet.

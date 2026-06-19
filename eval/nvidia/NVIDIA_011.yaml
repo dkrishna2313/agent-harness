@@ -1,0 +1,39 @@
+question_id: NVIDIA_011
+domain: nvidia
+difficulty: medium
+question: >
+  What is the Grace CPU's role in the GB200 system, and why is a CPU
+  integrated alongside the Blackwell GPU in the same package?
+
+must_include:
+  - CPU
+  - Grace
+
+acceptable_alternatives:
+  - Arm
+  - NVLink-C2C
+  - chip-to-chip
+  - memory coherence
+  - unified memory
+
+must_not_include:
+  - Grace is a separate server    # it is co-packaged in the GB200 module
+  - PCIe connection               # Grace-Blackwell uses NVLink-C2C, not PCIe
+
+expected_topics:
+  - rack architecture
+
+evaluation_tags:
+  - technical
+  - explanatory
+
+notes: >
+  The GB200 module (Grace Blackwell Superchip) pairs one Grace CPU with two
+  B200 GPUs connected via NVLink-C2C — a chip-to-chip link providing ~900 GB/s
+  bidirectional bandwidth.  The rationale for tight integration is:
+  (1) Memory coherence: CPU and GPU share a coherent memory address space,
+      eliminating explicit data copies for data-prep and preprocessing workloads.
+  (2) Latency: NVLink-C2C latency is far lower than PCIe, enabling the CPU
+      to serve as a fast host controller.
+  (3) Efficiency: co-packaging reduces the power overhead of host-device
+      data movement that plagued PCIe-attached GPU systems.

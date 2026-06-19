@@ -1,0 +1,180 @@
+{
+  "research_id": "R-SMR_005",
+  "created_at": "2026-06-18T20:41:30.484911+00:00",
+  "updated_at": "2026-06-18T20:41:30.485063+00:00",
+  "status": "completed",
+  "question": "What is the current deployment status of the BWRX-300 small modular reactor in Canada as of 2025?",
+  "profile": "smr",
+  "profile_source": "benchmark_domain_mapping",
+  "run_config": {
+    "sources_dir": null,
+    "web_search": false,
+    "mock_mode": false,
+    "model_name": null
+  },
+  "subquestions": [],
+  "retrieval_plan": {
+    "web_search": {
+      "dependency_status": {
+        "duckduckgo_search": "ok (ddgs)",
+        "requests": "ok",
+        "trafilatura": "ok",
+        "all_available": true
+      },
+      "query": "What is the current deployment status of the BWRX-300 small modular reactor in Canada as of 2025?",
+      "provider": "DuckDuckGoSearchProvider",
+      "search_error": null,
+      "search_results_returned": 5,
+      "search_results": [
+        {
+          "title": "BWRX-300 - Wikipedia",
+          "url": "https://en.wikipedia.org/wiki/BWRX-300",
+          "snippet": "May 18, 2026 - The BWRX-300 reactor would be cooled by the natural circulation of water, making it distinct from most nuclear plants which require active cooling with electrical pumps. In 2019, GVH sa"
+        },
+        {
+          "title": "BWRX-300 Small Modular Reactor | GE Vernova Hitachi Nuclear",
+          "url": "https://www.gevernova.com/nuclear/carbon-free-power/bwrx-300-small-modular-reactor",
+          "snippet": "Jan 17, 2025 - GE Vernova announced its part in a coalition of utility companies and supply chain partners collaborating to accelerate the BWRX-300 small modular reactor’s deployment in the U.S. Oct 3"
+        },
+        {
+          "title": "BWRX-300 Reactor in Darlington, Ontario | GE Vernova Hitachi Nuclear Energy",
+          "url": "https://www.gevernova.com/nuclear/carbon-free-power/bwrx-300-small-modular-reactor/bwrx-300-darlington-ontario",
+          "snippet": "Those plans took shape with the first groundbreaking in December 2022, followed by the signing of a contract for deploying a single GE Vernova BWRX-300 SMR at Darlington in January 2023."
+        },
+        {
+          "title": "GE Vernova Hitachi Nuclear Energy and Samsung C&T form strategic alliance to advance deployment of the BWRX-300 small modular reactor - USNIC",
+          "url": "https://www.usnic.org/news/ge-vernova-hitachi-nuclear-energy-and-samsung-c-t-form-strategic-alliance-to-advance-deployment-of-the-bwrx-300-small-modular-reactor/",
+          "snippet": "October 7, 2025 - WILMINGTON, North Carolina (October 7, 2025) – GE Vernova Hitachi Nuclear Energy (GVH) and Samsung C&T, a leading construction and engineering company, have announced a strategic all"
+        },
+        {
+          "title": "Small modular reactors | Darlington SMR – OPG",
+          "url": "https://www.opg.com/projects-services/projects/nuclear/smr/darlington-smr/",
+          "snippet": "April 3, 2020 - In April 2025, the Canadian Nuclear Safety Commission granted OPG a Licence to Construct the first SMR at the Darlington New Nuclear Project site, allowing nuclear construction activit"
+        }
+      ],
+      "pages_attempted": 5,
+      "downloaded_urls": [
+        "https://en.wikipedia.org/wiki/BWRX-300",
+        "https://www.gevernova.com/nuclear/carbon-free-power/bwrx-300-small-modular-reactor",
+        "https://www.gevernova.com/nuclear/carbon-free-power/bwrx-300-small-modular-reactor/bwrx-300-darlington-ontario",
+        "https://www.usnic.org/news/ge-vernova-hitachi-nuclear-energy-and-samsung-c-t-form-strategic-alliance-to-advance-deployment-of-the-bwrx-300-small-modular-reactor/"
+      ],
+      "failed_urls": [
+        {
+          "url": "https://www.opg.com/projects-services/projects/nuclear/smr/darlington-smr/",
+          "error": "fetch error: HTTPError: 403 Client Error: Forbidden for url: https://www.opg.com/projects-services/projects/nuclear/smr/darlington-smr/"
+        }
+      ],
+      "cache_hits": 4,
+      "documents_fetched": 4,
+      "extracted_characters": 17595,
+      "download_details": [
+        {
+          "url": "https://en.wikipedia.org/wiki/BWRX-300",
+          "title": "BWRX-300 - Wikipedia",
+          "source": "cache",
+          "error": null,
+          "chars": 7187
+        },
+        {
+          "url": "https://www.gevernova.com/nuclear/carbon-free-power/bwrx-300-small-modular-reactor",
+          "title": "BWRX-300 Small Modular Reactor | GE Vernova Hitachi Nuclear",
+          "source": "cache",
+          "error": null,
+          "chars": 1252
+        },
+        {
+          "url": "https://www.gevernova.com/nuclear/carbon-free-power/bwrx-300-small-modular-reactor/bwrx-300-darlington-ontario",
+          "title": "BWRX-300 Reactor in Darlington, Ontario | GE Vernova Hitachi Nuclear Energy",
+          "source": "cache",
+          "error": null,
+          "chars": 2622
+        },
+        {
+          "url": "https://www.usnic.org/news/ge-vernova-hitachi-nuclear-energy-and-samsung-c-t-form-strategic-alliance-to-advance-deployment-of-the-bwrx-300-small-modular-reactor/",
+          "title": "GE Vernova Hitachi Nuclear Energy and Samsung C&T form strategic alliance to advance deployment of the BWRX-300 small modular reactor - USNIC",
+          "source": "cache",
+          "error": null,
+          "chars": 6534
+        },
+        {
+          "url": "https://www.opg.com/projects-services/projects/nuclear/smr/darlington-smr/",
+          "title": "Small modular reactors | Darlington SMR – OPG",
+          "source": "live",
+          "error": "fetch error: HTTPError: 403 Client Error: Forbidden for url: https://www.opg.com/projects-services/projects/nuclear/smr/darlington-smr/",
+          "chars": 0
+        }
+      ],
+      "chunks_created": 4
+    },
+    "source_count": 3
+  },
+  "evidence_ids": [
+    "E004",
+    "E007",
+    "E005",
+    "E006",
+    "E002",
+    "E003",
+    "E010",
+    "E009",
+    "E008",
+    "E001"
+  ],
+  "evidence_topics": {
+    "BWRX-300": 10,
+    "final investment decision": 1,
+    "cost": 1,
+    "Darlington": 8,
+    "2025": 1,
+    "groundbreaking": 1,
+    "contract": 1,
+    "2022": 1,
+    "2023": 1,
+    "construction": 2,
+    "Canada": 5,
+    "deployment status": 1,
+    "SMR industry": 1,
+    "construction license": 1,
+    "2028": 1,
+    "order": 1,
+    "four units": 1,
+    "Saskatchewan": 1,
+    "deployment timeline": 1,
+    "power output": 1,
+    "design": 1,
+    "CNSC": 1,
+    "licensing": 1,
+    "site selection": 1
+  },
+  "findings": [
+    "Ontario Power Generation (OPG) selected the BWRX-300 SMR for use at the Darlington Nuclear Generating Station on December 1, 2021.",
+    "In October 2022, OPG applied for a construction license for the BWRX-300 reactor at Darlington, with plans to start operations in 2028.",
+    "On July 7, 2023, OPG ordered three additional BWRX-300 SMRs for construction at the Darlington New Nuclear Project, bringing the total to four units.",
+    "A final investment decision in May 2025 to proceed with building the first BWRX-300 at Darlington was based on a forecast cost of Canadian $7.7 billion (US$5.6 billion), with an estimated Canadian $13.2 billion (US$9.6 billion) for three further units.",
+    "The first BWRX-300 is under construction at Ontario Power Generation's Darlington site in Canada, with completion expected by the end of the decade, which will make it the first small modular reactor in the Western World."
+  ],
+  "contradictions": [],
+  "research_gaps": [],
+  "outputs": {
+    "question_id": "SMR_005"
+  },
+  "summary": {
+    "evidence_count": 10,
+    "citation_count": 10,
+    "contradictions_found": 0,
+    "research_gaps_found": 0,
+    "coverage_score": 0.0
+  },
+  "owner": null,
+  "assigned_agent": null,
+  "review_status": "unreviewed",
+  "parent_research_id": null,
+  "child_research_ids": [],
+  "profile_validation": {
+    "expected_profile": "smr",
+    "actual_profile": "smr",
+    "source": "benchmark_domain_mapping",
+    "valid": true
+  }
+}

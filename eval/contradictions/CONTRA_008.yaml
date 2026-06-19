@@ -1,0 +1,45 @@
+contradiction_id: CONTRA_008
+domain: smr
+expected_result: no_contradiction
+severity: null
+category: geographic_scope_mismatch
+
+claim_a: >
+  No OECD country currently has commercial-scale HALEU enrichment capacity.
+
+claim_b: >
+  Russia and China produce HALEU fuel for their domestic reactor programmes.
+
+entity_a: null
+entity_b: null
+scope_a: country   # OECD scope
+scope_b: country   # Russia/China scope
+
+why_no_contradiction: >
+  These claims describe the availability of HALEU in different geopolitical
+  jurisdictions.  Both are simultaneously true: OECD nations (US, Europe,
+  Japan, Korea) lack commercial HALEU capacity; Russia and China have it
+  for their own programmes.  The claims are complementary descriptions of
+  a fragmented global supply landscape, not contradictory.
+
+suppression_should_fire: false
+expected_suppression_reason: null
+why_no_suppression: >
+  Both scope tags would be "country" — the scope compatibility gate passes
+  (same scope).  The entity tags are different (OECD vs Russia/China) but
+  the entity names are probably empty (neither claim names a specific entity
+  that the extractor would recognise).  The engine may or may not produce
+  a false positive here; this case documents the expected correct behaviour.
+
+known_limitation: >
+  The engine currently has no geographic/political entity extraction.
+  If both entity fields are empty, both scope fields are "country",
+  and neither is "unknown", the scope gate passes, and the engine may
+  attempt a categorical comparison.  However, these claims do not share
+  any EXCLUSIVE_PAIRS terms, so no categorical contradiction would fire.
+  A numeric contradiction is also unlikely since there are no shared numeric
+  units in these claims.  Expected result: no contradiction detected.
+
+notes: >
+  Verifies that two simultaneously-true complementary claims about different
+  geographic subjects are not confused into a contradiction.

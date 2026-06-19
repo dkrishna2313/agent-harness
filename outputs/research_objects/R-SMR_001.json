@@ -1,0 +1,177 @@
+{
+  "research_id": "R-SMR_001",
+  "created_at": "2026-06-18T20:33:38.651175+00:00",
+  "updated_at": "2026-06-18T20:33:38.651710+00:00",
+  "status": "completed",
+  "question": "What regulatory approvals are required before a small modular reactor can begin commercial operation in the United States?",
+  "profile": "smr",
+  "profile_source": "benchmark_domain_mapping",
+  "run_config": {
+    "sources_dir": null,
+    "web_search": false,
+    "mock_mode": false,
+    "model_name": null
+  },
+  "subquestions": [],
+  "retrieval_plan": {
+    "web_search": {
+      "dependency_status": {
+        "duckduckgo_search": "ok (ddgs)",
+        "requests": "ok",
+        "trafilatura": "ok",
+        "all_available": true
+      },
+      "query": "What regulatory approvals are required before a small modular reactor can begin commercial operation in the United States?",
+      "provider": "DuckDuckGoSearchProvider",
+      "search_error": null,
+      "search_results_returned": 5,
+      "search_results": [
+        {
+          "title": "Small modular reactors and microreactors under development ...",
+          "url": "https://www.eia.gov/todayinenergy/detail.php?id=67584",
+          "snippet": "Apr 27, 2026 · High capital costs and lengthy licensing and approval processes have limited the expansion of nuclear power. However, several companies are ..."
+        },
+        {
+          "title": "[PDF] Nuclear Small Modular Reactors: Key Considerations for Deployment",
+          "url": "https://www.ief.org/_resources/files/events/nuclear-small-modular-reactors-smrs-key-considerations-for-deployment/smr-report.pdf",
+          "snippet": "Nations must consider fuel types when selecting a reactor design, since its availability will impact reactor operations, regulatory requirements, international."
+        },
+        {
+          "title": "Advanced Reactors | Nuclear Regulatory Commission",
+          "url": "https://www.nrc.gov/reactors/new-reactors/advanced",
+          "snippet": "The NRC refers to non-light water reactor (non-LWR) designs and small modular light water reactors (SMRs) as advanced reactors. These reactors incorporate ..."
+        },
+        {
+          "title": "Readiness to regulate small modular reactors",
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/reactors/new-reactor-power-plant-projects/regulate-small-modular-reactors/",
+          "snippet": "Jan 16, 2026 · CNSC's SMR Readiness project supports safe regulation of small modular reactors through innovation, policy and collaboration."
+        },
+        {
+          "title": "The Federal Authority to License Small Modular Reactors",
+          "url": "https://policyintegrity.org/publications/detail/the-federal-authority-to-license-small-modular-reactors",
+          "snippet": "Mar 25, 2026 · This report describes the legal and factual background behind the regulation of SMRs and explores a recent challenge to the authority of the ..."
+        }
+      ],
+      "pages_attempted": 5,
+      "downloaded_urls": [
+        "https://www.eia.gov/todayinenergy/detail.php?id=67584",
+        "https://www.cnsc-ccsn.gc.ca/eng/reactors/new-reactor-power-plant-projects/regulate-small-modular-reactors/",
+        "https://policyintegrity.org/publications/detail/the-federal-authority-to-license-small-modular-reactors"
+      ],
+      "failed_urls": [
+        {
+          "url": "https://www.ief.org/_resources/files/events/nuclear-small-modular-reactors-smrs-key-considerations-for-deployment/smr-report.pdf",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)"
+        },
+        {
+          "url": "https://www.nrc.gov/reactors/new-reactors/advanced",
+          "error": "fetch error: ReadTimeout: HTTPSConnectionPool(host='www.nrc.gov', port=443): Read timed out. (read timeout=20)"
+        }
+      ],
+      "cache_hits": 1,
+      "documents_fetched": 3,
+      "extracted_characters": 15695,
+      "download_details": [
+        {
+          "url": "https://www.eia.gov/todayinenergy/detail.php?id=67584",
+          "title": "Small modular reactors and microreactors under development ...",
+          "source": "cache",
+          "error": null,
+          "chars": 7596
+        },
+        {
+          "url": "https://www.ief.org/_resources/files/events/nuclear-small-modular-reactors-smrs-key-considerations-for-deployment/smr-report.pdf",
+          "title": "[PDF] Nuclear Small Modular Reactors: Key Considerations for Deployment",
+          "source": "live",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)",
+          "chars": 0
+        },
+        {
+          "url": "https://www.nrc.gov/reactors/new-reactors/advanced",
+          "title": "Advanced Reactors | Nuclear Regulatory Commission",
+          "source": "live",
+          "error": "fetch error: ReadTimeout: HTTPSConnectionPool(host='www.nrc.gov', port=443): Read timed out. (read timeout=20)",
+          "chars": 0
+        },
+        {
+          "url": "https://www.cnsc-ccsn.gc.ca/eng/reactors/new-reactor-power-plant-projects/regulate-small-modular-reactors/",
+          "title": "Readiness to regulate small modular reactors",
+          "source": "live",
+          "error": null,
+          "chars": 6415
+        },
+        {
+          "url": "https://policyintegrity.org/publications/detail/the-federal-authority-to-license-small-modular-reactors",
+          "title": "The Federal Authority to License Small Modular Reactors &ndash; Institute for Policy Integrity",
+          "source": "live",
+          "error": null,
+          "chars": 1684
+        }
+      ],
+      "chunks_created": 3
+    },
+    "source_count": 2
+  },
+  "evidence_ids": [
+    "E005",
+    "E001",
+    "E003",
+    "E006",
+    "E007",
+    "E002",
+    "E004"
+  ],
+  "evidence_topics": {
+    "NRC licensing": 2,
+    "Atomic Energy Act": 2,
+    "ADVANCE Act": 1,
+    "utilization facility": 2,
+    "SMR approval": 1,
+    "SMR licensing": 2,
+    "nuclear regulatory approval": 1,
+    "NRC": 1,
+    "commercial operation": 2,
+    "DOE licensing": 1,
+    "SMR fast-track": 1,
+    "regulatory approval": 2,
+    "NRC licensing authority": 1,
+    "SMR regulation": 2,
+    "public health": 1,
+    "common defense": 1,
+    "congressional authority": 1,
+    "NRC pre-application": 1,
+    "DOE authorization": 1,
+    "fuel cycle licensing": 1,
+    "SMR commercial licensing": 1
+  },
+  "findings": [
+    "The Nuclear Regulatory Commission (NRC) has legal authority under the Atomic Energy Act of 1954 to license SMRs as 'utilization facilities,' and the 2024 ADVANCE Act confirms Congress understood the NRC to have this licensing authority.",
+    "The question of whether SMRs qualify as 'utilization facilities' under the Atomic Energy Act of 1954 is at the heart of recent litigation and determines whether the NRC has authority to license them at all.",
+    "High capital costs and lengthy licensing and approval processes have limited the expansion of nuclear power in the United States, where electric utilities operate about 98 GW of nuclear generating capacity.",
+    "Several SMR vendors with designs not readily classified in standard reactor categories are engaged in pre-application activities with the Nuclear Regulatory Commission (NRC), indicating NRC pre-application engagement is part of the path to approval.",
+    "The DOE's Energy Reactor Pilot Program, announced in June 2025, aims to expedite testing of advanced reactor designs and provide a fast-track approach to licensing, with applicants responsible for funding their individual pilot reactor designs."
+  ],
+  "contradictions": [],
+  "research_gaps": [],
+  "outputs": {
+    "question_id": "SMR_001"
+  },
+  "summary": {
+    "evidence_count": 7,
+    "citation_count": 7,
+    "contradictions_found": 0,
+    "research_gaps_found": 0,
+    "coverage_score": 0.4
+  },
+  "owner": null,
+  "assigned_agent": null,
+  "review_status": "unreviewed",
+  "parent_research_id": null,
+  "child_research_ids": [],
+  "profile_validation": {
+    "expected_profile": "smr",
+    "actual_profile": "smr",
+    "source": "benchmark_domain_mapping",
+    "valid": true
+  }
+}

@@ -1,0 +1,320 @@
+name: ai_data_centers
+description: AI data center infrastructure and rack-scale computing research
+
+topic_keywords:
+  power:
+    - power
+    - electrical
+    - voltage
+    - utility
+    - grid
+    - ups
+    - bbu
+    - busway
+    - pdu
+    - megawatt
+    - bess
+  cooling:
+    - cooling
+    - liquid
+    - thermal
+    - cdu
+    - heat
+    - chilled water
+    - coolant
+    - heat rejection
+  networking:
+    - networking
+    - network
+    - nvlink
+    - infiniband
+    - ethernet
+    - spectrum
+    - connectx
+  rack architecture:
+    - rack
+    - nvl72
+    - mgx
+    - tray
+    - shelf
+    - cabinet
+    - rack-scale
+  operations:
+    - operations
+    - commissioning
+    - maintenance
+    - monitoring
+  backup/resiliency:
+    - backup
+    - battery
+    - bbu
+    - ups
+    - resiliency
+    - redundancy
+
+coverage_topics:
+  - power
+  - cooling
+  - rack architecture
+  - operations
+  - backup/resiliency
+
+# Maps coverage topic name -> evidence categories that count toward it.
+# If omitted for a topic, keyword-based matching is used instead.
+topic_categories:
+  power:
+    - power
+  cooling:
+    - cooling
+  networking:
+    - networking
+  rack architecture:
+    - rack architecture
+    - architecture
+  operations:
+    - operations
+  backup/resiliency:
+    - operations
+    - power
+
+research_gap_checks:
+  power:
+    - topic: "Rack Power Consumption"
+      keywords: ["rack power", "kw", "mw", "power draw", "power consumption", "watt"]
+      priority: high
+      description: "No explicit rack-level power consumption figure found."
+      rationale: "Power planning requires a concrete rack-level power target (kW per rack)."
+    - topic: "Power Delivery Infrastructure"
+      keywords: ["pdu", "busway", "power distribution", "power delivery", "breaker", "circuit"]
+      priority: high
+      description: "No power delivery or PDU infrastructure guidance found."
+      rationale: "Facility teams need PDU ratings and feed topology to plan electrical infrastructure."
+    - topic: "UPS and Backup Power"
+      keywords: ["ups", "uninterruptible", "battery backup", "bbu", "backup power"]
+      priority: medium
+      description: "No UPS or battery backup requirements found."
+      rationale: "Runtime and capacity targets for backup power are needed for resiliency planning."
+    - topic: "Generator and Utility Interconnect"
+      keywords: ["generator", "utility", "interconnect", "genset", "transfer switch", "grid connection"]
+      priority: medium
+      description: "No generator or utility interconnect specifications found."
+      rationale: "Generator sizing and interconnect requirements affect site planning."
+    - topic: "Power Quality"
+      keywords: ["power quality", "harmonic", "voltage regulation", "power factor", "transient"]
+      priority: low
+      description: "No power quality specifications found."
+      rationale: "Power quality requirements (harmonics, voltage tolerance) are needed for facility design."
+  cooling:
+    - topic: "Cooling Technology"
+      keywords: ["liquid cool", "direct liquid", "dlc", "air cool", "immersion", "rear door", "cooling technology"]
+      priority: high
+      description: "No cooling technology specification found."
+      rationale: "Operators must know whether liquid or air cooling is required before facility planning."
+    - topic: "CDU Requirements"
+      keywords: ["cdu", "coolant distribution", "cooling distribution unit", "manifold"]
+      priority: high
+      description: "No CDU sizing or specification found."
+      rationale: "CDU capacity and connection specifications are required for liquid cooling deployment."
+    - topic: "Water Temperature and Flow Rate"
+      keywords: ["supply temperature", "water temperature", "flow rate", "coolant temperature", "degrees"]
+      priority: medium
+      description: "No coolant supply temperature or flow rate specifications found."
+      rationale: "Facility chiller and pipe sizing depend on required supply temperature and flow rate."
+    - topic: "Heat Rejection"
+      keywords: ["heat rejection", "heat load", "thermal output", "btuh", "heat dissipation"]
+      priority: medium
+      description: "No total heat rejection load specification found."
+      rationale: "HVAC and cooling plant sizing requires the total heat rejection per rack."
+    - topic: "Facility Cooling Integration"
+      keywords: ["facility integration", "raised floor", "in-row", "overhead", "cooling integration", "chiller"]
+      priority: low
+      description: "No facility-side cooling integration guidance found."
+      rationale: "Integration guidance is needed to connect rack cooling to facility infrastructure."
+  networking:
+    - topic: "Network Bandwidth"
+      keywords: ["bandwidth", "throughput", "gb/s", "tb/s", "network speed"]
+      priority: high
+      description: "No network bandwidth specification found."
+      rationale: "Bandwidth requirements drive switch selection and cabling plant design."
+    - topic: "Network Topology"
+      keywords: ["topology", "spine", "leaf", "fat tree", "rail", "network topology"]
+      priority: medium
+      description: "No network topology guidance found."
+      rationale: "Topology affects switch count, cabling, and latency for scale-out deployments."
+    - topic: "Optical Transceivers"
+      keywords: ["optic", "transceiver", "pluggable", "qsfp", "dac", "aoc", "fiber"]
+      priority: medium
+      description: "No optical transceiver or cabling specifications found."
+      rationale: "Transceiver type and cable reach requirements drive infrastructure costs."
+    - topic: "Switch Architecture"
+      keywords: ["switch", "asic", "switching fabric", "switch architecture"]
+      priority: low
+      description: "No switch architecture or vendor recommendations found."
+      rationale: "Switch selection impacts latency, power, and operational complexity."
+  operations:
+    - topic: "Commissioning"
+      keywords: ["commission", "installation", "bring-up", "initial setup", "rack installation"]
+      priority: medium
+      description: "No commissioning or installation guidance found."
+      rationale: "Step-by-step commissioning procedures reduce deployment risk."
+    - topic: "Monitoring and Telemetry"
+      keywords: ["monitor", "telemetry", "alert", "dashboard", "observability", "health check"]
+      priority: medium
+      description: "No monitoring or telemetry requirements found."
+      rationale: "Monitoring requirements drive management network and tooling selection."
+    - topic: "Maintenance Procedures"
+      keywords: ["maintenance", "servicing", "hot-swap", "replacement", "field replace"]
+      priority: low
+      description: "No maintenance or field-servicing guidance found."
+      rationale: "Maintenance windows and procedures affect operational planning."
+    - topic: "Resiliency and Redundancy"
+      keywords: ["redundan", "resilien", "failover", "ha ", "high availability", "n+1"]
+      priority: low
+      description: "No resiliency or redundancy specifications found."
+      rationale: "Redundancy levels for power and cooling feed site availability calculations."
+  # backup/resiliency maps to the same subtopic checks as operations
+  backup/resiliency:
+    - topic: "Commissioning"
+      keywords: ["commission", "installation", "bring-up", "initial setup", "rack installation"]
+      priority: medium
+      description: "No commissioning or installation guidance found."
+      rationale: "Step-by-step commissioning procedures reduce deployment risk."
+    - topic: "Monitoring and Telemetry"
+      keywords: ["monitor", "telemetry", "alert", "dashboard", "observability", "health check"]
+      priority: medium
+      description: "No monitoring or telemetry requirements found."
+      rationale: "Monitoring requirements drive management network and tooling selection."
+    - topic: "Maintenance Procedures"
+      keywords: ["maintenance", "servicing", "hot-swap", "replacement", "field replace"]
+      priority: low
+      description: "No maintenance or field-servicing guidance found."
+      rationale: "Maintenance windows and procedures affect operational planning."
+    - topic: "Resiliency and Redundancy"
+      keywords: ["redundan", "resilien", "failover", "ha ", "high availability", "n+1"]
+      priority: low
+      description: "No resiliency or redundancy specifications found."
+      rationale: "Redundancy levels for power and cooling feed site availability calculations."
+  rack architecture: []
+
+contradiction_topics:
+  # Order matters: checked top-to-bottom; first match wins.
+  power:
+    keywords:
+      - kw
+      - mw
+      - gw
+      - power
+      - watt
+      - consumption
+      - load
+  cooling:
+    keywords:
+      - cooling
+      - liquid cool
+      - air cool
+      - cdu
+      - heat rejection
+      - thermal
+  networking:
+    keywords:
+      - network
+      - bandwidth
+      - nvlink
+      - infiniband
+  rack_architecture:
+    keywords:
+      - rack
+      - nvl72
+      - nvl36
+      - gpu
+  timeline:
+    keywords:
+      - "2025"
+      - "2026"
+      - "2027"
+      - "2028"
+  resiliency:
+    keywords:
+      - redundancy
+      - backup
+      - failover
+      - ups
+
+source_quality_hints:
+  primary:
+    - nvidia
+    - technical blog
+    - architecture
+    - specification
+    - spec
+    - platform
+    - datasheet
+    - reference
+    - developer
+    - inside the nvidia
+    - rubin
+    - blackwell
+    - nvl
+    - vera
+  secondary:
+    - storagereview
+    - dissecting
+    - microbenchmark
+    - benchmarks
+    - analysis
+    - review
+  synthetic:
+    - test_
+    - synthetic
+    - fixture
+
+domain_terms:
+  - blackwell
+  - cooling
+  - cpu
+  - gpu
+  - inference
+  - networking
+  - nvidia
+  - nvl72
+  - power
+  - rack
+  - rubin
+  - thermal
+  - vera
+
+specificity_terms:
+  - bbu
+  - busway
+  - cabinet
+  - cdu
+  - chilled water
+  - connectx
+  - ethernet
+  - gb
+  - gpu
+  - hbm
+  - infiniband
+  - kw
+  - liquid
+  - mgx
+  - mw
+  - nvlink
+  - nvl72
+  - pdu
+  - rack
+  - spectrum
+  - switch
+  - thermal
+  - tray
+  - ups
+  - voltage
+  - watt
+
+memo_section_hints:
+  - Power Implications
+  - Cooling Implications
+  - Networking Implications
+  - Rack Architecture Implications
+  - Research Gaps
+  - Coverage Matrix

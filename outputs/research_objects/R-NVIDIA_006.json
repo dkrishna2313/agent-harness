@@ -1,0 +1,289 @@
+{
+  "research_id": "R-NVIDIA_006",
+  "created_at": "2026-06-18T20:14:04.625320+00:00",
+  "updated_at": "2026-06-18T20:14:04.625520+00:00",
+  "status": "completed",
+  "question": "What are the key architectural changes introduced in the NVIDIA Vera Rubin platform compared to Blackwell?",
+  "profile": "ai_data_centers",
+  "profile_source": "benchmark_domain_mapping",
+  "run_config": {
+    "sources_dir": null,
+    "web_search": false,
+    "mock_mode": false,
+    "model_name": null
+  },
+  "subquestions": [],
+  "retrieval_plan": {
+    "web_search": {
+      "dependency_status": {
+        "duckduckgo_search": "ok (ddgs)",
+        "requests": "ok",
+        "trafilatura": "ok",
+        "all_available": true
+      },
+      "query": "What are the key architectural changes introduced in the NVIDIA Vera Rubin platform compared to Blackwell?",
+      "provider": "DuckDuckGoSearchProvider",
+      "search_error": null,
+      "search_results_returned": 5,
+      "search_results": [
+        {
+          "title": "Rubin (microarchitecture) - Wikipedia",
+          "url": "https://en.wikipedia.org/wiki/Rubin_(microarchitecture)",
+          "snippet": "1 month ago - Rubin is said to have 50 petaflops ... of Rubin with 100 petaflops. At Nvidia GTC 2025 it was announced that Rubin will be followed by an improved Rubin Ultra architecture ......"
+        },
+        {
+          "title": "Vera Rubin – Extreme Co-Design: An Evolution from Grace Blackwell Oberon",
+          "url": "https://newsletter.semianalysis.com/p/vera-rubin-extreme-co-design-an-evolution",
+          "snippet": "February 28, 2026 - NVLink 6 used in Vera Rubin doubles NVLink bandwidth by implementing bi-directional signaling over the same number of copper cables - effectively delivering 4 Lanes of 200G per NVL"
+        },
+        {
+          "title": "Inside the NVIDIA Vera Rubin Platform: Six New Chips, One AI Supercomputer | NVIDIA Technical Blog",
+          "url": "https://developer.nvidia.com/blog/inside-the-nvidia-rubin-platform-six-new-chips-one-ai-supercomputer/",
+          "snippet": "January 5, 2026 - This mechanical simplification enables up to 18x faster assembly compared with previous generation tray architectures and significantly reduces services time during in-field maintena"
+        },
+        {
+          "title": "Infrastructure for Scalable AI Reasoning | NVIDIA Vera Rubin Platform",
+          "url": "https://www.nvidia.com/en-us/data-center/technologies/rubin/",
+          "snippet": "2 weeks ago - The rack introduces modular, cable-free tray designs for 18x faster assembly and serviceability versus NVIDIA Blackwell, combined with intelligent resiliency and software-defined NVLink "
+        },
+        {
+          "title": "NVIDIA Vera Rubin NVL72 | Co-Designed Infrastructure for Agentic AI",
+          "url": "https://www.nvidia.com/en-us/data-center/vera-rubin-nvl72/",
+          "snippet": "2 weeks ago - Vera Rubin NVL72 is built on the ... prior generations. It delivers AI training with one-fourth the GPUs and AI inference at one-tenth the cost per million tokens versus NVIDIA Blackwell"
+        }
+      ],
+      "pages_attempted": 5,
+      "downloaded_urls": [
+        "https://en.wikipedia.org/wiki/Rubin_(microarchitecture)",
+        "https://newsletter.semianalysis.com/p/vera-rubin-extreme-co-design-an-evolution",
+        "https://developer.nvidia.com/blog/inside-the-nvidia-rubin-platform-six-new-chips-one-ai-supercomputer/",
+        "https://www.nvidia.com/en-us/data-center/technologies/rubin/",
+        "https://www.nvidia.com/en-us/data-center/vera-rubin-nvl72/"
+      ],
+      "failed_urls": [],
+      "cache_hits": 3,
+      "documents_fetched": 5,
+      "extracted_characters": 182053,
+      "download_details": [
+        {
+          "url": "https://en.wikipedia.org/wiki/Rubin_(microarchitecture)",
+          "title": "Rubin (microarchitecture) - Wikipedia",
+          "source": "cache",
+          "error": null,
+          "chars": 2014
+        },
+        {
+          "url": "https://newsletter.semianalysis.com/p/vera-rubin-extreme-co-design-an-evolution",
+          "title": "Vera Rubin – Extreme Co-Design: An Evolution from Grace Blackwell Oberon",
+          "source": "cache",
+          "error": null,
+          "chars": 85279
+        },
+        {
+          "url": "https://developer.nvidia.com/blog/inside-the-nvidia-rubin-platform-six-new-chips-one-ai-supercomputer/",
+          "title": "Inside the NVIDIA Vera Rubin Platform: Six New Chips, One AI Supercomputer | NVIDIA Technical Blog",
+          "source": "cache",
+          "error": null,
+          "chars": 86771
+        },
+        {
+          "url": "https://www.nvidia.com/en-us/data-center/technologies/rubin/",
+          "title": "Infrastructure for Scalable AI Reasoning | NVIDIA Vera Rubin Platform",
+          "source": "live",
+          "error": null,
+          "chars": 3651
+        },
+        {
+          "url": "https://www.nvidia.com/en-us/data-center/vera-rubin-nvl72/",
+          "title": "Rack-Scale Agentic AI Supercomputer | NVIDIA Vera Rubin NVL72",
+          "source": "live",
+          "error": null,
+          "chars": 4338
+        }
+      ],
+      "chunks_created": 5
+    },
+    "source_count": 4
+  },
+  "evidence_ids": [
+    "E001",
+    "E002",
+    "E003",
+    "E004",
+    "E005",
+    "E006",
+    "E008",
+    "E011",
+    "E012",
+    "E013",
+    "E022",
+    "E009",
+    "E007",
+    "E015",
+    "E017",
+    "E018",
+    "E019",
+    "E021",
+    "E010",
+    "E014",
+    "E016",
+    "E020",
+    "E023"
+  ],
+  "evidence_topics": {
+    "GPU architecture": 1,
+    "Tensor Cores": 1,
+    "NVFP4": 3,
+    "Streaming Multiprocessors": 1,
+    "transistor count": 2,
+    "HBM4": 4,
+    "memory bandwidth": 2,
+    "memory capacity": 1,
+    "HBM3e comparison": 1,
+    "Transformer Engine": 2,
+    "adaptive compression": 2,
+    "backward compatibility": 1,
+    "NVLink 6": 4,
+    "GPU-to-GPU bandwidth": 1,
+    "scale-up interconnect": 1,
+    "NVLink-C2C": 2,
+    "Vera CPU": 1,
+    "Grace CPU": 1,
+    "Olympus cores": 1,
+    "Spatial Multithreading": 1,
+    "compute tray": 2,
+    "cable-free design": 1,
+    "assembly time": 1,
+    "modular design": 1,
+    "serviceability": 1,
+    "direct liquid cooling": 2,
+    "power smoothing": 1,
+    "energy buffering": 1,
+    "thermal performance": 1,
+    "45°C cooling": 1,
+    "confidential computing": 1,
+    "rack-scale trust": 1,
+    "security": 1,
+    "trusted execution environment": 1,
+    "BlueField-4": 1,
+    "DPU": 1,
+    "infrastructure offload": 1,
+    "bandwidth": 2,
+    "compute": 1,
+    "Spectrum-6": 1,
+    "co-packaged optics": 1,
+    "scale-out networking": 1,
+    "ConnectX-9": 2,
+    "generational comparison": 1,
+    "FLOPS": 1,
+    "CPU comparison": 1,
+    "extreme co-design": 1,
+    "rack-scale architecture": 1,
+    "unit of compute": 1,
+    "platform architecture": 1,
+    "SHARP": 1,
+    "in-network compute": 1,
+    "all-reduce": 1,
+    "collective operations": 1,
+    "structured sparsity": 1,
+    "inference performance": 1,
+    "TDP": 1,
+    "power consumption": 1,
+    "Max-P": 1,
+    "Max-Q": 1,
+    "rack power": 1,
+    "compute tray topology": 1,
+    "GPU-NIC connectivity": 1,
+    "PCIe": 1,
+    "NIC direct": 1,
+    "C2C interconnect": 1,
+    "bidirectional SerDes": 1,
+    "copper backplane": 1,
+    "NVLink switch": 1,
+    "scale-up bandwidth": 1,
+    "rack SKU": 1,
+    "NVL72": 1,
+    "rack architecture": 1,
+    "product configuration": 1,
+    "RAS engine": 1,
+    "reliability": 1,
+    "zero-downtime": 1,
+    "SRAM repair": 1,
+    "health monitoring": 1,
+    "3nm process": 2,
+    "chiplet design": 1,
+    "die architecture": 1,
+    "liquid cooling": 1,
+    "fanless": 1,
+    "cold plate": 1,
+    "SM count": 1,
+    "Tensor Core width": 1,
+    "FP4": 1,
+    "clock speed": 1,
+    "compute scaling": 1,
+    "FP4 performance": 1,
+    "TSMC": 1,
+    "petaflops": 1
+  },
+  "findings": [
+    "The Rubin GPU integrates 224 Streaming Multiprocessors with fifth-generation Tensor Cores optimized for NVFP4 and FP8, scaling to 336B transistors compared to Blackwell's 208B-transistor chip, and achieves up to 50 PFLOPS NVFP4 inference vs. 10 PFLOPS for Blackwell.",
+    "The Rubin GPU adopts HBM4 memory with doubled interface width versus HBM3e, providing up to 288 GB capacity per GPU and aggregate bandwidth of up to 22 TB/s, nearly triple Blackwell's memory bandwidth.",
+    "The third-generation Transformer Engine introduces hardware-accelerated adaptive compression for NVFP4 performance, enabling up to 50 PetaFLOPS of NVFP4 inference, and is fully backward-compatible with Blackwell-optimized code.",
+    "NVLink 6 delivers 3.6 TB/s of bidirectional GPU-to-GPU bandwidth per GPU, doubling the 1,800 GB/s scale-up bandwidth of Blackwell's NVLink 5.",
+    "The Vera CPU features 88 custom Olympus cores with Spatial Multithreading (176 threads), up to 1.2 TB/s memory bandwidth, up to 1.5 TB LPDDR5X capacity, and 1.8 TB/s NVLink-C2C, replacing Grace's 72 Neoverse V2 cores, 512 GB/s memory bandwidth, and 900 GB/s NVLink-C2C."
+  ],
+  "contradictions": [
+    {
+      "contradiction_id": "C001",
+      "severity": "medium",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C002",
+      "severity": "medium",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C003",
+      "severity": "medium",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C004",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C005",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C006",
+      "severity": "medium",
+      "topic": "power"
+    }
+  ],
+  "research_gaps": [],
+  "outputs": {
+    "question_id": "NVIDIA_006"
+  },
+  "summary": {
+    "evidence_count": 23,
+    "citation_count": 23,
+    "contradictions_found": 6,
+    "research_gaps_found": 0,
+    "coverage_score": 0.4
+  },
+  "owner": null,
+  "assigned_agent": null,
+  "review_status": "unreviewed",
+  "parent_research_id": null,
+  "child_research_ids": [],
+  "profile_validation": {
+    "expected_profile": "ai_data_centers",
+    "actual_profile": "ai_data_centers",
+    "source": "benchmark_domain_mapping",
+    "valid": true
+  }
+}

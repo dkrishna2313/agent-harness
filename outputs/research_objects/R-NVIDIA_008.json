@@ -1,0 +1,250 @@
+{
+  "research_id": "R-NVIDIA_008",
+  "created_at": "2026-06-18T20:21:28.383602+00:00",
+  "updated_at": "2026-06-18T20:21:28.383699+00:00",
+  "status": "completed",
+  "question": "What is the memory architecture of the GB200 Blackwell GPU, and how does HBM3e contribute to AI training performance?",
+  "profile": "ai_data_centers",
+  "profile_source": "benchmark_domain_mapping",
+  "run_config": {
+    "sources_dir": null,
+    "web_search": false,
+    "mock_mode": false,
+    "model_name": null
+  },
+  "subquestions": [],
+  "retrieval_plan": {
+    "web_search": {
+      "dependency_status": {
+        "duckduckgo_search": "ok (ddgs)",
+        "requests": "ok",
+        "trafilatura": "ok",
+        "all_available": true
+      },
+      "query": "What is the memory architecture of the GB200 Blackwell GPU, and how does HBM3e contribute to AI training performance?",
+      "provider": "DuckDuckGoSearchProvider",
+      "search_error": null,
+      "search_results_returned": 5,
+      "search_results": [
+        {
+          "title": "GB200 NVL72 | NVIDIA",
+          "url": "https://www.nvidia.com/en-us/data-center/gb200-nvl72/",
+          "snippet": "The Blackwell Rack-Scale Architecture for Real-Time Trillion-Parameter Inference and Training The NVIDIA GB200 NVL72 is an exascale computer in a single rack. With 72 NVIDIA Blackwell GPUs interconnec"
+        },
+        {
+          "title": "The Engine Behind AI Factories | NVIDIA Blackwell Architecture",
+          "url": "https://www.nvidia.com/en-us/data-center/technologies/blackwell-architecture/",
+          "snippet": "Breaking Barriers in Accelerated Computing and Generative AI Explore the groundbreaking advancements the NVIDIA Blackwell architecture brings to generative AI and accelerated computing. Building upon "
+        },
+        {
+          "title": "Microbenchmarking NVIDIA’s Blackwell Architecture: An in-depth ...",
+          "url": "https://arxiv.org/html/2512.02189v1",
+          "snippet": "As the direct successor to the Hopper generation, the Blackwell architecture extends NVIDIA’s GPU design in several modifications across the compute pipeline, memory hierarchy, and tensor processing s"
+        },
+        {
+          "title": "The Evolution of Nvidia Blackwell GPU Memory Architecture",
+          "url": "https://www.freecodecamp.org/news/the-evolution-of-nvidia-blackwell-gpu-memory-architecture/",
+          "snippet": "The numbers tell a clear story: more memory, more bandwidth, larger caches. The rest of this article explains how these pieces fit together The GB200 Superchip The Grace Blackwell (GB200) extends the "
+        },
+        {
+          "title": "NVIDIA introduces Blackwell GPU lineup - CUDO Compute",
+          "url": "https://www.cudocompute.com/blog/nvidias-blackwell-architecture-breaking-down-the-b100-b200-and-gb200",
+          "snippet": "With the Blackwell architecture, NVIDIA introduces a fifth-generation NVLink, offering unprecedented levels of parallelism and bandwidth that considerably outpace the Hopper architecture’s capabilitie"
+        }
+      ],
+      "pages_attempted": 5,
+      "downloaded_urls": [
+        "https://www.nvidia.com/en-us/data-center/gb200-nvl72/",
+        "https://www.nvidia.com/en-us/data-center/technologies/blackwell-architecture/",
+        "https://arxiv.org/html/2512.02189v1",
+        "https://www.freecodecamp.org/news/the-evolution-of-nvidia-blackwell-gpu-memory-architecture/",
+        "https://www.cudocompute.com/blog/nvidias-blackwell-architecture-breaking-down-the-b100-b200-and-gb200"
+      ],
+      "failed_urls": [],
+      "cache_hits": 5,
+      "documents_fetched": 5,
+      "extracted_characters": 91819,
+      "download_details": [
+        {
+          "url": "https://www.nvidia.com/en-us/data-center/gb200-nvl72/",
+          "title": "GB200 NVL72 | NVIDIA",
+          "source": "cache",
+          "error": null,
+          "chars": 3403
+        },
+        {
+          "url": "https://www.nvidia.com/en-us/data-center/technologies/blackwell-architecture/",
+          "title": "The Engine Behind AI Factories | NVIDIA Blackwell Architecture",
+          "source": "cache",
+          "error": null,
+          "chars": 4776
+        },
+        {
+          "url": "https://arxiv.org/html/2512.02189v1",
+          "title": "Microbenchmarking NVIDIA’s Blackwell Architecture: An in-depth ...",
+          "source": "cache",
+          "error": null,
+          "chars": 55084
+        },
+        {
+          "url": "https://www.freecodecamp.org/news/the-evolution-of-nvidia-blackwell-gpu-memory-architecture/",
+          "title": "The Evolution of Nvidia Blackwell GPU Memory Architecture",
+          "source": "cache",
+          "error": null,
+          "chars": 13119
+        },
+        {
+          "url": "https://www.cudocompute.com/blog/nvidias-blackwell-architecture-breaking-down-the-b100-b200-and-gb200",
+          "title": "NVIDIA introduces Blackwell GPU lineup - CUDO Compute",
+          "source": "cache",
+          "error": null,
+          "chars": 15437
+        }
+      ],
+      "chunks_created": 5
+    },
+    "source_count": 7
+  },
+  "evidence_ids": [
+    "E015",
+    "E016",
+    "E020",
+    "E002",
+    "E003",
+    "E004",
+    "E008",
+    "E005",
+    "E006",
+    "E007",
+    "E018",
+    "E019",
+    "E017",
+    "E001",
+    "E021",
+    "E022",
+    "E009",
+    "E010",
+    "E011",
+    "E012",
+    "E013",
+    "E014"
+  ],
+  "evidence_topics": {
+    "HBM3e": 15,
+    "memory bandwidth": 5,
+    "memory capacity": 4,
+    "Blackwell": 15,
+    "GB200": 7,
+    "NVLink-C2C": 2,
+    "AI training": 8,
+    "MLPerf": 1,
+    "performance": 3,
+    "dual-die": 2,
+    "bandwidth": 1,
+    "tensor cores": 4,
+    "L2 cache": 1,
+    "memory hierarchy": 1,
+    "AI performance": 2,
+    "memory stacks": 1,
+    "physical architecture": 1,
+    "NVL72": 1,
+    "LPDDR5X": 1,
+    "LLM inference": 2,
+    "MoE": 1,
+    "NVLink": 2,
+    "memory architecture": 5,
+    "HBM2e": 1,
+    "Hopper": 1,
+    "Grace CPU": 1,
+    "Transformer Engine": 1,
+    "FP4": 1,
+    "RAS": 1,
+    "reliability": 1,
+    "STREAM Triad": 1,
+    "TMEM": 2,
+    "memory latency": 1,
+    "AI training performance": 1,
+    "NV-HBI": 1
+  },
+  "findings": [
+    "The GB200 Grace Blackwell Superchip pairs one Grace CPU with two Blackwell GPUs via NVLink Chip-to-Chip (NVLink-C2C), creating a unified coherent memory architecture called Unified CPU-GPU Memory or Extended GPU Memory (EGM).",
+    "The Blackwell B200 GPU uses a dual-die design where each die contains 96 GB of HBM3e memory, totaling 192 GB (180 GB usable after ECC/system overhead); the two dies are connected by NVIDIA's NV-HBI at 10 TB/s.",
+    "The Blackwell B200 GPU achieves 8 TB/s of HBM3e memory bandwidth, a 2.4x improvement over the Hopper H100's 3.35 TB/s HBM3 bandwidth, which is critical for keeping tensor cores fed during large matrix multiplications.",
+    "The Blackwell B200 GPU's L2 cache was increased to approximately 126 MB total (~64–65 MB per die), a 2.5x increase over Hopper's 50 MB, reducing trips to HBM by keeping more neural network weights and intermediate results on-chip.",
+    "The Blackwell B200 GPU includes eight HBM3e memory stacks in an 8-Hi stack design (eight DRAM dies stacked vertically, each providing 3 GB), with four stacks per die, for 192 GB total on-package memory."
+  ],
+  "contradictions": [
+    {
+      "contradiction_id": "C001",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C002",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C003",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C004",
+      "severity": "medium",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C005",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C006",
+      "severity": "medium",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C007",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C008",
+      "severity": "medium",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C009",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C010",
+      "severity": "high",
+      "topic": "power"
+    }
+  ],
+  "research_gaps": [],
+  "outputs": {
+    "question_id": "NVIDIA_008"
+  },
+  "summary": {
+    "evidence_count": 22,
+    "citation_count": 22,
+    "contradictions_found": 56,
+    "research_gaps_found": 0,
+    "coverage_score": 0.2
+  },
+  "owner": null,
+  "assigned_agent": null,
+  "review_status": "unreviewed",
+  "parent_research_id": null,
+  "child_research_ids": [],
+  "profile_validation": {
+    "expected_profile": "ai_data_centers",
+    "actual_profile": "ai_data_centers",
+    "source": "benchmark_domain_mapping",
+    "valid": true
+  }
+}

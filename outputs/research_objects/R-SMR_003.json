@@ -1,0 +1,187 @@
+{
+  "research_id": "R-SMR_003",
+  "created_at": "2026-06-18T20:37:56.624698+00:00",
+  "updated_at": "2026-06-18T20:37:56.624917+00:00",
+  "status": "completed",
+  "question": "Why is availability of high-assay low-enriched uranium (HALEU) considered a critical deployment risk for advanced SMRs?",
+  "profile": "smr",
+  "profile_source": "benchmark_domain_mapping",
+  "run_config": {
+    "sources_dir": null,
+    "web_search": false,
+    "mock_mode": false,
+    "model_name": null
+  },
+  "subquestions": [],
+  "retrieval_plan": {
+    "web_search": {
+      "dependency_status": {
+        "duckduckgo_search": "ok (ddgs)",
+        "requests": "ok",
+        "trafilatura": "ok",
+        "all_available": true
+      },
+      "query": "Why is availability of high-assay low-enriched uranium (HALEU) considered a critical deployment risk for advanced SMRs?",
+      "provider": "DuckDuckGoSearchProvider",
+      "search_error": null,
+      "search_results_returned": 5,
+      "search_results": [
+        {
+          "title": "High-Assay Low-Enriched Uranium (HALEU) - World Nuclear Association",
+          "url": "https://world-nuclear.org/information-library/nuclear-fuel-cycle/conversion-enrichment-and-fabrication/high-assay-low-enriched-uranium-haleu",
+          "snippet": "Feb 11, 2026 · However, HALEU will be needed for many advanced power reactor fuels, and more than half of the small modular reactor (SMR) designs in ..."
+        },
+        {
+          "title": "High-Assay Low-Enriched Uranium - Centrus Energy Corp",
+          "url": "https://www.centrusenergy.com/what-we-do/nuclear-fuel/high-assay-low-enriched-uranium/",
+          "snippet": "The lack of a domestic HALEU supply is widely regarded as critical to the successful commercialization of U.S. advanced reactor technologies, could result in a ..."
+        },
+        {
+          "title": "What is High-Assay Low-Enriched Uranium (HALEU)?",
+          "url": "https://www.energy.gov/ne/articles/what-high-assay-low-enriched-uranium-haleu",
+          "snippet": "Dec 3, 2024 · HALEU is enriched between 5% and less than 20% and is required for most US advanced reactors to achieve smaller designs that get more power per unit of volume."
+        },
+        {
+          "title": "[PDF] High-Assay Low-Enriched Uranium - Nuclear Energy Agency (NEA)",
+          "url": "https://www.oecd-nea.org/upload/docs/application/pdf/2024-09/nea_publication_2_2_2024-09-18_16-53-42_174.pdf",
+          "snippet": "This report examines the fundamental drivers motivating the use of HALEU fuel in advanced nuclear technologies and SMRs today. It aims to provide an ..."
+        },
+        {
+          "title": "Declassified cable reinforces proliferation concerns about high ...",
+          "url": "https://thebulletin.org/2025/11/declassified-cable-reinforces-proliferation-concerns-about-high-assay-low-enriched-uranium-fuel/",
+          "snippet": "Nov 7, 2025 · large-scale production and use of HALEU may greatly increase the risks of nuclear proliferation and terrorism."
+        }
+      ],
+      "pages_attempted": 5,
+      "downloaded_urls": [
+        "https://world-nuclear.org/information-library/nuclear-fuel-cycle/conversion-enrichment-and-fabrication/high-assay-low-enriched-uranium-haleu",
+        "https://www.centrusenergy.com/what-we-do/nuclear-fuel/high-assay-low-enriched-uranium/",
+        "https://www.energy.gov/ne/articles/what-high-assay-low-enriched-uranium-haleu",
+        "https://thebulletin.org/2025/11/declassified-cable-reinforces-proliferation-concerns-about-high-assay-low-enriched-uranium-fuel/"
+      ],
+      "failed_urls": [
+        {
+          "url": "https://www.oecd-nea.org/upload/docs/application/pdf/2024-09/nea_publication_2_2_2024-09-18_16-53-42_174.pdf",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)"
+        }
+      ],
+      "cache_hits": 3,
+      "documents_fetched": 4,
+      "extracted_characters": 39786,
+      "download_details": [
+        {
+          "url": "https://world-nuclear.org/information-library/nuclear-fuel-cycle/conversion-enrichment-and-fabrication/high-assay-low-enriched-uranium-haleu",
+          "title": "High-Assay Low-Enriched Uranium (HALEU) - World Nuclear Association",
+          "source": "cache",
+          "error": null,
+          "chars": 16473
+        },
+        {
+          "url": "https://www.centrusenergy.com/what-we-do/nuclear-fuel/high-assay-low-enriched-uranium/",
+          "title": "High-Assay Low-Enriched Uranium - Centrus Energy Corp",
+          "source": "live",
+          "error": null,
+          "chars": 3401
+        },
+        {
+          "url": "https://www.energy.gov/ne/articles/what-high-assay-low-enriched-uranium-haleu",
+          "title": "What is High-Assay Low-Enriched Uranium (HALEU)?",
+          "source": "cache",
+          "error": null,
+          "chars": 4805
+        },
+        {
+          "url": "https://www.oecd-nea.org/upload/docs/application/pdf/2024-09/nea_publication_2_2_2024-09-18_16-53-42_174.pdf",
+          "title": "[PDF] High-Assay Low-Enriched Uranium - Nuclear Energy Agency (NEA)",
+          "source": "live",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)",
+          "chars": 0
+        },
+        {
+          "url": "https://thebulletin.org/2025/11/declassified-cable-reinforces-proliferation-concerns-about-high-assay-low-enriched-uranium-fuel/",
+          "title": "Declassified cable reinforces proliferation concerns about high ...",
+          "source": "cache",
+          "error": null,
+          "chars": 15107
+        }
+      ],
+      "chunks_created": 4
+    },
+    "source_count": 4
+  },
+  "evidence_ids": [
+    "E001",
+    "E008",
+    "E009",
+    "E010",
+    "E004",
+    "E011",
+    "E012",
+    "E002",
+    "E003",
+    "E006",
+    "E007",
+    "E005"
+  ],
+  "evidence_topics": {
+    "HALEU": 12,
+    "supply chain": 3,
+    "enrichment": 1,
+    "SMR deployment risk": 2,
+    "advanced reactor demonstration": 1,
+    "SMR deployment": 3,
+    "demand forecast": 1,
+    "supply gap": 1,
+    "reactor design": 1,
+    "commercial availability": 1,
+    "SMR": 2,
+    "transport": 1,
+    "licensing": 3,
+    "deployment risk": 2,
+    "proliferation": 1,
+    "safeguards": 1,
+    "IAEA": 1,
+    "proliferation risk": 1,
+    "NNSA": 1,
+    "regulatory uncertainty": 1,
+    "SMR fuel requirements": 1,
+    "advanced reactors": 1,
+    "market failure": 1,
+    "regulation": 1,
+    "capital investment": 1,
+    "commercialization": 1,
+    "fuel security": 1,
+    "physical security": 1,
+    "cost": 1
+  },
+  "findings": [
+    "HALEU is not yet widely available commercially; only Russia and China have the infrastructure to produce HALEU at scale, and a US ban on Russian uranium imports enacted in 2024 has further constrained supply options.",
+    "Approximately two-thirds of SMR designs currently in development require HALEU fuel, making its availability critical to the entire advanced reactor pipeline.",
+    "A 'chicken and egg' problem — where private fuel-cycle companies cannot invest without assured long-term commercial demand and reactor developers cannot commit without an assured fuel supply — has stalled HALEU infrastructure build-out and threatens to delay SMR deployment.",
+    "There are currently no approved transport casks that would permit economical movement of HALEU in the quantities needed to sustain a commercial fuel cycle, creating a logistical barrier to deployment.",
+    "HALEU requires a higher physical security classification (Category II) than conventional reactor fuel (Category III), meaning enrichment plants, fuel fabrication facilities, and transport operations will face significantly more stringent and costly security requirements."
+  ],
+  "contradictions": [],
+  "research_gaps": [],
+  "outputs": {
+    "question_id": "SMR_003"
+  },
+  "summary": {
+    "evidence_count": 12,
+    "citation_count": 12,
+    "contradictions_found": 0,
+    "research_gaps_found": 0,
+    "coverage_score": 0.0
+  },
+  "owner": null,
+  "assigned_agent": null,
+  "review_status": "unreviewed",
+  "parent_research_id": null,
+  "child_research_ids": [],
+  "profile_validation": {
+    "expected_profile": "smr",
+    "actual_profile": "smr",
+    "source": "benchmark_domain_mapping",
+    "valid": true
+  }
+}

@@ -1,0 +1,6 @@
+questions:
+  - "How do Rubin-class racks affect power distribution, UPS/BBU strategy, and utility interconnect?"
+  - "What cooling infrastructure changes are implied by liquid-cooled AI factory racks?"
+  - "How do NVLink, InfiniBand, Ethernet, Spectrum, and ConnectX shape AI data center networking?"
+  - "What does NVL72 rack-scale architecture imply for trays, shelves, cabinets, and deployment planning?"
+  - "What operational risks should be considered for commissioning, monitoring, maintenance, and resiliency?"

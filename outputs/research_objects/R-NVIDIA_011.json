@@ -1,0 +1,246 @@
+{
+  "research_id": "R-NVIDIA_011",
+  "created_at": "2026-06-18T20:29:09.344512+00:00",
+  "updated_at": "2026-06-18T20:29:09.344780+00:00",
+  "status": "completed",
+  "question": "What is the Grace CPU's role in the GB200 system, and why is a CPU integrated alongside the Blackwell GPU in the same package?",
+  "profile": "ai_data_centers",
+  "profile_source": "benchmark_domain_mapping",
+  "run_config": {
+    "sources_dir": null,
+    "web_search": false,
+    "mock_mode": false,
+    "model_name": null
+  },
+  "subquestions": [],
+  "retrieval_plan": {
+    "web_search": {
+      "dependency_status": {
+        "duckduckgo_search": "ok (ddgs)",
+        "requests": "ok",
+        "trafilatura": "ok",
+        "all_available": true
+      },
+      "query": "What is the Grace CPU's role in the GB200 system, and why is a CPU integrated alongside the Blackwell GPU in the same package?",
+      "provider": "DuckDuckGoSearchProvider",
+      "search_error": null,
+      "search_results_returned": 5,
+      "search_results": [
+        {
+          "title": "NVIDIA GB200 Supply Chain: The Global Ecosystem Explained |",
+          "url": "https://intuitionlabs.ai/articles/nvidia-gb200-supply-chain",
+          "snippet": "The core of the GB200 is a multi-chip package containing two Blackwell GPUs and one Grace CPU linked by 900 GB/s NVLink C2C HDL interconnect ( [9] )."
+        },
+        {
+          "title": "[GB200 NVL72] The Mainframe of Doom",
+          "url": "https://irrationalanalysis.substack.com/p/gb200-nvl72-the-mainframe-of-doom",
+          "snippet": "However, the new GB200 NVL72 has a 2:1 ratio and is much more compelling from a power/thermal/system/networking integration perspective."
+        },
+        {
+          "title": "CoreWeave Launches NVIDIA GB200 Grace Blackwell Systems at Scale",
+          "url": "https://www.coreweave.com/news/coreweave-launches-nvidia-gb200-grace-blackwell-systems-at-scale",
+          "snippet": "CoreWeave s rapid deployment of NVIDIA GB200 systems delivers the AI infrastructure and software that are making AI factories a reality."
+        },
+        {
+          "title": "NVIDIA introduces Blackwell GPU lineup",
+          "url": "https://www.cudocompute.com/blog/nvidias-blackwell-architecture-breaking-down-the-b100-b200-and-gb200",
+          "snippet": "The Blackwell architecture is named in honor of David Blackwell , the esteemed mathematician and statistician. ... The High-Bandwidth Memory (HBM) ..."
+        },
+        {
+          "title": "NVIDIA GB200: Unveiling the Truth Behind the Oberon",
+          "url": "https://techovedas.com/nvidia-gb200-unveiling-the-truth-behind-the-oberon-architecture/",
+          "snippet": "The introduction of the GB200 architecture has catalyzed a surge in demand for ABF substrates, signaling a paradigm shift in semiconductor ..."
+        }
+      ],
+      "pages_attempted": 5,
+      "downloaded_urls": [
+        "https://intuitionlabs.ai/articles/nvidia-gb200-supply-chain",
+        "https://irrationalanalysis.substack.com/p/gb200-nvl72-the-mainframe-of-doom",
+        "https://www.coreweave.com/news/coreweave-launches-nvidia-gb200-grace-blackwell-systems-at-scale",
+        "https://www.cudocompute.com/blog/nvidias-blackwell-architecture-breaking-down-the-b100-b200-and-gb200"
+      ],
+      "failed_urls": [
+        {
+          "url": "https://techovedas.com/nvidia-gb200-unveiling-the-truth-behind-the-oberon-architecture/",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)"
+        }
+      ],
+      "cache_hits": 4,
+      "documents_fetched": 4,
+      "extracted_characters": 83242,
+      "download_details": [
+        {
+          "url": "https://intuitionlabs.ai/articles/nvidia-gb200-supply-chain",
+          "title": "NVIDIA GB200 Supply Chain: The Global Ecosystem Explained |",
+          "source": "cache",
+          "error": null,
+          "chars": 54964
+        },
+        {
+          "url": "https://irrationalanalysis.substack.com/p/gb200-nvl72-the-mainframe-of-doom",
+          "title": "[GB200 NVL72] The Mainframe of Doom",
+          "source": "cache",
+          "error": null,
+          "chars": 9446
+        },
+        {
+          "url": "https://www.coreweave.com/news/coreweave-launches-nvidia-gb200-grace-blackwell-systems-at-scale",
+          "title": "CoreWeave Launches NVIDIA GB200 Grace Blackwell Systems at Scale",
+          "source": "cache",
+          "error": null,
+          "chars": 3395
+        },
+        {
+          "url": "https://www.cudocompute.com/blog/nvidias-blackwell-architecture-breaking-down-the-b100-b200-and-gb200",
+          "title": "NVIDIA introduces Blackwell GPU lineup",
+          "source": "cache",
+          "error": null,
+          "chars": 15437
+        },
+        {
+          "url": "https://techovedas.com/nvidia-gb200-unveiling-the-truth-behind-the-oberon-architecture/",
+          "title": "NVIDIA GB200: Unveiling the Truth Behind the Oberon",
+          "source": "live",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)",
+          "chars": 0
+        }
+      ],
+      "chunks_created": 4
+    },
+    "source_count": 6
+  },
+  "evidence_ids": [
+    "E001",
+    "E002",
+    "E011",
+    "E007",
+    "E008",
+    "E014",
+    "E006",
+    "E015",
+    "E013",
+    "E004",
+    "E009",
+    "E010",
+    "E012",
+    "E005",
+    "E003"
+  ],
+  "evidence_topics": {
+    "Grace CPU": 12,
+    "Blackwell GPU": 8,
+    "NVLink-C2C": 7,
+    "memory coherence": 3,
+    "superchip": 3,
+    "NVL72": 3,
+    "rack-scale": 1,
+    "token generation": 1,
+    "LPDDR5X": 5,
+    "memory bandwidth": 1,
+    "Neoverse V2": 1,
+    "NVLink": 2,
+    "compute tray": 1,
+    "HBM3E": 1,
+    "memory capacity": 1,
+    "multi-chip package": 1,
+    "Grace Blackwell Superchip": 1,
+    "agentic AI": 1,
+    "deployment": 1,
+    "unified address space": 1,
+    "HBM": 1,
+    "KV-cache": 1,
+    "CPU-GPU ratio": 1,
+    "TCO": 1,
+    "Grace Hopper": 1,
+    "CPU-GPU integration": 2,
+    "co-design": 1,
+    "utilization": 1,
+    "data engine": 1,
+    "orchestration": 2,
+    "CPU role": 1,
+    "data movement": 1,
+    "GPU utilization": 1,
+    "Grace successor": 1,
+    "interconnect fabric": 1,
+    "power efficiency": 1,
+    "GPU feeding": 1,
+    "CUDA scheduler": 1,
+    "memory expansion": 1
+  },
+  "findings": [
+    "The GB200 Grace Blackwell Superchip combines two NVIDIA B200 Tensor Core GPUs with one NVIDIA Grace CPU via an ultra-low-power NVLink chip-to-chip interconnect running at 900 GB/s, and the chip-to-chip link is completely memory-coherent, creating a unified chip without memory localization.",
+    "Grace is designed specifically to feed the GPUs — its primary roles are to run the CUDA software scheduler, feed the GPUs, and expand memory and host additional high-speed I/O, rather than to serve as a general high-performance CPU.",
+    "GB200 packages two Blackwell GPUs per one Grace CPU (a 2:1 GPU-to-CPU ratio), which brings the platform near TCO parity with x86 systems and is far more compelling from a power, thermal, system, and networking integration perspective than the prior Grace-Hopper 1:1 approach.",
+    "The Grace interconnect fabric enables memory-coherent CPU-GPU communication; anyone trying to duplicate the GB200 NVL72's connectivity and coherency without NVLink will face massive power and TCO penalties.",
+    "The core of the GB200 is a multi-chip package containing two Blackwell GPUs and one Grace CPU linked by a 900 GB/s NVLink-C2C interconnect; each compute tray in an NVL72 rack holds two of these modules (2 Grace CPUs + 4 GPUs), and in total the NVL72 rack houses 36 modules (72 GPUs, 36 72-core CPUs) in 18 1U servers."
+  ],
+  "contradictions": [
+    {
+      "contradiction_id": "C001",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C002",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C003",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C004",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C005",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C006",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C007",
+      "severity": "medium",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C008",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C009",
+      "severity": "high",
+      "topic": "power"
+    }
+  ],
+  "research_gaps": [],
+  "outputs": {
+    "question_id": "NVIDIA_011"
+  },
+  "summary": {
+    "evidence_count": 15,
+    "citation_count": 15,
+    "contradictions_found": 9,
+    "research_gaps_found": 0,
+    "coverage_score": 0.2
+  },
+  "owner": null,
+  "assigned_agent": null,
+  "review_status": "unreviewed",
+  "parent_research_id": null,
+  "child_research_ids": [],
+  "profile_validation": {
+    "expected_profile": "ai_data_centers",
+    "actual_profile": "ai_data_centers",
+    "source": "benchmark_domain_mapping",
+    "valid": true
+  }
+}

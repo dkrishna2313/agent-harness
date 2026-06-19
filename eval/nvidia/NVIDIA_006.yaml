@@ -1,0 +1,35 @@
+question_id: NVIDIA_006
+domain: nvidia
+difficulty: medium
+question: >
+  What are the key architectural changes introduced in the NVIDIA Vera Rubin
+  platform compared to Blackwell?
+
+must_include:
+  - Rubin
+
+acceptable_alternatives:
+  - next generation
+  - successor to Blackwell
+  - Vera
+  - GB300
+
+must_not_include:
+  - Rubin is the same as Blackwell    # incorrect
+  - no architectural changes          # incorrect
+
+expected_topics:
+  - rack architecture
+  - power
+
+evaluation_tags:
+  - roadmap
+  - comparative
+
+notes: >
+  Vera Rubin (expected ~2026) succeeds Blackwell.  Key reported changes include:
+  the Vera CPU paired with Rubin GPU, HBM4 memory, NVLink 6 interconnect, and
+  continued rack-scale integration.  Because this is roadmap information, sources
+  vary and specific TDP/GPU-count claims should be treated as preliminary.
+  A correct answer should identify Rubin as the successor to Blackwell/GB200 and
+  describe at least one architectural dimension of change.

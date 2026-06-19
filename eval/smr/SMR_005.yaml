@@ -1,0 +1,42 @@
+question_id: SMR_005
+domain: smr
+difficulty: easy
+question: >
+  What is the current deployment status of the BWRX-300 small modular
+  reactor in Canada as of 2025?
+
+must_include:
+  - BWRX-300
+  - Canada
+
+acceptable_alternatives:
+  - Ontario Power Generation
+  - OPG
+  - Darlington
+  - license to prepare site
+  - construction
+  - GE Hitachi
+
+must_not_include:
+  - BWRX-300 is operating commercially    # not yet as of 2025
+  - never approved                         # approval milestones have been reached
+
+expected_topics:
+  - deployment
+  - licensing
+
+evaluation_tags:
+  - factual
+  - current_events
+  - easy
+
+notes: >
+  As of 2025, the BWRX-300 status at Darlington (Ontario Power Generation):
+  - OPG received a Licence to Prepare Site from the Canadian Nuclear Safety
+    Commission (CNSC) in 2024, enabling site preparation work to begin.
+  - The project is in detailed engineering and early site preparation phase.
+  - First commercial power is targeted for the early 2030s.
+  - GE Hitachi Nuclear Energy is the technology vendor.
+  This is a current-events question; answers should reflect the licensing
+  milestone achieved and the approximate timeline to operation.  Answers
+  stating the reactor is already operating are wrong.

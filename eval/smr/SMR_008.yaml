@@ -1,0 +1,49 @@
+question_id: SMR_008
+domain: smr
+difficulty: medium
+question: >
+  How do SMRs compare to large nuclear reactors in terms of economics of
+  scale, and what advantages do SMRs claim to offset the scale disadvantage?
+
+must_include:
+  - economy of scale
+  - factory
+
+acceptable_alternatives:
+  - diseconomy of scale
+  - modular fabrication
+  - learning rate
+  - serial production
+  - standardisation
+  - overnight cost per kW
+
+must_not_include:
+  - SMRs are always cheaper per kW than large reactors    # not established
+  - large reactors have no advantage                      # large reactors benefit from economies of scale
+
+expected_topics:
+  - economics
+
+evaluation_tags:
+  - comparative
+  - medium
+  - economics
+
+notes: >
+  Core tension:
+  - Large reactors (1000–1700 MWe) benefit from economies of scale: the
+    overnight cost per kW decreases as unit size increases (fixed engineering,
+    regulatory, and site preparation costs are spread over more capacity).
+  - SMRs (50–300 MWe) have higher overnight cost per kW at the unit level.
+  SMR counter-arguments:
+  (1) Factory fabrication: modules built in a controlled factory environment
+      reduces on-site labour and improves quality; analogous to aerospace or
+      shipbuilding learning curves.
+  (2) Serial production learning rate: each nth unit costs less to build;
+      projections assume 10–20% cost reduction per doubling of units built.
+  (3) Financing: smaller unit capital outlay reduces financing risk; shorter
+      construction period means less interest during construction.
+  (4) Grid flexibility: SMRs can be matched to smaller grids; not all markets
+      need 1000 MWe increments.
+  Whether these advantages offset the scale penalty remains unproven at
+  commercial scale as of 2025.

@@ -1,0 +1,48 @@
+question_id: SMR_003
+domain: smr
+difficulty: medium
+question: >
+  Why is availability of high-assay low-enriched uranium (HALEU) considered
+  a critical deployment risk for advanced SMRs?
+
+must_include:
+  - HALEU
+  - supply
+
+acceptable_alternatives:
+  - enrichment capacity
+  - fuel supply chain
+  - Russia
+  - Centrus
+  - ">5% enrichment"
+  - 20% enrichment
+  - weapons-grade risk
+
+must_not_include:
+  - HALEU is readily available      # incorrect; commercial-scale supply does not yet exist
+  - no supply chain risk            # incorrect
+
+expected_topics:
+  - fuel
+  - risk
+
+evaluation_tags:
+  - explanatory
+  - medium
+  - supply_chain
+
+notes: >
+  HALEU (5–20% U-235 enrichment) is required by many advanced reactor designs
+  (TerraPower Natrium, Kairos FHR, some SMR concepts) because it enables smaller
+  core sizes and higher energy density.
+  Supply chain risk arises because:
+  (1) The only commercial-scale HALEU supplier historically was Russia (through
+      TENEX/Rosatom).  Western sanctions post-2022 Ukraine invasion created
+      acute supply uncertainty.
+  (2) Centrus Energy has begun US domestic HALEU production but at very small
+      scale (initially hundreds of kg/year; reactors need tens of tonnes/year).
+  (3) Enrichment to HALEU requires different centrifuge cascades than standard
+      ~4.5% LEU; significant capital investment is needed to scale Western supply.
+  (4) Export controls and non-proliferation concerns add regulatory complexity.
+  A correct answer must identify HALEU as a specific fuel type (>5% enrichment)
+  and explain that commercial-scale Western supply is limited or nascent.

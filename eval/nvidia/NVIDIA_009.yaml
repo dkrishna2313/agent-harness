@@ -1,0 +1,41 @@
+question_id: NVIDIA_009
+domain: nvidia
+difficulty: easy
+question: >
+  What cooling method is used for the compute trays in the GB200 NVL72,
+  and what cooling method handles the power shelves?
+
+must_include:
+  - liquid
+  - power shelf
+
+acceptable_alternatives:
+  - direct liquid cooling
+  - DLC
+  - air cooled PSU
+  - air cooled power shelf
+  - hybrid cooling
+
+must_not_include:
+  - entire rack is air cooled    # incorrect
+  - power shelves use liquid     # incorrect; power shelves use air cooling
+
+expected_topics:
+  - cooling
+  - rack architecture
+
+evaluation_tags:
+  - factual
+  - scope_distinction
+
+notes: >
+  This question is a J1.6 scope-distinction test case.  The correct answer
+  describes a HYBRID cooling architecture:
+  - Compute trays (GPUs): direct liquid cooling (DLC) with coolant at ~45 °C
+    supply temperature.
+  - Power shelves (PSUs): air-cooled using conventional forced-air.
+  These are different subsystems within the same rack.  An answer that says
+  "the rack uses liquid cooling" without qualifying which subsystem is
+  incomplete; an answer that says "the rack is fully liquid cooled" is
+  factually imprecise.  Distinguishing compute-tray DLC from PSU air cooling
+  is the key insight.

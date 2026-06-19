@@ -1,0 +1,216 @@
+{
+  "research_id": "R-20260617-095037",
+  "created_at": "2026-06-17T09:50:37.906167+00:00",
+  "updated_at": "2026-06-17T09:52:26.007137+00:00",
+  "status": "completed",
+  "question": "What factors drive SMR deployment risk?",
+  "profile": "smr",
+  "profile_source": "cli_argument",
+  "run_config": {
+    "sources_dir": "sources",
+    "web_search": true,
+    "mock_mode": false,
+    "model_name": null
+  },
+  "subquestions": [],
+  "retrieval_plan": {
+    "web_search": {
+      "dependency_status": {
+        "duckduckgo_search": "ok (ddgs)",
+        "requests": "ok",
+        "trafilatura": "ok",
+        "all_available": true
+      },
+      "query": "What factors drive SMR deployment risk?",
+      "provider": "DuckDuckGoSearchProvider",
+      "search_error": null,
+      "search_results_returned": 5,
+      "search_results": [
+        {
+          "title": "What are the main obstacles preventing the widespread use of ...",
+          "url": "https://www.quora.com/What-are-the-main-obstacles-preventing-the-widespread-use-of-small-modular-nuclear-reactors-SMRs-on-land",
+          "snippet": "17 Apr 2026 · This delay in commercial deployment on land is not due to a single fatal flaw, but rather a combination of economic, regulatory, and supply ...What are the obstacles holding back small m"
+        },
+        {
+          "title": "Why aren't underwater small modular reactors (SMRs) being ... - Reddit",
+          "url": "https://www.reddit.com/r/NuclearPower/comments/1m58vhd/why_arent_underwater_small_modular_reactors_smrs/",
+          "snippet": "21 Jul 2025 · Operation shifts, admin building sizes, ancillary costs to run and maintain the plant. Access and control requirements. SMRs don't benefit from ..."
+        },
+        {
+          "title": "SMRs' fatal flaw: too many designs, high costs, and a bleak future",
+          "url": "https://www.linkedin.com/posts/joe-romm-1053841_smrs-other-fatal-flaw-far-too-many-designs-activity-7354229211022168066-OgaR",
+          "snippet": "24 Jul 2025 · The Current Scenario: Stuck in first gear • SMR deployment is slow, under 1 GW per year. • Costs over $100/MWh. • Only a handful of projects ...SMR alternate routes to market | Andy Cham"
+        },
+        {
+          "title": "Regulatory Certainty as Catalyst for SMR Deployment: UK Case -",
+          "url": "https://www.ogel.org/journal-advance-publication-article.asp?key=846",
+          "snippet": "... central thesis is that not only technological progress, but also regulatory innovation will determine the transition of SMRs to commercial deployment ..."
+        },
+        {
+          "title": "SMR Projects and AI Data Centre Energy Demand",
+          "url": "https://fastmac.org/nuclear-ai-power/",
+          "snippet": "In the UK, Rolls-Royce SMR aims for deployment in the early 2030s, subject to successful completion of regulatory review and site selection."
+        }
+      ],
+      "pages_attempted": 5,
+      "downloaded_urls": [
+        "https://www.linkedin.com/posts/joe-romm-1053841_smrs-other-fatal-flaw-far-too-many-designs-activity-7354229211022168066-OgaR",
+        "https://www.ogel.org/journal-advance-publication-article.asp?key=846",
+        "https://fastmac.org/nuclear-ai-power/"
+      ],
+      "failed_urls": [
+        {
+          "url": "https://www.quora.com/What-are-the-main-obstacles-preventing-the-widespread-use-of-small-modular-nuclear-reactors-SMRs-on-land",
+          "error": "fetch error: HTTPError: 403 Client Error: Forbidden for url: https://www.quora.com/What-are-the-main-obstacles-preventing-the-widespread-use-of-small-modular-nuclear-reactors-SMRs-on-land"
+        },
+        {
+          "url": "https://www.reddit.com/r/NuclearPower/comments/1m58vhd/why_arent_underwater_small_modular_reactors_smrs/",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)"
+        }
+      ],
+      "cache_hits": 0,
+      "documents_fetched": 3,
+      "extracted_characters": 12574,
+      "download_details": [
+        {
+          "url": "https://www.quora.com/What-are-the-main-obstacles-preventing-the-widespread-use-of-small-modular-nuclear-reactors-SMRs-on-land",
+          "title": "What are the main obstacles preventing the widespread use of ...",
+          "source": "live",
+          "error": "fetch error: HTTPError: 403 Client Error: Forbidden for url: https://www.quora.com/What-are-the-main-obstacles-preventing-the-widespread-use-of-small-modular-nuclear-reactors-SMRs-on-land",
+          "chars": 0
+        },
+        {
+          "url": "https://www.reddit.com/r/NuclearPower/comments/1m58vhd/why_arent_underwater_small_modular_reactors_smrs/",
+          "title": "Why aren't underwater small modular reactors (SMRs) being ... - Reddit",
+          "source": "live",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)",
+          "chars": 0
+        },
+        {
+          "url": "https://www.linkedin.com/posts/joe-romm-1053841_smrs-other-fatal-flaw-far-too-many-designs-activity-7354229211022168066-OgaR",
+          "title": "SMR&#39;s OTHER Fatal Flaw: Far too many designs—27+ in U.S.—mean &#39;virtually all SMR companies will fail and costs will remain very high for a long time&#39; as I explained in a major UPenn report | Joe Romm",
+          "source": "live",
+          "error": null,
+          "chars": 4063
+        },
+        {
+          "url": "https://www.ogel.org/journal-advance-publication-article.asp?key=846",
+          "title": "Regulatory Certainty as Catalyst for SMR Deployment: UK Case - Advance publication - Journal | \r\nOGEL Journal",
+          "source": "live",
+          "error": null,
+          "chars": 1245
+        },
+        {
+          "url": "https://fastmac.org/nuclear-ai-power/",
+          "title": "SMR Projects and AI Data Centre Energy Demand",
+          "source": "live",
+          "error": null,
+          "chars": 7266
+        }
+      ],
+      "chunks_created": 3
+    },
+    "source_count": 3
+  },
+  "evidence_ids": [
+    "E007",
+    "E008",
+    "E001",
+    "E004",
+    "E006",
+    "E011",
+    "E002",
+    "E009",
+    "E005",
+    "E010",
+    "E003"
+  ],
+  "evidence_topics": {
+    "supply chain risk": 1,
+    "manufacturing readiness": 1,
+    "first-of-a-kind risk": 1,
+    "deployment risk": 7,
+    "capital cost": 1,
+    "financing risk": 2,
+    "bankability": 1,
+    "first-of-a-kind cost": 1,
+    "SMR economics": 2,
+    "cost per MW": 1,
+    "deployment timeline": 2,
+    "capital risk": 1,
+    "manufacturing risk": 1,
+    "competitive risk": 1,
+    "regulatory risk": 2,
+    "licensing bottleneck": 1,
+    "policy risk": 1,
+    "government support": 1,
+    "financing structure": 1,
+    "SMR design fragmentation": 1,
+    "standardization": 2,
+    "market failure": 1,
+    "construction risk": 1,
+    "regulatory uncertainty": 1,
+    "political risk": 1,
+    "investor confidence": 1,
+    "grid integration": 1,
+    "energy demand": 1,
+    "SMR market drivers": 1,
+    "modularity": 1
+  },
+  "findings": [
+    "As of 2026, no SMR project had entered full commercial operation in Western Europe or North America, and large-scale manufacturing facilities dedicated to SMRs were only just being planned, meaning cost reductions from serial production may not materialize quickly enough to make early projects economically competitive.",
+    "The capital cost of first-of-a-kind SMR units is expected to be high—overnight costs could exceed £5,000 per kW for early deployments—and nuclear projects require revenue certainty over very long horizons to secure financing at reasonable rates, raising bankability risk.",
+    "The U.S. DOE's own 2024 report modeled a median cost per MW over 50% higher for SMRs than for large reactors.",
+    "51 SMR designs globally are involved in pre-licensing or licensing, of which 27 are in the U.S.; the current multi-design strategy means virtually all SMR companies will fail and costs will remain very high because standardization economies require mass-producing only one or two designs.",
+    "Achieving SMR cost reductions through modularity requires mass-producing one or at most two designs; the current multi-design approach is incompatible with realizing savings from standardization."
+  ],
+  "contradictions": [],
+  "research_gaps": [
+    {
+      "gap_id": "G001",
+      "priority": "high",
+      "topic": "Construction Permit",
+      "description": "No construction permit or combined license information found."
+    },
+    {
+      "gap_id": "G002",
+      "priority": "high",
+      "topic": "Levelized Cost of Electricity",
+      "description": "No levelized cost of electricity (LCOE) estimate found."
+    },
+    {
+      "gap_id": "G003",
+      "priority": "high",
+      "topic": "NRC Licensing Path",
+      "description": "No NRC licensing pathway or design certification status found."
+    },
+    {
+      "gap_id": "G004",
+      "priority": "medium",
+      "topic": "Cost Overrun Risk",
+      "description": "No cost overrun risk assessment found."
+    }
+  ],
+  "outputs": {
+    "memo_path": "outputs/j45c_validation.md",
+    "trace_path": "outputs/j45c_validation.trace.json"
+  },
+  "summary": {
+    "evidence_count": 11,
+    "citation_count": 11,
+    "contradictions_found": 0,
+    "research_gaps_found": 4,
+    "coverage_score": 0.56
+  },
+  "owner": null,
+  "assigned_agent": null,
+  "review_status": "unreviewed",
+  "parent_research_id": null,
+  "child_research_ids": [],
+  "profile_validation": {
+    "expected_profile": "smr",
+    "actual_profile": "smr",
+    "source": "cli_argument",
+    "valid": true
+  }
+}

@@ -1,0 +1,45 @@
+question_id: NVIDIA_012
+domain: nvidia
+difficulty: medium
+question: >
+  What power management or efficiency features does NVIDIA GB200 NVL72
+  incorporate to handle its high thermal design point?
+
+must_include:
+  - power
+
+acceptable_alternatives:
+  - power capping
+  - TDP
+  - dynamic frequency
+  - thermal throttling
+  - workload-dependent
+  - power shelf
+  - redundant power
+
+must_not_include:
+  - no power management features    # incorrect
+
+expected_topics:
+  - power
+  - operations
+  - rack architecture
+
+evaluation_tags:
+  - technical
+  - medium
+
+notes: >
+  Key power management aspects of GB200 NVL72:
+  (1) Configurable TDP: the B200 GPU supports power capping; operators can
+      reduce from peak TDP for lower-priority workloads or to fit facility
+      power envelopes.
+  (2) Redundant power shelves: multiple N+1 or N+N PSU shelves per rack
+      provide fault tolerance and allow hot-swap.
+  (3) Liquid cooling as the primary thermal path: unlike air-cooled systems
+      that require active fan speed management, the liquid loop provides
+      more stable thermal headroom.
+  (4) NVLink power domains: the interconnect fabric has its own power budget
+      separate from compute.
+  A correct answer should identify at least power capping/TDP flexibility
+  and the role of liquid cooling in thermal management.

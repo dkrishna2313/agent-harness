@@ -1,0 +1,222 @@
+{
+  "research_id": "R-SMR_007",
+  "created_at": "2026-06-18T20:45:39.752282+00:00",
+  "updated_at": "2026-06-18T20:45:39.752368+00:00",
+  "status": "completed",
+  "question": "Why did the NuScale VOYGR SMR project at the Carbon Free Power Project fail, and what does this reveal about SMR commercial viability?",
+  "profile": "smr",
+  "profile_source": "benchmark_domain_mapping",
+  "run_config": {
+    "sources_dir": null,
+    "web_search": false,
+    "mock_mode": false,
+    "model_name": null
+  },
+  "subquestions": [],
+  "retrieval_plan": {
+    "web_search": {
+      "dependency_status": {
+        "duckduckgo_search": "ok (ddgs)",
+        "requests": "ok",
+        "trafilatura": "ok",
+        "all_available": true
+      },
+      "query": "Why did the NuScale VOYGR SMR project at the Carbon Free Power Project fail, and what does this reveal about SMR commercial viability?",
+      "provider": "DuckDuckGoSearchProvider",
+      "search_error": null,
+      "search_results_returned": 5,
+      "search_results": [
+        {
+          "title": "NuScale cancels first-of-a-kind nuclear project as costs surge",
+          "url": "https://www.eenews.net/articles/nuscale-cancels-first-of-a-kind-nuclear-project-as-costs-surge/",
+          "snippet": "Nov 9, 2023 · The country's first expected commercial small modular reactor was scrapped by NuScale Power on Wednesday, delivering a major setback to the advanced nuclear ..."
+        },
+        {
+          "title": "Why did the NuScale project fail and how to avoid it? - Facebook",
+          "url": "https://www.facebook.com/groups/c4ne.ca/posts/1289829029079522/",
+          "snippet": "Nov 8, 2023 · Nuscale smr project cancelled due to lack of subscriptions · Nuclear distraction delays coal profits and climate goals · What lessons were learned ...Nuscale Power USA gets US nuclear re"
+        },
+        {
+          "title": "What's preventing the build out and deployment of NuScale's VOYGR ...",
+          "url": "https://www.reddit.com/r/nuclear/comments/1jdc3js/whats_preventing_the_build_out_and_deployment_of/",
+          "snippet": "Mar 17, 2025 · The NuScale reactor building is large because of the giant pool of water that serves as the ultimate heat sink. That allows the plant to be “ ...Flagship NuScale SMR Project in Idaho ca"
+        },
+        {
+          "title": "What the hell happened with NuScale?! #nuclear #nuscale ...",
+          "url": "https://www.facebook.com/generationatomic/posts/what-the-hell-happened-with-nuscalenuclear-nuscale-smrnuclearenergy-cleanenergy-/649115693972132/",
+          "snippet": "Nov 21, 2023 · NuScale's project in Utah failed before it even began construction, because the expected cost of producing energy was revised upwards due to ..."
+        },
+        {
+          "title": "The collapse of NuScale's project should spell the end for ... - Utility Dive",
+          "url": "https://www.utilitydive.com/news/nuscale-uamps-project-small-modular-reactor-ramanasmr-/705717/",
+          "snippet": "Jan 31, 2024 · The engineers and accountants on the project were evidently unrealistic about the likely costs, or perhaps NuScale preferred to gently break the ..."
+        }
+      ],
+      "pages_attempted": 5,
+      "downloaded_urls": [
+        "https://www.eenews.net/articles/nuscale-cancels-first-of-a-kind-nuclear-project-as-costs-surge/",
+        "https://www.utilitydive.com/news/nuscale-uamps-project-small-modular-reactor-ramanasmr-/705717/"
+      ],
+      "failed_urls": [
+        {
+          "url": "https://www.facebook.com/groups/c4ne.ca/posts/1289829029079522/",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)"
+        },
+        {
+          "url": "https://www.reddit.com/r/nuclear/comments/1jdc3js/whats_preventing_the_build_out_and_deployment_of/",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)"
+        },
+        {
+          "url": "https://www.facebook.com/generationatomic/posts/what-the-hell-happened-with-nuscalenuclear-nuscale-smrnuclearenergy-cleanenergy-/649115693972132/",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)"
+        }
+      ],
+      "cache_hits": 2,
+      "documents_fetched": 2,
+      "extracted_characters": 11365,
+      "download_details": [
+        {
+          "url": "https://www.eenews.net/articles/nuscale-cancels-first-of-a-kind-nuclear-project-as-costs-surge/",
+          "title": "NuScale cancels first-of-a-kind nuclear project as costs surge",
+          "source": "cache",
+          "error": null,
+          "chars": 4687
+        },
+        {
+          "url": "https://www.facebook.com/groups/c4ne.ca/posts/1289829029079522/",
+          "title": "Why did the NuScale project fail and how to avoid it? - Facebook",
+          "source": "live",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)",
+          "chars": 0
+        },
+        {
+          "url": "https://www.reddit.com/r/nuclear/comments/1jdc3js/whats_preventing_the_build_out_and_deployment_of/",
+          "title": "What's preventing the build out and deployment of NuScale's VOYGR ...",
+          "source": "live",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)",
+          "chars": 0
+        },
+        {
+          "url": "https://www.facebook.com/generationatomic/posts/what-the-hell-happened-with-nuscalenuclear-nuscale-smrnuclearenergy-cleanenergy-/649115693972132/",
+          "title": "What the hell happened with NuScale?! #nuclear #nuscale ...",
+          "source": "live",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)",
+          "chars": 0
+        },
+        {
+          "url": "https://www.utilitydive.com/news/nuscale-uamps-project-small-modular-reactor-ramanasmr-/705717/",
+          "title": "The collapse of NuScale's project should spell the end for ... - Utility Dive",
+          "source": "cache",
+          "error": null,
+          "chars": 6678
+        }
+      ],
+      "chunks_created": 2
+    },
+    "source_count": 2
+  },
+  "evidence_ids": [
+    "E001",
+    "E002",
+    "E003",
+    "E008",
+    "E005",
+    "E006",
+    "E007",
+    "E009",
+    "E010",
+    "E011",
+    "E004",
+    "E012"
+  ],
+  "evidence_topics": {
+    "SMR cancellation": 1,
+    "NuScale": 1,
+    "CFPP": 1,
+    "UAMPS": 1,
+    "nuclear energy": 1,
+    "SMR viability": 3,
+    "cost overruns": 1,
+    "subscriber withdrawal": 1,
+    "offtake agreements": 1,
+    "levelized cost of electricity": 1,
+    "cost escalation": 2,
+    "SMR economics": 3,
+    "nuclear cost overruns": 1,
+    "construction delays": 1,
+    "historical analysis": 1,
+    "nuclear construction costs": 2,
+    "economies of scale": 1,
+    "per-MW cost": 1,
+    "SMR vs large nuclear": 1,
+    "cost comparison": 1,
+    "LCOE": 1,
+    "nuclear vs renewables": 1,
+    "SMR cost competitiveness": 1,
+    "nuclear investment": 1,
+    "SMR commercial prospects": 1,
+    "cost transparency": 1,
+    "SMR pricing": 1,
+    "utility procurement": 1,
+    "public funding": 1,
+    "government support": 1,
+    "project cancellation": 1,
+    "advanced nuclear": 1,
+    "climate goals": 1
+  },
+  "findings": [
+    "NuScale and UAMPS mutually terminated the Carbon Free Power Project (CFPP), which was to consist of six 77-MW SMRs generating 462 MW near Idaho Falls, Idaho, at the DOE's Idaho National Laboratory, with a target online date of 2029.",
+    "The CFPP was cancelled primarily because NuScale lacked enough subscribers; multiple UAMPS member utilities withdrew from a 2019 power-purchase agreement after substantial cost overruns and schedule delays from the original 2026 online date.",
+    "Project electricity costs escalated from a target of $55/MWh to $89/MWh, prompting criticism that SMR cost competitiveness claims are false.",
+    "The DOE had provided $232 million for the CFPP since 2020 and backed the project with a $1.4 billion cost-share deal; both DOE and UAMPS called the cancellation disappointing.",
+    "The CFPP's estimated total cost rose from $3 billion in 2015 (for a 600 MW plant) to $9.3 billion in 2023 (for a scaled-down 462 MW plant), representing massive cost escalation across three upward revisions in 2018, 2020, and 2023."
+  ],
+  "contradictions": [
+    {
+      "contradiction_id": "C001",
+      "severity": "high",
+      "topic": "power"
+    }
+  ],
+  "research_gaps": [
+    {
+      "gap_id": "G001",
+      "priority": "high",
+      "topic": "Power Delivery Infrastructure",
+      "description": "No power delivery or PDU infrastructure guidance found."
+    },
+    {
+      "gap_id": "G002",
+      "priority": "medium",
+      "topic": "UPS and Backup Power",
+      "description": "No UPS or battery backup requirements found."
+    },
+    {
+      "gap_id": "G003",
+      "priority": "low",
+      "topic": "Power Quality",
+      "description": "No power quality specifications found."
+    }
+  ],
+  "outputs": {
+    "question_id": "SMR_007"
+  },
+  "summary": {
+    "evidence_count": 12,
+    "citation_count": 12,
+    "contradictions_found": 1,
+    "research_gaps_found": 3,
+    "coverage_score": 0.0
+  },
+  "owner": null,
+  "assigned_agent": null,
+  "review_status": "unreviewed",
+  "parent_research_id": null,
+  "child_research_ids": [],
+  "profile_validation": {
+    "expected_profile": "smr",
+    "actual_profile": "smr",
+    "source": "benchmark_domain_mapping",
+    "valid": true
+  }
+}

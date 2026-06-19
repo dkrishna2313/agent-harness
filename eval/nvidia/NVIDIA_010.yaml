@@ -1,0 +1,49 @@
+question_id: NVIDIA_010
+domain: nvidia
+difficulty: hard
+question: >
+  What are the practical limits on how many GB200 NVL72 racks can be
+  deployed in a single data centre pod, and what are the constraining factors?
+
+must_include:
+  - power
+  - cooling
+
+acceptable_alternatives:
+  - network
+  - InfiniBand
+  - Ethernet
+  - cooling capacity
+  - power distribution
+  - floor space
+
+must_not_include:
+  - unlimited racks             # incorrect; physical and power limits exist
+  - only limited by budget      # ignores hard physical constraints
+
+expected_topics:
+  - power
+  - cooling
+  - networking
+  - operations
+
+evaluation_tags:
+  - systems_thinking
+  - hard
+  - infrastructure
+
+notes: >
+  This is a hard question requiring multi-factor reasoning.  Key constraining
+  factors:
+  (1) Power: at 120 kW/rack, a 1 MW power budget supports ~8 racks.
+      Hyperscaler pods are typically 1–5 MW; larger campuses can scale to tens
+      of MW per building.
+  (2) Cooling: liquid cooling plant capacity (CDUs, chilled water capacity,
+      heat rejection) is often the first bottleneck in retrofits.
+  (3) Network fabric: NVLink is within-rack; cross-rack fabric (InfiniBand
+      NDR/XDR or Ethernet) determines maximum all-reduce latency for large
+      distributed jobs, which sets practical pod size for LLM training.
+  (4) Floor loading and mechanical: water-filled manifolds increase per-rack
+      weight.
+  A full-credit answer should identify at least power and cooling as limits,
+  with bonus credit for the network fabric argument.

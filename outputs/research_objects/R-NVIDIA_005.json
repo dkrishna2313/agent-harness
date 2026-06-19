@@ -1,0 +1,231 @@
+{
+  "research_id": "R-NVIDIA_005",
+  "created_at": "2026-06-18T20:10:00.661553+00:00",
+  "updated_at": "2026-06-18T20:10:00.661761+00:00",
+  "status": "completed",
+  "question": "How does the power density of the GB200 NVL72 compare to a DGX H100 system?",
+  "profile": "ai_data_centers",
+  "profile_source": "benchmark_domain_mapping",
+  "run_config": {
+    "sources_dir": null,
+    "web_search": false,
+    "mock_mode": false,
+    "model_name": null
+  },
+  "subquestions": [],
+  "retrieval_plan": {
+    "web_search": {
+      "dependency_status": {
+        "duckduckgo_search": "ok (ddgs)",
+        "requests": "ok",
+        "trafilatura": "ok",
+        "all_available": true
+      },
+      "query": "How does the power density of the GB200 NVL72 compare to a DGX H100 system?",
+      "provider": "DuckDuckGoSearchProvider",
+      "search_error": null,
+      "search_results_returned": 5,
+      "search_results": [
+        {
+          "title": "Deep dive into NVIDIA Blackwell Benchmarks — where does the 4x ...",
+          "url": "https://adrianco.medium.com/deep-dive-into-nvidia-blackwell-benchmarks-where-does-the-4x-training-and-30x-inference-0209f1971e71",
+          "snippet": "Sep 23, 2024 · The comparison made in the updated note is that 65 x HGX H100's = 520 GPUs and 700 kW, are equivalent performance to one NVL72 with 72 GPUs and ..."
+        },
+        {
+          "title": "NVIDIA GB200 NVL72 vs. NVIDIA H100: When to choose which",
+          "url": "https://www.whitefiber.com/compare/nvidia-gb200-nvl72-vs-nvidia-h100-when-to-choose-which",
+          "snippet": "The NVIDIA GB200 NVL72 offers up to 13.5 TB of HBM3e memory, while the NVIDIA H100 has 80 GB of HBM3 memory. The GB200 NVL72 provides significantly more memory ..."
+        },
+        {
+          "title": "H100 vs GB200 NVL72 Training Benchmarks - SemiAnalysis",
+          "url": "https://newsletter.semianalysis.com/p/h100-vs-gb200-nvl72-training-benchmarks",
+          "snippet": "Aug 19, 2025 · The cost difference comes from the fact the GB200 NVL72 has a higher all-in power consumption per GPU than the H100. This is primarily driven by ..."
+        },
+        {
+          "title": "NVIDIA Blackwell Deployments - GB200 NVL72, DGX/HGX B200 ...",
+          "url": "https://www.exxactcorp.com/blog/hpc/nvidia-blackwell-deployments-gb200-nvl72-dgx-hgx-b200-hgx-b100",
+          "snippet": "May 29, 2024 · The GB200 NVL72 is a liquid cooled, rack-scale 72-GPU NVLink connected powerhouse, that can act as one massive GPU with up to 13.5TB of GPU ..."
+        },
+        {
+          "title": "H100 vs GB200 NVL72 Training Benchmarks – Power, TCO ... - Reddit",
+          "url": "https://www.reddit.com/r/AMD_Stock/comments/1mvgaow/h100_vs_gb200_nvl72_training_benchmarks_power_tco/",
+          "snippet": "Aug 20, 2025 · The GB200 NVL72 ramp is slightly slower than prior generations, but not by much, and we are confident that before the end of the year, GB200 ...Nvidia Blackwell variants comparison tabl"
+        }
+      ],
+      "pages_attempted": 5,
+      "downloaded_urls": [
+        "https://adrianco.medium.com/deep-dive-into-nvidia-blackwell-benchmarks-where-does-the-4x-training-and-30x-inference-0209f1971e71",
+        "https://www.whitefiber.com/compare/nvidia-gb200-nvl72-vs-nvidia-h100-when-to-choose-which",
+        "https://newsletter.semianalysis.com/p/h100-vs-gb200-nvl72-training-benchmarks",
+        "https://www.exxactcorp.com/blog/hpc/nvidia-blackwell-deployments-gb200-nvl72-dgx-hgx-b200-hgx-b100"
+      ],
+      "failed_urls": [
+        {
+          "url": "https://www.reddit.com/r/AMD_Stock/comments/1mvgaow/h100_vs_gb200_nvl72_training_benchmarks_power_tco/",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)"
+        }
+      ],
+      "cache_hits": 4,
+      "documents_fetched": 4,
+      "extracted_characters": 52053,
+      "download_details": [
+        {
+          "url": "https://adrianco.medium.com/deep-dive-into-nvidia-blackwell-benchmarks-where-does-the-4x-training-and-30x-inference-0209f1971e71",
+          "title": "Deep dive into NVIDIA Blackwell Benchmarks — where does the 4x ...",
+          "source": "cache",
+          "error": null,
+          "chars": 12926
+        },
+        {
+          "url": "https://www.whitefiber.com/compare/nvidia-gb200-nvl72-vs-nvidia-h100-when-to-choose-which",
+          "title": "NVIDIA GB200 NVL72 vs. NVIDIA H100: When to choose which",
+          "source": "cache",
+          "error": null,
+          "chars": 5636
+        },
+        {
+          "url": "https://newsletter.semianalysis.com/p/h100-vs-gb200-nvl72-training-benchmarks",
+          "title": "H100 vs GB200 NVL72 Training Benchmarks - SemiAnalysis",
+          "source": "cache",
+          "error": null,
+          "chars": 20125
+        },
+        {
+          "url": "https://www.exxactcorp.com/blog/hpc/nvidia-blackwell-deployments-gb200-nvl72-dgx-hgx-b200-hgx-b100",
+          "title": "NVIDIA Blackwell Deployments - GB200 NVL72, DGX/HGX B200 ...",
+          "source": "cache",
+          "error": null,
+          "chars": 13366
+        },
+        {
+          "url": "https://www.reddit.com/r/AMD_Stock/comments/1mvgaow/h100_vs_gb200_nvl72_training_benchmarks_power_tco/",
+          "title": "H100 vs GB200 NVL72 Training Benchmarks – Power, TCO ... - Reddit",
+          "source": "live",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)",
+          "chars": 0
+        }
+      ],
+      "chunks_created": 4
+    },
+    "source_count": 6
+  },
+  "evidence_ids": [
+    "E001",
+    "E005",
+    "E007",
+    "E003",
+    "E004",
+    "E006",
+    "E009",
+    "E010",
+    "E011",
+    "E012",
+    "E002",
+    "E008"
+  ],
+  "evidence_topics": {
+    "power consumption": 3,
+    "rack power": 1,
+    "GB200 NVL72": 4,
+    "HGX H100": 2,
+    "DGX H100": 1,
+    "rack architecture": 2,
+    "GPU density": 3,
+    "cooling": 2,
+    "form factor": 2,
+    "power density": 7,
+    "power efficiency": 2,
+    "TCO": 2,
+    "GPU count": 1,
+    "memory bandwidth": 1,
+    "compute performance": 2,
+    "rack density": 1,
+    "TDP": 2,
+    "GB200": 2,
+    "B200": 1,
+    "B100": 1,
+    "liquid cooling": 1,
+    "rack design": 1,
+    "NVLink": 1,
+    "memory capacity": 1,
+    "inference throughput": 1,
+    "power requirements": 1,
+    "infrastructure": 1,
+    "data center": 1,
+    "performance per watt": 1,
+    "inference": 2,
+    "GB300 NVL72": 1,
+    "H100": 1,
+    "energy efficiency": 1
+  },
+  "findings": [
+    "The GB200 NVL72 is rated at 120 kW total rack power; nine HGX H100 units supporting an equivalent 72-GPU count consume approximately 100 kW combined (~10.2–11 kW each).",
+    "The GB200 chip consumes 1,200 W per chip, versus 700 W for the H100, giving the NVL72 a higher all-in power consumption per GPU than the H100.",
+    "The GB200 Superchip (two Blackwell GPUs) has a TDP of 2,700 W; the standalone B200 GPU is rated at 1,000 W and the B100 at 700 W.",
+    "The GB200 NVL72 rack hosts 72 Blackwell GPUs with 13.5 TB total GPU memory, 576 TB/s aggregate memory bandwidth, and 130 TB/s NVLink bandwidth in a liquid-cooled rack-scale design.",
+    "The GB200 NVL72 rack assembly consists of 10 compute trays (1U each), each hosting 4 Blackwell GPUs with liquid cooling via cold plate loops, for 72 GPUs total."
+  ],
+  "contradictions": [
+    {
+      "contradiction_id": "C001",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C002",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C003",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C004",
+      "severity": "high",
+      "topic": "power"
+    }
+  ],
+  "research_gaps": [
+    {
+      "gap_id": "G001",
+      "priority": "high",
+      "topic": "Power Delivery Infrastructure",
+      "description": "No power delivery or PDU infrastructure guidance found."
+    },
+    {
+      "gap_id": "G002",
+      "priority": "medium",
+      "topic": "UPS and Backup Power",
+      "description": "No UPS or battery backup requirements found."
+    },
+    {
+      "gap_id": "G003",
+      "priority": "low",
+      "topic": "Power Quality",
+      "description": "No power quality specifications found."
+    }
+  ],
+  "outputs": {
+    "question_id": "NVIDIA_005"
+  },
+  "summary": {
+    "evidence_count": 12,
+    "citation_count": 12,
+    "contradictions_found": 4,
+    "research_gaps_found": 3,
+    "coverage_score": 0.56
+  },
+  "owner": null,
+  "assigned_agent": null,
+  "review_status": "unreviewed",
+  "parent_research_id": null,
+  "child_research_ids": [],
+  "profile_validation": {
+    "expected_profile": "ai_data_centers",
+    "actual_profile": "ai_data_centers",
+    "source": "benchmark_domain_mapping",
+    "valid": true
+  }
+}

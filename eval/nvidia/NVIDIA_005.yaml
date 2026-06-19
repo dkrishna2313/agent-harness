@@ -1,0 +1,36 @@
+question_id: NVIDIA_005
+domain: nvidia
+difficulty: medium
+question: >
+  How does the power density of the GB200 NVL72 compare to a DGX H100 system?
+
+must_include:
+  - GB200
+  - H100
+
+acceptable_alternatives:
+  - Hopper
+  - Blackwell
+  - power density increase
+  - higher power
+
+must_not_include:
+  - H100 uses more power than GB200    # incorrect; GB200 NVL72 is significantly denser
+  - same power requirements            # incorrect
+
+expected_topics:
+  - power
+  - rack architecture
+
+evaluation_tags:
+  - comparative
+  - numeric_answer
+
+notes: >
+  The DGX H100 system (8× H100 SXM5, ~700 W TDP per GPU) draws approximately
+  10.2 kW per node in an 8-GPU pod form factor.  A full H100-based rack (e.g.
+  8-node DGX SuperPOD column) might draw 80–100 kW.  The GB200 NVL72 at 120 kW
+  for 72 GPUs represents roughly 1.7 kW per GPU vs ~1.3 kW per H100 GPU — a
+  ~30% per-GPU increase, but the rack-level integration enables 9× more GPUs per
+  rack footprint.  A correct answer should note that GB200 NVL72 is substantially
+  denser per rack than H100 configurations.

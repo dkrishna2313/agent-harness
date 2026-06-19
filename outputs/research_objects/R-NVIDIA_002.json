@@ -1,0 +1,257 @@
+{
+  "research_id": "R-NVIDIA_002",
+  "created_at": "2026-06-18T20:03:09.143209+00:00",
+  "updated_at": "2026-06-18T20:03:09.143359+00:00",
+  "status": "completed",
+  "question": "Why does the GB200 NVL72 require liquid cooling rather than air cooling?",
+  "profile": "ai_data_centers",
+  "profile_source": "benchmark_domain_mapping",
+  "run_config": {
+    "sources_dir": null,
+    "web_search": false,
+    "mock_mode": false,
+    "model_name": null
+  },
+  "subquestions": [],
+  "retrieval_plan": {
+    "web_search": {
+      "dependency_status": {
+        "duckduckgo_search": "ok (ddgs)",
+        "requests": "ok",
+        "trafilatura": "ok",
+        "all_available": true
+      },
+      "query": "Why does the GB200 NVL72 require liquid cooling rather than air cooling?",
+      "provider": "DuckDuckGoSearchProvider",
+      "search_error": null,
+      "search_results_returned": 5,
+      "search_results": [
+        {
+          "title": "NVIDIA GB200 NVL72 Cooling Requirements - ToneCooling",
+          "url": "https://tonecooling.com/nvidia-gb200-nvl72-cooling-requirements/",
+          "snippet": "Apr 12, 2026 · NVIDIA has officially confirmed that GB200 NVL72 requires liquid cooling. This is not a design preference — it is a mandatory architectural ..."
+        },
+        {
+          "title": "NVIDIA GB200 and GB300: Liquid-cooled for AI efficiency",
+          "url": "https://www.linkedin.com/posts/benjamin-chan_chill-factor-nvidia-blackwell-platform-boosts-activity-7326449320654708736-rOfd",
+          "snippet": "May 8, 2025 · NEWS: Liquid-cooled NVIDIA GB200 and GB300 NVL72 systems are made to power trillion-parameter models — with a fraction of the energy and ..."
+        },
+        {
+          "title": "Liquid Cooling Penetration Expected to Reach 10% by Late 2024",
+          "url": "https://www.techpowerup.com/forums/threads/nvidia-blackwells-high-power-consumption-drives-cooling-demands-liquid-cooling-penetration-expected-to-reach-10-by-late-2024.325046/",
+          "snippet": "Jul 30, 2024 · TrendForce observes that the GB200 NVL36 architecture will initially utilize a combination of air and liquid cooling solutions, while the NVL72, ..."
+        },
+        {
+          "title": "Air vs Liquid Cooling for NVIDIA B200 - AlloComp",
+          "url": "https://allocomp.com/b200-air-vs-liquid-cooling/",
+          "snippet": "Nov 23, 2025 · The B200 supports advanced liquid cooling, which removes heat far more effectively than air cooling alone. This allows systems to run cooler ..."
+        },
+        {
+          "title": "In-depth Analysis: How to Choose Computing Power, Liquid Cooling ...",
+          "url": "https://www.fibermall.com/blog/in-depth-analysis-for-nvidia-gb200.htm?srsltid=AfmBOorQdi4SjaGr5W5GYCYgLT41kJJCsnElkDxGpRRR7s11ftH0RR9A",
+          "snippet": "Dec 27, 2024 · In the B200 phase, each chip consumes 1200W, requiring more cooling space, thus expanding the system to a 10U size (8 * B200). In the GB200 ..."
+        }
+      ],
+      "pages_attempted": 5,
+      "downloaded_urls": [
+        "https://tonecooling.com/nvidia-gb200-nvl72-cooling-requirements/",
+        "https://www.linkedin.com/posts/benjamin-chan_chill-factor-nvidia-blackwell-platform-boosts-activity-7326449320654708736-rOfd",
+        "https://www.techpowerup.com/forums/threads/nvidia-blackwells-high-power-consumption-drives-cooling-demands-liquid-cooling-penetration-expected-to-reach-10-by-late-2024.325046/",
+        "https://www.fibermall.com/blog/in-depth-analysis-for-nvidia-gb200.htm?srsltid=AfmBOorQdi4SjaGr5W5GYCYgLT41kJJCsnElkDxGpRRR7s11ftH0RR9A"
+      ],
+      "failed_urls": [
+        {
+          "url": "https://allocomp.com/b200-air-vs-liquid-cooling/",
+          "error": "fetch error: HTTPError: 403 Client Error: Forbidden for url: https://allocomp.com/b200-air-vs-liquid-cooling/"
+        }
+      ],
+      "cache_hits": 3,
+      "documents_fetched": 4,
+      "extracted_characters": 25970,
+      "download_details": [
+        {
+          "url": "https://tonecooling.com/nvidia-gb200-nvl72-cooling-requirements/",
+          "title": "NVIDIA GB200 NVL72 Cooling Requirements - ToneCooling",
+          "source": "cache",
+          "error": null,
+          "chars": 7293
+        },
+        {
+          "url": "https://www.linkedin.com/posts/benjamin-chan_chill-factor-nvidia-blackwell-platform-boosts-activity-7326449320654708736-rOfd",
+          "title": "NVIDIA GB200 and GB300: Liquid-cooled for AI efficiency",
+          "source": "cache",
+          "error": null,
+          "chars": 7981
+        },
+        {
+          "url": "https://www.techpowerup.com/forums/threads/nvidia-blackwells-high-power-consumption-drives-cooling-demands-liquid-cooling-penetration-expected-to-reach-10-by-late-2024.325046/",
+          "title": "Liquid Cooling Penetration Expected to Reach 10% by Late 2024",
+          "source": "cache",
+          "error": null,
+          "chars": 1068
+        },
+        {
+          "url": "https://allocomp.com/b200-air-vs-liquid-cooling/",
+          "title": "Air vs Liquid Cooling for NVIDIA B200 - AlloComp",
+          "source": "live",
+          "error": "fetch error: HTTPError: 403 Client Error: Forbidden for url: https://allocomp.com/b200-air-vs-liquid-cooling/",
+          "chars": 0
+        },
+        {
+          "url": "https://www.fibermall.com/blog/in-depth-analysis-for-nvidia-gb200.htm?srsltid=AfmBOorQdi4SjaGr5W5GYCYgLT41kJJCsnElkDxGpRRR7s11ftH0RR9A",
+          "title": "In-depth Analysis: How to Choose Computing Power, Liquid Cooling, Network, and Power for NVIDIA GB200 - fibermall.com",
+          "source": "live",
+          "error": null,
+          "chars": 9628
+        }
+      ],
+      "chunks_created": 4
+    },
+    "source_count": 5
+  },
+  "evidence_ids": [
+    "E001",
+    "E002",
+    "E003",
+    "E004",
+    "E006",
+    "E007",
+    "E008",
+    "E009",
+    "E014",
+    "E011",
+    "E010",
+    "E012",
+    "E005",
+    "E015",
+    "E013"
+  ],
+  "evidence_topics": {
+    "liquid cooling": 6,
+    "air cooling limits": 3,
+    "rack power density": 2,
+    "thermal management": 1,
+    "heat flux": 1,
+    "die thermal management": 1,
+    "thermal resistance": 1,
+    "junction temperature": 1,
+    "fan power": 1,
+    "energy efficiency": 3,
+    "air cooling impracticality": 1,
+    "TDP": 2,
+    "power consumption": 2,
+    "liquid cooling requirement": 1,
+    "airflow limitations": 1,
+    "power density": 1,
+    "liquid cooling necessity": 1,
+    "rack form factor": 1,
+    "power per chip": 1,
+    "air cooling scalability": 1,
+    "generational comparison": 1,
+    "water savings": 1,
+    "cost efficiency": 1,
+    "direct liquid cooling": 1,
+    "DLC": 1,
+    "air cooling inefficiency": 1,
+    "cold plate": 1,
+    "CDU": 1,
+    "rack cooling architecture": 1,
+    "rack-scale design": 1,
+    "GPU density": 1,
+    "liquid cooling mandate": 1,
+    "architectural requirement": 1,
+    "direct-to-chip cooling": 1,
+    "thermal requirements": 1,
+    "heat generation": 1,
+    "air cooling": 1,
+    "thermal solutions": 1
+  },
+  "findings": [
+    "The GB200 NVL72 rack generates over 120 kW of heat — 5× to 15× beyond the 8–25 kW air-cooling limit for a standard server rack — making air cooling physically impossible.",
+    "The B200 GPU die operates at 500–600 W/cm² heat flux, which is 40–100× beyond the 5–15 W/cm² effective heat flux that air-cooled heatsinks can handle.",
+    "Air-cooled heatsinks achieve a thermal resistance of 0.1–0.3 °C/W; at 1200 W per GB200 module, this would produce 120–360 °C above ambient — far exceeding the GB200's maximum junction temperature.",
+    "Even if air cooling were thermally feasible for the GB200 NVL72, the fan power required to move sufficient airflow through a 120 kW rack would consume 20–30% of the rack's compute power and generate 90+ dB of noise.",
+    "NVIDIA has officially confirmed that GB200 NVL72 requires liquid cooling; this is described as a mandatory architectural requirement, not a design preference."
+  ],
+  "contradictions": [
+    {
+      "contradiction_id": "C001",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C002",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C003",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C004",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C005",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C006",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C007",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C008",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C009",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C010",
+      "severity": "high",
+      "topic": "power"
+    }
+  ],
+  "research_gaps": [
+    {
+      "gap_id": "G001",
+      "priority": "medium",
+      "topic": "Heat Rejection",
+      "description": "No total heat rejection load specification found."
+    }
+  ],
+  "outputs": {
+    "question_id": "NVIDIA_002"
+  },
+  "summary": {
+    "evidence_count": 15,
+    "citation_count": 15,
+    "contradictions_found": 18,
+    "research_gaps_found": 1,
+    "coverage_score": 0.44
+  },
+  "owner": null,
+  "assigned_agent": null,
+  "review_status": "unreviewed",
+  "parent_research_id": null,
+  "child_research_ids": [],
+  "profile_validation": {
+    "expected_profile": "ai_data_centers",
+    "actual_profile": "ai_data_centers",
+    "source": "benchmark_domain_mapping",
+    "valid": true
+  }
+}

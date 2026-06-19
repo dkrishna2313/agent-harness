@@ -1,0 +1,33 @@
+question_id: NVIDIA_001
+domain: nvidia
+difficulty: easy
+question: >
+  What is the rack-level DC power requirement of the NVIDIA GB200 NVL72?
+
+must_include:
+  - 120 kW
+  - rack
+
+acceptable_alternatives:
+  # Some sources break out cooling subsystem separately
+  - "132 kW"          # total facility draw including cooling overhead
+  - "115 kW compute plus 17 kW cooling"
+
+must_not_include:
+  - 30 kW             # single-GPU figure, wrong scale
+  - 600 kW            # cluster-level figure, wrong scale
+  - air cooled only   # incorrect cooling method
+
+expected_topics:
+  - power
+  - rack architecture
+
+evaluation_tags:
+  - numeric_answer
+  - factual
+
+notes: >
+  The 120 kW figure is the commonly cited rack-level DC draw for a fully populated
+  GB200 NVL72.  Answers citing the facility-side gross draw (~132 kW including
+  cooling plant overhead) are also acceptable.  Any answer below 100 kW or above
+  200 kW for a single rack should be flagged.

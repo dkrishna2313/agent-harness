@@ -1,0 +1,214 @@
+{
+  "research_id": "R-20260616-095536",
+  "created_at": "2026-06-16T09:55:36.798216+00:00",
+  "updated_at": "2026-06-16T09:58:18.986880+00:00",
+  "status": "completed",
+  "question": "What factors drive SMR deployment risk?",
+  "profile": "smr",
+  "run_config": {
+    "sources_dir": "sources",
+    "web_search": true,
+    "mock_mode": false,
+    "model_name": null
+  },
+  "subquestions": [],
+  "retrieval_plan": {
+    "web_search": {
+      "dependency_status": {
+        "duckduckgo_search": "ok (ddgs)",
+        "requests": "ok",
+        "trafilatura": "ok",
+        "all_available": true
+      },
+      "query": "What factors drive SMR deployment risk?",
+      "provider": "DuckDuckGoSearchProvider",
+      "search_error": null,
+      "search_results_returned": 5,
+      "search_results": [
+        {
+          "title": "From procurement to construction: Key risks and challenges in SMR...",
+          "url": "https://www.hsfkramer.com/notes/construction/2025-posts/from-procurement-to-construction-key-risks-and-challenges-in-smr-depolyment-in-the-uk",
+          "snippet": "The deployment of SMRs presents a promising yet complex opportunity for the UK's energy strategy. As highlighted, SMRs offer numerous potential benefits, including enhanced safety features, reduced ca"
+        },
+        {
+          "title": "What will it take to accelerate global Small Modular Reactor (SMR)...",
+          "url": "https://www.linkedin.com/pulse/what-take-accelerate-global-small-modular-reactor-smr-deployment-ej5nf",
+          "snippet": "As such, de-risking SMR projects is key to ensuring its role in the clean-energy future. To accelerate SMR deployment and ensure successful execution, these risks need to be addressed. Here, we list t"
+        },
+        {
+          "title": "What Is Blocking U.S. SMR Deployment?",
+          "url": "http://large.stanford.edu/courses/2026/ph241/garcia1/",
+          "snippet": "In spite of all of these clear advantages, the U.S. has yet to see an SMR deployed for commercial use. The most recent promising SMR deployment attempt, led by NuScale Power, failed in 2023 because it"
+        },
+        {
+          "title": "What Are the Key Factors in SMR Deployment Globally? Question",
+          "url": "https://energy.sustainability-directory.com/question/what-are-the-key-factors-in-smr-deployment-globally/",
+          "snippet": "Key Drivers for SMR Adoption. Several interconnected factors are driving the global interest in SMRs. One of the primary motivations is the urgent need to decarbonize energy production to combat clima"
+        },
+        {
+          "title": "NuScale’s Strategic Breakthrough in SMR Deployment and Its...",
+          "url": "https://www.ainvest.com/news/nuscale-strategic-breakthrough-smr-deployment-implications-clean-energy-transition-2509/",
+          "snippet": "This initiative, described as the largest SMR deployment program in U.S. history [1], reflects a calculated response to surging energy demands driven by artificial intelligence, advanced manufacturing"
+        }
+      ],
+      "pages_attempted": 5,
+      "downloaded_urls": [
+        "https://www.linkedin.com/pulse/what-take-accelerate-global-small-modular-reactor-smr-deployment-ej5nf",
+        "http://large.stanford.edu/courses/2026/ph241/garcia1/",
+        "https://energy.sustainability-directory.com/question/what-are-the-key-factors-in-smr-deployment-globally/",
+        "https://www.ainvest.com/news/nuscale-strategic-breakthrough-smr-deployment-implications-clean-energy-transition-2509/"
+      ],
+      "failed_urls": [
+        {
+          "url": "https://www.hsfkramer.com/notes/construction/2025-posts/from-procurement-to-construction-key-risks-and-challenges-in-smr-depolyment-in-the-uk",
+          "error": "fetch error: HTTPError: 403 Client Error: Forbidden for url: https://www.hsfkramer.com/notes/construction/2025-posts/from-procurement-to-construction-key-risks-and-challenges-in-smr-depolyment-in-the-uk"
+        }
+      ],
+      "cache_hits": 1,
+      "documents_fetched": 4,
+      "extracted_characters": 48925,
+      "download_details": [
+        {
+          "url": "https://www.hsfkramer.com/notes/construction/2025-posts/from-procurement-to-construction-key-risks-and-challenges-in-smr-depolyment-in-the-uk",
+          "title": "From procurement to construction: Key risks and challenges in SMR...",
+          "source": "live",
+          "error": "fetch error: HTTPError: 403 Client Error: Forbidden for url: https://www.hsfkramer.com/notes/construction/2025-posts/from-procurement-to-construction-key-risks-and-challenges-in-smr-depolyment-in-the-uk",
+          "chars": 0
+        },
+        {
+          "url": "https://www.linkedin.com/pulse/what-take-accelerate-global-small-modular-reactor-smr-deployment-ej5nf",
+          "title": "What will it take to accelerate global Small Modular Reactor (SMR) deployment",
+          "source": "live",
+          "error": null,
+          "chars": 12433
+        },
+        {
+          "url": "http://large.stanford.edu/courses/2026/ph241/garcia1/",
+          "title": "What Is Blocking U.S. SMR Deployment?",
+          "source": "cache",
+          "error": null,
+          "chars": 17618
+        },
+        {
+          "url": "https://energy.sustainability-directory.com/question/what-are-the-key-factors-in-smr-deployment-globally/",
+          "title": "What Are the Key Factors in SMR Deployment Globally? → Question",
+          "source": "live",
+          "error": null,
+          "chars": 11158
+        },
+        {
+          "url": "https://www.ainvest.com/news/nuscale-strategic-breakthrough-smr-deployment-implications-clean-energy-transition-2509/",
+          "title": "NuScale’s Strategic Breakthrough in SMR Deployment and Its Implications for the Clean Energy Transition",
+          "source": "live",
+          "error": null,
+          "chars": 7716
+        }
+      ],
+      "chunks_created": 4
+    },
+    "source_count": 4
+  },
+  "evidence_ids": [
+    "E006",
+    "E007",
+    "E003",
+    "E008",
+    "E013",
+    "E009",
+    "E002",
+    "E004",
+    "E012",
+    "E014",
+    "E001",
+    "E010",
+    "E011",
+    "E005"
+  ],
+  "evidence_topics": {
+    "supply chain": 2,
+    "quality assurance": 1,
+    "ASME N-stamp": 1,
+    "deployment bottleneck": 1,
+    "fuel cycle": 1,
+    "uranium enrichment": 1,
+    "geopolitical risk": 2,
+    "revenue risk": 1,
+    "offtake contracts": 1,
+    "PPA": 1,
+    "IRA tax credits": 1,
+    "government support": 3,
+    "licensing": 2,
+    "NRC": 1,
+    "regulatory risk": 2,
+    "10 CFR Part 53": 1,
+    "permitting": 1,
+    "cost overrun": 1,
+    "FOAK risk": 2,
+    "investor risk": 1,
+    "construction risk": 2,
+    "capital costs": 1,
+    "investor confidence": 2,
+    "NuScale": 1,
+    "learning curve": 1,
+    "cost risk": 2,
+    "BWRX-300": 1,
+    "workforce shortage": 1,
+    "labor risk": 1,
+    "nuclear skills gap": 1,
+    "schedule risk": 1,
+    "financing": 1,
+    "technology risk": 1,
+    "technology proliferation": 1,
+    "export controls": 1,
+    "nuclear security": 1,
+    "SMR deployment": 1,
+    "project execution": 1,
+    "FOAK": 1,
+    "regulatory harmonization": 1,
+    "international standards": 1,
+    "public acceptance": 1,
+    "social license": 2,
+    "nuclear safety perception": 1,
+    "community engagement": 2,
+    "public perception": 1,
+    "nuclear safety": 1
+  },
+  "findings": [
+    "Revenue uncertainty is a key SMR deployment risk; government procurement commitments, IRA Investment and Production Tax Credits, and long-term offtake contracts such as 25-year PPAs are identified as necessary mitigations.",
+    "Securing financing for SMR projects is a critical challenge because the relatively untested nature of some SMR technologies makes investors hesitant, requiring government support in the form of loan guarantees, tax incentives, or power purchase agreements.",
+    "High capital costs and regulatory risks are cited by analysts as key challenges to SMR deployment; NuScale's project failure in 2023 due to insufficient utility customers illustrates the revenue and market adoption risk.",
+    "Learning curve inefficiencies from FOAK to NOAK builds are a key cost risk; government support for FOAK projects—such as the Canada Infrastructure Bank's $970M CAD commitment for the Darlington BWRX-300—is needed to reduce execution partner risk.",
+    "Traditional nuclear projects have suffered major cost overruns—Plant Vogtle's third and fourth reactors were $16 billion over budget, forcing contractor bankruptcy—and SMR FOAK projects will face similar investor and utility risk-sharing challenges."
+  ],
+  "contradictions": [],
+  "research_gaps": [
+    {
+      "gap_id": "G001",
+      "priority": "high",
+      "topic": "Construction Permit",
+      "description": "No construction permit or combined license information found."
+    },
+    {
+      "gap_id": "G002",
+      "priority": "high",
+      "topic": "Levelized Cost of Electricity",
+      "description": "No levelized cost of electricity (LCOE) estimate found."
+    }
+  ],
+  "outputs": {
+    "memo_path": "outputs/j45_smr_research_object_test.md",
+    "trace_path": "outputs/j45_smr_research_object_test.trace.json"
+  },
+  "summary": {
+    "evidence_count": 14,
+    "citation_count": 14,
+    "contradictions_found": 0,
+    "research_gaps_found": 2,
+    "coverage_score": 0.6
+  },
+  "owner": null,
+  "assigned_agent": null,
+  "review_status": "unreviewed",
+  "parent_research_id": null,
+  "child_research_ids": []
+}

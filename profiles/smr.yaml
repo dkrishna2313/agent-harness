@@ -1,0 +1,401 @@
+name: smr
+description: Small Modular Reactor deployment challenges and infrastructure implications
+
+topic_keywords:
+  reactor design:
+    - reactor
+    - core design
+    - coolant
+    - moderator
+    - neutron
+    - fission
+    - fuel rod
+    - pressurizer
+    - primary loop
+    - smr
+    - small modular
+    - mwt
+    - mwe
+    - thermal output
+  licensing:
+    - licensing
+    - nrc
+    - regulatory
+    - permit
+    - approval
+    - certification
+    - design certification
+    - construction permit
+    - operating license
+    - 10 cfr
+    - col
+    # Broad deployment questions imply licensing as the primary regulatory barrier
+    - deploy
+    - regulatory challenge
+    - regulatory pathway
+  safety:
+    - safety
+    - passive safety
+    - emergency cooling
+    - containment
+    - meltdown
+    - radiation
+    - safeguard
+    - decay heat
+    - defense in depth
+    - loss of coolant
+  economics:
+    - economics
+    - cost
+    - capital cost
+    - levelized
+    - lcoe
+    - overnight cost
+    - financing
+    - investment
+    - capex
+    - revenue
+    - profitability
+    # Deployment questions imply economic viability as a primary challenge
+    - deploy
+    - economic viability
+    - economic challenge
+  construction:
+    - construction
+    - modular
+    - factory
+    - prefab
+    - prefabrication
+    - assembly
+    - site preparation
+    - schedule
+    - timeline
+    - nth of a kind
+    - first of a kind
+  grid integration:
+    - grid
+    - interconnection
+    - transmission
+    - load following
+    - capacity factor
+    - baseload
+    - dispatch
+    - curtailment
+    - ancillary services
+    # Infrastructure implications questions imply grid integration in an SMR context
+    - infrastructure implication
+    - grid infrastructure
+    - power infrastructure
+    - energy infrastructure
+  fuel cycle:
+    - fuel
+    - enrichment
+    - haleu
+    - refueling
+    - spent fuel
+    - fuel supply
+    - uranium
+    - fuel fabrication
+    - burnup
+  waste management:
+    - waste
+    - spent fuel
+    - disposal
+    - storage
+    - repository
+    - high-level waste
+    - interim storage
+    - dry cask
+  cooling:
+    - cooling
+    - water
+    - heat rejection
+    - thermal
+    - condenser
+    - cooling tower
+    - water withdrawal
+    - makeup water
+  deployment timeline:
+    - deployment
+    - timeline
+    - schedule
+    - first of a kind
+    - commercial operation
+    - commissioning
+    - construction start
+    - project completion
+
+coverage_topics:
+  - reactor design
+  - licensing
+  - safety
+  - economics
+  - construction
+  - grid integration
+  - fuel cycle
+  - waste management
+  - cooling
+  - deployment timeline
+
+research_gap_checks:
+  licensing:
+    - topic: "NRC Licensing Path"
+      keywords: ["nrc", "design certification", "dc application", "licensing path", "10 cfr"]
+      priority: high
+      description: "No NRC licensing pathway or design certification status found."
+      rationale: "NRC licensing timeline is typically 3-7 years and is the critical path for deployment."
+    - topic: "Construction Permit"
+      keywords: ["construction permit", "cp application", "combined license", "col"]
+      priority: high
+      description: "No construction permit or combined license information found."
+      rationale: "Construction permit must precede site preparation and equipment orders."
+    - topic: "Operating License"
+      keywords: ["operating license", "ol ", "commercial operation", "first criticality"]
+      priority: medium
+      description: "No operating license timeline found."
+      rationale: "Operating license completion marks the start of commercial operation."
+    - topic: "Regulatory Timeline"
+      keywords: ["regulatory timeline", "review period", "licensing schedule", "regulatory approval"]
+      priority: medium
+      description: "No regulatory timeline or approval schedule found."
+      rationale: "Regulatory timeline uncertainty is a primary deployment risk factor."
+  economics:
+    - topic: "Overnight Capital Cost"
+      keywords: ["overnight capital", "capital cost", "$/kw", "dollar per kilowatt", "capex"]
+      priority: high
+      description: "No overnight capital cost estimate found."
+      rationale: "Capital cost per kW is the primary economic comparator for SMR deployment decisions."
+    - topic: "Levelized Cost of Electricity"
+      keywords: ["lcoe", "levelized cost", "cost of electricity", "$/mwh", "cents per kwh"]
+      priority: high
+      description: "No levelized cost of electricity (LCOE) estimate found."
+      rationale: "LCOE determines economic competitiveness against alternative generation sources."
+    - topic: "Financing Model"
+      keywords: ["financing", "debt", "equity", "ppa", "power purchase", "government support", "loan guarantee"]
+      priority: medium
+      description: "No financing model or structure found."
+      rationale: "Financing structure significantly affects project economics and risk allocation."
+    - topic: "Cost Overrun Risk"
+      keywords: ["cost overrun", "contingency", "schedule risk", "first of a kind", "nth of a kind"]
+      priority: medium
+      description: "No cost overrun risk assessment found."
+      rationale: "First-of-a-kind projects historically face 50-200% cost overruns."
+  fuel cycle:
+    - topic: "Fuel Availability"
+      keywords: ["fuel availability", "fuel supply", "uranium supply", "fuel procurement"]
+      priority: high
+      description: "No fuel availability or supply chain analysis found."
+      rationale: "Fuel supply chain must be secured before commercial operation."
+    - topic: "HALEU Supply"
+      keywords: ["haleu", "high-assay low-enriched", "enrichment capacity", "centrus", "urenco"]
+      priority: high
+      description: "No HALEU (High-Assay Low-Enriched Uranium) supply analysis found."
+      rationale: "Many SMR designs require HALEU which has limited current supply capacity."
+    - topic: "Enrichment"
+      keywords: ["enrichment", "enriched uranium", "enrichment facility", "swu"]
+      priority: medium
+      description: "No uranium enrichment pathway found."
+      rationale: "Enrichment capacity determines fuel lead times and costs."
+    - topic: "Refueling Interval"
+      keywords: ["refueling", "refuel interval", "core life", "fuel cycle length", "outage"]
+      priority: medium
+      description: "No refueling interval or schedule found."
+      rationale: "Refueling interval affects capacity factor and operational planning."
+  waste management:
+    - topic: "Spent Fuel Handling"
+      keywords: ["spent fuel", "used fuel", "sfp", "spent fuel pool", "fuel handling"]
+      priority: high
+      description: "No spent fuel handling or storage plan found."
+      rationale: "On-site spent fuel management is required from first reload."
+    - topic: "Interim Storage"
+      keywords: ["interim storage", "dry cask", "issi", "independent spent fuel storage"]
+      priority: medium
+      description: "No interim spent fuel storage plan found."
+      rationale: "Interim storage is required given lack of final repository."
+    - topic: "Disposal Pathway"
+      keywords: ["disposal", "repository", "yucca mountain", "final disposal", "permanent storage"]
+      priority: medium
+      description: "No final waste disposal pathway identified."
+      rationale: "Final disposal pathway remains unresolved for the US nuclear industry."
+  grid integration:
+    - topic: "Interconnection Requirements"
+      keywords: ["interconnection", "grid connection", "transmission", "pcc", "point of common coupling"]
+      priority: high
+      description: "No grid interconnection requirements found."
+      rationale: "Transmission interconnection queue timelines can add 5-10 years to project timeline."
+    - topic: "Load Following"
+      keywords: ["load following", "dispatchable", "ramping", "flexible operation", "baseload"]
+      priority: medium
+      description: "No load-following or dispatch capability assessment found."
+      rationale: "Load-following capability affects market value in variable-renewable-heavy grids."
+    - topic: "Transmission Constraints"
+      keywords: ["transmission constraint", "congestion", "curtailment", "transmission capacity"]
+      priority: medium
+      description: "No transmission constraint analysis found."
+      rationale: "Transmission constraints can significantly reduce realized capacity factor."
+    - topic: "Capacity Factor"
+      keywords: ["capacity factor", "availability factor", "planned outage", "unplanned outage"]
+      priority: medium
+      description: "No capacity factor or availability estimate found."
+      rationale: "Capacity factor is a primary driver of LCOE and revenue projections."
+  cooling:
+    - topic: "Water Requirements"
+      keywords: ["water withdrawal", "water consumption", "makeup water", "cooling water", "gal/mwh"]
+      priority: high
+      description: "No cooling water requirements found."
+      rationale: "Water availability can be a site-limiting constraint for SMR deployment."
+    - topic: "Heat Rejection"
+      keywords: ["heat rejection", "waste heat", "thermal discharge", "condenser duty"]
+      priority: medium
+      description: "No heat rejection or thermal discharge specification found."
+      rationale: "Thermal discharge requirements affect site selection and environmental permitting."
+    - topic: "Cooling Technology"
+      keywords: ["cooling tower", "once-through", "dry cooling", "hybrid cooling", "air-cooled condenser"]
+      priority: medium
+      description: "No cooling technology selection found."
+      rationale: "Cooling technology choice affects water use, efficiency, and site suitability."
+  reactor design: []
+  safety: []
+  construction: []
+  deployment timeline: []
+
+contradiction_topics:
+  # Order matters: checked top-to-bottom; first match wins.
+  construction:
+    keywords:
+      - construction
+      - duration
+      - build
+      - schedule
+      - assembly
+      - prefab
+  licensing:
+    keywords:
+      - licensing
+      - nrc
+      - regulatory
+      - permit
+      - approval
+      - certification
+  economics:
+    keywords:
+      - lcoe
+      - cost
+      - capital
+      - financing
+      - investment
+      - capex
+  fuel_cycle:
+    keywords:
+      - haleu
+      - enrichment
+      - fuel
+      - uranium
+  grid_integration:
+    keywords:
+      - grid
+      - transmission
+      - interconnection
+      - load following
+  reactor_design:
+    keywords:
+      - mwt
+      - mwe
+      - thermal output
+      - coolant
+      - core design
+
+source_quality_hints:
+  # Score 5 (primary): authoritative government and intergovernmental bodies
+  primary:
+    - doe
+    - department of energy
+    - iaea
+    - nrc
+    - nuclear regulatory commission
+    - oecd
+    - nea
+    - inl
+    - idaho national laboratory
+    - iea
+    - international energy agency
+    - liftoff  # DOE Liftoff report series
+    - nuclear energy agency
+  # Score 4 (secondary): named industry vendors and associations
+  secondary:
+    - world nuclear association
+    - wna
+    - nuscale
+    - terrapower
+    - ge hitachi
+    - bwrx
+    - kairos
+    - x-energy
+    - rolls-royce smr
+    - newcleo
+  # Score 3 (tertiary): general analysis, consultant, and industry reports
+  tertiary:
+    - analysis
+    - review
+    - assessment
+    - nuclear economics
+    - energy economics
+    - nuclear power report
+    - consultant
+    - market report
+    - industry report
+  # Score 1 (synthetic): test and fixture files
+  synthetic:
+    - test_
+    - _test.
+    - synthetic
+    - fixture
+
+domain_terms:
+  - reactor
+  - smr
+  - nuclear
+  - licensing
+  - nrc
+  - safety
+  - cooling
+  - fuel
+  - haleu
+  - grid
+  - economics
+  - lcoe
+  - deployment
+  - enrichment
+  - containment
+
+specificity_terms:
+  - haleu
+  - nrc
+  - lcoe
+  - mwt
+  - mwe
+  - kwh
+  - mwh
+  - enrichment
+  - sfp
+  - ppa
+  - refueling
+  - interconnection
+  - coolant
+  - moderator
+  - pressurizer
+  - containment
+  - reactor
+  - fission
+  - burnup
+  - swu
+
+memo_section_hints:
+  - Reactor Design Implications
+  - Licensing and Regulatory Implications
+  - Safety Implications
+  - Economics Implications
+  - Grid Integration Implications
+  - Fuel Cycle Implications
+  - Research Gaps
+  - Coverage Matrix

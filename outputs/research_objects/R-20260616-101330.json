@@ -1,0 +1,216 @@
+{
+  "research_id": "R-20260616-101330",
+  "created_at": "2026-06-16T10:13:30.845712+00:00",
+  "updated_at": "2026-06-16T10:15:33.810268+00:00",
+  "status": "completed",
+  "question": "What factors drive SMR deployment risk?",
+  "profile": "smr",
+  "run_config": {
+    "sources_dir": "sources",
+    "web_search": true,
+    "mock_mode": false,
+    "model_name": null
+  },
+  "subquestions": [],
+  "retrieval_plan": {
+    "web_search": {
+      "dependency_status": {
+        "duckduckgo_search": "ok (ddgs)",
+        "requests": "ok",
+        "trafilatura": "ok",
+        "all_available": true
+      },
+      "query": "What factors drive SMR deployment risk?",
+      "provider": "DuckDuckGoSearchProvider",
+      "search_error": null,
+      "search_results_returned": 5,
+      "search_results": [
+        {
+          "title": "Nuclear Small Modular Reactors: Key Considerations for Deployment",
+          "url": "https://www.ief.org/_resources/files/events/nuclear-small-modular-reactors-smrs-key-considerations-for-deployment/smr-report.pdf",
+          "snippet": "Given the early stage of global SMR deployment, FOAK projects will likely incur higher costs and other project risks. ... SMR waste depends on factors like ..."
+        },
+        {
+          "title": "Deployment of small modular reactors: A strategic roadmap ...",
+          "url": "https://www.sciencedirect.com/science/article/pii/S2211467X26001938",
+          "snippet": "The findings advance understanding of SMR deployment as an energy strategy implementation problem characterised by long lead times, multi-actor coordination, ..."
+        },
+        {
+          "title": "Risks of small modular reactors for data centers - Facebook",
+          "url": "https://www.facebook.com/groups/1333591443969203/posts/1789069701754706/",
+          "snippet": "Feb 8, 2026 ... Risk adds up. Every additional unit, every extra year of operation, and every shared system or operator team increases the odds that some ..."
+        },
+        {
+          "title": "4 Pros and Cons of Small Modular Reactors (SMRs) - ABI Research",
+          "url": "https://www.abiresearch.com/blog/small-modular-reactors-pros-and-cons",
+          "snippet": "Nov 11, 2025 ... New nuclear energy designs often take up to 4 years for certification. Moreover, SMR deployment stipulates site permitting and environmental ..."
+        },
+        {
+          "title": "Advances in SMR Developments 2024",
+          "url": "https://www-pub.iaea.org/MTCD/Publications/PDF/p15790-PUB9062_web.pdf",
+          "snippet": "Oct 21, 2024 ... These factors make nuclear power projects less appealing to risk-adverse investors. ... benefits from SMR deployment. For instance, a study ..."
+        }
+      ],
+      "pages_attempted": 5,
+      "downloaded_urls": [
+        "https://www.abiresearch.com/blog/small-modular-reactors-pros-and-cons"
+      ],
+      "failed_urls": [
+        {
+          "url": "https://www.ief.org/_resources/files/events/nuclear-small-modular-reactors-smrs-key-considerations-for-deployment/smr-report.pdf",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)"
+        },
+        {
+          "url": "https://www.sciencedirect.com/science/article/pii/S2211467X26001938",
+          "error": "fetch error: HTTPError: 403 Client Error: Forbidden for url: https://www.sciencedirect.com/science/article/pii/S2211467X26001938"
+        },
+        {
+          "url": "https://www.facebook.com/groups/1333591443969203/posts/1789069701754706/",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)"
+        },
+        {
+          "url": "https://www-pub.iaea.org/MTCD/Publications/PDF/p15790-PUB9062_web.pdf",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)"
+        }
+      ],
+      "cache_hits": 1,
+      "documents_fetched": 1,
+      "extracted_characters": 12776,
+      "download_details": [
+        {
+          "url": "https://www.ief.org/_resources/files/events/nuclear-small-modular-reactors-smrs-key-considerations-for-deployment/smr-report.pdf",
+          "title": "Nuclear Small Modular Reactors: Key Considerations for Deployment",
+          "source": "live",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)",
+          "chars": 0
+        },
+        {
+          "url": "https://www.sciencedirect.com/science/article/pii/S2211467X26001938",
+          "title": "Deployment of small modular reactors: A strategic roadmap ...",
+          "source": "live",
+          "error": "fetch error: HTTPError: 403 Client Error: Forbidden for url: https://www.sciencedirect.com/science/article/pii/S2211467X26001938",
+          "chars": 0
+        },
+        {
+          "url": "https://www.facebook.com/groups/1333591443969203/posts/1789069701754706/",
+          "title": "Risks of small modular reactors for data centers - Facebook",
+          "source": "live",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)",
+          "chars": 0
+        },
+        {
+          "url": "https://www.abiresearch.com/blog/small-modular-reactors-pros-and-cons",
+          "title": "4 Pros and Cons of Small Modular Reactors (SMRs) - ABI Research",
+          "source": "cache",
+          "error": null,
+          "chars": 12776
+        },
+        {
+          "url": "https://www-pub.iaea.org/MTCD/Publications/PDF/p15790-PUB9062_web.pdf",
+          "title": "Advances in SMR Developments 2024",
+          "source": "live",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)",
+          "chars": 0
+        }
+      ],
+      "chunks_created": 1
+    },
+    "source_count": 1
+  },
+  "evidence_ids": [
+    "E002",
+    "E005",
+    "E001",
+    "E004",
+    "E008",
+    "E006",
+    "E003",
+    "E007"
+  ],
+  "evidence_topics": {
+    "CAPEX": 2,
+    "financial risk": 2,
+    "SMR deployment barriers": 1,
+    "project delays": 1,
+    "SMR market valuation": 1,
+    "regulatory risk": 1,
+    "SMR deployment": 1,
+    "certification timelines": 1,
+    "public perception": 1,
+    "social license": 1,
+    "nuclear waste concerns": 1,
+    "investment scale": 1,
+    "deployment risk": 1,
+    "deployment timeline": 1,
+    "commercial rollout risk": 1,
+    "SMR barriers": 1,
+    "technology risk": 1,
+    "unproven designs": 1,
+    "investor skepticism": 1,
+    "nuclear waste": 1,
+    "contract risk": 1,
+    "public acceptance": 1
+  },
+  "findings": [
+    "A single SMR unit can cost up to US$1 billion, and combined or multi-modal configurations drive costs even higher, representing a significant capital barrier.",
+    "New nuclear energy designs often take up to 4 years for regulatory certification, and SMR deployment additionally requires site permitting and environmental impact assessments.",
+    "Many SMR vendors are pursuing novel, largely unvetted technologies—including molten salt, liquid metal cooling, and Light Water Reactor variants—creating technological uncertainty for investors and regulators.",
+    "Public safety concerns and fears reinforced by Chernobyl (1986) and Fukushima-Daiichi (2011) persist, and SMR deployment typically requires local community buy-in.",
+    "NuScale's valuation dropped 14.7% and Oklo's dropped 16.2% in the week of October 20–24, 2025, driven by concerns about project delays and perceived overvaluations."
+  ],
+  "contradictions": [],
+  "research_gaps": [
+    {
+      "gap_id": "G001",
+      "priority": "high",
+      "topic": "Construction Permit",
+      "description": "No construction permit or combined license information found."
+    },
+    {
+      "gap_id": "G002",
+      "priority": "high",
+      "topic": "Levelized Cost of Electricity",
+      "description": "No levelized cost of electricity (LCOE) estimate found."
+    },
+    {
+      "gap_id": "G003",
+      "priority": "high",
+      "topic": "NRC Licensing Path",
+      "description": "No NRC licensing pathway or design certification status found."
+    },
+    {
+      "gap_id": "G004",
+      "priority": "medium",
+      "topic": "Cost Overrun Risk",
+      "description": "No cost overrun risk assessment found."
+    },
+    {
+      "gap_id": "G005",
+      "priority": "medium",
+      "topic": "Financing Model",
+      "description": "No financing model or structure found."
+    },
+    {
+      "gap_id": "G006",
+      "priority": "medium",
+      "topic": "Operating License",
+      "description": "No operating license timeline found."
+    }
+  ],
+  "outputs": {
+    "memo_path": "outputs/j45_smr_research_object_test.md",
+    "trace_path": "outputs/j45_smr_research_object_test.trace.json"
+  },
+  "summary": {
+    "evidence_count": 8,
+    "citation_count": 8,
+    "contradictions_found": 0,
+    "research_gaps_found": 6,
+    "coverage_score": 0.44
+  },
+  "owner": null,
+  "assigned_agent": null,
+  "review_status": "unreviewed",
+  "parent_research_id": null,
+  "child_research_ids": []
+}

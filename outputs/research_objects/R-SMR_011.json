@@ -1,0 +1,164 @@
+{
+  "research_id": "R-SMR_011",
+  "created_at": "2026-06-18T20:54:27.898183+00:00",
+  "updated_at": "2026-06-18T20:54:27.898312+00:00",
+  "status": "completed",
+  "question": "What is the output capacity of the BWRX-300, and what type of reactor technology does it use?",
+  "profile": "smr",
+  "profile_source": "benchmark_domain_mapping",
+  "run_config": {
+    "sources_dir": null,
+    "web_search": false,
+    "mock_mode": false,
+    "model_name": null
+  },
+  "subquestions": [],
+  "retrieval_plan": {
+    "web_search": {
+      "dependency_status": {
+        "duckduckgo_search": "ok (ddgs)",
+        "requests": "ok",
+        "trafilatura": "ok",
+        "all_available": true
+      },
+      "query": "What is the output capacity of the BWRX-300, and what type of reactor technology does it use?",
+      "provider": "DuckDuckGoSearchProvider",
+      "search_error": null,
+      "search_results_returned": 5,
+      "search_results": [
+        {
+          "title": "BWRX-300 - Wikipedia",
+          "url": "https://en.wikipedia.org/wiki/BWRX-300",
+          "snippet": "May 18, 2026 - Like most boiling water reactors, the BWRX-300 will use a medium pressure steam-water cycle to cool the core. A distinct feature of this reactor design is that the water is circulated w"
+        },
+        {
+          "title": "BWRX-300 - Fermi Energy",
+          "url": "https://fermi.ee/en/bwrx-300/",
+          "snippet": "The technologies used in this reactor have proven reliability in previous generations of reactors and the newer solutions have been licensed by the US Nuclear Regulatory Commission (NRC). It is a smal"
+        },
+        {
+          "title": "BWRX-300 Small Modular Reactor | GE Vernova Hitachi Nuclear",
+          "url": "https://www.gevernova.com/nuclear/carbon-free-power/bwrx-300-small-modular-reactor",
+          "snippet": "The Economic Simplified Boiling-Water Reactor was built with 25% fewer pumps and mechanical drives than existing active safety plants to generate as much as 1,520 MW. ... When wind, solar, or hydro ar"
+        },
+        {
+          "title": "BWRX-300 — Grokipedia",
+          "url": "https://grokipedia.com/page/BWRX-300",
+          "snippet": "January 14, 2026 - The BWRX-300 is a boiling water reactor small modular reactor design with a net electrical output of 300 MWe and a thermal output of 870 MWth.[7][8] Key physical dimensions include "
+        },
+        {
+          "title": "GE Hitachi Nuclear Energy - BWRX-300 | Description & Characteristics",
+          "url": "https://small-modular-reactors.org/ge-hitachi-nuclear-energy-bwrx-300/",
+          "snippet": "February 27, 2023 - Design: The BWRX-300 is a boiling ... features to simplify the design and enhance safety. Size: The BWRX-300 has a capacity of 300 MW...."
+        }
+      ],
+      "pages_attempted": 5,
+      "downloaded_urls": [
+        "https://en.wikipedia.org/wiki/BWRX-300",
+        "https://fermi.ee/en/bwrx-300/",
+        "https://www.gevernova.com/nuclear/carbon-free-power/bwrx-300-small-modular-reactor",
+        "https://grokipedia.com/page/BWRX-300",
+        "https://small-modular-reactors.org/ge-hitachi-nuclear-energy-bwrx-300/"
+      ],
+      "failed_urls": [],
+      "cache_hits": 5,
+      "documents_fetched": 5,
+      "extracted_characters": 19803,
+      "download_details": [
+        {
+          "url": "https://en.wikipedia.org/wiki/BWRX-300",
+          "title": "BWRX-300 - Wikipedia",
+          "source": "cache",
+          "error": null,
+          "chars": 7187
+        },
+        {
+          "url": "https://fermi.ee/en/bwrx-300/",
+          "title": "BWRX-300 - Fermi Energy",
+          "source": "cache",
+          "error": null,
+          "chars": 5187
+        },
+        {
+          "url": "https://www.gevernova.com/nuclear/carbon-free-power/bwrx-300-small-modular-reactor",
+          "title": "BWRX-300 Small Modular Reactor | GE Vernova Hitachi Nuclear",
+          "source": "cache",
+          "error": null,
+          "chars": 1252
+        },
+        {
+          "url": "https://grokipedia.com/page/BWRX-300",
+          "title": "BWRX-300 — Grokipedia",
+          "source": "cache",
+          "error": null,
+          "chars": 3727
+        },
+        {
+          "url": "https://small-modular-reactors.org/ge-hitachi-nuclear-energy-bwrx-300/",
+          "title": "GE Hitachi Nuclear Energy - BWRX-300 | Description & Characteristics",
+          "source": "cache",
+          "error": null,
+          "chars": 2450
+        }
+      ],
+      "chunks_created": 5
+    },
+    "source_count": 4
+  },
+  "evidence_ids": [
+    "E006",
+    "E003",
+    "E004",
+    "E001",
+    "E002",
+    "E005",
+    "E008",
+    "E007"
+  ],
+  "evidence_topics": {
+    "reactor technology": 7,
+    "BWR": 5,
+    "ESBWR": 1,
+    "ABWR": 1,
+    "light water reactor": 1,
+    "output capacity": 5,
+    "passive safety": 3,
+    "natural circulation": 4,
+    "reactor type": 1,
+    "coolant": 1,
+    "SMR": 2,
+    "boiling water reactor": 1,
+    "passive cooling": 1,
+    "GE Vernova Hitachi": 1
+  },
+  "findings": [
+    "The BWRX-300 has an electrical output capacity of 300 MWe and is a Boiling Water Reactor (BWR) small modular reactor (SMR) developed by GE Vernova Hitachi Nuclear Energy.",
+    "The BWRX-300 has a net electrical output of 300 MWe and a thermal output of 870 MWth, using water as both coolant and moderator, boiling in the core to produce steam via natural circulation without recirculation pumps.",
+    "The BWRX-300's technical parameters confirm an electric power output of 300 MWe, thermal power output of 870 MWth, H2O as both coolant and neutron moderator, and reactor type classified as BWR.",
+    "The BWRX-300 is a small modular reactor with an electrical capacity of 300 MWe, using naturally circulating water cooling where pumps are not required for reactor safety.",
+    "The BWRX-300 is a smaller evolution of the ESBWR and utilizes components of the operational ABWR; boiling water reactors use ordinary light water as a nuclear reactor coolant."
+  ],
+  "contradictions": [],
+  "research_gaps": [],
+  "outputs": {
+    "question_id": "SMR_011"
+  },
+  "summary": {
+    "evidence_count": 8,
+    "citation_count": 8,
+    "contradictions_found": 0,
+    "research_gaps_found": 0,
+    "coverage_score": 0.48
+  },
+  "owner": null,
+  "assigned_agent": null,
+  "review_status": "unreviewed",
+  "parent_research_id": null,
+  "child_research_ids": [],
+  "profile_validation": {
+    "expected_profile": "smr",
+    "actual_profile": "smr",
+    "source": "benchmark_domain_mapping",
+    "valid": true
+  }
+}

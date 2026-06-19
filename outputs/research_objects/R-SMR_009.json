@@ -1,0 +1,216 @@
+{
+  "research_id": "R-SMR_009",
+  "created_at": "2026-06-18T20:51:51.781493+00:00",
+  "updated_at": "2026-06-18T20:51:51.781656+00:00",
+  "status": "completed",
+  "question": "What are the claimed grid flexibility benefits of SMRs, and are these claims supported by evidence from operating reactors?",
+  "profile": "smr",
+  "profile_source": "benchmark_domain_mapping",
+  "run_config": {
+    "sources_dir": null,
+    "web_search": false,
+    "mock_mode": false,
+    "model_name": null
+  },
+  "subquestions": [],
+  "retrieval_plan": {
+    "web_search": {
+      "dependency_status": {
+        "duckduckgo_search": "ok (ddgs)",
+        "requests": "ok",
+        "trafilatura": "ok",
+        "all_available": true
+      },
+      "query": "What are the claimed grid flexibility benefits of SMRs, and are these claims supported by evidence from operating reactors?",
+      "provider": "DuckDuckGoSearchProvider",
+      "search_error": null,
+      "search_results_returned": 5,
+      "search_results": [
+        {
+          "title": "Small modular reactor - Wikipedia",
+          "url": "https://en.wikipedia.org/wiki/Small_modular_reactor",
+          "snippet": "4 days ago - This unit is too large to meet the International Atomic Energy Agency's definition of a SMR being smaller than 300MWe and will require more on-site construction, which calls into question"
+        },
+        {
+          "title": "Benefits of Small Modular Reactors (SMRs) | Department of Energy",
+          "url": "https://www.energy.gov/ne/benefits-small-modular-reactors-smrs",
+          "snippet": "1 week ago - SMRs can be coupled with other energy sources, including renewables and fossil energy, to leverage resources and produce higher efficiencies and multiple energy end-products while increas"
+        },
+        {
+          "title": "Small Modular Reactors: A Realist Approach to the Future of Nuclear Power | Reports & Briefings | Apr 14, 2025 | ITIF",
+          "url": "https://itif.org/publications/2025/04/14/small-modular-reactors-a-realist-approach-to-the-future-of-nuclear-power/",
+          "snippet": "September 10, 2025 - Evidence so far suggests that data center operators are willing to pay a substantial but not exorbitant premium for new nuclear energy, whether it is SMRs that will enter service "
+        },
+        {
+          "title": "Small Modular Reactor-based solutions to enhance grid reliability: impact of modularization of large power plants on frequency stability | EPJ N",
+          "url": "https://www.epj-n.org/articles/epjn/full_html/2022/01/epjn210026/epjn210026.html",
+          "snippet": "August 25, 2022 - Concerning this grid stability item, it is admitted by the IAEA that small- and medium-sized or modular reactors are an option to fulfil the need for flexible power generation for a "
+        },
+        {
+          "title": "Could SMRs add supply-side grid flexibility? | New Civil Engineer",
+          "url": "https://www.newcivilengineer.com/latest/could-smrs-add-supply-side-grid-flexibility-13-11-2025/",
+          "snippet": "November 13, 2025 - Liberal Democrat spokesperson for ... nuclear, including SMRs, offers new possibilities, including faster deployment, lower capital costs and greater flexibility...."
+        }
+      ],
+      "pages_attempted": 5,
+      "downloaded_urls": [
+        "https://en.wikipedia.org/wiki/Small_modular_reactor",
+        "https://www.energy.gov/ne/benefits-small-modular-reactors-smrs",
+        "https://itif.org/publications/2025/04/14/small-modular-reactors-a-realist-approach-to-the-future-of-nuclear-power/",
+        "https://www.epj-n.org/articles/epjn/full_html/2022/01/epjn210026/epjn210026.html",
+        "https://www.newcivilengineer.com/latest/could-smrs-add-supply-side-grid-flexibility-13-11-2025/"
+      ],
+      "failed_urls": [],
+      "cache_hits": 5,
+      "documents_fetched": 5,
+      "extracted_characters": 388922,
+      "download_details": [
+        {
+          "url": "https://en.wikipedia.org/wiki/Small_modular_reactor",
+          "title": "Small modular reactor - Wikipedia",
+          "source": "cache",
+          "error": null,
+          "chars": 114499
+        },
+        {
+          "url": "https://www.energy.gov/ne/benefits-small-modular-reactors-smrs",
+          "title": "Benefits of Small Modular Reactors (SMRs) | Department of Energy",
+          "source": "cache",
+          "error": null,
+          "chars": 5561
+        },
+        {
+          "url": "https://itif.org/publications/2025/04/14/small-modular-reactors-a-realist-approach-to-the-future-of-nuclear-power/",
+          "title": "Small Modular Reactors: A Realist Approach to the Future of Nuclear Power | Reports & Briefings | Apr 14, 2025 | ITIF",
+          "source": "cache",
+          "error": null,
+          "chars": 220708
+        },
+        {
+          "url": "https://www.epj-n.org/articles/epjn/full_html/2022/01/epjn210026/epjn210026.html",
+          "title": "Small Modular Reactor-based solutions to enhance grid reliability: impact of modularization of large power plants on frequency stability | EPJ N",
+          "source": "cache",
+          "error": null,
+          "chars": 43121
+        },
+        {
+          "url": "https://www.newcivilengineer.com/latest/could-smrs-add-supply-side-grid-flexibility-13-11-2025/",
+          "title": "Could SMRs add supply-side grid flexibility? | New Civil Engineer",
+          "source": "cache",
+          "error": null,
+          "chars": 5033
+        }
+      ],
+      "chunks_created": 5
+    },
+    "source_count": 5
+  },
+  "evidence_ids": [
+    "E007",
+    "E008",
+    "E006",
+    "E009",
+    "E011",
+    "E001",
+    "E002",
+    "E005",
+    "E015",
+    "E003",
+    "E010",
+    "E012",
+    "E004",
+    "E013",
+    "E014"
+  ],
+  "evidence_topics": {
+    "capacity factor": 1,
+    "baseload": 1,
+    "grid stability": 2,
+    "SMR vs large nuclear": 1,
+    "frequency stability": 1,
+    "grid flexibility": 3,
+    "simulation": 1,
+    "modularization": 1,
+    "SMR": 2,
+    "operating SMRs": 1,
+    "evidence gap": 1,
+    "commercial deployment": 1,
+    "simulation limitations": 1,
+    "preliminary results": 1,
+    "SMR grid flexibility evidence": 1,
+    "load following": 5,
+    "grid flexibility claims": 1,
+    "evidence critique": 1,
+    "UK SMR policy": 1,
+    "cogeneration": 2,
+    "hybrid energy systems": 1,
+    "renewables integration": 2,
+    "microgrids": 1,
+    "molten salt storage": 1,
+    "renewables complement": 2,
+    "Natrium": 1,
+    "NuScale": 1,
+    "siting flexibility": 2,
+    "behind the meter": 1,
+    "data center": 1,
+    "grid interconnection": 1,
+    "renewables coupling": 1,
+    "modular scalability": 1,
+    "SMR benefits": 2,
+    "operational flexibility": 1,
+    "inherent self-regulation": 1,
+    "SMR design": 1,
+    "France nuclear load following": 1,
+    "SMR load following": 1,
+    "evidence from operating reactors": 1,
+    "smaller grids": 1,
+    "ramping capability": 1,
+    "demand-side flexibility": 1,
+    "cost-effectiveness": 1,
+    "NuScale VOYGR": 1,
+    "SMR flexibility": 1
+  },
+  "findings": [
+    "Only two SMRs are commercially operating as of April 2025—one in Russia (Akademik Lomonosov) and one in China (HTR-PM)—and no operational data from these units is available to validate flexibility or cost projections.",
+    "U.S. nuclear plants achieve an average capacity factor of 92.5%, making nuclear (including SMRs) highly reliable for baseload supply; this reduces the need for balancing resources such as lithium-ion battery banks or natural gas peakers, though this is a general nuclear property rather than an SMR-specific flexibility benefit.",
+    "SMR designs are generally expected to provide baseload electrical power; some proposed designs aim to adjust output based on electricity demand (load following), and cogeneration strategies (district heating, desalination, hydrogen) can allow constant thermal output while varying electricity supply.",
+    "The U.S. Department of Energy states SMRs can be coupled with renewables and fossil energy to increase grid stability and security, and that modules can be added incrementally as demand grows.",
+    "The DOE states SMRs offer more flexibility in financing, siting, sizing, and end-use applications compared to larger nuclear plants, and can serve smaller electrical markets, isolated areas, and sites with limited infrastructure."
+  ],
+  "contradictions": [],
+  "research_gaps": [
+    {
+      "gap_id": "G001",
+      "priority": "medium",
+      "topic": "UPS and Backup Power",
+      "description": "No UPS or battery backup requirements found."
+    },
+    {
+      "gap_id": "G002",
+      "priority": "low",
+      "topic": "Power Quality",
+      "description": "No power quality specifications found."
+    }
+  ],
+  "outputs": {
+    "question_id": "SMR_009"
+  },
+  "summary": {
+    "evidence_count": 15,
+    "citation_count": 15,
+    "contradictions_found": 0,
+    "research_gaps_found": 2,
+    "coverage_score": 0.4
+  },
+  "owner": null,
+  "assigned_agent": null,
+  "review_status": "unreviewed",
+  "parent_research_id": null,
+  "child_research_ids": [],
+  "profile_validation": {
+    "expected_profile": "smr",
+    "actual_profile": "smr",
+    "source": "benchmark_domain_mapping",
+    "valid": true
+  }
+}

@@ -1,0 +1,39 @@
+question_id: SMR_011
+domain: smr
+difficulty: easy
+question: >
+  What is the output capacity of the BWRX-300, and what type of reactor
+  technology does it use?
+
+must_include:
+  - 300
+  - boiling water
+
+acceptable_alternatives:
+  - 300 MWe
+  - 300 MW
+  - BWR
+  - light water
+  - GE Hitachi
+  - Generation IV
+  - Generation III+
+
+must_not_include:
+  - molten salt          # incorrect; BWRX-300 is a light-water reactor
+  - sodium-cooled        # incorrect
+  - 100 MW               # wrong capacity
+
+expected_topics:
+  - deployment
+
+evaluation_tags:
+  - factual
+  - easy
+
+notes: >
+  The BWRX-300 is a 300 MWe (net electrical) boiling water reactor (BWR)
+  developed by GE Hitachi Nuclear Energy.  It is a Generation III+ design
+  derived from the ESBWR (Economic Simplified Boiling Water Reactor).
+  Key simplifications over ESBWR: passive safety systems, simplified containment,
+  and reduced number of components — claims to cut overnight capital cost by
+  ~50% vs ESBWR.  It uses standard LEU fuel (<5% enrichment), not HALEU.

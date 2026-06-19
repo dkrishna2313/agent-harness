@@ -1,0 +1,32 @@
+contradiction_id: CONTRA_010
+domain: nvidia
+expected_result: no_contradiction
+severity: null
+category: scope_mismatch
+
+claim_a: >
+  A cluster of GB200 NVL72 racks requires several megawatts of power for
+  a large-scale AI training workload.
+
+claim_b: >
+  The GB200 NVL72 rack has a DC power draw of 120 kW.
+
+entity_a: null
+entity_b: GB200 NVL72
+scope_a: cluster
+scope_b: rack
+metric_a: cluster_power_mw
+metric_b: rack_power_kw
+
+why_no_contradiction: >
+  These claims describe power at different aggregation levels.
+  120 kW per rack × N racks = several MW for a cluster is consistent;
+  the claims describe the same system at different scales.
+  Cluster-level power and rack-level power are not comparable metrics.
+
+suppression_should_fire: true
+expected_suppression_reason: scope_mismatch
+
+notes: >
+  Tests the cluster vs rack scope incompatibility.  A cluster drawing
+  "several MW" and a rack drawing "120 kW" are compatible facts.

@@ -1,0 +1,33 @@
+contradiction_id: CONTRA_003
+domain: nvidia
+expected_result: no_contradiction
+severity: null
+category: scope_mismatch
+
+claim_a: >
+  The GB200 NVL72 rack has a total DC power draw of 120 kW.
+
+claim_b: >
+  Each power shelf in the GB200 NVL72 draws approximately 33 kW.
+
+entity_a: GB200 NVL72
+entity_b: Power Shelf
+scope_a: rack
+scope_b: component
+metric_a: rack_power_kw
+metric_b: shelf_power_kw
+
+why_no_contradiction: >
+  These claims describe different physical entities at different measurement
+  scopes.  120 kW is the aggregate rack-level draw; 33 kW is the draw of
+  one of several power subsystem components within that rack.  They are
+  consistent, not contradictory: a rack with multiple power shelves drawing
+  33 kW each can produce a rack-level total around 120 kW.
+
+suppression_should_fire: true
+expected_suppression_reason: scope_mismatch
+
+notes: >
+  Primary J1.6 false-positive regression test.  The contradiction engine
+  must suppress this comparison.  Flagging it as a contradiction would be
+  a false positive.

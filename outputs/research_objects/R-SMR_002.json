@@ -1,0 +1,203 @@
+{
+  "research_id": "R-SMR_002",
+  "created_at": "2026-06-18T20:35:41.535026+00:00",
+  "updated_at": "2026-06-18T20:35:41.535258+00:00",
+  "status": "completed",
+  "question": "What factors drive the levelized cost of electricity (LCOE) for small modular reactors, and why do first-of-a-kind projects tend to be more expensive than projected?",
+  "profile": "smr",
+  "profile_source": "benchmark_domain_mapping",
+  "run_config": {
+    "sources_dir": null,
+    "web_search": false,
+    "mock_mode": false,
+    "model_name": null
+  },
+  "subquestions": [],
+  "retrieval_plan": {
+    "web_search": {
+      "dependency_status": {
+        "duckduckgo_search": "ok (ddgs)",
+        "requests": "ok",
+        "trafilatura": "ok",
+        "all_available": true
+      },
+      "query": "What factors drive the levelized cost of electricity (LCOE) for small modular reactors, and why do first-of-a-kind projects tend to be more expensive than projected?",
+      "provider": "DuckDuckGoSearchProvider",
+      "search_error": null,
+      "search_results_returned": 5,
+      "search_results": [
+        {
+          "title": "Successful Scaling of Small Modular Reactors Requires the Right ...",
+          "url": "https://www.tandfonline.com/doi/full/10.1080/00295450.2025.2525706",
+          "snippet": "The listed reasons include (1) insufficient public funding, (2) an increasing acceptance that the beneficiaries of a project should pay for it rather than ..."
+        },
+        {
+          "title": "ECONOMIC AND FINANCE WORKING GROUP SMR ROADMAP",
+          "url": "https://smrroadmap.ca/wp-content/uploads/2018/12/Economics-Finance-WG.pdf?x93402",
+          "snippet": "WHY SMALL MODULAR REACTORS? In Canada, commercial nuclear power plants have been safely operated for over 40 years. Canada is home to a mature nuclear supply ..."
+        },
+        {
+          "title": "A world of caution about the Levelized Full System Costs of ... - Reddit",
+          "url": "https://www.reddit.com/r/nuclear/comments/1ff7ij2/a_world_of_caution_about_the_levelized_full/",
+          "snippet": "Sep 12, 2024 ... Grid frequency stabilisation - wind turbines are rotating mass. Solar panel arrays can be equipped with grid forming inverters that stabilise ..."
+        },
+        {
+          "title": "Literature Review of Advanced Reactor Cost Estimates",
+          "url": "https://gain.inl.gov/content/uploads/4/2024/11/INL-RPT-23-72972-Literature-Review-of-Adv-Reactor-Cost-Estimates.pdf",
+          "snippet": "away from large, stick-built nuclear power plants and towards smaller and more modular reactors that are expected to minimize onsite labor and take advantage of ..."
+        },
+        {
+          "title": "Nuclear Energy Cost Estimation: Methods, Drivers & Solutions",
+          "url": "https://www.nomitech.com/cost-estimating/cost-estimating-nuclear-energy",
+          "snippet": "The capital outlay is daunting, often representing at least 60% of the plant's levelized cost of electricity (LCOE), as reported by major agencies like the ..."
+        }
+      ],
+      "pages_attempted": 5,
+      "downloaded_urls": [
+        "https://www.nomitech.com/cost-estimating/cost-estimating-nuclear-energy"
+      ],
+      "failed_urls": [
+        {
+          "url": "https://www.tandfonline.com/doi/full/10.1080/00295450.2025.2525706",
+          "error": "fetch error: HTTPError: 403 Client Error: Forbidden for url: https://www.tandfonline.com/doi/full/10.1080/00295450.2025.2525706"
+        },
+        {
+          "url": "https://smrroadmap.ca/wp-content/uploads/2018/12/Economics-Finance-WG.pdf?x93402",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)"
+        },
+        {
+          "url": "https://www.reddit.com/r/nuclear/comments/1ff7ij2/a_world_of_caution_about_the_levelized_full/",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)"
+        },
+        {
+          "url": "https://gain.inl.gov/content/uploads/4/2024/11/INL-RPT-23-72972-Literature-Review-of-Adv-Reactor-Cost-Estimates.pdf",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)"
+        }
+      ],
+      "cache_hits": 1,
+      "documents_fetched": 1,
+      "extracted_characters": 20655,
+      "download_details": [
+        {
+          "url": "https://www.tandfonline.com/doi/full/10.1080/00295450.2025.2525706",
+          "title": "Successful Scaling of Small Modular Reactors Requires the Right ...",
+          "source": "live",
+          "error": "fetch error: HTTPError: 403 Client Error: Forbidden for url: https://www.tandfonline.com/doi/full/10.1080/00295450.2025.2525706",
+          "chars": 0
+        },
+        {
+          "url": "https://smrroadmap.ca/wp-content/uploads/2018/12/Economics-Finance-WG.pdf?x93402",
+          "title": "ECONOMIC AND FINANCE WORKING GROUP SMR ROADMAP",
+          "source": "live",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)",
+          "chars": 0
+        },
+        {
+          "url": "https://www.reddit.com/r/nuclear/comments/1ff7ij2/a_world_of_caution_about_the_levelized_full/",
+          "title": "A world of caution about the Levelized Full System Costs of ... - Reddit",
+          "source": "live",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)",
+          "chars": 0
+        },
+        {
+          "url": "https://gain.inl.gov/content/uploads/4/2024/11/INL-RPT-23-72972-Literature-Review-of-Adv-Reactor-Cost-Estimates.pdf",
+          "title": "Literature Review of Advanced Reactor Cost Estimates",
+          "source": "live",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)",
+          "chars": 0
+        },
+        {
+          "url": "https://www.nomitech.com/cost-estimating/cost-estimating-nuclear-energy",
+          "title": "Nuclear Energy Cost Estimation: Methods, Drivers & Solutions",
+          "source": "cache",
+          "error": null,
+          "chars": 20655
+        }
+      ],
+      "chunks_created": 1
+    },
+    "source_count": 1
+  },
+  "evidence_ids": [
+    "E001",
+    "E007",
+    "E008",
+    "E009",
+    "E010",
+    "E013",
+    "E002",
+    "E003",
+    "E011",
+    "E012",
+    "E005",
+    "E004",
+    "E006"
+  ],
+  "evidence_topics": {
+    "LCOE": 4,
+    "capital costs": 1,
+    "nuclear economics": 2,
+    "learning rates": 2,
+    "SMR": 2,
+    "cost reduction": 2,
+    "FOAK": 3,
+    "decommissioning": 1,
+    "waste management": 1,
+    "cost structure": 1,
+    "LCOE benchmarks": 1,
+    "microreactors": 1,
+    "tax credits": 1,
+    "capacity factor": 1,
+    "base-load": 1,
+    "case study": 1,
+    "financing": 2,
+    "government support": 2,
+    "financing costs": 1,
+    "construction timeline": 1,
+    "LCOE drivers": 2,
+    "first-of-a-kind": 1,
+    "standardization": 1,
+    "economies of scale": 1,
+    "FOAK cost reduction": 1,
+    "labor": 1,
+    "supply chain": 2,
+    "project management": 1,
+    "FOAK cost overruns": 1,
+    "procurement": 1,
+    "cost drivers": 1,
+    "soft costs": 1,
+    "regulatory compliance": 1,
+    "construction delays": 1,
+    "cost overruns": 1
+  },
+  "findings": [
+    "Capital costs represent at least 60% of a nuclear plant's LCOE, making upfront investment the single dominant cost driver.",
+    "LCOE is calculated by dividing total lifetime plant costs by all electricity dispatched; decommissioning (≈9–15% of initial capital) and waste management are explicitly included in that calculation.",
+    "Financing costs are magnified by construction timelines often exceeding five years, high interest rates, and extended non-revenue-generating phases, all of which escalate overall capital costs.",
+    "FOAK reactors carry higher cost estimates than subsequent units due to developmental uncertainties; later units benefit from accumulated experience.",
+    "Construction delays triggered by design changes or regulatory shifts produce significant cost overruns and raise financing costs because capital remains locked in a non-revenue-generating project."
+  ],
+  "contradictions": [],
+  "research_gaps": [],
+  "outputs": {
+    "question_id": "SMR_002"
+  },
+  "summary": {
+    "evidence_count": 13,
+    "citation_count": 13,
+    "contradictions_found": 0,
+    "research_gaps_found": 0,
+    "coverage_score": 0.2
+  },
+  "owner": null,
+  "assigned_agent": null,
+  "review_status": "unreviewed",
+  "parent_research_id": null,
+  "child_research_ids": [],
+  "profile_validation": {
+    "expected_profile": "smr",
+    "actual_profile": "smr",
+    "source": "benchmark_domain_mapping",
+    "valid": true
+  }
+}

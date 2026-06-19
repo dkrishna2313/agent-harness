@@ -1,0 +1,52 @@
+question_id: SMR_004
+domain: smr
+difficulty: medium
+question: >
+  What are the major sources of uncertainty in SMR construction schedule
+  estimates, and what historical evidence exists for nuclear construction
+  delays?
+
+must_include:
+  - construction
+  - delay
+
+acceptable_alternatives:
+  - schedule overrun
+  - cost overrun
+  - years
+  - Vogtle
+  - Hinkley
+  - first-of-a-kind
+  - workforce
+  - regulatory
+
+must_not_include:
+  - SMRs have a guaranteed schedule    # no SMR has been built at commercial scale yet
+  - no schedule uncertainty            # incorrect
+
+expected_topics:
+  - construction
+  - risk
+  - economics
+
+evaluation_tags:
+  - explanatory
+  - medium
+  - historical
+
+notes: >
+  Sources of schedule uncertainty:
+  (1) Regulatory novelty: a new design requires extra NRC review; any design
+      change during construction triggers re-review.
+  (2) Supply chain: long-lead items (pressure vessels, steam generators) have
+      6–12 year lead times from limited global suppliers.
+  (3) Workforce: nuclear-qualified welders, inspectors, and engineers are scarce;
+      workforce ramp-up takes years.
+  (4) Design maturity: FOAK projects often incorporate design changes mid-build.
+  Historical evidence:
+  - Vogtle 3 & 4 (Georgia, US): originally 2016–2017 completion; completed 2023–2024
+    at ~$35B vs initial $14B estimate.
+  - Hinkley Point C (UK): multiple schedule slips; currently expected ~2030+.
+  - Olkiluoto 3 (Finland): 4-year project took 17 years.
+  SMRs claim factory fabrication and modular assembly reduce these risks;
+  the claim is plausible but unproven at commercial scale as of 2025.

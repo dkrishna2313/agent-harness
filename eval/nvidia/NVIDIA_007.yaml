@@ -1,0 +1,46 @@
+question_id: NVIDIA_007
+domain: nvidia
+difficulty: hard
+question: >
+  What data centre facility infrastructure changes are required to support
+  GB200 NVL72 deployments compared to existing H100-era facilities?
+
+must_include:
+  - liquid cooling
+  - power
+
+acceptable_alternatives:
+  - coolant distribution unit
+  - CDU
+  - chilled water
+  - floor loading
+  - power delivery
+  - UPS
+  - cooling capacity
+
+must_not_include:
+  - no facility changes required    # incorrect; liquid cooling is a major upgrade
+  - air cooling is sufficient       # incorrect
+
+expected_topics:
+  - cooling
+  - power
+  - operations
+
+evaluation_tags:
+  - infrastructure
+  - explanatory
+  - hard
+
+notes: >
+  Key facility changes from H100-era to GB200:
+  (1) Liquid cooling infrastructure: coolant distribution units (CDUs), in-row
+      manifolds, chilled water or facility water loops — major retrofit in
+      air-cooled facilities.
+  (2) Power density: 120 kW/rack requires upgraded PDUs, busways, and UPS
+      capacity.  H100-era racks at 10–20 kW/rack may have used shared power
+      infrastructure that cannot support 6–10× density increase.
+  (3) Floor loading: water-filled manifolds and denser racks increase weight.
+  (4) Network cabling: NVLink Switch fabric requires specific within-rack
+      copper cabling; no change to external fabric typically.
+  A full-credit answer should address at least cooling and power distribution.

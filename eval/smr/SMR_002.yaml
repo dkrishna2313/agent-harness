@@ -1,0 +1,49 @@
+question_id: SMR_002
+domain: smr
+difficulty: medium
+question: >
+  What factors drive the levelized cost of electricity (LCOE) for small
+  modular reactors, and why do first-of-a-kind projects tend to be more
+  expensive than projected?
+
+must_include:
+  - cost
+  - first-of-a-kind
+
+acceptable_alternatives:
+  - FOAK
+  - LCOE
+  - overnight cost
+  - learning rate
+  - schedule overrun
+  - construction cost
+  - capital cost
+
+must_not_include:
+  - SMRs are always cheaper than large reactors    # not established; FOAK costs are high
+  - no cost uncertainty                            # incorrect
+
+expected_topics:
+  - economics
+
+evaluation_tags:
+  - explanatory
+  - medium
+  - economics
+
+notes: >
+  Key LCOE drivers for SMRs:
+  (1) Capital cost (overnight): dominates; SMRs aim for factory fabrication to
+      reduce on-site labour, but FOAK projects face learning-curve penalties.
+  (2) Schedule risk: construction delays translate directly into higher
+      financing costs (interest during construction — IDC).
+  (3) Capacity factor: nuclear runs at ~90%+ capacity factor which spreads
+      fixed costs over more MWh, improving LCOE vs intermittent sources.
+  (4) Fuel cost: lower share of LCOE than for gas; HALEU-fuelled designs have
+      uncertain fuel cost trajectories.
+  (5) Decommissioning and waste: long-tail costs.
+  FOAK penalty arises from: regulatory novelty (extra NRC review time),
+  supply-chain constraints (one-off manufacturing), workforce learning curve,
+  and design changes during construction.  The NuScale VOYGR cancellation
+  (2023) illustrated how FOAK cost escalation can make a project commercially
+  unviable.

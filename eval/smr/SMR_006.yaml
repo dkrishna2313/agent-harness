@@ -1,0 +1,51 @@
+question_id: SMR_006
+domain: smr
+difficulty: medium
+question: >
+  What are the main barriers to large-scale commercial SMR deployment
+  by 2035?
+
+must_include:
+  - cost
+
+acceptable_alternatives:
+  - regulatory
+  - supply chain
+  - financing
+  - public acceptance
+  - grid integration
+  - HALEU
+  - workforce
+  - first-of-a-kind
+
+must_not_include:
+  - no barriers to deployment    # incorrect; multiple barriers are well-documented
+  - SMRs are ready to deploy now at scale    # not accurate as of 2025
+
+expected_topics:
+  - risk
+  - economics
+  - licensing
+
+evaluation_tags:
+  - synthesis
+  - medium
+  - barriers
+
+notes: >
+  Major barriers (as of 2025) in approximate order of impact:
+  (1) Unproven cost at commercial scale: no SMR has been built in the West
+      at commercial scale; LCOE estimates range from $60/MWh to $200+/MWh
+      depending on assumptions.
+  (2) Regulatory timelines: NRC design certification for new designs takes
+      5–10 years; site licensing adds further time.
+  (3) Financing: high upfront capital with long payback periods requires
+      government support or utility rate-base models; merchant markets
+      struggle to finance nuclear.
+  (4) Supply chain: specialised components, qualified fabricators, and
+      nuclear-grade materials are constrained.
+  (5) Workforce: nuclear-qualified workforce pipeline was largely dormant
+      for 2–3 decades in the US.
+  (6) Fuel availability (HALEU-dependent designs).
+  (7) Public acceptance: siting opposition in some jurisdictions.
+  A correct answer should identify at least two distinct barrier categories.

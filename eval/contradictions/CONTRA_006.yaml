@@ -1,0 +1,50 @@
+contradiction_id: CONTRA_006
+domain: smr
+expected_result: no_contradiction
+severity: null
+category: rate_vs_target
+known_limitation: true
+
+claim_a: >
+  Global SMR deployment targets aim for 300 GW of nuclear capacity by 2050.
+
+claim_b: >
+  Current global nuclear licensing throughput is approximately 13 GW per year.
+
+entity: null
+scope_a: fleet
+scope_b: fleet
+metric_a: fleet_capacity_gw_target
+metric_b: fleet_capacity_gw_rate
+
+why_no_contradiction: >
+  These claims describe the same domain (global nuclear capacity) but
+  different metric types: a long-horizon capacity target vs an annual
+  licensing throughput rate.  They are not measuring the same quantity
+  at the same point in time.  300 GW / 13 GW/year ≈ 23 years of licensing,
+  which is plausibly compatible with a 2050 target.  They describe the
+  scale of the challenge, not contradictory facts.
+
+suppression_should_fire: false
+expected_suppression_reason: null
+why_no_suppression: >
+  The metric type classifier should distinguish target vs rate and block
+  the comparison in the numeric conflict check via _metric_types_compatible.
+  No SuppressedComparison entry is expected because the comparison is
+  blocked at the metric type gate (not the scope/entity gate) — the engine
+  simply skips the comparison without recording a suppression.
+
+notes: >
+  Tests the metric-type gate for rate vs target values.  Both use GW units
+  but represent different measurement contexts.  The engine must not flag
+  300 GW (target) vs 13 GW (rate) as a contradiction.
+
+  Known engine limitation: the current _classify_numeric_metric_type
+  function maps all fleet-scope GW values to fleet_capacity_gw regardless
+  of whether they represent cumulative targets or annual rates.  Until the
+  classifier distinguishes rate vs target contexts, this case will produce
+  a false positive (incorrectly flagged as a contradiction).
+
+  Expected failure until J2.3 target: implement rate-vs-target metric
+  type classification (e.g. fleet_capacity_gw_target vs
+  fleet_capacity_gw_rate) in _classify_numeric_metric_type.

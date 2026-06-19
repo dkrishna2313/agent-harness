@@ -1,0 +1,213 @@
+{
+  "research_id": "R-SMR_008",
+  "created_at": "2026-06-18T20:48:48.881616+00:00",
+  "updated_at": "2026-06-18T20:48:48.882337+00:00",
+  "status": "completed",
+  "question": "How do SMRs compare to large nuclear reactors in terms of economics of scale, and what advantages do SMRs claim to offset the scale disadvantage?",
+  "profile": "smr",
+  "profile_source": "benchmark_domain_mapping",
+  "run_config": {
+    "sources_dir": null,
+    "web_search": false,
+    "mock_mode": false,
+    "model_name": null
+  },
+  "subquestions": [],
+  "retrieval_plan": {
+    "web_search": {
+      "dependency_status": {
+        "duckduckgo_search": "ok (ddgs)",
+        "requests": "ok",
+        "trafilatura": "ok",
+        "all_available": true
+      },
+      "query": "How do SMRs compare to large nuclear reactors in terms of economics of scale, and what advantages do SMRs claim to offset the scale disadvantage?",
+      "provider": "DuckDuckGoSearchProvider",
+      "search_error": null,
+      "search_results_returned": 5,
+      "search_results": [
+        {
+          "title": "Small modular reactor - Wikipedia",
+          "url": "https://en.wikipedia.org/wiki/Small_modular_reactor",
+          "snippet": "4 days ago - Construction costs per SMR reactor ... the higher number of reactors. SMR staff operating costs per unit output can be as much as 190% higher than the fixed operating cost of fewer large "
+        },
+        {
+          "title": "Benefits of Small Modular Reactors (SMRs) | Department of Energy",
+          "url": "https://www.energy.gov/ne/benefits-small-modular-reactors-smrs",
+          "snippet": "1 week ago - Small modular reactors offer a lower initial capital investment, greater scalability, and siting flexibility for locations unable to accommodate more traditional larger reactors. They als"
+        },
+        {
+          "title": "Small Modular Reactors: A Realist Approach to the Future of Nuclear Power | Reports & Briefings | Apr 14, 2025 | ITIF",
+          "url": "https://itif.org/publications/2025/04/14/small-modular-reactors-a-realist-approach-to-the-future-of-nuclear-power/",
+          "snippet": "September 10, 2025 - SMRs do have plenty of potential ... baseload energy 24/7. But most important of all, SMRs could generate clean reliable power much more cheaply than large reactors if major compo"
+        },
+        {
+          "title": "Office of Industry and Competitiveness Analysis Working Paper ICA-105",
+          "url": "https://www.usitc.gov/sites/default/files/publications/332/working_papers/smrs_fo_ma.pdf",
+          "snippet": "for the current push towards SMRs derive from identified differences between SMR and large nuclear · reactors, namely updated safety features, increased standardization, and modularity. The more modul"
+        },
+        {
+          "title": "The Economics of SMRs: Why Simplicity and Scalability Matter",
+          "url": "https://www.nuscalepower.com/smr-insights-blog/the-economics-of-smrs-why-simplicity-and-scalability-matter",
+          "snippet": "January 23, 2026 - Experience has shown as much as an 8-1 productivity advantage in assembly-line manufacturing over on-site fabrication · Assembly line production with a reasonable throughput offers "
+        }
+      ],
+      "pages_attempted": 5,
+      "downloaded_urls": [
+        "https://en.wikipedia.org/wiki/Small_modular_reactor",
+        "https://www.energy.gov/ne/benefits-small-modular-reactors-smrs",
+        "https://itif.org/publications/2025/04/14/small-modular-reactors-a-realist-approach-to-the-future-of-nuclear-power/",
+        "https://www.nuscalepower.com/smr-insights-blog/the-economics-of-smrs-why-simplicity-and-scalability-matter"
+      ],
+      "failed_urls": [
+        {
+          "url": "https://www.usitc.gov/sites/default/files/publications/332/working_papers/smrs_fo_ma.pdf",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)"
+        }
+      ],
+      "cache_hits": 4,
+      "documents_fetched": 4,
+      "extracted_characters": 347787,
+      "download_details": [
+        {
+          "url": "https://en.wikipedia.org/wiki/Small_modular_reactor",
+          "title": "Small modular reactor - Wikipedia",
+          "source": "cache",
+          "error": null,
+          "chars": 114499
+        },
+        {
+          "url": "https://www.energy.gov/ne/benefits-small-modular-reactors-smrs",
+          "title": "Benefits of Small Modular Reactors (SMRs) | Department of Energy",
+          "source": "cache",
+          "error": null,
+          "chars": 5561
+        },
+        {
+          "url": "https://itif.org/publications/2025/04/14/small-modular-reactors-a-realist-approach-to-the-future-of-nuclear-power/",
+          "title": "Small Modular Reactors: A Realist Approach to the Future of Nuclear Power | Reports & Briefings | Apr 14, 2025 | ITIF",
+          "source": "cache",
+          "error": null,
+          "chars": 220708
+        },
+        {
+          "url": "https://www.usitc.gov/sites/default/files/publications/332/working_papers/smrs_fo_ma.pdf",
+          "title": "Office of Industry and Competitiveness Analysis Working Paper ICA-105",
+          "source": "live",
+          "error": "trafilatura returned empty text (page may be JS-rendered or paywalled)",
+          "chars": 0
+        },
+        {
+          "url": "https://www.nuscalepower.com/smr-insights-blog/the-economics-of-smrs-why-simplicity-and-scalability-matter",
+          "title": "The Economics of SMRs: Why Simplicity and Scalability Matter",
+          "source": "cache",
+          "error": null,
+          "chars": 7019
+        }
+      ],
+      "chunks_created": 4
+    },
+    "source_count": 4
+  },
+  "evidence_ids": [
+    "E001",
+    "E002",
+    "E017",
+    "E018",
+    "E019",
+    "E007",
+    "E008",
+    "E009",
+    "E014",
+    "E016",
+    "E013",
+    "E003",
+    "E004",
+    "E005",
+    "E006",
+    "E010",
+    "E020",
+    "E011",
+    "E012",
+    "E015"
+  ],
+  "evidence_topics": {
+    "economies of scale": 4,
+    "large nuclear reactors": 1,
+    "nuclear history": 1,
+    "diseconomies of scale": 2,
+    "SMR costs": 2,
+    "large nuclear reactor comparison": 1,
+    "project cancellation": 1,
+    "commercial viability": 1,
+    "SMR cost premium": 1,
+    "large nuclear cost comparison": 1,
+    "learning rates": 1,
+    "LCOE": 1,
+    "SMR economics": 3,
+    "cost competitiveness": 2,
+    "nonlinear cost scaling": 1,
+    "SMR vs large reactor cost": 1,
+    "SMR advantages": 2,
+    "new markets": 1,
+    "siting flexibility": 3,
+    "Wright's Law": 1,
+    "learning curves": 1,
+    "factory production": 4,
+    "scale economics": 1,
+    "factory fabrication": 2,
+    "assembly-line manufacturing": 1,
+    "learning curve": 1,
+    "construction schedule": 1,
+    "workforce requirements": 1,
+    "capital costs": 2,
+    "design simplicity": 1,
+    "SMR strategy": 1,
+    "market scale": 1,
+    "modular expansion": 1,
+    "construction time": 1,
+    "staffing costs": 1,
+    "financial barriers": 1,
+    "factory manufacturing": 1,
+    "cost decline": 1,
+    "large reactor vs SMR": 1,
+    "passive safety": 1,
+    "containment costs": 1,
+    "fuel costs": 1,
+    "construction costs": 1,
+    "capital investment": 1,
+    "scalability": 2,
+    "capital cost": 1,
+    "financial risk reduction": 1
+  },
+  "findings": [
+    "Large nuclear reactors were intentionally scaled up to exploit economies of scale; utilities ordered plants exceeding 1,000 MW before any reactor larger than 250 MW was even operational.",
+    "SMR staff operating costs per unit output can be as much as 190% higher than the fixed operating cost of fewer large reactors, and a German BASE study estimates an average of 3,000 SMRs must be produced before SMR production becomes cost-worthwhile.",
+    "The first US SMR deployment—NuScale's Carbon Free Power Project—was cancelled in November 2023 after its estimated generation cost surged from $58/MWh in 2021 to $89/MWh in 2023, raising broader concerns about SMR commercial viability.",
+    "Australian CSIRO estimated in 2024 that electricity from an SMR built from 2023 would cost roughly 2.5× that of a traditional large nuclear plant, declining to about 1.6× by 2030.",
+    "An October 2023 academic study of 19 SMR designs found none were profitable or economically competitive, with median LCOEs for closer-to-market PWR SMRs ranging from $218/MWh to $614/MWh (2020 USD)."
+  ],
+  "contradictions": [],
+  "research_gaps": [],
+  "outputs": {
+    "question_id": "SMR_008"
+  },
+  "summary": {
+    "evidence_count": 20,
+    "citation_count": 20,
+    "contradictions_found": 0,
+    "research_gaps_found": 0,
+    "coverage_score": 0.08
+  },
+  "owner": null,
+  "assigned_agent": null,
+  "review_status": "unreviewed",
+  "parent_research_id": null,
+  "child_research_ids": [],
+  "profile_validation": {
+    "expected_profile": "smr",
+    "actual_profile": "smr",
+    "source": "benchmark_domain_mapping",
+    "valid": true
+  }
+}

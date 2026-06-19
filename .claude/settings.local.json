@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest tests/test_agent_markdown.py -v)",
+      "Bash(python3 -m pytest tests/test_agent_markdown.py -v)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 -m pytest tests/ -v)",
+      "Bash(pip3 install *)",
+      "Bash(~/Library/Python/3.14/bin/pytest tests/ -v)",
+      "Bash(~/Library/Python/3.14/bin/pytest /Users/dkrishna/Documents/Clients/Climate/ARI/AI-Apps/agent-harness/tests/ -v)",
+      "Bash(sed -n '1,30p' /Users/dkrishna/Documents/Clients/Climate/ARI/AI-Apps/agent-harness/dc_power_agent/schemas.py)",
+      "Bash(sed -n '1,60p' /Users/dkrishna/Documents/Clients/Climate/ARI/AI-Apps/agent-harness/dc_power_agent/markdown.py)",
+      "Bash(sed -n '207,230p' /Users/dkrishna/Documents/Clients/Climate/ARI/AI-Apps/agent-harness/dc_power_agent/claude_client.py)",
+      "Bash(sed -n '470,560p' /Users/dkrishna/Documents/Clients/Climate/ARI/AI-Apps/agent-harness/dc_power_agent/claude_client.py)",
+      "Bash(python -m pytest tests/ -q)",
+      "Bash(python3 -m pytest tests/ -q)",
+      "Bash(python3 -m pytest tests/test_synthesis_truncation.py -v)",
+      "Bash(python3 -m pytest tests/test_source_quality.py -v)",
+      "Bash(python3 -m pytest tests/test_contradiction.py::test_pipeline_120kw_vs_180kw_contradiction_detected -v)",
+      "Bash(python3 -m pytest tests/test_coverage.py -v)",
+      "Bash(python3 -m pytest tests/test_coverage.py::TestCoverageScoringRules::test_rationale_mentions_high_quality -v)",
+      "WebSearch",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Bash(python -m pytest tests/test_web_search.py -v)",
+      "Bash(python -m pytest tests/test_evaluation.py tests/test_regression.py tests/test_eval_runner.py -x -q)",
+      "Bash(python -m pytest tests/test_semantic_matcher.py -v --tb=short)",
+      "Bash(python -m pytest tests/test_prohibited_term_checker.py -v)",
+      "Bash(brew list *)",
+      "Bash(ls ~/.ssh/*.pub 2>/dev/null || echo \"no keys found\")"
+    ]
+  }
+}

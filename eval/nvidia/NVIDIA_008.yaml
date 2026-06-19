@@ -1,0 +1,36 @@
+question_id: NVIDIA_008
+domain: nvidia
+difficulty: medium
+question: >
+  What is the memory architecture of the GB200 Blackwell GPU, and how does
+  HBM3e contribute to AI training performance?
+
+must_include:
+  - HBM
+  - memory bandwidth
+
+acceptable_alternatives:
+  - HBM3e
+  - high bandwidth memory
+  - terabytes per second
+  - TB/s
+
+must_not_include:
+  - GDDR                # incorrect memory type for this GPU class
+  - PCIe memory         # not the on-package memory being asked about
+
+expected_topics:
+  - rack architecture
+
+evaluation_tags:
+  - factual
+  - technical
+
+notes: >
+  Each B200 GPU uses HBM3e stacked DRAM providing ~8 TB/s memory bandwidth
+  per GPU (exact figures vary by source).  With 72 GPUs in an NVL72 rack, the
+  aggregate memory bandwidth is substantial.  HBM3e provides higher bandwidth
+  than HBM2e (used in A100) or HBM3 (used in H100) while maintaining the
+  close-proximity on-package integration needed for power-efficient data transfer.
+  A correct answer should identify HBM as the memory type and mention bandwidth
+  as the key performance driver for large-model training.

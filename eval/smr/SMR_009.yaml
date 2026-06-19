@@ -1,0 +1,48 @@
+question_id: SMR_009
+domain: smr
+difficulty: medium
+question: >
+  What are the claimed grid flexibility benefits of SMRs, and are these
+  claims supported by evidence from operating reactors?
+
+must_include:
+  - load following
+  - grid
+
+acceptable_alternatives:
+  - flexible operation
+  - ramping
+  - baseload
+  - variable output
+  - capacity factor
+
+must_not_include:
+  - SMRs cannot vary output           # most designs can load-follow to some degree
+  - proven at commercial scale        # commercial-scale SMRs are not yet operating in the West
+
+expected_topics:
+  - operations
+  - deployment
+
+evaluation_tags:
+  - explanatory
+  - medium
+  - grid
+
+notes: >
+  Claimed flexibility benefits:
+  (1) Load-following capability: many SMR designs are designed to ramp output
+      in response to grid demand, unlike conventional large reactors optimised
+      for baseload.
+  (2) Grid decarbonisation: nuclear provides firm, dispatchable, low-carbon
+      power that complements intermittent renewables.
+  (3) Small unit size: 50–300 MWe increments fit smaller grids (e.g. remote
+      communities, island grids) that cannot absorb 1000+ MWe additions.
+  Evidence gaps:
+  - No Western commercial SMR has been built; flexibility claims are based on
+    engineering design and small-scale demonstrations.
+  - Large conventional reactors in France have demonstrated load-following;
+    this shows the physics is possible, but whether SMR-specific designs
+    improve on it is unverified.
+  - Russian RITM-200 (icebreaker) provides some operational data but at small
+    scale and non-commercial context.

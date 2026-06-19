@@ -1,0 +1,37 @@
+question_id: NVIDIA_002
+domain: nvidia
+difficulty: easy
+question: >
+  Why does the GB200 NVL72 require liquid cooling rather than air cooling?
+
+must_include:
+  - power density
+  - liquid
+
+acceptable_alternatives:
+  - direct liquid cooling
+  - DLC
+  - coolant
+  - thermal design point
+  - heat flux
+
+must_not_include:
+  - air cooled           # incorrect — the answer should explain why air is insufficient
+  - rear-door heat exchanger only  # rear-door alone cannot handle this thermal load
+
+expected_topics:
+  - cooling
+  - power
+  - rack architecture
+
+evaluation_tags:
+  - explanatory
+  - factual
+
+notes: >
+  A correct answer should explain that the rack power density (≥ 120 kW in a
+  single rack footprint) exceeds what conventional air cooling can remove.
+  Typical data-centre air cooling handles 10–30 kW per rack; liquid cooling
+  is required at 50 kW+ per rack to maintain component junction temperatures
+  within spec.  Bonus credit for mentioning specific coolant temperature
+  targets (e.g. 45 °C supply) or the NVLink interconnect thermal management.

@@ -1,0 +1,39 @@
+contradiction_id: CONTRA_011
+domain: smr
+expected_result: contradiction
+severity: medium
+category: numeric_conflict
+
+claim_a: >
+  The BWRX-300 has a net electrical output of 300 MW.
+
+claim_b: >
+  The BWRX-300 generates approximately 500 MW of electricity.
+
+entity: BWRX-300
+scope_a: unit
+scope_b: unit
+metric_a: installed_capacity_mw
+metric_b: installed_capacity_mw
+
+why_contradiction: >
+  Both claims describe the same entity (BWRX-300), the same scope (single
+  reactor unit), and the same metric (net electrical output).
+  300 MW vs 500 MW is a 40% difference, well above the 20% threshold.
+  This is a genuine numerical contradiction about a specific reactor's
+  rated capacity.
+
+suppression_should_not_fire: true
+expected_suppression_reason: null
+
+notes: >
+  Tests that same-entity, same-scope capacity contradictions are detected
+  for nuclear reactors.  The 500 MW figure is fabricated for test purposes;
+  the correct figure is 300 MWe.
+
+  Fix history: original claim_a used "300 MWe" (megawatts electric, a
+  nuclear-specific unit suffix).  The unit extractor recognises "mw" as a
+  substring of "mwe" but the value-extraction regex fails to bind the
+  number to the "mw" unit when an "e" follows immediately.  Changed to
+  "300 MW" so the claim exercises the intended numeric-conflict detection
+  without triggering the MWe parsing edge case.

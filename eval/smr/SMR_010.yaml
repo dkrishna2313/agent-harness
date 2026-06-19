@@ -1,0 +1,53 @@
+question_id: SMR_010
+domain: smr
+difficulty: hard
+question: >
+  What construction duration should be expected for a BWRX-300 or similar
+  light-water SMR from first concrete to commercial operation, and how does
+  this compare to recent large reactor projects?
+
+must_include:
+  - years
+  - construction
+
+acceptable_alternatives:
+  - months
+  - 2–4 years
+  - 3–5 years
+  - 7 years
+  - Vogtle
+  - Hinkley
+  - schedule
+
+must_not_include:
+  - 6 months         # implausibly short for any nuclear construction
+  - 20+ years        # only applies to extreme historical outliers
+
+expected_topics:
+  - construction
+  - economics
+
+evaluation_tags:
+  - numeric_answer
+  - hard
+  - comparative
+
+notes: >
+  Vendor claims vs historical reality:
+  - GE Hitachi targets ~3–4 years for BWRX-300 construction (first concrete
+    to commercial operation) using modular construction.
+  - Industry optimists suggest 24–36 months for nth-of-a-kind after learning.
+  - Historical comparisons:
+    * Vogtle 3 & 4: 7–8 years of construction (2013 start, 2023–2024 completion).
+    * Hinkley Point C: currently projected at 7–9 years from first concrete.
+    * South Korea APR-1400 (Shin Hanul): ~5–6 years in a strong serial build programme.
+  - SMRs have never been built at commercial scale; vendor 3–4 year targets
+    are based on engineering models, not demonstrated performance.
+  A complete answer should:
+  (1) State the vendor target (3–4 years).
+  (2) Note this is undemonstrated.
+  (3) Provide a historical comparator showing that FOAK large reactor
+      projects routinely take 7–10 years.
+  This is a J1.6 test: "24–36 months" and "7–12 years" claims come from
+  different contexts and should NOT be flagged as contradictions
+  (vendor target vs FOAK historical data).

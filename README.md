@@ -1,0 +1,88 @@
+# dc_power_agent
+
+`dc_power_agent` is a local research harness for AI data center infrastructure documents. It loads `.pdf`, `.md`, and `.txt` sources, uses Claude when configured, evaluates the memo in warning mode, and writes Markdown output.
+
+By default the harness uses Claude when `ANTHROPIC_API_KEY` is set. Use `--mock`
+for deterministic local testing. If `ANTHROPIC_API_KEY` is not configured or
+Claude fails, the harness logs a warning and continues with deterministic local
+fallback output.
+
+## Install
+
+```bash
+python -m pip install -e ".[dev]"
+```
+
+## Run
+
+```bash
+python -m dc_power_agent.cli \
+  "Explain NVIDIA Rubin architecture and implications for AI data centers" \
+  --sources ./sources \
+  --out ./outputs/rubin.md
+```
+
+Each run also writes a JSON trace next to the Markdown output. For example,
+`./outputs/rubin.md` produces `./outputs/rubin.trace.json`.
+
+Evidence is scored and ranked before synthesis. By default the top 50 evidence
+items are passed into memo synthesis; use `--top-evidence` to change that limit.
+
+Use `--debug` to print a concise terminal summary of loaded documents, evidence
+counts, memo sections, warnings, and the trace path:
+
+```bash
+python -m dc_power_agent.cli \
+  "Explain NVIDIA Rubin architecture and implications for AI data centers" \
+  --sources ./sources \
+  --out ./outputs/rubin.md \
+  --debug
+```
+
+## Claude Configuration
+
+Set `ANTHROPIC_API_KEY` to use Claude. The default model is Claude Sonnet
+(`claude-sonnet-4-6`), and `ANTHROPIC_MODEL` or `--model` can override it.
+
+```bash
+export ANTHROPIC_API_KEY="..."
+python -m dc_power_agent.cli "Question" --sources ./sources --out ./outputs/memo.md
+```
+
+For deterministic local testing without Claude:
+
+```bash
+python -m dc_power_agent.cli "Question" --sources ./sources --out ./outputs/memo.md --mock
+```
+
+## Memo Sections
+
+Every memo includes:
+
+- Executive Summary
+- Confirmed Facts
+- Inferences
+- Power Implications
+- Cooling Implications
+- Networking Implications
+- Rack Architecture Implications
+- Open Questions
+- Source Notes
+- Evaluation Warnings
+
+## Tests
+
+```bash
+pytest
+```
+
+## Evaluation Suite
+
+Run the lightweight regression questions:
+
+```bash
+python -m dc_power_agent.eval_runner \
+  --sources ./sources \
+  --evals ./evals/questions.yaml \
+  --out ./outputs/eval_report.md
+```

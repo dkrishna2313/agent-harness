@@ -1,0 +1,44 @@
+question_id: SMR_001
+domain: smr
+difficulty: easy
+question: >
+  What regulatory approvals are required before a small modular reactor
+  can begin commercial operation in the United States?
+
+must_include:
+  - NRC
+  - license
+
+acceptable_alternatives:
+  - Nuclear Regulatory Commission
+  - design certification
+  - combined license
+  - COL
+  - construction permit
+  - operating license
+  - Part 52
+  - Part 50
+
+must_not_include:
+  - no regulatory approval required    # factually wrong
+  - self-certifying                    # no reactor is self-certifying in the US
+
+expected_topics:
+  - licensing
+  - operations
+
+evaluation_tags:
+  - factual
+  - regulatory
+
+notes: >
+  In the US, the NRC pathway typically involves:
+  (1) Design Certification (DC): vendor submits a standardised reactor design
+      for NRC review; results in a rulemaking certifying the design.
+  (2) Combined License (COL) under 10 CFR Part 52: a single licence covering
+      construction and conditional operation authorisation for a specific site.
+  Alternative: Construction Permit (CP) + Operating License (OL) under
+  10 CFR Part 50 — the older two-step pathway.
+  Some SMR vendors (NuScale, TerraPower) have pursued or are pursuing the
+  Part 52 path.  A correct answer must identify the NRC as the regulator and
+  mention at least one licence type.

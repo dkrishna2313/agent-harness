@@ -1,0 +1,33 @@
+contradiction_id: CONTRA_001
+domain: smr
+expected_result: contradiction
+severity: high
+category: duration_conflict
+
+claim_a: >
+  Reactor Alpha construction duration is 24 to 36 months from first concrete
+  to commercial operation.
+
+claim_b: >
+  Reactor Alpha construction schedule is estimated at 7 to 12 years.
+
+entity: Reactor Alpha
+scope_a: unit
+scope_b: unit
+metric_a: construction_duration_months
+metric_b: construction_duration_months
+
+why_contradiction: >
+  Both claims describe the same entity (Reactor Alpha), the same metric
+  (construction duration), and the same scope (single reactor unit).
+  The ranges [24, 36] months and [84, 144] months do not overlap.
+  The minimum of the high range (84 months) is 2.3× the maximum of the
+  low range (36 months).  This is a genuine factual contradiction.
+
+suppression_should_not_fire: true
+expected_suppression_reason: null
+
+notes: >
+  This is the primary SMR regression test case.  The contradiction engine
+  must detect this.  A suppression on scope or entity grounds would be a
+  false negative.

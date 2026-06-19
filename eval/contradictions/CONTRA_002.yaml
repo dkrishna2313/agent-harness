@@ -1,0 +1,31 @@
+contradiction_id: CONTRA_002
+domain: nvidia
+expected_result: contradiction
+severity: high
+category: numeric_conflict
+
+claim_a: >
+  The GB200 NVL72 rack has a total DC power draw of 120 kW.
+
+claim_b: >
+  The GB200 NVL72 rack requires 200 kW of DC power at full utilisation.
+
+entity: GB200 NVL72
+scope_a: rack
+scope_b: rack
+metric_a: rack_power_kw
+metric_b: rack_power_kw
+
+why_contradiction: >
+  Both claims describe the same entity (GB200 NVL72), the same scope (rack),
+  and the same metric (rack-level DC power).  120 kW vs 200 kW is a 40%
+  difference — well above the 20% threshold.  The contradiction engine must
+  flag this as a genuine conflict.
+
+suppression_should_not_fire: true
+expected_suppression_reason: null
+
+notes: >
+  This tests that the numeric conflict detection fires for same-entity,
+  same-scope power claims.  The contradiction engine must NOT suppress this
+  despite both being power claims.

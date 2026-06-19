@@ -1,0 +1,53 @@
+question_id: SMR_007
+domain: smr
+difficulty: hard
+question: >
+  Why did the NuScale VOYGR SMR project at the Carbon Free Power Project
+  fail, and what does this reveal about SMR commercial viability?
+
+must_include:
+  - NuScale
+  - cost
+
+acceptable_alternatives:
+  - CFPP
+  - Carbon Free Power Project
+  - UAMPS
+  - subscription
+  - $/MWh
+  - cancelled
+  - price escalation
+
+must_not_include:
+  - NuScale is operating commercially    # CFPP was cancelled; NuScale's design is certified but no plant built
+  - technical failure                    # cancellation was economic, not technical
+
+expected_topics:
+  - economics
+  - risk
+
+evaluation_tags:
+  - case_study
+  - hard
+  - economics
+
+notes: >
+  The Carbon Free Power Project (CFPP) was the planned first NuScale VOYGR
+  deployment, led by Utah Associated Municipal Power Systems (UAMPS).
+  It was cancelled in November 2023.
+  Root causes:
+  (1) Cost escalation: estimated cost per MWh rose from ~$58/MWh (2020 estimate)
+      to ~$89/MWh (2023 estimate) as inflation, interest rate increases, and
+      supply chain costs hit the project.
+  (2) Subscriber pullout: as costs rose, UAMPS members (municipalities) found
+      cheaper alternatives (renewables + storage) and dropped subscriptions;
+      project viability requires a minimum subscriber base.
+  (3) Capital cost uncertainty: the 6-module VOYGR overnight capital estimate
+      exceeded $9 billion, up from earlier projections.
+  Implications:
+  - Illustrates that SMR LCOE estimates made in low-interest-rate environments
+    may not survive in higher-rate environments.
+  - Demonstrates that merchant/utility economics for nuclear are extremely
+    sensitive to cost uncertainty.
+  - Does NOT mean SMRs are technically infeasible; NuScale's design was
+    NRC-certified (DC approved 2023).

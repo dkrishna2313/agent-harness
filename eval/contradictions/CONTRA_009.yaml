@@ -1,0 +1,34 @@
+contradiction_id: CONTRA_009
+domain: nvidia
+expected_result: no_contradiction
+severity: null
+category: entity_mismatch
+
+claim_a: >
+  The GB200 NVL72 uses 72 B200 Blackwell GPUs.
+
+claim_b: >
+  The GB200 NVL36 integrates 36 B200 Blackwell GPUs.
+
+entity_a: GB200 NVL72
+entity_b: GB200 NVL36
+scope_a: rack
+scope_b: rack
+metric_a: gpu_count
+metric_b: gpu_count
+
+why_no_contradiction: >
+  These claims describe two different products in the same product family.
+  NVL72 and NVL36 are distinct SKUs; the GPU counts are correct for each
+  and do not conflict.  A contradiction would only exist if both claims
+  described the same product with different GPU counts.
+
+suppression_should_fire: true
+expected_suppression_reason: entity_mismatch
+
+notes: >
+  Tests the entity gate for distinct product variants within a family.
+  The engine must recognise "NVL72" and "NVL36" as different entities
+  and suppress the comparison.  Without entity extraction, the engine
+  would see "72 gpu" vs "36 gpu" as a categorical or numeric conflict
+  (they appear in EXCLUSIVE_PAIRS).

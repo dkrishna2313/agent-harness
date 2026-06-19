@@ -1,0 +1,429 @@
+{
+  "generated_at": "2026-06-18T20:54:32.863657+00:00",
+  "regression_type": "evaluation_regression",
+  "current": "outputs/evaluation_report.json",
+  "baseline": "baseline/evaluation_report.json",
+  "fail_threshold": 0.03,
+  "status": "pass",
+  "passed": true,
+  "fail_reasons": [],
+  "baseline_generated_at": "2026-06-17T05:14:45.556135+00:00",
+  "current_generated_at": "2026-06-18T20:54:27.940696+00:00",
+  "metric_deltas": [
+    {
+      "metric": "overall_score",
+      "display_name": "Overall score",
+      "baseline": 0.942,
+      "current": 0.9928,
+      "delta": 0.0508,
+      "pct_delta": 0.053928,
+      "higher_is_better": true,
+      "status": "improved",
+      "threshold": 0.03
+    },
+    {
+      "metric": "fact_coverage_score",
+      "display_name": "Fact coverage",
+      "baseline": 0.8261,
+      "current": 0.9783,
+      "delta": 0.1522,
+      "pct_delta": 0.184239,
+      "higher_is_better": true,
+      "status": "improved",
+      "threshold": 0.03
+    },
+    {
+      "metric": "citation_score",
+      "display_name": "Citation coverage",
+      "baseline": 1.0,
+      "current": 1.0,
+      "delta": 0.0,
+      "pct_delta": 0.0,
+      "higher_is_better": true,
+      "status": "pass",
+      "threshold": 0.03
+    },
+    {
+      "metric": "hallucination_rate",
+      "display_name": "Hallucination rate",
+      "baseline": 0.0,
+      "current": 0.0,
+      "delta": 0.0,
+      "pct_delta": 0.0,
+      "higher_is_better": false,
+      "status": "pass",
+      "threshold": 0.03
+    },
+    {
+      "metric": "contradiction_accuracy",
+      "display_name": "Contradiction accuracy",
+      "baseline": 1.0,
+      "current": 1.0,
+      "delta": 0.0,
+      "pct_delta": 0.0,
+      "higher_is_better": true,
+      "status": "pass",
+      "threshold": 0.03
+    },
+    {
+      "metric": "qa_questions_passed",
+      "display_name": "Q&A passed (count)",
+      "baseline": 22.0,
+      "current": 23.0,
+      "delta": 1.0,
+      "pct_delta": 0.045455,
+      "higher_is_better": true,
+      "status": "improved",
+      "threshold": 0.03
+    },
+    {
+      "metric": "contradiction_tests_passed",
+      "display_name": "Contradiction passed (count)",
+      "baseline": 8.0,
+      "current": 8.0,
+      "delta": 0.0,
+      "pct_delta": 0.0,
+      "higher_is_better": true,
+      "status": "pass",
+      "threshold": 0.03
+    }
+  ],
+  "question_diffs": [
+    {
+      "question_id": "NVIDIA_001",
+      "domain": "nvidia",
+      "difficulty": "easy",
+      "baseline_passed": true,
+      "current_passed": true,
+      "baseline_coverage": 0.5,
+      "current_coverage": 1.0,
+      "status": "unchanged_pass"
+    },
+    {
+      "question_id": "NVIDIA_002",
+      "domain": "nvidia",
+      "difficulty": "easy",
+      "baseline_passed": true,
+      "current_passed": true,
+      "baseline_coverage": 0.5,
+      "current_coverage": 1.0,
+      "status": "unchanged_pass"
+    },
+    {
+      "question_id": "NVIDIA_003",
+      "domain": "nvidia",
+      "difficulty": "easy",
+      "baseline_passed": true,
+      "current_passed": true,
+      "baseline_coverage": 1.0,
+      "current_coverage": 1.0,
+      "status": "unchanged_pass"
+    },
+    {
+      "question_id": "NVIDIA_004",
+      "domain": "nvidia",
+      "difficulty": "medium",
+      "baseline_passed": true,
+      "current_passed": true,
+      "baseline_coverage": 1.0,
+      "current_coverage": 1.0,
+      "status": "unchanged_pass"
+    },
+    {
+      "question_id": "NVIDIA_005",
+      "domain": "nvidia",
+      "difficulty": "medium",
+      "baseline_passed": true,
+      "current_passed": true,
+      "baseline_coverage": 1.0,
+      "current_coverage": 1.0,
+      "status": "unchanged_pass"
+    },
+    {
+      "question_id": "NVIDIA_006",
+      "domain": "nvidia",
+      "difficulty": "medium",
+      "baseline_passed": true,
+      "current_passed": true,
+      "baseline_coverage": 1.0,
+      "current_coverage": 1.0,
+      "status": "unchanged_pass"
+    },
+    {
+      "question_id": "NVIDIA_007",
+      "domain": "nvidia",
+      "difficulty": "hard",
+      "baseline_passed": true,
+      "current_passed": true,
+      "baseline_coverage": 1.0,
+      "current_coverage": 1.0,
+      "status": "unchanged_pass"
+    },
+    {
+      "question_id": "NVIDIA_008",
+      "domain": "nvidia",
+      "difficulty": "medium",
+      "baseline_passed": true,
+      "current_passed": true,
+      "baseline_coverage": 1.0,
+      "current_coverage": 1.0,
+      "status": "unchanged_pass"
+    },
+    {
+      "question_id": "NVIDIA_009",
+      "domain": "nvidia",
+      "difficulty": "easy",
+      "baseline_passed": true,
+      "current_passed": true,
+      "baseline_coverage": 0.5,
+      "current_coverage": 1.0,
+      "status": "unchanged_pass"
+    },
+    {
+      "question_id": "NVIDIA_010",
+      "domain": "nvidia",
+      "difficulty": "hard",
+      "baseline_passed": true,
+      "current_passed": true,
+      "baseline_coverage": 1.0,
+      "current_coverage": 1.0,
+      "status": "unchanged_pass"
+    },
+    {
+      "question_id": "NVIDIA_011",
+      "domain": "nvidia",
+      "difficulty": "medium",
+      "baseline_passed": true,
+      "current_passed": true,
+      "baseline_coverage": 1.0,
+      "current_coverage": 1.0,
+      "status": "unchanged_pass"
+    },
+    {
+      "question_id": "NVIDIA_012",
+      "domain": "nvidia",
+      "difficulty": "medium",
+      "baseline_passed": true,
+      "current_passed": true,
+      "baseline_coverage": 1.0,
+      "current_coverage": 1.0,
+      "status": "unchanged_pass"
+    },
+    {
+      "question_id": "SMR_001",
+      "domain": "smr",
+      "difficulty": "easy",
+      "baseline_passed": true,
+      "current_passed": true,
+      "baseline_coverage": 1.0,
+      "current_coverage": 1.0,
+      "status": "unchanged_pass"
+    },
+    {
+      "question_id": "SMR_002",
+      "domain": "smr",
+      "difficulty": "medium",
+      "baseline_passed": true,
+      "current_passed": true,
+      "baseline_coverage": 1.0,
+      "current_coverage": 1.0,
+      "status": "unchanged_pass"
+    },
+    {
+      "question_id": "SMR_003",
+      "domain": "smr",
+      "difficulty": "medium",
+      "baseline_passed": true,
+      "current_passed": true,
+      "baseline_coverage": 0.5,
+      "current_coverage": 1.0,
+      "status": "unchanged_pass"
+    },
+    {
+      "question_id": "SMR_004",
+      "domain": "smr",
+      "difficulty": "medium",
+      "baseline_passed": true,
+      "current_passed": true,
+      "baseline_coverage": 1.0,
+      "current_coverage": 1.0,
+      "status": "unchanged_pass"
+    },
+    {
+      "question_id": "SMR_005",
+      "domain": "smr",
+      "difficulty": "easy",
+      "baseline_passed": true,
+      "current_passed": true,
+      "baseline_coverage": 1.0,
+      "current_coverage": 1.0,
+      "status": "unchanged_pass"
+    },
+    {
+      "question_id": "SMR_006",
+      "domain": "smr",
+      "difficulty": "medium",
+      "baseline_passed": false,
+      "current_passed": true,
+      "baseline_coverage": 0.0,
+      "current_coverage": 1.0,
+      "status": "improved"
+    },
+    {
+      "question_id": "SMR_007",
+      "domain": "smr",
+      "difficulty": "hard",
+      "baseline_passed": true,
+      "current_passed": true,
+      "baseline_coverage": 1.0,
+      "current_coverage": 1.0,
+      "status": "unchanged_pass"
+    },
+    {
+      "question_id": "SMR_008",
+      "domain": "smr",
+      "difficulty": "medium",
+      "baseline_passed": true,
+      "current_passed": true,
+      "baseline_coverage": 0.5,
+      "current_coverage": 0.5,
+      "status": "unchanged_pass"
+    },
+    {
+      "question_id": "SMR_009",
+      "domain": "smr",
+      "difficulty": "medium",
+      "baseline_passed": true,
+      "current_passed": true,
+      "baseline_coverage": 1.0,
+      "current_coverage": 1.0,
+      "status": "unchanged_pass"
+    },
+    {
+      "question_id": "SMR_010",
+      "domain": "smr",
+      "difficulty": "hard",
+      "baseline_passed": true,
+      "current_passed": true,
+      "baseline_coverage": 0.5,
+      "current_coverage": 1.0,
+      "status": "unchanged_pass"
+    },
+    {
+      "question_id": "SMR_011",
+      "domain": "smr",
+      "difficulty": "easy",
+      "baseline_passed": true,
+      "current_passed": true,
+      "baseline_coverage": 1.0,
+      "current_coverage": 1.0,
+      "status": "unchanged_pass"
+    }
+  ],
+  "contradiction_diffs": [
+    {
+      "contradiction_id": "CONTRA_001",
+      "domain": "smr",
+      "expected_result": "contradiction",
+      "baseline_correct": true,
+      "current_correct": true,
+      "status": "unchanged_pass"
+    },
+    {
+      "contradiction_id": "CONTRA_002",
+      "domain": "nvidia",
+      "expected_result": "contradiction",
+      "baseline_correct": true,
+      "current_correct": true,
+      "status": "unchanged_pass"
+    },
+    {
+      "contradiction_id": "CONTRA_003",
+      "domain": "nvidia",
+      "expected_result": "no_contradiction",
+      "baseline_correct": true,
+      "current_correct": true,
+      "status": "unchanged_pass"
+    },
+    {
+      "contradiction_id": "CONTRA_004",
+      "domain": "nvidia",
+      "expected_result": "no_contradiction",
+      "baseline_correct": true,
+      "current_correct": true,
+      "status": "unchanged_pass"
+    },
+    {
+      "contradiction_id": "CONTRA_005",
+      "domain": "smr",
+      "expected_result": "no_contradiction",
+      "baseline_correct": true,
+      "current_correct": true,
+      "status": "unchanged_pass"
+    },
+    {
+      "contradiction_id": "CONTRA_006",
+      "domain": "smr",
+      "expected_result": "no_contradiction",
+      "baseline_correct": false,
+      "current_correct": false,
+      "status": "unchanged_fail"
+    },
+    {
+      "contradiction_id": "CONTRA_007",
+      "domain": "smr",
+      "expected_result": "no_contradiction",
+      "baseline_correct": true,
+      "current_correct": true,
+      "status": "unchanged_pass"
+    },
+    {
+      "contradiction_id": "CONTRA_008",
+      "domain": "smr",
+      "expected_result": "no_contradiction",
+      "baseline_correct": true,
+      "current_correct": true,
+      "status": "unchanged_pass"
+    },
+    {
+      "contradiction_id": "CONTRA_009",
+      "domain": "nvidia",
+      "expected_result": "no_contradiction",
+      "baseline_correct": true,
+      "current_correct": true,
+      "status": "unchanged_pass"
+    },
+    {
+      "contradiction_id": "CONTRA_010",
+      "domain": "nvidia",
+      "expected_result": "no_contradiction",
+      "baseline_correct": true,
+      "current_correct": true,
+      "status": "unchanged_pass"
+    },
+    {
+      "contradiction_id": "CONTRA_011",
+      "domain": "smr",
+      "expected_result": "contradiction",
+      "baseline_correct": true,
+      "current_correct": true,
+      "status": "unchanged_pass"
+    }
+  ],
+  "regressions": {
+    "metric_regressions": [],
+    "question_regressions": [],
+    "contradiction_regressions": []
+  },
+  "improvements": {
+    "metric_improvements": [
+      "overall_score",
+      "fact_coverage_score",
+      "qa_questions_passed"
+    ],
+    "question_improvements": [
+      "SMR_006"
+    ],
+    "contradiction_improvements": []
+  }
+}

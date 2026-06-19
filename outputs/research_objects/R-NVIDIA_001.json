@@ -1,0 +1,220 @@
+{
+  "research_id": "R-NVIDIA_001",
+  "created_at": "2026-06-18T20:00:30.169111+00:00",
+  "updated_at": "2026-06-18T20:00:30.169291+00:00",
+  "status": "completed",
+  "question": "What is the rack-level DC power requirement of the NVIDIA GB200 NVL72?",
+  "profile": "ai_data_centers",
+  "profile_source": "benchmark_domain_mapping",
+  "run_config": {
+    "sources_dir": null,
+    "web_search": false,
+    "mock_mode": false,
+    "model_name": null
+  },
+  "subquestions": [],
+  "retrieval_plan": {
+    "web_search": {
+      "dependency_status": {
+        "duckduckgo_search": "ok (ddgs)",
+        "requests": "ok",
+        "trafilatura": "ok",
+        "all_available": true
+      },
+      "query": "What is the rack-level DC power requirement of the NVIDIA GB200 NVL72?",
+      "provider": "DuckDuckGoSearchProvider",
+      "search_error": null,
+      "search_results_returned": 5,
+      "search_results": [
+        {
+          "title": "NVIDIA GB200 NVL72 Guide: Specs, Pricing & Architecture | Spheron Blog",
+          "url": "https://www.spheron.network/blog/nvidia-gb200-nvl72-guide/",
+          "snippet": "March 22, 2026 - A typical data center rack budget is 10-20 kW. Deploying a GB200 NVL72 requires dedicated 3-phase power circuits rated for the full load, typically a dedicated PDU with 200A+ capacity"
+        },
+        {
+          "title": "NVIDIA GB200 NVL72: PCB & System Architecture Explained",
+          "url": "https://www.nextpcb.com/blog/nvidia-gb200-nvl72-architecture",
+          "snippet": "1 week ago - At 120 kW total rack power, the GB200 NVL72 requires a power architecture that standard 12 V data center infrastructure cannot support. The rack uses 48 V DC bus distribution throughout, "
+        },
+        {
+          "title": "NVIDIA GB200 NVL72 - Rack-Scale Blackwell | Awesome Agents",
+          "url": "https://awesomeagents.ai/hardware/nvidia-gb200-nvl72/",
+          "snippet": "April 8, 2026 - Deploying a GB200 NVL72 rack requires the following infrastructure: Power: 120kW per rack at 200-480V AC or 240-400V DC. Three-phase power distribution with adequate circuit breaker ca"
+        },
+        {
+          "title": "Hardware — NVIDIA DGX GB Rack Scale Systems User Guide",
+          "url": "https://docs.nvidia.com/dgx/dgxgb200-user-guide/hardware.html",
+          "snippet": "March 3, 2026 - An NVL72 rack is an NVIDIA rack with 72-GPU NVL domains."
+        },
+        {
+          "title": "GB200 Hardware Architecture - Component Supply Chain & BOM",
+          "url": "https://newsletter.semianalysis.com/p/gb200-hardware-architecture-and-component",
+          "snippet": "October 29, 2025 - This form factor requires approximately 120kW per rack. To put this density into context, a general-purpose CPU rack supports up to 12kW/rack, while the higher-density H100 air-cool"
+        }
+      ],
+      "pages_attempted": 5,
+      "downloaded_urls": [
+        "https://www.spheron.network/blog/nvidia-gb200-nvl72-guide/",
+        "https://www.nextpcb.com/blog/nvidia-gb200-nvl72-architecture",
+        "https://awesomeagents.ai/hardware/nvidia-gb200-nvl72/",
+        "https://docs.nvidia.com/dgx/dgxgb200-user-guide/hardware.html",
+        "https://newsletter.semianalysis.com/p/gb200-hardware-architecture-and-component"
+      ],
+      "failed_urls": [],
+      "cache_hits": 5,
+      "documents_fetched": 5,
+      "extracted_characters": 113396,
+      "download_details": [
+        {
+          "url": "https://www.spheron.network/blog/nvidia-gb200-nvl72-guide/",
+          "title": "NVIDIA GB200 NVL72 Guide: Specs, Pricing & Architecture | Spheron Blog",
+          "source": "cache",
+          "error": null,
+          "chars": 20631
+        },
+        {
+          "url": "https://www.nextpcb.com/blog/nvidia-gb200-nvl72-architecture",
+          "title": "NVIDIA GB200 NVL72: PCB & System Architecture Explained",
+          "source": "cache",
+          "error": null,
+          "chars": 24390
+        },
+        {
+          "url": "https://awesomeagents.ai/hardware/nvidia-gb200-nvl72/",
+          "title": "NVIDIA GB200 NVL72 - Rack-Scale Blackwell | Awesome Agents",
+          "source": "cache",
+          "error": null,
+          "chars": 31912
+        },
+        {
+          "url": "https://docs.nvidia.com/dgx/dgxgb200-user-guide/hardware.html",
+          "title": "Hardware — NVIDIA DGX GB Rack Scale Systems User Guide",
+          "source": "cache",
+          "error": null,
+          "chars": 4640
+        },
+        {
+          "url": "https://newsletter.semianalysis.com/p/gb200-hardware-architecture-and-component",
+          "title": "GB200 Hardware Architecture - Component Supply Chain & BOM",
+          "source": "cache",
+          "error": null,
+          "chars": 31823
+        }
+      ],
+      "chunks_created": 5
+    },
+    "source_count": 5
+  },
+  "evidence_ids": [
+    "E009",
+    "E005",
+    "E008",
+    "E006",
+    "E007",
+    "E001",
+    "E002",
+    "E003",
+    "E004",
+    "E010"
+  ],
+  "evidence_topics": {
+    "rack power": 8,
+    "120 kW": 5,
+    "liquid cooling": 2,
+    "specifications": 2,
+    "NVL72": 10,
+    "48V DC bus": 1,
+    "bus current": 1,
+    "power architecture": 1,
+    "DLC": 1,
+    "130 kW full load": 1,
+    "power infrastructure": 1,
+    "PDU": 1,
+    "3-phase power": 1,
+    "DC power": 2,
+    "GB200": 1,
+    "power shelves": 2,
+    "bus bar": 1,
+    "50V DC": 1,
+    "AC to DC conversion": 1,
+    "total power draw": 1,
+    "compute tray TDP": 1,
+    "per-tray power": 1,
+    "NVSwitch power": 1
+  },
+  "findings": [
+    "The GB200 NVL72 rack power consumption is approximately 120 kW per NVIDIA's official DGX GB200 user guide.",
+    "The power shelf architecture uses six air-cooled 5.5 kW PSUs across eight power shelves providing N+N redundancy, with each shelf requiring ~33 kW AC input.",
+    "The power shelves convert AC input to nominal 50V–51V DC output distributed through a bus bar to rack components.",
+    "SemiAnalysis estimates total rack power draw at 123.6 kW per NVL72, inclusive of AC-to-DC rectification inefficiencies.",
+    "The GB200 NVL72 requires approximately 120 kW per rack; exceeding 40 kW/rack is cited as the primary reason liquid cooling is required for GB200."
+  ],
+  "contradictions": [
+    {
+      "contradiction_id": "C001",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C002",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C003",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C004",
+      "severity": "high",
+      "topic": "power"
+    },
+    {
+      "contradiction_id": "C005",
+      "severity": "medium",
+      "topic": "power"
+    }
+  ],
+  "research_gaps": [
+    {
+      "gap_id": "G001",
+      "priority": "medium",
+      "topic": "Generator and Utility Interconnect",
+      "description": "No generator or utility interconnect specifications found."
+    },
+    {
+      "gap_id": "G002",
+      "priority": "medium",
+      "topic": "UPS and Backup Power",
+      "description": "No UPS or battery backup requirements found."
+    },
+    {
+      "gap_id": "G003",
+      "priority": "low",
+      "topic": "Power Quality",
+      "description": "No power quality specifications found."
+    }
+  ],
+  "outputs": {
+    "question_id": "NVIDIA_001"
+  },
+  "summary": {
+    "evidence_count": 10,
+    "citation_count": 10,
+    "contradictions_found": 5,
+    "research_gaps_found": 3,
+    "coverage_score": 0.4
+  },
+  "owner": null,
+  "assigned_agent": null,
+  "review_status": "unreviewed",
+  "parent_research_id": null,
+  "child_research_ids": [],
+  "profile_validation": {
+    "expected_profile": "ai_data_centers",
+    "actual_profile": "ai_data_centers",
+    "source": "benchmark_domain_mapping",
+    "valid": true
+  }
+}
