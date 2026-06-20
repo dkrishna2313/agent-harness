@@ -86,49 +86,60 @@ def _build_executive_summary(
 def _build_key_findings(
     evidence_note: dict[str, Any],
     plan: dict[str, Any],
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """Derive evidence-backed findings from subquestion coverage.
 
-    A finding is generated for each subquestion that has MODERATE or STRONG
-    evidence coverage. The finding statement is derived from the subquestion
-    itself, with evidence IDs for traceability (J5.4.10).
+    Finding text is taken verbatim from the highest-relevance evidence claim
+    for each covered subquestion — no reformulation, no synthesis (J5.4 fix).
+    Returns (findings, grounding_counts) where grounding_counts has keys
+    'supported_findings' and 'unsupported_findings'.
     """
     subquestions: list[str] = plan.get("subquestions", [])
     coverage_by_sq: dict = evidence_note.get("coverage_by_subquestion", {})
     evidence_by_sq: dict = evidence_note.get("evidence_by_subquestion", {})
+    evidence_items: list[dict] = evidence_note.get("evidence_items", [])
 
-    findings = []
+    # Build lookup from evidence_id to verbatim claim text
+    id_to_claim: dict[str, str] = {
+        e["evidence_id"]: e.get("claim", "").strip()
+        for e in evidence_items
+        if e.get("evidence_id") and e.get("claim", "").strip()
+    }
+
+    findings: list[dict[str, Any]] = []
+    supported = 0
+    unsupported = 0
+
     for sq in subquestions:
         cov = coverage_by_sq.get(sq, {})
         level = cov.get("coverage", "NONE")
-        if level in ("MODERATE", "STRONG"):
-            ids = evidence_by_sq.get(sq, [])
-            confidence = "HIGH" if level == "STRONG" else "MEDIUM"
-            # Rephrase subquestion into declarative form
-            finding_text = _sq_to_finding(sq)
-            findings.append({
-                "finding": finding_text,
-                "evidence_count": len(ids),
-                "confidence": confidence,
-                "supporting_evidence_ids": ids[:10],  # cap for readability
-                "source_subquestion": sq,
-            })
+        if level not in ("MODERATE", "STRONG"):
+            continue
 
-    return findings
+        ids = evidence_by_sq.get(sq, [])
+        # Take the first claim that has non-empty text
+        claim_text = next(
+            (id_to_claim[eid] for eid in ids if eid in id_to_claim),
+            "",
+        )
 
+        if not claim_text:
+            # MODERATE/STRONG coverage but no usable claim text — skip
+            unsupported += 1
+            continue
 
-def _sq_to_finding(sq: str) -> str:
-    """Convert a subquestion string into a declarative finding statement."""
-    sq = sq.strip().rstrip("?")
-    # Strip leading question words
-    for prefix in ("what is ", "what are ", "how does ", "how do ", "why does ",
-                   "why do ", "explain ", "describe ", "identify ", "list "):
-        if sq.lower().startswith(prefix):
-            sq = sq[len(prefix):]
-            break
-    # Capitalise and add a finding frame
-    sq = sq[:1].upper() + sq[1:] if sq else sq
-    return f"Evidence supports: {sq}"
+        confidence = "HIGH" if level == "STRONG" else "MEDIUM"
+        findings.append({
+            "finding": claim_text,          # verbatim evidence claim
+            "evidence_count": len(ids),
+            "confidence": confidence,
+            "supporting_evidence_ids": ids[:10],
+            "source_subquestion": sq,
+        })
+        supported += 1
+
+    grounding = {"supported_findings": supported, "unsupported_findings": unsupported}
+    return findings, grounding
 
 
 def _build_key_risks(
@@ -251,7 +262,7 @@ class ReportAgent(FunctionalAgent):
         evidence_note = context.evidence_notes[0] if context.evidence_notes else {}
         qa = context.qa
 
-        findings = _build_key_findings(evidence_note, plan)
+        findings, grounding = _build_key_findings(evidence_note, plan)
         risks = _build_key_risks(qa, evidence_note, plan)
         open_questions = _build_open_questions(qa, evidence_note, plan)
         report_conf = _report_confidence(qa)
@@ -273,6 +284,7 @@ class ReportAgent(FunctionalAgent):
             "open_questions": open_questions,
             "report_confidence": report_conf,
             "report_summary": report_summary,
+            "report_grounding_score": grounding,
         }
 
         LOGGER.log(
@@ -356,6 +368,7 @@ class ReportAgent(FunctionalAgent):
             "risk_count": len(risks),
             "open_question_count": len(open_questions),
             "report_confidence": report_conf,
+            "report_grounding_score": grounding,
         }
 
         # ------------------------------------------------------------------
@@ -383,6 +396,7 @@ class ReportAgent(FunctionalAgent):
                 "key_risks": risks,
                 "open_questions": open_questions,
                 "report_confidence": report_conf,
+                "report_grounding_score": grounding,
             }
 
             ro_path = write_research_object(ro, out_dir=output_path.parent)
