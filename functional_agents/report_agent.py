@@ -1,4 +1,4 @@
-"""ReportAgent – writes the Markdown memo and trace (J5.0b)."""
+"""ReportAgent – synthesis, narrative construction, and output writing (J5.0b / J5.4)."""
 
 from __future__ import annotations
 
@@ -12,14 +12,227 @@ from .context import AgentContext
 LOGGER = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Narrative synthesis helpers (J5.4)
+# ---------------------------------------------------------------------------
+
+def _build_executive_summary(
+    question: str,
+    plan: dict[str, Any],
+    evidence_note: dict[str, Any],
+    qa: dict[str, Any],
+    findings: list[dict[str, Any]],
+    risks: list[dict[str, Any]],
+) -> str:
+    """Build a 2–5 paragraph executive summary from structured agent outputs."""
+    research_type = plan.get("research_type", "RESEARCH")
+    subquestions = plan.get("subquestions", [])
+    ev_summary = evidence_note.get("evidence_summary", {})
+    total_ev = ev_summary.get("total_evidence_items", 0)
+    covered = ev_summary.get("subquestions_with_evidence", 0)
+    uncovered = ev_summary.get("subquestions_without_evidence", 0)
+    confidence = qa.get("confidence_assessment", {}).get("overall_confidence", "MEDIUM")
+
+    # Para 1: scope
+    n_sq = len(subquestions)
+    type_label = {
+        "FACT_LOOKUP": "factual",
+        "COMPARISON": "comparative",
+        "EXPLANATION": "explanatory",
+        "RESEARCH": "in-depth research",
+    }.get(research_type, "research")
+    p1 = (
+        f"This {type_label} inquiry examined: \"{question}\". "
+        f"The analysis was structured around {n_sq} sub-question{'' if n_sq == 1 else 's'}, "
+        f"drawing on {total_ev} evidence item{'' if total_ev == 1 else 's'} "
+        f"across multiple sources."
+    )
+
+    # Para 2: what the evidence shows
+    finding_strs = [f["finding"] for f in findings[:3]]
+    if finding_strs:
+        bullets = "; ".join(finding_strs)
+        p2 = f"Key findings indicate: {bullets}."
+    else:
+        p2 = "The available evidence did not yield strongly supported conclusions."
+
+    # Para 3: coverage / gaps
+    if uncovered == 0:
+        p3 = (
+            f"Evidence coverage was comprehensive: all {covered} sub-question{'' if covered == 1 else 's'} "
+            f"received supporting evidence."
+        )
+    else:
+        p3 = (
+            f"Coverage was partial: {covered} of {n_sq} sub-question{'' if n_sq == 1 else 's'} "
+            f"received evidence support, while {uncovered} remain{'' if uncovered == 1 else 's'} "
+            f"without direct evidence."
+        )
+
+    # Para 4: risks and confidence
+    high_risks = [r for r in risks if r.get("severity") == "HIGH"]
+    risk_str = ""
+    if high_risks:
+        risk_labels = "; ".join(r["risk"] for r in high_risks[:2])
+        risk_str = f" Key risks identified: {risk_labels}."
+    p4 = (
+        f"Overall analytical confidence is assessed as {confidence}.{risk_str} "
+        f"Readers should weigh findings against the identified gaps before drawing conclusions."
+    )
+
+    return "\n\n".join([p1, p2, p3, p4])
+
+
+def _build_key_findings(
+    evidence_note: dict[str, Any],
+    plan: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Derive evidence-backed findings from subquestion coverage.
+
+    A finding is generated for each subquestion that has MODERATE or STRONG
+    evidence coverage. The finding statement is derived from the subquestion
+    itself, with evidence IDs for traceability (J5.4.10).
+    """
+    subquestions: list[str] = plan.get("subquestions", [])
+    coverage_by_sq: dict = evidence_note.get("coverage_by_subquestion", {})
+    evidence_by_sq: dict = evidence_note.get("evidence_by_subquestion", {})
+
+    findings = []
+    for sq in subquestions:
+        cov = coverage_by_sq.get(sq, {})
+        level = cov.get("coverage", "NONE")
+        if level in ("MODERATE", "STRONG"):
+            ids = evidence_by_sq.get(sq, [])
+            confidence = "HIGH" if level == "STRONG" else "MEDIUM"
+            # Rephrase subquestion into declarative form
+            finding_text = _sq_to_finding(sq)
+            findings.append({
+                "finding": finding_text,
+                "evidence_count": len(ids),
+                "confidence": confidence,
+                "supporting_evidence_ids": ids[:10],  # cap for readability
+                "source_subquestion": sq,
+            })
+
+    return findings
+
+
+def _sq_to_finding(sq: str) -> str:
+    """Convert a subquestion string into a declarative finding statement."""
+    sq = sq.strip().rstrip("?")
+    # Strip leading question words
+    for prefix in ("what is ", "what are ", "how does ", "how do ", "why does ",
+                   "why do ", "explain ", "describe ", "identify ", "list "):
+        if sq.lower().startswith(prefix):
+            sq = sq[len(prefix):]
+            break
+    # Capitalise and add a finding frame
+    sq = sq[:1].upper() + sq[1:] if sq else sq
+    return f"Evidence supports: {sq}"
+
+
+def _build_key_risks(
+    qa: dict[str, Any],
+    evidence_note: dict[str, Any],
+    plan: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Build risk list from QA issues, coverage gaps, and contradictions."""
+    risks: list[dict[str, Any]] = []
+
+    # Risks from high-severity QA coverage issues
+    for issue in qa.get("coverage_issues", []):
+        if issue.get("severity") == "HIGH":
+            sq = issue.get("subquestion", "")[:120]
+            risks.append({
+                "risk": f"No evidence found for: {sq}",
+                "severity": "HIGH",
+                "source": "coverage_gap",
+            })
+
+    # Risks from contradictions
+    for issue in qa.get("contradiction_issues", []):
+        topic = issue.get("topic", "unknown topic")
+        sev = issue.get("severity", "MEDIUM").upper()
+        risks.append({
+            "risk": f"Contradictory evidence on: {topic}",
+            "severity": sev if sev in ("HIGH", "MEDIUM", "LOW") else "MEDIUM",
+            "source": "contradiction",
+        })
+
+    # Risks from weak evidence on any subquestion
+    coverage_by_sq: dict = evidence_note.get("coverage_by_subquestion", {})
+    subquestions: list[str] = plan.get("subquestions", [])
+    for sq in subquestions:
+        level = coverage_by_sq.get(sq, {}).get("coverage", "NONE")
+        if level == "WEAK":
+            risks.append({
+                "risk": f"Weak evidence for: {sq[:120]}",
+                "severity": "MEDIUM",
+                "source": "weak_coverage",
+            })
+
+    return risks
+
+
+def _build_open_questions(
+    qa: dict[str, Any],
+    evidence_note: dict[str, Any],
+    plan: dict[str, Any],
+) -> list[str]:
+    """Build open questions from uncovered subquestions and evidence gaps."""
+    open_qs: list[str] = []
+    seen: set[str] = set()
+
+    coverage_by_sq: dict = evidence_note.get("coverage_by_subquestion", {})
+    subquestions: list[str] = plan.get("subquestions", [])
+
+    # Subquestions with NONE coverage become open questions
+    for sq in subquestions:
+        level = coverage_by_sq.get(sq, {}).get("coverage", "NONE")
+        if level == "NONE" and sq not in seen:
+            open_qs.append(sq)
+            seen.add(sq)
+
+    # WEAK subquestions that also have HIGH-severity evidence issues
+    high_ev_sqs = {
+        i.get("subquestion", "")
+        for i in qa.get("evidence_issues", [])
+        if i.get("severity") == "HIGH"
+    }
+    for sq in high_ev_sqs:
+        if sq not in seen and sq:
+            open_qs.append(sq)
+            seen.add(sq)
+
+    return open_qs
+
+
+def _report_confidence(qa: dict[str, Any]) -> str:
+    """Derive report_confidence from QA overall_confidence."""
+    return qa.get("confidence_assessment", {}).get("overall_confidence", "MEDIUM")
+
+
+# ---------------------------------------------------------------------------
+# Agent
+# ---------------------------------------------------------------------------
+
+
 class ReportAgent(FunctionalAgent):
-    """Writes the Markdown output and JSON trace. Surfaces agent_history in both."""
+    """Synthesises research into narrative and writes all outputs (J5.0b / J5.4).
+
+    J5.4 additions:
+      - Generates executive_summary, key_findings, key_risks, open_questions
+      - Derives report_confidence from QAAgent output
+      - Maintains evidence traceability (supporting_evidence_ids per finding)
+      - Writes context.report, research_object["report"], trace["report_agent"]
+    """
 
     def __init__(self, *, out_path: Path, domain_profile: Any = None) -> None:
         self._out_path = out_path
         self._domain_profile = domain_profile
 
     def _execute(self, context: AgentContext) -> AgentContext:
+        from research_agent.log import PROGRESS
         from research_agent.markdown import memo_to_markdown, write_markdown
         from research_agent.trace import build_trace, write_trace
 
@@ -31,19 +244,68 @@ class ReportAgent(FunctionalAgent):
             self._record(context, status="error", summary="No memo available; report not written.")
             return context
 
+        # ------------------------------------------------------------------
+        # J5.4 – Synthesis
+        # ------------------------------------------------------------------
+        plan = context.plan
+        evidence_note = context.evidence_notes[0] if context.evidence_notes else {}
+        qa = context.qa
+
+        findings = _build_key_findings(evidence_note, plan)
+        risks = _build_key_risks(qa, evidence_note, plan)
+        open_questions = _build_open_questions(qa, evidence_note, plan)
+        report_conf = _report_confidence(qa)
+        executive_summary = _build_executive_summary(
+            context.question, plan, evidence_note, qa, findings, risks
+        )
+
+        report_summary = {
+            "finding_count": len(findings),
+            "risk_count": len(risks),
+            "open_question_count": len(open_questions),
+            "report_confidence": report_conf,
+        }
+
+        context.report = {
+            "executive_summary": executive_summary,
+            "key_findings": findings,
+            "key_risks": risks,
+            "open_questions": open_questions,
+            "report_confidence": report_conf,
+            "report_summary": report_summary,
+        }
+
+        LOGGER.log(
+            PROGRESS,
+            "[ReportAgent] findings=%d  risks=%d  open_questions=%d  confidence=%s",
+            len(findings), len(risks), len(open_questions), report_conf,
+        )
+
+        # ------------------------------------------------------------------
+        # Write markdown report (existing behaviour)
+        # ------------------------------------------------------------------
         output_path = write_markdown(memo_to_markdown(memo), self._out_path)
         context.artifacts["report_path"] = str(output_path)
         context.artifacts["trace_path"] = str(output_path.with_suffix(".trace.json"))
 
-        # Record ReportAgent in history before building trace so it appears in agents_run
+        # Record in history before trace so it appears in agents_run (J5.4.9)
         self._record(
             context,
             status="success",
-            summary=f"Report written to {output_path}",
+            summary=(
+                f"Report written to {output_path}. "
+                f"Findings={len(findings)}, risks={len(risks)}, "
+                f"open_questions={len(open_questions)}, confidence={report_conf}."
+            ),
             report_path=str(output_path),
+            finding_count=len(findings),
+            risk_count=len(risks),
+            report_confidence=report_conf,
         )
 
-        # Build standard trace then inject functional_agents block (J5.0b.5)
+        # ------------------------------------------------------------------
+        # Build trace
+        # ------------------------------------------------------------------
         trace_payload = build_trace(
             question=context.question,
             source_directory=Path("sources"),
@@ -55,8 +317,7 @@ class ReportAgent(FunctionalAgent):
         )
         trace_payload["functional_agents"] = context.to_functional_trace()
 
-        # Inject planner summary into trace (J5.1.7)
-        plan = context.plan
+        # Planner block (J5.1.7)
         if plan:
             trace_payload["planner"] = {
                 "research_type": plan.get("research_type", ""),
@@ -66,10 +327,8 @@ class ReportAgent(FunctionalAgent):
                 "reasoning": plan.get("reasoning", ""),
             }
 
-        # Inject evidence_agent summary into trace (J5.2.7)
-        evidence_note = context.evidence_notes[0] if context.evidence_notes else {}
+        # Evidence agent block (J5.2.7)
         ev_summary = evidence_note.get("evidence_summary", {})
-        ev_by_sq = evidence_note.get("evidence_by_subquestion", {})
         if evidence_note:
             trace_payload["evidence_agent"] = {
                 "evidence_count": ev_summary.get("total_evidence_items", 0),
@@ -79,20 +338,29 @@ class ReportAgent(FunctionalAgent):
                 "coverage_distribution": ev_summary.get("coverage_distribution", {}),
             }
 
-        # Inject qa_agent summary into trace (J5.3.8)
-        qa = context.qa
+        # QA block (J5.3.8)
         if qa:
             qa_summary = qa.get("qa_summary", {})
-            confidence = qa.get("confidence_assessment", {})
+            confidence_assessment = qa.get("confidence_assessment", {})
             trace_payload["qa_agent"] = {
                 "issues_found": qa_summary.get("issues_found", 0),
-                "overall_confidence": confidence.get("overall_confidence", ""),
+                "overall_confidence": confidence_assessment.get("overall_confidence", ""),
                 "coverage_issues": qa_summary.get("coverage_issues", 0),
                 "evidence_issues": qa_summary.get("evidence_issues", 0),
                 "contradiction_issues": qa_summary.get("contradiction_issues", 0),
             }
 
-        # Update Research Object and surface agent_history in it (J5.0b.4)
+        # Report agent block (J5.4.8)
+        trace_payload["report_agent"] = {
+            "finding_count": len(findings),
+            "risk_count": len(risks),
+            "open_question_count": len(open_questions),
+            "report_confidence": report_conf,
+        }
+
+        # ------------------------------------------------------------------
+        # Update Research Object (J5.0b.4 + J5.4.7)
+        # ------------------------------------------------------------------
         if context.research_object:
             from research_agent.research_object import (
                 research_object_trace_stub,
@@ -106,8 +374,16 @@ class ReportAgent(FunctionalAgent):
                 output_path=output_path,
                 trace_path=context.artifacts["trace_path"],
             )
-            # Inject agent_history into the research object outputs
             ro.setdefault("outputs", {})["agent_history"] = context.agent_history
+
+            # J5.4.7 – inject report block
+            ro["report"] = {
+                "executive_summary": executive_summary,
+                "key_findings": findings,
+                "key_risks": risks,
+                "open_questions": open_questions,
+                "report_confidence": report_conf,
+            }
 
             ro_path = write_research_object(ro, out_dir=output_path.parent)
             trace_payload["research_object"] = research_object_trace_stub(ro, ro_path)

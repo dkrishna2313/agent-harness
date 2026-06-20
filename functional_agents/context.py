@@ -52,6 +52,7 @@ class AgentContext:
     evidence_notes: list[dict[str, Any]] = field(default_factory=list)
     qa_notes: list[dict[str, Any]] = field(default_factory=list)
     qa: dict[str, Any] = field(default_factory=dict)
+    report: dict[str, Any] = field(default_factory=dict)
 
     # Unified agent history (J5.0b.3)
     agent_history: list[dict[str, Any]] = field(default_factory=list)
