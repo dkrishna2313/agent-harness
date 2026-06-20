@@ -194,10 +194,10 @@ def download_web_document(
         )
         resp.raise_for_status()
         LOGGER.info(
-            "[WEB DOWNLOAD] fetch ok  url=%s  status=%s  html_chars=%d",
+            "[WEB DOWNLOAD] fetch ok  url=%s  status=%s  bytes=%d",
             url,
             resp.status_code,
-            len(resp.text),
+            len(resp.content),
         )
     except Exception as exc:
         msg = f"{type(exc).__name__}: {exc}"
@@ -205,26 +205,37 @@ def download_web_document(
         LOGGER.debug("[WEB DOWNLOAD] fetch traceback:\n%s", traceback.format_exc())
         return None, f"fetch error: {msg}"
 
-    # --- text extraction ---
-    try:
-        text = _trafilatura.extract(resp.text) or ""
-    except Exception as exc:
-        msg = f"{type(exc).__name__}: {exc}"
-        LOGGER.error("[WEB DOWNLOAD] extraction exception  url=%s — %s", url, msg)
-        LOGGER.debug("[WEB DOWNLOAD] extraction traceback:\n%s", traceback.format_exc())
-        return None, f"extraction error: {msg}"
+    # --- detect PDF vs HTML and extract accordingly ---
+    content_type = resp.headers.get("Content-Type", "").lower()
+    is_pdf = "application/pdf" in content_type or url.lower().split("?")[0].endswith(".pdf")
 
-    if not text.strip():
-        msg = "trafilatura returned empty text (page may be JS-rendered or paywalled)"
-        LOGGER.warning("[WEB DOWNLOAD] no text extracted  url=%s — %s", url, msg)
-        return None, msg
+    if is_pdf:
+        text, title = _extract_pdf(resp.content, url)
+        if not text:
+            msg = "pypdf returned empty text (PDF may be scanned/image-only)"
+            LOGGER.warning("[WEB DOWNLOAD] no text extracted from PDF  url=%s — %s", url, msg)
+            return None, msg
+    else:
+        try:
+            text = _trafilatura.extract(resp.text) or ""
+        except Exception as exc:
+            msg = f"{type(exc).__name__}: {exc}"
+            LOGGER.error("[WEB DOWNLOAD] extraction exception  url=%s — %s", url, msg)
+            LOGGER.debug("[WEB DOWNLOAD] extraction traceback:\n%s", traceback.format_exc())
+            return None, f"extraction error: {msg}"
 
-    title = _extract_title(resp.text) or url
+        if not text.strip():
+            msg = "trafilatura returned empty text (page may be JS-rendered or paywalled)"
+            LOGGER.warning("[WEB DOWNLOAD] no text extracted  url=%s — %s", url, msg)
+            return None, msg
+
+        title = _extract_title(resp.text) or url
     LOGGER.info(
-        "[WEB DOWNLOAD] extracted  url=%s  title=%r  chars=%d",
+        "[WEB DOWNLOAD] extracted  url=%s  title=%r  chars=%d  pdf=%s",
         url,
         title,
         len(text),
+        is_pdf,
     )
     return (
         WebDocument(
@@ -235,6 +246,36 @@ def download_web_document(
         ),
         None,
     )
+
+
+def _extract_pdf(content: bytes, url: str) -> tuple[str, str]:
+    """Extract text and title from raw PDF bytes using pypdf.
+
+    Returns (text, title). Text is empty string on failure.
+    pypdf is already a project dependency (used by the local source loader).
+    """
+    try:
+        import io
+        from pypdf import PdfReader
+        reader = PdfReader(io.BytesIO(content))
+        title = ""
+        if reader.metadata and reader.metadata.title:
+            title = reader.metadata.title.strip()
+        pages = []
+        for page in reader.pages:
+            page_text = page.extract_text() or ""
+            if page_text.strip():
+                pages.append(page_text)
+        text = "\n\n".join(pages)
+        LOGGER.info(
+            "[WEB DOWNLOAD] PDF extracted  url=%s  pages=%d  chars=%d",
+            url, len(reader.pages), len(text),
+        )
+        return text, title or url
+    except Exception as exc:
+        LOGGER.error("[WEB DOWNLOAD] PDF extraction failed  url=%s — %s", url, exc)
+        LOGGER.debug("[WEB DOWNLOAD] PDF traceback:\n%s", traceback.format_exc())
+        return "", url
 
 
 def _extract_title(html: str) -> str:
