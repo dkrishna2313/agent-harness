@@ -1,26 +1,125 @@
-"""PlannerAgent – creates the initial research plan (J5.0b)."""
+"""PlannerAgent – classifies the question and generates a research plan (J5.1)."""
 
 from __future__ import annotations
+
+import logging
+from typing import Any
 
 from .base import FunctionalAgent
 from .context import AgentContext
 
+LOGGER = logging.getLogger(__name__)
+
 
 class PlannerAgent(FunctionalAgent):
-    """Skeleton planner: records profiles and question into a plan."""
+    """Calls Claude (or mock) to classify the question and generate:
+    - research_type (FACT_LOOKUP / COMPARISON / EXPLANATION / RESEARCH)
+    - subquestions (3-7 focused decompositions)
+    - investigation_areas (4-8 topic labels)
+
+    Results are written into context.plan, the Research Object, and agent_history.
+    """
+
+    def __init__(
+        self,
+        *,
+        client: Any = None,
+        domain_profiles: list[Any] | None = None,
+    ) -> None:
+        self._client = client
+        self._domain_profiles = domain_profiles or []
 
     def _execute(self, context: AgentContext) -> AgentContext:
+        from research_agent.log import PROGRESS
+
+        profiles_context = self._build_profiles_context(context)
+
+        plan = self._generate_plan(context.question, profiles_context)
+
         context.plan = {
             "question": context.question,
-            "execution_profile": context.execution_profile,
-            "supporting_profiles": context.profiles[1:],
-            "strategy": "single-pass retrieval and synthesis via research_agent engine",
+            "research_type": plan.research_type,
+            "subquestions": plan.subquestions,
+            "investigation_areas": plan.investigation_areas,
+            "profiles_used": plan.profiles_used,
+            "reasoning": plan.reasoning,
         }
+
+        # Write plan fields into the Research Object (J5.1.6)
+        if context.research_object:
+            context.research_object["research_type"] = plan.research_type
+            context.research_object["subquestions"] = plan.subquestions
+            context.research_object["investigation_areas"] = plan.investigation_areas
+
+        LOGGER.log(
+            PROGRESS,
+            "[PlannerAgent] type=%s  subquestions=%d  areas=%d",
+            plan.research_type,
+            len(plan.subquestions),
+            len(plan.investigation_areas),
+        )
+
         self._record(
             context,
             status="success",
-            summary="Generated initial research plan.",
-            execution_profile=context.execution_profile,
-            supporting_profiles=context.profiles[1:],
+            summary=(
+                f"Classified as {plan.research_type}; "
+                f"generated {len(plan.subquestions)} subquestions and "
+                f"{len(plan.investigation_areas)} investigation areas."
+            ),
+            research_type=plan.research_type,
+            subquestions_generated=len(plan.subquestions),
+            investigation_areas_generated=len(plan.investigation_areas),
         )
         return context
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _build_profiles_context(self, context: AgentContext) -> list[dict]:
+        """Build a lightweight profile summary list for the planning prompt."""
+        result: list[dict] = []
+        # Prefer loaded DomainProfile objects when available
+        profile_map: dict[str, Any] = {
+            p.name: p for p in self._domain_profiles if hasattr(p, "name")
+        }
+        for name in context.profiles:
+            if name in profile_map:
+                p = profile_map[name]
+                result.append({
+                    "name": name,
+                    "description": getattr(p, "description", ""),
+                    "key_topics": list(getattr(p, "evaluator_topic_terms", {}).keys())[:8],
+                })
+            else:
+                result.append({"name": name, "description": "", "key_topics": []})
+        return result
+
+    def _generate_plan(self, question: str, profiles_context: list[dict]):
+        """Call the LLM client to generate the research plan."""
+        from research_agent.claude_client import ResearchPlanningPayload
+
+        if self._client is None:
+            LOGGER.warning("[PlannerAgent] no client provided — using mock plan")
+            return ResearchPlanningPayload(
+                research_type="RESEARCH",
+                subquestions=[
+                    f"What are the key facts about: {question}?",
+                    "What evidence exists in the available sources?",
+                    "What are the main constraints or limitations?",
+                    "What are the practical implications?",
+                    "What gaps remain in the available evidence?",
+                ],
+                investigation_areas=["Overview", "Key Facts", "Evidence Quality", "Implications", "Open Questions"],
+                profiles_used=[p.get("name", "") for p in profiles_context],
+                reasoning="No client available; using default plan structure.",
+            )
+
+        if hasattr(self._client, "plan_research_question"):
+            return self._client.plan_research_question(question, profiles_context)
+
+        # Fallback for clients that predate this method
+        LOGGER.warning("[PlannerAgent] client does not support plan_research_question — using mock plan")
+        from research_agent.claude_client import MockClaudeClient
+        return MockClaudeClient().plan_research_question(question, profiles_context)

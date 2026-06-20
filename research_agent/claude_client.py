@@ -55,8 +55,33 @@ class MemoSynthesisPayload(BaseModel):
     open_questions: list[str] = Field(default_factory=list)
 
 
+class ResearchPlanningPayload(BaseModel):
+    """Structured output for PlannerAgent (J5.1)."""
+
+    research_type: str = Field(
+        description="Question classification: FACT_LOOKUP, COMPARISON, EXPLANATION, or RESEARCH"
+    )
+    subquestions: list[str] = Field(
+        default_factory=list,
+        description="3-7 focused subquestions that decompose the main question",
+    )
+    investigation_areas: list[str] = Field(
+        default_factory=list,
+        description="4-8 topic areas to investigate (e.g. Power, Cooling, Economics)",
+    )
+    profiles_used: list[str] = Field(
+        default_factory=list,
+        description="Profile names whose domain knowledge informed this plan",
+    )
+    reasoning: str = Field(
+        default="",
+        description="Brief explanation of the classification and planning choices",
+    )
+
+
 _SCHEMA_ADAPTERS = {
     "research_plan": TypeAdapter(ResearchPlan),
+    "research_planning": TypeAdapter(ResearchPlanningPayload),
     # Used for the tool-definition schema sent to Claude (strict EvidenceItem types).
     "evidence_extraction": TypeAdapter(EvidenceExtractionPayload),
     # Used for response validation (lenient — items validated per-item in extract_evidence).
@@ -81,6 +106,38 @@ class MockClaudeClient:
 
     def __init__(self) -> None:
         self.call_traces: list[ClaudeCallTrace] = []
+
+    def plan_research_question(
+        self,
+        question: str,
+        profiles_context: list[dict],
+    ) -> ResearchPlanningPayload:
+        q = question.lower()
+        if any(w in q for w in ("compare", "vs", "versus", "difference between")):
+            research_type = "COMPARISON"
+        elif any(w in q for w in ("why", "how does", "explain", "what causes")):
+            research_type = "EXPLANATION"
+        elif any(w in q for w in ("what is", "what are", "how many", "how much", "list")):
+            research_type = "FACT_LOOKUP"
+        else:
+            research_type = "RESEARCH"
+
+        profiles_used = [p.get("name", "") for p in profiles_context if p.get("name")]
+        subquestions = [
+            f"What are the key facts about: {question}?",
+            "What evidence exists in the available sources?",
+            "What are the main constraints or limitations?",
+            "What are the practical implications?",
+            "What gaps remain in the available evidence?",
+        ]
+        investigation_areas = ["Overview", "Key Facts", "Evidence Quality", "Implications", "Open Questions"]
+        return ResearchPlanningPayload(
+            research_type=research_type,
+            subquestions=subquestions,
+            investigation_areas=investigation_areas,
+            profiles_used=profiles_used,
+            reasoning="Mock deterministic plan.",
+        )
 
 
 class ClaudeClient:
@@ -114,6 +171,20 @@ class ClaudeClient:
             raise RuntimeError("Install anthropic to use Claude.") from exc
 
         self._client = anthropic.Anthropic(api_key=self.api_key)
+
+    def plan_research_question(
+        self,
+        question: str,
+        profiles_context: list[dict],
+    ) -> ResearchPlanningPayload:
+        """Classify the question and generate a structured research plan (J5.1)."""
+        payload = self._call_json(
+            operation="plan_research_question",
+            schema_name="research_planning",
+            prompt=_planning_prompt(question, profiles_context),
+            max_tokens=2000,
+        )
+        return ResearchPlanningPayload.model_validate(payload)
 
     def create_research_plan(
         self,
@@ -417,6 +488,45 @@ def aggregate_call_traces(call_traces: Sequence[ClaudeCallTrace]) -> dict[str, A
         "token_usage": token_usage or None,
         "errors": errors,
     }
+
+
+def _planning_prompt(question: str, profiles_context: list[dict]) -> str:
+    """Build the PlannerAgent prompt for question classification and decomposition (J5.1)."""
+    profile_lines = ""
+    for p in profiles_context:
+        name = p.get("name", "unknown")
+        desc = p.get("description", "")
+        topics = ", ".join(p.get("key_topics", []))
+        profile_lines += f"\n- {name}: {desc}"
+        if topics:
+            profile_lines += f" (key topics: {topics})"
+
+    return f"""You are a research planning agent. Analyze the question below and produce a structured research plan.
+
+Question:
+{question}
+
+Domain profiles loaded:{profile_lines if profile_lines else " (none)"}
+
+Instructions:
+1. Classify the research_type as exactly one of:
+   - FACT_LOOKUP: asking for a specific fact, number, or definition
+   - COMPARISON: comparing two or more entities, technologies, or options
+   - EXPLANATION: asking why or how something works
+   - RESEARCH: broad investigation requiring synthesis across multiple topics
+
+2. Generate 3-7 focused subquestions that decompose the main question into
+   answerable parts. Draw on the domain profiles to make subquestions specific.
+
+3. Generate 4-8 investigation areas (short topic labels like "Power Requirements",
+   "Deployment Timeline", "Economics") that structure the research.
+
+4. List which profile names informed this plan in profiles_used.
+
+5. Write a brief reasoning (2-3 sentences) explaining your classification.
+
+Return structured JSON only.
+"""
 
 
 def _research_plan_prompt(question: str, source_texts: Sequence[SourceDocument]) -> str:

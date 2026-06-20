@@ -103,9 +103,19 @@ class Orchestrator:
         LOGGER.log(PROGRESS, "AgentContext validated — profiles=%s execution=%s",
                    ctx.profiles, ctx.execution_profile)
 
+        # Collect all loaded DomainProfile objects for the planner
+        loaded_profiles: list = []
+        if self._domain_profile is not None:
+            loaded_profiles.append(self._domain_profile)
+        for name in self._profile_names[1:]:
+            try:
+                loaded_profiles.append(load_profile(name))
+            except FileNotFoundError:
+                pass
+
         # Build and run agents in sequence (J5.0b.2)
         agents = [
-            PlannerAgent(),
+            PlannerAgent(client=self._client, domain_profiles=loaded_profiles),
             EvidenceAgent(
                 sources_dir=self._sources_dir,
                 client=self._client,

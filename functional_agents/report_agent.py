@@ -55,6 +55,17 @@ class ReportAgent(FunctionalAgent):
         )
         trace_payload["functional_agents"] = context.to_functional_trace()
 
+        # Inject planner summary into trace (J5.1.7)
+        plan = context.plan
+        if plan:
+            trace_payload["planner"] = {
+                "research_type": plan.get("research_type", ""),
+                "subquestion_count": len(plan.get("subquestions", [])),
+                "investigation_area_count": len(plan.get("investigation_areas", [])),
+                "profiles_used": plan.get("profiles_used", []),
+                "reasoning": plan.get("reasoning", ""),
+            }
+
         # Update Research Object and surface agent_history in it (J5.0b.4)
         if context.research_object:
             from research_agent.research_object import (

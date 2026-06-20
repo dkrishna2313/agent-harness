@@ -116,7 +116,9 @@ def create_research_object(
             "model_name": model_name,
         },
         # Populated during/after run
+        "research_type": None,
         "subquestions": [],
+        "investigation_areas": [],
         "retrieval_plan": {},
         "evidence_ids": [],
         "evidence_topics": {},
