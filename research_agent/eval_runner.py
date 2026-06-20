@@ -310,12 +310,25 @@ def benchmark(
         str | None,
         typer.Option("--log-level", help="Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL."),
     ] = None,
+    workers: Annotated[
+        int,
+        typer.Option(
+            "--workers",
+            "-w",
+            help=(
+                "Parallel workers for Q&A and contradiction runs. "
+                "1 = sequential (default). "
+                "Recommended: 3-5 for live LLM runs (respect API rate limits)."
+            ),
+        ),
+    ] = 1,
 ) -> None:
     """Run the J2.1 gold evaluation dataset and produce scored reports.
 
     Example:
 
         python3 -m research_agent.eval_runner benchmark --eval-dir ./eval --web-search
+        python3 -m research_agent.eval_runner benchmark --workers 5
     """
     import logging
 
@@ -378,6 +391,7 @@ def benchmark(
         sources_dir=sources,
         profile=domain_profile,
         ro_out_dir=out_dir,
+        workers=workers,
     )
 
     typer.echo("Running evaluation suite…")

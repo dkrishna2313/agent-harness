@@ -137,12 +137,8 @@ class DuckDuckGoSearchProvider:
                 raw = list(ddgs.text(query, max_results=max_results))
         except Exception as exc:
             msg = f"{type(exc).__name__}: {exc}"
-            LOGGER.error(
-                "[WEB SEARCH] search exception for %r — %s\n%s",
-                query,
-                msg,
-                traceback.format_exc(),
-            )
+            LOGGER.error("[WEB SEARCH] search exception for %r — %s", query, msg)
+            LOGGER.debug("[WEB SEARCH] traceback:\n%s", traceback.format_exc())
             return [], msg
 
         results = [
@@ -205,12 +201,8 @@ def download_web_document(
         )
     except Exception as exc:
         msg = f"{type(exc).__name__}: {exc}"
-        LOGGER.error(
-            "[WEB DOWNLOAD] fetch failed  url=%s — %s\n%s",
-            url,
-            msg,
-            traceback.format_exc(),
-        )
+        LOGGER.error("[WEB DOWNLOAD] fetch failed  url=%s — %s", url, msg)
+        LOGGER.debug("[WEB DOWNLOAD] fetch traceback:\n%s", traceback.format_exc())
         return None, f"fetch error: {msg}"
 
     # --- text extraction ---
@@ -218,12 +210,8 @@ def download_web_document(
         text = _trafilatura.extract(resp.text) or ""
     except Exception as exc:
         msg = f"{type(exc).__name__}: {exc}"
-        LOGGER.error(
-            "[WEB DOWNLOAD] extraction exception  url=%s — %s\n%s",
-            url,
-            msg,
-            traceback.format_exc(),
-        )
+        LOGGER.error("[WEB DOWNLOAD] extraction exception  url=%s — %s", url, msg)
+        LOGGER.debug("[WEB DOWNLOAD] extraction traceback:\n%s", traceback.format_exc())
         return None, f"extraction error: {msg}"
 
     if not text.strip():

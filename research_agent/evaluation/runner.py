@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Sequence
+from typing import Any, Sequence
 
 from ..agent import DcPowerAgent
 from ..contradiction import detect_contradictions, enrich_evidence_items
@@ -23,6 +24,8 @@ from .scorer import QAScore, ContradictionScore, score_qa_response, score_contra
 from .validator import validate_benchmark
 
 LOGGER = logging.getLogger(__name__)
+
+DEFAULT_WORKERS = 1
 
 
 @dataclass
@@ -56,12 +59,19 @@ class EvaluationRunner:
     Parameters
     ----------
     agent:
-        A configured ``DcPowerAgent`` used for Q&A questions.
-        When *None*, a mock agent (no LLM calls) is used.
+        A configured ``DcPowerAgent`` used as the template for Q&A runs.
+        Its constructor args (client, top_evidence, top_chunks, profile) are
+        copied so each parallel worker gets its own fresh instance with no
+        shared mutable state (e.g. client.call_traces).
     sources_dir:
         Directory of source documents passed to the agent.
     profile:
         Optional domain profile; forwarded to the agent and contradiction engine.
+    workers:
+        Number of parallel workers for Q&A and contradiction runs.
+        1 = sequential (default, safe for all environments).
+        >1 = parallel — each worker gets its own DcPowerAgent instance.
+        Recommended: 3-5 for live LLM runs (stay within API rate limits).
     """
 
     def __init__(
@@ -71,11 +81,36 @@ class EvaluationRunner:
         sources_dir: str | Path = "sources",
         profile: DomainProfile | None = None,
         ro_out_dir: str | Path | None = None,
+        workers: int = DEFAULT_WORKERS,
     ) -> None:
         self._agent = agent or DcPowerAgent(profile=profile)
         self._sources_dir = Path(sources_dir)
         self._profile = profile
         self._ro_out_dir: Path | None = Path(ro_out_dir) if ro_out_dir else None
+        self._workers = max(1, workers)
+
+    def _make_agent(self) -> DcPowerAgent:
+        """Create a fresh DcPowerAgent with the same config as the template.
+
+        Each parallel worker gets its own instance so client.call_traces
+        and any other per-instance state is never shared across threads.
+        """
+        from ..claude_client import ClaudeClient, MockClaudeClient
+        template = self._agent
+        is_mock = getattr(template.client, "is_mock", False)
+        if is_mock:
+            client: Any = MockClaudeClient()
+        else:
+            client = ClaudeClient(
+                model=getattr(template.client, "model", None),
+                api_key=getattr(template.client, "api_key", None),
+            )
+        return DcPowerAgent(
+            client=client,
+            top_evidence=template.top_evidence,
+            top_chunks=template.top_chunks,
+            profile=template.profile,
+        )
 
     def run(
         self,
@@ -102,54 +137,21 @@ class EvaluationRunner:
             for err in collection.errors:
                 LOGGER.warning("Source load error: %s — %s", err.path.name, err.message)
 
-        # Q&A questions
+        # Q&A questions — parallel when workers > 1
         total = len(qa_questions)
-        for idx, question in enumerate(qa_questions, start=1):
-            LOGGER.info(
-                "[%d/%d] Running %s: %s",
-                idx,
-                total,
-                question.question_id,
-                question.question[:60],
-            )
-            try:
-                memo = self._agent.analyze(question.question, documents)
-                qa_score = score_qa_response(question, memo)
-                # J4.5 – write per-question research object
-                if self._ro_out_dir is not None:
-                    _write_qa_research_object(
-                        question=question,
-                        memo=memo,
-                        profile=self._profile,
-                        out_dir=self._ro_out_dir,
-                    )
-            except Exception as exc:  # pragma: no cover
-                LOGGER.error("Error running %s: %s", question.question_id, exc)
-                qa_score = _failed_qa_score(question, str(exc))
-            result.qa_scores.append(qa_score)
+        if self._workers > 1:
+            LOGGER.info("Running %d Q&A questions with %d workers", total, self._workers)
+        result.qa_scores = self._run_qa_parallel(
+            list(qa_questions), documents, total
+        )
 
-        # Contradiction cases
+        # Contradiction cases — parallel when workers > 1
         total_c = len(contradiction_cases)
-        for idx, case in enumerate(contradiction_cases, start=1):
-            LOGGER.info(
-                "[%d/%d] Contradiction test %s",
-                idx,
-                total_c,
-                case.contradiction_id,
-            )
-            try:
-                c_score = self._run_contradiction_case(case)
-            except Exception as exc:  # pragma: no cover
-                LOGGER.error("Error running %s: %s", case.contradiction_id, exc)
-                c_score = ContradictionScore(
-                    contradiction_id=case.contradiction_id,
-                    domain=case.domain,
-                    expected_result=case.expected_result,
-                    actual_result="error",
-                    correct=False,
-                    notes=f"Runner error: {exc}",
-                )
-            result.contradiction_scores.append(c_score)
+        if self._workers > 1 and total_c:
+            LOGGER.info("Running %d contradiction cases with %d workers", total_c, self._workers)
+        result.contradiction_scores = self._run_contradiction_parallel(
+            list(contradiction_cases), total_c
+        )
 
         _compute_aggregates(result)
         return result
@@ -192,6 +194,101 @@ class EvaluationRunner:
         )
 
         return score_contradiction_result(case, contradictions, suppressed, enriched_items=enriched)
+
+    def _run_one_qa(
+        self,
+        idx: int,
+        total: int,
+        question: QAQuestion,
+        documents: list,
+    ) -> tuple[int, QAScore]:
+        """Run a single Q&A question. Returns (original_index, score) for ordering."""
+        LOGGER.info(
+            "[%d/%d] Running %s: %s",
+            idx + 1, total, question.question_id, question.question[:60],
+        )
+        try:
+            agent = self._make_agent()
+            memo = agent.analyze(question.question, documents)
+            qa_score = score_qa_response(question, memo)
+            if self._ro_out_dir is not None:
+                _write_qa_research_object(
+                    question=question,
+                    memo=memo,
+                    profile=self._profile,
+                    out_dir=self._ro_out_dir,
+                )
+        except Exception as exc:
+            LOGGER.error("Error running %s: %s", question.question_id, exc)
+            qa_score = _failed_qa_score(question, str(exc))
+        return idx, qa_score
+
+    def _run_qa_parallel(
+        self,
+        questions: list[QAQuestion],
+        documents: list,
+        total: int,
+    ) -> list[QAScore]:
+        """Run Q&A questions in parallel, preserving original ordering."""
+        scores: list[QAScore | None] = [None] * len(questions)
+        if self._workers == 1:
+            for idx, question in enumerate(questions):
+                _, score = self._run_one_qa(idx, total, question, documents)
+                scores[idx] = score
+        else:
+            with ThreadPoolExecutor(max_workers=self._workers) as pool:
+                futures = {
+                    pool.submit(self._run_one_qa, idx, total, q, documents): idx
+                    for idx, q in enumerate(questions)
+                }
+                for future in as_completed(futures):
+                    idx, score = future.result()
+                    scores[idx] = score
+        return [s for s in scores if s is not None]
+
+    def _run_one_contradiction(
+        self,
+        idx: int,
+        total: int,
+        case: ContradictionCase,
+    ) -> tuple[int, ContradictionScore]:
+        """Run a single contradiction case. Returns (original_index, score)."""
+        LOGGER.info("[%d/%d] Contradiction test %s", idx + 1, total, case.contradiction_id)
+        try:
+            score = self._run_contradiction_case(case)
+        except Exception as exc:
+            LOGGER.error("Error running %s: %s", case.contradiction_id, exc)
+            score = ContradictionScore(
+                contradiction_id=case.contradiction_id,
+                domain=case.domain,
+                expected_result=case.expected_result,
+                actual_result="error",
+                correct=False,
+                notes=f"Runner error: {exc}",
+            )
+        return idx, score
+
+    def _run_contradiction_parallel(
+        self,
+        cases: list[ContradictionCase],
+        total: int,
+    ) -> list[ContradictionScore]:
+        """Run contradiction cases in parallel, preserving original ordering."""
+        scores: list[ContradictionScore | None] = [None] * len(cases)
+        if self._workers == 1:
+            for idx, case in enumerate(cases):
+                _, score = self._run_one_contradiction(idx, total, case)
+                scores[idx] = score
+        else:
+            with ThreadPoolExecutor(max_workers=self._workers) as pool:
+                futures = {
+                    pool.submit(self._run_one_contradiction, idx, total, case): idx
+                    for idx, case in enumerate(cases)
+                }
+                for future in as_completed(futures):
+                    idx, score = future.result()
+                    scores[idx] = score
+        return [s for s in scores if s is not None]
 
 
 # ---------------------------------------------------------------------------
