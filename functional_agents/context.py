@@ -1,4 +1,9 @@
-"""Shared context object passed through functional agents (J5.0a.3)."""
+"""Shared context object passed through functional agents (J5.0b).
+
+AgentContext is the single source of truth for all workflow state.
+It is created once by the Orchestrator, passed through every agent in
+sequence, and written to the Research Object and trace at the end.
+"""
 
 from __future__ import annotations
 
@@ -6,49 +11,87 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+class ContextValidationError(ValueError):
+    """Raised when AgentContext fails pre-flight validation."""
+
+
 @dataclass
 class AgentContext:
-    """Mutable shared state threaded through each functional agent.
+    """Mutable shared state threaded through each functional agent (J5.0b.1).
 
-    Each agent receives the context, appends its notes, and returns it.
-    The orchestrator owns the lifecycle.
+    Lifecycle
+    ---------
+    1. Orchestrator creates one AgentContext and calls validate().
+    2. Each agent receives it, mutates it, and returns it.
+    3. ReportAgent writes agent_history into the RO and trace.
+
+    Fields
+    ------
+    question          : the research question
+    profiles          : ordered list of profile names (first = execution profile)
+    execution_profile : explicit copy of profiles[0] for clarity
+    research_object   : the durable Research Object dict (updated in-place)
+    plan              : PlannerAgent output
+    evidence_notes    : EvidenceAgent detailed notes
+    qa_notes          : QAAgent detailed notes
+    agent_history     : structured completion record from every agent (J5.0b.3)
+    artifacts         : named output paths and blobs (report_path, trace_path, …)
+    trace             : scratch space for inter-agent data (not persisted directly)
     """
 
     # Core research intent
     question: str
     profiles: list[str] = field(default_factory=list)
-
-    # Execution profile is the first entry in profiles
-    @property
-    def execution_profile(self) -> str | None:
-        return self.profiles[0] if self.profiles else None
+    execution_profile: str = ""
 
     # Shared durable state
     research_object: dict[str, Any] = field(default_factory=dict)
 
-    # Agent outputs
+    # Per-agent detailed notes
     plan: dict[str, Any] = field(default_factory=dict)
     evidence_notes: list[dict[str, Any]] = field(default_factory=list)
     qa_notes: list[dict[str, Any]] = field(default_factory=list)
 
-    # Final outputs
-    report_path: str | None = None
+    # Unified agent history (J5.0b.3)
+    agent_history: list[dict[str, Any]] = field(default_factory=list)
+
+    # Named output artifacts (J5.0b)
+    artifacts: dict[str, Any] = field(default_factory=dict)
+
+    # Inter-agent scratch space (not written to trace directly)
     trace: dict[str, Any] = field(default_factory=dict)
 
-    # Agent run log
-    agents_run: list[str] = field(default_factory=list)
+    # ------------------------------------------------------------------
+    # Lifecycle helpers
+    # ------------------------------------------------------------------
 
-    def record_agent(self, note: dict[str, Any]) -> None:
-        """Append an agent completion note and record the agent name."""
-        agent_name = note.get("agent", "unknown")
-        if agent_name not in self.agents_run:
-            self.agents_run.append(agent_name)
+    def validate(self) -> None:
+        """Raise ContextValidationError if required fields are missing (J5.0b.7)."""
+        errors: list[str] = []
+        if not self.question or not self.question.strip():
+            errors.append("'question' is required and must not be empty")
+        if not self.profiles:
+            errors.append("'profiles' must contain at least one profile name")
+        if not self.execution_profile:
+            errors.append("'execution_profile' must be set")
+        if not isinstance(self.research_object, dict) or not self.research_object:
+            errors.append("'research_object' must be a non-empty dict")
+        if errors:
+            raise ContextValidationError(
+                f"AgentContext validation failed ({len(errors)} error(s)):\n"
+                + "\n".join(f"  - {e}" for e in errors)
+            )
+
+    def append_history(self, entry: dict[str, Any]) -> None:
+        """Append a structured agent completion entry to agent_history."""
+        self.agent_history.append(entry)
 
     def to_functional_trace(self) -> dict[str, Any]:
-        """Return the functional_agents block for the execution trace."""
+        """Return the functional_agents block for the execution trace (J5.0b.5)."""
         return {
             "enabled": True,
-            "agents_run": self.agents_run,
+            "agents_run": [h["agent"] for h in self.agent_history],
+            "agent_history": self.agent_history,
             "profiles": self.profiles,
             "execution_profile": self.execution_profile,
         }

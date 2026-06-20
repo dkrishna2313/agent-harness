@@ -93,9 +93,10 @@ def main(
         logging.error("Functional agent pipeline failed: %s", exc)
         raise typer.Exit(code=1) from exc
 
-    typer.echo(f"Agents run: {', '.join(ctx.agents_run)}")
+    agents_run = [h["agent"] for h in ctx.agent_history]
+    typer.echo(f"Agents run: {', '.join(agents_run)}")
     typer.echo(f"Profiles:   {', '.join(ctx.profiles)}")
-    typer.echo(f"Report:     {ctx.report_path}")
+    typer.echo(f"Report:     {ctx.artifacts.get('report_path', ctx.artifacts)}")
 
 
 def _build_client(*, mock: bool, model: str | None):

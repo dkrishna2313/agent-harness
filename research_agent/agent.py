@@ -333,13 +333,13 @@ class DcPowerAgent:
         # K1.0 – optional web retrieval: extend the selected chunk pool
         web_search_trace: dict | None = None
         ws_cfg = self.profile.web_search
-        LOGGER.info(
-            "[WEB SEARCH] enabled=%s  profile=%s  max_results=%d  max_pages=%d  timeout=%ds",
+        from .log import PROGRESS
+        LOGGER.log(PROGRESS,
+            "[WEB SEARCH] enabled=%s  profile=%s  max_results=%d  max_pages=%d",
             ws_cfg.enabled,
             self.profile.name,
             ws_cfg.max_results,
             ws_cfg.max_pages,
-            ws_cfg.timeout_seconds,
         )
         if ws_cfg.enabled:
             web_docs, web_search_trace = web_retrieve(
@@ -352,7 +352,7 @@ class DcPowerAgent:
             web_chunks = _web_docs_to_chunks(web_docs)
             web_search_trace["chunks_created"] = len(web_chunks)
             selected_chunks = list(selected_chunks) + web_chunks
-            LOGGER.info(
+            LOGGER.log(PROGRESS,
                 "Web retrieval: %d web chunks added; total selected=%d",
                 len(web_chunks),
                 len(selected_chunks),
@@ -368,8 +368,8 @@ class DcPowerAgent:
         evidence = rank_evidence_items(
             score_evidence_items(question, assign_evidence_ids(list(evidence)), source_quality_map, self.profile)
         )
-        LOGGER.debug(
-            "Evidence pipeline: %d total extracted and ranked",
+        LOGGER.log(PROGRESS,
+            "Evidence: %d items extracted and ranked",
             len(evidence),
         )
         # J3.2 — diversity-aware selection: cap over-represented perspectives so

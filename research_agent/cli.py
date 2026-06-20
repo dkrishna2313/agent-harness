@@ -222,11 +222,14 @@ def main(
 
 
 def _configure_logging(verbose: bool, log_level: str | None = None) -> None:
+    from .log import PROGRESS
     if log_level:
-        level = getattr(logging, log_level.upper(), logging.INFO)
+        level = logging.getLevelName(log_level.upper())
+        if not isinstance(level, int):
+            level = logging.INFO
     else:
         level = logging.DEBUG if verbose else logging.INFO
-    logging.basicConfig(level=level, format="%(levelname)s: %(message)s")
+    logging.basicConfig(level=level, format="%(asctime)s %(levelname)s: %(message)s", datefmt="%H:%M:%S")
 
 
 def _load_profile(

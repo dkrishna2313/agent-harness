@@ -117,9 +117,9 @@ class DuckDuckGoSearchProvider:
         *error* is ``None`` on success or a string describing the failure.
         Never raises.
         """
-        LOGGER.info(
-            "[WEB SEARCH] provider=%s  query=%r  max_results=%d",
-            self.name,
+        from .log import PROGRESS
+        LOGGER.log(PROGRESS,
+            "[WEB SEARCH] query=%r  max_results=%d",
             query,
             max_results,
         )
@@ -154,11 +154,10 @@ class DuckDuckGoSearchProvider:
             for r in raw
             if r.get("href")
         ]
-        LOGGER.info(
-            "[WEB SEARCH] provider=%s  raw_count=%d  valid_count=%d",
-            self.name,
-            len(raw),
+        LOGGER.log(PROGRESS,
+            "[WEB SEARCH] found %d results for %r",
             len(results),
+            query,
         )
         return results, None
 

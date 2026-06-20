@@ -1,4 +1,4 @@
-"""Orchestrator – drives agents in sequence and owns the context lifecycle (J5.0a)."""
+"""Orchestrator – creates AgentContext, validates it, then runs agents (J5.0b)."""
 
 from __future__ import annotations
 
@@ -6,10 +6,10 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from research_agent.profile import load_profile, DomainProfile
+from research_agent.profile import DomainProfile, load_profile
 from research_agent.research_object import create_research_object
 
-from .context import AgentContext
+from .context import AgentContext, ContextValidationError
 from .planner_agent import PlannerAgent
 from .evidence_agent import EvidenceAgent
 from .qa_agent import QAAgent
@@ -23,7 +23,13 @@ class Orchestrator:
 
     Profiles:
         The first profile in *profile_names* is the execution profile passed
-        to the research engine.  All profiles are recorded in the trace.
+        to the research engine.  All profiles are recorded in the context.
+
+    Context lifecycle (J5.0b.2):
+        1. Build AgentContext with all required fields.
+        2. Validate context — raise ContextValidationError on missing fields.
+        3. Pass context through agents in sequence.
+        4. Return final context.
     """
 
     def __init__(
@@ -43,46 +49,61 @@ class Orchestrator:
         self._top_evidence = top_evidence
         self._top_chunks = top_chunks
 
+        from research_agent.log import PROGRESS
+
         # Load execution profile (first in list)
         self._domain_profile: DomainProfile | None = None
         if profile_names:
             try:
                 self._domain_profile = load_profile(profile_names[0])
-                LOGGER.info("Execution profile: %s", profile_names[0])
+                LOGGER.log(PROGRESS, "Execution profile loaded: %s", profile_names[0])
             except FileNotFoundError as exc:
                 LOGGER.warning("Could not load profile %r: %s", profile_names[0], exc)
 
-        # Load all profiles (for context record — not used in engine yet)
-        self._all_profiles: list[DomainProfile] = []
-        for name in profile_names:
+        # Verify all profiles exist (warn on missing; don't abort)
+        for name in profile_names[1:]:
             try:
-                self._all_profiles.append(load_profile(name))
+                load_profile(name)
+                LOGGER.log(PROGRESS, "Supporting profile loaded: %s", name)
             except FileNotFoundError:
-                LOGGER.warning("Profile not found: %r", name)
+                LOGGER.warning("Supporting profile not found: %r", name)
 
     def run(self, question: str) -> AgentContext:
-        """Execute the full functional agent pipeline and return the final context."""
+        """Build, validate, and execute the full functional agent pipeline."""
 
-        # Create initial context
-        ctx = AgentContext(
-            question=question,
-            profiles=self._profile_names,
-        )
+        execution_profile = self._profile_names[0] if self._profile_names else ""
+        mock_mode = self._client is not None and getattr(self._client, "is_mock", False)
 
-        # Create research object before pipeline starts
-        ctx.research_object = create_research_object(
+        # Create Research Object before building context (J5.0b — RO is prerequisite)
+        research_object = create_research_object(
             question=question,
-            profile_name=self._profile_names[0] if self._profile_names else None,
+            profile_name=execution_profile or None,
             profile_source="cli_argument",
             sources_dir=self._sources_dir,
             web_search=False,
-            mock_mode=self._client is not None and getattr(self._client, "is_mock", False),
+            mock_mode=mock_mode,
         )
 
-        LOGGER.info("Profiles loaded: %s", self._profile_names)
-        LOGGER.info("Execution profile: %s", ctx.execution_profile)
+        # Build context with all required fields populated (J5.0b.1)
+        ctx = AgentContext(
+            question=question,
+            profiles=self._profile_names,
+            execution_profile=execution_profile,
+            research_object=research_object,
+        )
 
-        # Build and run agents in sequence
+        # Validate before running any agent (J5.0b.7)
+        try:
+            ctx.validate()
+        except ContextValidationError as exc:
+            LOGGER.error("Context validation failed: %s", exc)
+            raise
+
+        from research_agent.log import PROGRESS
+        LOGGER.log(PROGRESS, "AgentContext validated — profiles=%s execution=%s",
+                   ctx.profiles, ctx.execution_profile)
+
+        # Build and run agents in sequence (J5.0b.2)
         agents = [
             PlannerAgent(),
             EvidenceAgent(
