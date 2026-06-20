@@ -358,6 +358,7 @@ class DcPowerAgent:
                 len(selected_chunks),
             )
 
+        LOGGER.log(PROGRESS, "Starting evidence extraction from %d chunks", len(selected_chunks))
         try:
             evidence = self.client.extract_evidence_from_chunks(question, selected_chunks)
         except Exception as exc:
@@ -365,6 +366,7 @@ class DcPowerAgent:
             LOGGER.error("Claude %s", message)
             errors.append(message)
             evidence = extract_evidence(question, documents, source_quality_map=source_quality_map, profile=self.profile)
+        LOGGER.log(PROGRESS, "Starting evidence ranking")
         evidence = rank_evidence_items(
             score_evidence_items(question, assign_evidence_ids(list(evidence)), source_quality_map, self.profile)
         )
