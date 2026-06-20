@@ -79,6 +79,19 @@ class ReportAgent(FunctionalAgent):
                 "coverage_distribution": ev_summary.get("coverage_distribution", {}),
             }
 
+        # Inject qa_agent summary into trace (J5.3.8)
+        qa = context.qa
+        if qa:
+            qa_summary = qa.get("qa_summary", {})
+            confidence = qa.get("confidence_assessment", {})
+            trace_payload["qa_agent"] = {
+                "issues_found": qa_summary.get("issues_found", 0),
+                "overall_confidence": confidence.get("overall_confidence", ""),
+                "coverage_issues": qa_summary.get("coverage_issues", 0),
+                "evidence_issues": qa_summary.get("evidence_issues", 0),
+                "contradiction_issues": qa_summary.get("contradiction_issues", 0),
+            }
+
         # Update Research Object and surface agent_history in it (J5.0b.4)
         if context.research_object:
             from research_agent.research_object import (
