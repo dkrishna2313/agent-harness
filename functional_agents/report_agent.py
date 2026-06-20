@@ -66,6 +66,19 @@ class ReportAgent(FunctionalAgent):
                 "reasoning": plan.get("reasoning", ""),
             }
 
+        # Inject evidence_agent summary into trace (J5.2.7)
+        evidence_note = context.evidence_notes[0] if context.evidence_notes else {}
+        ev_summary = evidence_note.get("evidence_summary", {})
+        ev_by_sq = evidence_note.get("evidence_by_subquestion", {})
+        if evidence_note:
+            trace_payload["evidence_agent"] = {
+                "evidence_count": ev_summary.get("total_evidence_items", 0),
+                "mapped_subquestions": ev_summary.get("subquestions_with_evidence", 0),
+                "mapped_areas": ev_summary.get("investigation_areas_with_evidence", 0),
+                "uncovered_subquestions": ev_summary.get("subquestions_without_evidence", 0),
+                "coverage_distribution": ev_summary.get("coverage_distribution", {}),
+            }
+
         # Update Research Object and surface agent_history in it (J5.0b.4)
         if context.research_object:
             from research_agent.research_object import (
