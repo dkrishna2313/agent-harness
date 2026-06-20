@@ -525,6 +525,14 @@ def regress(
             help="Absolute score drop (or hallucination rise) that triggers a failure.",
         ),
     ] = 0.03,
+    verbose: Annotated[
+        bool,
+        typer.Option("--verbose", "-v", help="Enable verbose logging (shorthand for --log-level DEBUG)."),
+    ] = False,
+    log_level: Annotated[
+        str | None,
+        typer.Option("--log-level", help="Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL, PROGRESS."),
+    ] = None,
 ) -> None:
     """Compare a current evaluation report against the baseline (J2.3).
 
@@ -537,6 +545,7 @@ def regress(
           --baseline baseline/evaluation_report.json \\
           --fail-threshold 0.03
     """
+    _configure_logging(verbose, log_level)
     from .evaluation.regression import (
         load_report,
         compare_reports,

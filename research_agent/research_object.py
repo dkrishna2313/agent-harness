@@ -50,6 +50,85 @@ _DOMAIN_TO_PROFILE: dict[str, str] = {
 }
 
 
+def _classify_research_type(question: str) -> str:
+    """Heuristic question classification — no LLM required.
+
+    PlannerAgent overrides this with an LLM-generated value in functional_agents runs.
+    Benchmark runs use this heuristic so ROs are never left with research_type=null.
+    """
+    q = question.lower()
+    if any(w in q for w in ("compare", " vs ", "versus", "difference between", "contrast")):
+        return "COMPARISON"
+    if any(w in q for w in ("why ", "how does", "how do", "explain", "what causes", "reason for")):
+        return "EXPLANATION"
+    if any(
+        q.startswith(p)
+        for p in ("what is ", "what are ", "how many ", "how much ", "list ", "name ", "when ")
+    ) or any(w in q for w in ("output capacity", "power output", "how many", "how much", "what is the")):
+        return "FACT_LOOKUP"
+    return "RESEARCH"
+
+
+def _heuristic_subquestions(question: str, research_type: str) -> list[str]:
+    """Generate basic subquestions from the question text (no LLM).
+
+    PlannerAgent replaces these with LLM-generated subquestions in functional_agents runs.
+    """
+    if research_type == "FACT_LOOKUP":
+        return [
+            f"What is the specific answer to: {question}",
+            "What sources contain this information?",
+            "Are there any caveats or conditions on this fact?",
+        ]
+    if research_type == "COMPARISON":
+        return [
+            f"What are the key dimensions for comparing in: {question}",
+            "What are the strengths of each option?",
+            "What are the limitations of each option?",
+            "Which option is preferred under what conditions?",
+        ]
+    if research_type == "EXPLANATION":
+        return [
+            f"What is the mechanism behind: {question}",
+            "What are the key contributing factors?",
+            "What evidence supports this explanation?",
+            "Are there alternative explanations?",
+        ]
+    # RESEARCH
+    return [
+        f"What are the key facts relevant to: {question}",
+        "What evidence exists in the available sources?",
+        "What are the main constraints or limitations?",
+        "What are the practical implications?",
+        "What gaps remain in the available evidence?",
+    ]
+
+
+def _heuristic_investigation_areas(question: str, research_type: str) -> list[str]:
+    """Generate basic investigation areas from the question text (no LLM)."""
+    q = question.lower()
+    areas = ["Overview"]
+    for keyword, area in [
+        ("power", "Power"),
+        ("cool", "Cooling"),
+        ("cost", "Economics"),
+        ("econom", "Economics"),
+        ("deploy", "Deployment Timeline"),
+        ("grid", "Grid Integration"),
+        ("regulat", "Regulation"),
+        ("safety", "Safety"),
+        ("nuclear", "Nuclear Technology"),
+        ("smr", "SMR Technology"),
+        ("data center", "Data Center Requirements"),
+        ("nvidia", "NVIDIA Technology"),
+        ("gpu", "GPU Architecture"),
+    ]:
+        if keyword in q and area not in areas:
+            areas.append(area)
+    areas += ["Key Findings", "Open Questions"]
+    return areas
+
+
 def infer_profile_from_domain(domain: str | None, question_id: str | None = None) -> str | None:
     """Return the canonical profile for a benchmark domain or question_id.
 
@@ -99,6 +178,7 @@ def create_research_object(
     """
     now = datetime.now(timezone.utc).isoformat()
     research_id = _new_research_id(question_id)
+    _rtype = _classify_research_type(question)
     return {
         "research_id": research_id,
         "created_at": now,
@@ -115,10 +195,10 @@ def create_research_object(
             "mock_mode": mock_mode,
             "model_name": model_name,
         },
-        # Populated during/after run
-        "research_type": None,
-        "subquestions": [],
-        "investigation_areas": [],
+        # Populated during/after run — heuristic baseline; PlannerAgent overrides in functional runs
+        "research_type": _rtype,
+        "subquestions": _heuristic_subquestions(question, _rtype),
+        "investigation_areas": _heuristic_investigation_areas(question, _rtype),
         "retrieval_plan": {},
         "evidence_ids": [],
         "evidence_topics": {},
