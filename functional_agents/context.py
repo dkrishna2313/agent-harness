@@ -16,10 +16,11 @@ class ContextValidationError(ValueError):
 
 
 # ---------------------------------------------------------------------------
-# Workflow constants (J5.5 / J5.5a) – defined here to avoid circular imports
+# Workflow constants (J5.5 / J5.5a / J6.1) – defined here to avoid circular imports
 # ---------------------------------------------------------------------------
 
 class WorkflowState:
+    PROBLEM_FRAMING = "PROBLEM_FRAMING"
     PLANNING  = "PLANNING"
     EVIDENCE  = "EVIDENCE"
     QA        = "QA"
@@ -49,7 +50,10 @@ class AgentContext:
 
     Fields
     ------
-    question          : the research question
+    question          : the research question (may be empty if goal is provided;
+                        ProblemFramingAgent populates it from the decision model)
+    goal              : high-level business goal for goal-driven runs (J6.1)
+    decision_model    : structured output of ProblemFramingAgent (J6.1)
     profiles          : ordered list of profile names (first = execution profile)
     execution_profile : explicit copy of profiles[0] for clarity
     research_object   : the durable Research Object dict (updated in-place)
@@ -62,10 +66,14 @@ class AgentContext:
     """
 
     # Core research intent
-    question: str
+    question: str = ""
     profiles: list[str] = field(default_factory=list)
     execution_profile: str = ""
     run_id: str = ""
+
+    # Goal-driven input (J6.1) — alternative entry point to question-driven
+    goal: str = ""
+    decision_model: dict[str, Any] = field(default_factory=dict)
 
     # Shared durable state
     research_object: dict[str, Any] = field(default_factory=dict)
@@ -96,10 +104,16 @@ class AgentContext:
     # ------------------------------------------------------------------
 
     def validate(self) -> None:
-        """Raise ContextValidationError if required fields are missing (J5.0b.7)."""
+        """Raise ContextValidationError if required fields are missing (J5.0b.7).
+
+        Either question or goal must be provided — goal-driven runs leave
+        question empty until ProblemFramingAgent populates it.
+        """
         errors: list[str] = []
-        if not self.question or not self.question.strip():
-            errors.append("'question' is required and must not be empty")
+        has_question = bool(self.question and self.question.strip())
+        has_goal = bool(self.goal and self.goal.strip())
+        if not has_question and not has_goal:
+            errors.append("either 'question' or 'goal' is required and must not be empty")
         if not self.profiles:
             errors.append("'profiles' must contain at least one profile name")
         if not self.execution_profile:

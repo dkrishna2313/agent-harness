@@ -83,9 +83,38 @@ class ResearchPlanningPayload(BaseModel):
     )
 
 
+class DecisionModelPayload(BaseModel):
+    """Structured output for ProblemFramingAgent (J6.1).
+
+    Transforms a business goal into a structured Decision Model that guides
+    the rest of the research pipeline.
+    """
+
+    objective: str = Field(
+        description="The core decision objective, restated as a precise research goal"
+    )
+    decision_areas: list[str] = Field(
+        default_factory=list,
+        description="3-6 key decision areas or dimensions the research must address",
+    )
+    critical_uncertainties: list[str] = Field(
+        default_factory=list,
+        description="2-5 critical unknowns that most affect the decision outcome",
+    )
+    research_questions: list[str] = Field(
+        default_factory=list,
+        description="3-6 specific research questions derived from the goal",
+    )
+    evidence_requirements: list[str] = Field(
+        default_factory=list,
+        description="Types of evidence needed (e.g. market data, technical specs, case studies)",
+    )
+
+
 _SCHEMA_ADAPTERS = {
     "research_plan": TypeAdapter(ResearchPlan),
     "research_planning": TypeAdapter(ResearchPlanningPayload),
+    "problem_framing": TypeAdapter(DecisionModelPayload),
     # Used for the tool-definition schema sent to Claude (strict EvidenceItem types).
     "evidence_extraction": TypeAdapter(EvidenceExtractionPayload),
     # Used for response validation (lenient — items validated per-item in extract_evidence).
@@ -143,6 +172,25 @@ class MockClaudeClient:
             reasoning="Mock deterministic plan.",
         )
 
+    def frame_problem(
+        self,
+        goal: str,
+        profiles_context: list[dict],
+    ) -> "DecisionModelPayload":
+        """Return a deterministic decision model for the given business goal."""
+        return DecisionModelPayload(
+            objective=f"Research and analyse: {goal}",
+            decision_areas=["Market Landscape", "Technical Feasibility", "Risk Assessment", "Investment Criteria"],
+            critical_uncertainties=["Market timing", "Competitive dynamics", "Regulatory environment"],
+            research_questions=[
+                f"What is the current state of: {goal}?",
+                "What are the key technical and market constraints?",
+                "What evidence exists on investment returns and risk factors?",
+                "What are the strategic options and their trade-offs?",
+            ],
+            evidence_requirements=["Market data", "Technical specifications", "Case studies", "Analyst reports"],
+        )
+
 
 class ClaudeClient:
     """Thin Anthropic SDK wrapper for structured research calls."""
@@ -194,6 +242,20 @@ class ClaudeClient:
             raise RuntimeError("Install anthropic to use Claude.") from exc
 
         self._client = anthropic.Anthropic(api_key=self.api_key)
+
+    def frame_problem(
+        self,
+        goal: str,
+        profiles_context: list[dict],
+    ) -> DecisionModelPayload:
+        """Transform a business goal into a structured Decision Model (J6.1)."""
+        payload = self._call_json(
+            operation="problem_framing",
+            schema_name="problem_framing",
+            prompt=_problem_framing_prompt(goal, profiles_context),
+            max_tokens=2000,
+        )
+        return DecisionModelPayload.model_validate(payload)
 
     def plan_research_question(
         self,
@@ -565,6 +627,39 @@ Instructions:
 4. List which profile names informed this plan in profiles_used.
 
 5. Write a brief reasoning (2-3 sentences) explaining your classification.
+
+Return structured JSON only.
+"""
+
+
+def _problem_framing_prompt(goal: str, profiles_context: list[dict]) -> str:
+    """Build the ProblemFramingAgent prompt for decision model generation (J6.1)."""
+    profile_lines = ""
+    for p in profiles_context:
+        name = p.get("name", "unknown")
+        desc = p.get("description", "")
+        topics = ", ".join(p.get("key_topics", []))
+        profile_lines += f"\n- {name}: {desc}"
+        if topics:
+            profile_lines += f" (key topics: {topics})"
+
+    return f"""You are a strategic research planning agent. Transform the business goal below into a structured Decision Model that will guide a research pipeline.
+
+Business Goal:
+{goal}
+
+Domain profiles available:{profile_lines if profile_lines else " (none)"}
+
+Instructions:
+1. Restate the goal as a precise research objective (1-2 sentences).
+
+2. Identify 3-6 key decision areas — the dimensions that must be understood to act on this goal (e.g. "Market readiness", "Technical feasibility", "Regulatory landscape").
+
+3. Identify 2-5 critical uncertainties — the unknowns that most affect the decision outcome.
+
+4. Generate 3-6 specific, answerable research questions derived directly from the goal and decision areas. Draw on the domain profiles to make questions specific and actionable.
+
+5. List 2-5 evidence requirements — the types of evidence needed to answer the research questions (e.g. "Benchmark performance data", "Vendor cost sheets", "Industry analyst reports").
 
 Return structured JSON only.
 """

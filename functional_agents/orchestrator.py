@@ -56,8 +56,9 @@ class AgentOrchestrator:
     """State-machine orchestrator.  Executes agents, reads their next_action,
     and drives the workflow — supporting iteration loops and re-planning.
 
-    States (J5.5.3):
-        PLANNING → EVIDENCE → QA → REPORT → COMPLETE
+    States (J5.5.3 / J6.1):
+        [PROBLEM_FRAMING →] PLANNING → EVIDENCE → QA → REPORT → COMPLETE
+        PROBLEM_FRAMING is prepended when problem_framing_factory is provided.
         QA may loop back to EVIDENCE (REQUEST_EVIDENCE) or PLANNING (REQUEST_REPLAN)
         until max_iterations is reached, then forces REPORT.
 
@@ -73,8 +74,10 @@ class AgentOrchestrator:
         evidence_factory: Any,
         qa_factory: Any,
         report_factory: Any,
+        problem_framing_factory: Any = None,
         max_iterations: int = 3,
     ) -> None:
+        self._problem_framing_factory = problem_framing_factory
         self._planner_factory  = planner_factory
         self._evidence_factory = evidence_factory
         self._qa_factory       = qa_factory
@@ -84,7 +87,11 @@ class AgentOrchestrator:
     def run(self, ctx: AgentContext) -> AgentContext:
         from research_agent.log import PROGRESS
 
-        state = WorkflowState.PLANNING
+        state = (
+            WorkflowState.PROBLEM_FRAMING
+            if self._problem_framing_factory is not None
+            else WorkflowState.PLANNING
+        )
         termination_reason = NextAction.COMPLETE
         ctx.iteration_count = 0
 
@@ -93,8 +100,14 @@ class AgentOrchestrator:
             ctx.workflow_state = state
             LOGGER.log(PROGRESS, "[Orchestrator] state=%s  iteration=%d", state, ctx.iteration_count)
 
+            # ---- PROBLEM FRAMING (J6.1) -------------------------------------
+            if state == WorkflowState.PROBLEM_FRAMING:
+                result = _step(self._problem_framing_factory(), ctx)
+                ctx = result.context
+                state = WorkflowState.PLANNING
+
             # ---- PLANNING ---------------------------------------------------
-            if state == WorkflowState.PLANNING:
+            elif state == WorkflowState.PLANNING:
                 result = _step(self._planner_factory(), ctx)
                 ctx = result.context
                 state = WorkflowState.EVIDENCE
@@ -221,11 +234,24 @@ class Orchestrator:
                 LOGGER.warning("Supporting profile not found: %r", name)
 
     def run(self, question: str) -> AgentContext:
-        """Build, validate, and execute the adaptive agent pipeline."""
-        from .planner_agent  import PlannerAgent
-        from .evidence_agent import EvidenceAgent
-        from .qa_agent       import QAAgent
-        from .report_agent   import ReportAgent
+        """Build, validate, and execute the adaptive agent pipeline (question-driven)."""
+        return self._run_internal(question=question, goal="")
+
+    def run_from_goal(self, goal: str) -> AgentContext:
+        """Build, validate, and execute the pipeline starting from a business goal (J6.1).
+
+        ProblemFramingAgent runs first to derive research questions from the goal,
+        then the standard PLANNING → EVIDENCE → QA → REPORT pipeline follows.
+        """
+        return self._run_internal(question="", goal=goal)
+
+    def _run_internal(self, *, question: str, goal: str) -> AgentContext:
+        """Shared implementation for question-driven and goal-driven runs."""
+        from .planner_agent          import PlannerAgent
+        from .evidence_agent         import EvidenceAgent
+        from .qa_agent               import QAAgent
+        from .report_agent           import ReportAgent
+        from .problem_framing_agent  import ProblemFramingAgent
 
         execution_profile = self._profile_names[0] if self._profile_names else ""
         mock_mode = self._client is not None and getattr(self._client, "is_mock", False)
@@ -241,6 +267,9 @@ class Orchestrator:
                 pass
 
         # Agent factories — called fresh for each invocation in the loop
+        def problem_framing_factory() -> ProblemFramingAgent:
+            return ProblemFramingAgent(client=self._client, domain_profiles=loaded_profiles)
+
         def planner_factory() -> PlannerAgent:
             return PlannerAgent(client=self._client, domain_profiles=loaded_profiles)
 
@@ -263,9 +292,11 @@ class Orchestrator:
                 domain_profile=self._domain_profile,
             )
 
-        # Create Research Object before building context
+        # For goal-driven runs the question is empty until ProblemFramingAgent runs;
+        # use a placeholder so create_research_object gets a non-empty string.
+        ro_question = question or goal
         research_object = create_research_object(
-            question=question,
+            question=ro_question,
             profile_name=execution_profile or None,
             profile_source="cli_argument",
             sources_dir=self._sources_dir,
@@ -273,9 +304,10 @@ class Orchestrator:
             mock_mode=mock_mode,
         )
 
-        # Build and validate context (J5.0b.1 / J5.0b.7)
+        # Build and validate context (J5.0b.1 / J5.0b.7 / J6.1)
         ctx = AgentContext(
             question=question,
+            goal=goal,
             profiles=self._profile_names,
             execution_profile=execution_profile,
             research_object=research_object,
@@ -290,12 +322,13 @@ class Orchestrator:
         from research_agent.log import PROGRESS
         LOGGER.log(
             PROGRESS,
-            "AgentContext validated — profiles=%s execution=%s",
-            ctx.profiles, ctx.execution_profile,
+            "AgentContext validated — profiles=%s execution=%s goal=%r",
+            ctx.profiles, ctx.execution_profile, ctx.goal[:60] if ctx.goal else "",
         )
 
         # Hand off to the adaptive orchestrator
         orchestrator = AgentOrchestrator(
+            problem_framing_factory=problem_framing_factory if goal else None,
             planner_factory=planner_factory,
             evidence_factory=evidence_factory,
             qa_factory=qa_factory,
