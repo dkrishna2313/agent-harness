@@ -33,10 +33,16 @@ def build_json_report(run: EvaluationRun, *, run_meta: dict | None = None) -> di
             ),
             "known_limitation_cases": len(known_limitation),
             "benchmark_errors": len(benchmark_errors) + len(run.validation_errors),
+            # J5.7 — aggregate agent scores (also in agent_evaluation block)
+            "planner_score": run.planner_score,
+            "evidence_score": run.evidence_score,
+            "qa_agent_score": run.qa_agent_score,
+            "report_score": run.report_score,
         },
         "domain_scores": run.domain_scores,
         "qa_results": [_qa_score_dict(s) for s in run.qa_scores],
         "contradiction_results": [_contra_score_dict(s) for s in run.contradiction_scores],
+        "agent_evaluation": _agent_evaluation_dict(run),
         "failed_tests": {
             "qa": [_qa_score_dict(s) for s in run.failed_qa],
             "contradictions": [_contra_score_dict(s) for s in run.failed_contradictions],
@@ -268,6 +274,7 @@ def build_trace(run: EvaluationRun, *, run_meta: dict | None = None) -> dict:
             "known_limitation_excluded": len(known_limitation),
             "benchmark_errors": len(run.validation_errors),
         },
+        "agent_evaluation": _agent_evaluation_dict(run),
         "qa_results": [_qa_trace_dict(s) for s in run.qa_scores],
         "contradiction_results": [_contra_trace_dict(s) for s in run.contradiction_scores],
         "failed_tests": {
@@ -363,6 +370,49 @@ def _contra_score_dict(s: ContradictionScore) -> dict:
         "suppression_correct": s.suppression_correct,
         "known_limitation": s.known_limitation,
         "notes": s.notes,
+    }
+
+
+def _agent_evaluation_dict(run: "EvaluationRun") -> dict:
+    """Serialise J5.7 agent evaluation block."""
+    per_question = []
+    for s in run.agent_scores:
+        per_question.append({
+            "question_id": s.question_id,
+            "domain": s.domain,
+            "planner_score": s.planner_score,
+            "evidence_score": s.evidence_score,
+            "qa_score": s.qa_score,
+            "report_score": s.report_score,
+            "detail": {
+                "planner": {
+                    "investigation_area_count": s.investigation_area_count,
+                    "investigation_areas_covered": s.investigation_areas_covered,
+                },
+                "evidence": {
+                    "evidence_count": s.evidence_count,
+                    "high_quality_evidence": s.high_quality_evidence,
+                    "source_diversity": s.source_diversity,
+                },
+                "qa": {
+                    "gaps_identified": s.gaps_identified,
+                    "contradictions_found": s.contradictions_found,
+                },
+                "report": {
+                    "citation_count": s.citation_count,
+                    "confirmed_facts": s.confirmed_facts,
+                    "citation_score": s.report_citation_score,
+                },
+            },
+        })
+    return {
+        "aggregate": {
+            "planner_score": run.planner_score,
+            "evidence_score": run.evidence_score,
+            "qa_score": run.qa_agent_score,
+            "report_score": run.report_score,
+        },
+        "per_question": per_question,
     }
 
 

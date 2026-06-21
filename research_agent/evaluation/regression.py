@@ -36,6 +36,11 @@ _COMPARABLE_METRICS: list[tuple[str, str, bool]] = [
     ("contradiction_accuracy",   "Contradiction accuracy",  True),
     ("qa_questions_passed",      "Q&A passed (count)",      True),
     ("contradiction_tests_passed", "Contradiction passed (count)", True),
+    # J5.7 — per-agent scores (sourced from agent_evaluation.aggregate in report)
+    ("planner_score",   "Planner score",  True),
+    ("evidence_score",  "Evidence score", True),
+    ("qa_agent_score",  "QA agent score", True),
+    ("report_score",    "Report score",   True),
 ]
 
 

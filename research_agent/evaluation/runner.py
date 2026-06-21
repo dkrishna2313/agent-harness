@@ -21,6 +21,7 @@ from ..research_object import (
 from ..schemas import EvidenceItem, SuppressedComparison
 from .loader import QAQuestion, ContradictionCase
 from .scorer import QAScore, ContradictionScore, score_qa_response, score_contradiction_result
+from .agent_scorer import AgentScores, score_agents, aggregate_agent_scores
 from .validator import validate_benchmark
 
 LOGGER = logging.getLogger(__name__)
@@ -51,6 +52,15 @@ class EvaluationRun:
     # Failed tests
     failed_qa: list[QAScore] = field(default_factory=list)
     failed_contradictions: list[ContradictionScore] = field(default_factory=list)
+
+    # J5.7 — per-question agent evaluation scores
+    agent_scores: list[AgentScores] = field(default_factory=list)
+
+    # J5.7 — aggregate agent scores (computed in _compute_aggregates)
+    planner_score: float = 0.0
+    evidence_score: float = 0.0
+    qa_agent_score: float = 0.0
+    report_score: float = 0.0
 
 
 class EvaluationRunner:
@@ -141,7 +151,7 @@ class EvaluationRunner:
         total = len(qa_questions)
         if self._workers > 1:
             LOGGER.info("Running %d Q&A questions with %d workers", total, self._workers)
-        result.qa_scores = self._run_qa_parallel(
+        result.qa_scores, result.agent_scores = self._run_qa_parallel(
             list(qa_questions), documents, total
         )
 
@@ -211,6 +221,7 @@ class EvaluationRunner:
             agent = self._make_agent()
             memo = agent.analyze(question.question, documents)
             qa_score = score_qa_response(question, memo)
+            agent_score = score_agents(question.question_id, question.domain, memo, qa_score)
             if self._ro_out_dir is not None:
                 _write_qa_research_object(
                     question=question,
@@ -221,20 +232,23 @@ class EvaluationRunner:
         except Exception as exc:
             LOGGER.error("Error running %s: %s", question.question_id, exc)
             qa_score = _failed_qa_score(question, str(exc))
-        return idx, qa_score
+            agent_score = AgentScores(question_id=question.question_id, domain=question.domain)
+        return idx, qa_score, agent_score
 
     def _run_qa_parallel(
         self,
         questions: list[QAQuestion],
         documents: list,
         total: int,
-    ) -> list[QAScore]:
+    ) -> tuple[list[QAScore], list[AgentScores]]:
         """Run Q&A questions in parallel, preserving original ordering."""
-        scores: list[QAScore | None] = [None] * len(questions)
+        qa_slots: list[QAScore | None] = [None] * len(questions)
+        agent_slots: list[AgentScores | None] = [None] * len(questions)
         if self._workers == 1:
             for idx, question in enumerate(questions):
-                _, score = self._run_one_qa(idx, total, question, documents)
-                scores[idx] = score
+                _, qa_score, agent_score = self._run_one_qa(idx, total, question, documents)
+                qa_slots[idx] = qa_score
+                agent_slots[idx] = agent_score
         else:
             with ThreadPoolExecutor(max_workers=self._workers) as pool:
                 futures = {
@@ -242,9 +256,13 @@ class EvaluationRunner:
                     for idx, q in enumerate(questions)
                 }
                 for future in as_completed(futures):
-                    idx, score = future.result()
-                    scores[idx] = score
-        return [s for s in scores if s is not None]
+                    idx, qa_score, agent_score = future.result()
+                    qa_slots[idx] = qa_score
+                    agent_slots[idx] = agent_score
+        return (
+            [s for s in qa_slots if s is not None],
+            [s for s in agent_slots if s is not None],
+        )
 
     def _run_one_contradiction(
         self,
@@ -380,6 +398,13 @@ def _compute_aggregates(result: EvaluationRun) -> None:
         s for s in contra_scoreable
         if not s.correct or not s.suppression_correct
     ]
+
+    # J5.7 — aggregate agent scores
+    agg = aggregate_agent_scores(result.agent_scores)
+    result.planner_score = agg["planner_score"]
+    result.evidence_score = agg["evidence_score"]
+    result.qa_agent_score = agg["qa_score"]
+    result.report_score = agg["report_score"]
 
 
 def _write_qa_research_object(

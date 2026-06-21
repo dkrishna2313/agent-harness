@@ -2,6 +2,7 @@
 
 from .loader import load_qa_questions, load_contradiction_cases
 from .scorer import score_qa_response, score_contradiction_result
+from .agent_scorer import AgentScores, score_agents, aggregate_agent_scores
 from .runner import EvaluationRunner
 from .report import build_json_report, build_md_report, build_trace, write_trace
 from .validator import validate_benchmark, ValidationReport, ValidationError
@@ -25,6 +26,9 @@ __all__ = [
     "load_contradiction_cases",
     "score_qa_response",
     "score_contradiction_result",
+    "AgentScores",
+    "score_agents",
+    "aggregate_agent_scores",
     "EvaluationRunner",
     "build_json_report",
     "build_md_report",
