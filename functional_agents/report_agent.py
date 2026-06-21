@@ -402,6 +402,15 @@ class ReportAgent(FunctionalAgent):
                 "contradiction_issues": qa_summary.get("contradiction_issues", 0),
             }
 
+        # Orchestrator block (J5.5.7)
+        orchestrator_meta = context.trace.get("_orchestrator", {})
+        if orchestrator_meta:
+            trace_payload["orchestrator"] = {
+                "iterations": orchestrator_meta.get("iterations", 0),
+                "workflow_path": orchestrator_meta.get("workflow_path", []),
+                "termination_reason": orchestrator_meta.get("termination_reason", "COMPLETE"),
+            }
+
         # Report agent block (J5.4.8)
         trace_payload["report_agent"] = {
             "finding_count": len(findings),
@@ -429,6 +438,14 @@ class ReportAgent(FunctionalAgent):
                 trace_path=context.artifacts["trace_path"],
             )
             ro.setdefault("outputs", {})["agent_history"] = context.agent_history
+
+            # J5.5.9 – inject workflow block
+            if orchestrator_meta:
+                ro["workflow"] = {
+                    "iterations": orchestrator_meta.get("iterations", 0),
+                    "workflow_path": orchestrator_meta.get("workflow_path", []),
+                    "termination_reason": orchestrator_meta.get("termination_reason", "COMPLETE"),
+                }
 
             # J5.4.7 – inject report block
             ro["report"] = {

@@ -140,6 +140,47 @@ def _assess_confidence(
 
 
 # ---------------------------------------------------------------------------
+# Next-action decision (J5.5.4)
+# ---------------------------------------------------------------------------
+
+def _decide_next_action(
+    overall_confidence: str,
+    coverage_issues: list[dict],
+    evidence_issues: list[dict],
+    iteration_count: int,
+) -> str:
+    """Choose the next workflow action based on QA findings.
+
+    REQUEST_REPLAN  — confidence is LOW AND coverage is very poor (< 30 % covered):
+                      the research plan itself needs rethinking.
+    REQUEST_EVIDENCE — confidence is LOW but partial coverage exists:
+                       more evidence retrieval may fill the gaps.
+    CONTINUE        — confidence is MEDIUM or HIGH, or iteration limit exceeded.
+    """
+    from .orchestrator import NextAction
+
+    if overall_confidence != "LOW":
+        return NextAction.CONTINUE
+
+    high_none_issues = sum(
+        1 for i in coverage_issues if i.get("coverage_level") == "NONE"
+    )
+    high_ev_issues = sum(
+        1 for i in evidence_issues if i.get("severity") == "HIGH"
+    )
+
+    # Very poor coverage → suggest re-plan
+    if high_none_issues >= 3 and high_ev_issues >= 2:
+        return NextAction.REQUEST_REPLAN
+
+    # Moderate gaps → request more evidence
+    if high_none_issues >= 1 or high_ev_issues >= 1:
+        return NextAction.REQUEST_EVIDENCE
+
+    return NextAction.CONTINUE
+
+
+# ---------------------------------------------------------------------------
 # Agent
 # ---------------------------------------------------------------------------
 
@@ -209,14 +250,24 @@ class QAAgent(FunctionalAgent):
         if ro:
             ro["qa"] = context.qa
 
+        # --- decide next workflow action (J5.5.4 / J5.5.8) ---
+        next_action = _decide_next_action(
+            overall_confidence=confidence["overall_confidence"],
+            coverage_issues=coverage_issues,
+            evidence_issues=evidence_issues,
+            iteration_count=context.iteration_count,
+        )
+
         LOGGER.log(
             PROGRESS,
-            "[QAAgent] confidence=%s  issues=%d (coverage=%d evidence=%d contradictions=%d)",
+            "[QAAgent] confidence=%s  issues=%d (coverage=%d evidence=%d contradictions=%d)"
+            "  next_action=%s",
             confidence["overall_confidence"],
             total_issues,
             len(coverage_issues),
             len(evidence_issues),
             len(contradiction_issues),
+            next_action,
         )
 
         # --- qa_notes (backward compat with existing callers) ---
@@ -224,18 +275,20 @@ class QAAgent(FunctionalAgent):
         summary = (
             f"QA complete: confidence={confidence['overall_confidence']}, "
             f"{total_issues} issue(s) found across "
-            f"{len(subquestions)} subquestions."
+            f"{len(subquestions)} subquestions. "
+            f"next_action={next_action}"
         )
         context.qa_notes.append(
             self._make_note(status=status, summary=summary, qa_summary=qa_summary)
         )
 
-        # --- agent history (J5.3.9) ---
+        # --- agent history (J5.3.9 / J5.5.8) ---
         self._record(
             context,
             status=status,
             summary=summary,
             issues_found=total_issues,
             overall_confidence=confidence["overall_confidence"],
+            next_action=next_action,
         )
         return context

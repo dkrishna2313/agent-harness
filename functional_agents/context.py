@@ -54,6 +54,11 @@ class AgentContext:
     qa: dict[str, Any] = field(default_factory=dict)
     report: dict[str, Any] = field(default_factory=dict)
 
+    # Orchestrator state (J5.5)
+    workflow_state: str = ""
+    iteration_count: int = 0
+    workflow_path: list[str] = field(default_factory=list)
+
     # Unified agent history (J5.0b.3)
     agent_history: list[dict[str, Any]] = field(default_factory=list)
 
