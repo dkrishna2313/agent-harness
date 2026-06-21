@@ -16,7 +16,11 @@ app = typer.Typer(add_completion=False, no_args_is_help=True)
 
 @app.command()
 def main(
-    question: Annotated[str, typer.Argument(help="Research question to answer.")],
+    question: Annotated[str, typer.Argument(help="Research question to answer. Omit if using --goal.")] = "",
+    goal: Annotated[
+        str | None,
+        typer.Option("--goal", "-g", help="High-level business goal (goal-driven mode). Mutually exclusive with QUESTION."),
+    ] = None,
     sources: Annotated[
         Path,
         typer.Option("--sources", "-s", exists=True, file_okay=False, dir_okay=True,
@@ -55,7 +59,19 @@ def main(
         typer.Option("--log-level", help="Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL."),
     ] = None,
 ) -> None:
-    """Run the functional agent pipeline and write a Markdown research memo."""
+    """Run the functional agent pipeline and write a Markdown research memo.
+
+    Either pass a QUESTION as a positional argument (question-driven mode) or
+    use --goal for goal-driven mode where ProblemFramingAgent derives the
+    research questions automatically.
+    """
+
+    if goal and question:
+        typer.echo("Error: provide either QUESTION or --goal, not both.", err=True)
+        raise typer.Exit(code=1)
+    if not goal and not question:
+        typer.echo("Error: provide a QUESTION or --goal.", err=True)
+        raise typer.Exit(code=1)
 
     _configure_logging(verbose=False, log_level=log_level or "INFO")
 
@@ -88,7 +104,7 @@ def main(
     )
 
     try:
-        ctx = orchestrator.run(question)
+        ctx = orchestrator.run_from_goal(goal) if goal else orchestrator.run(question)
     except Exception as exc:
         logging.error("Functional agent pipeline failed: %s", exc)
         raise typer.Exit(code=1) from exc
