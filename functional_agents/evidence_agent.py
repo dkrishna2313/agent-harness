@@ -321,7 +321,7 @@ class EvidenceAgent(FunctionalAgent):
             len(investigation_areas),
         )
 
-        # --- 5. Serialize evidence items and attribute to profiles (J5.6) ---
+        # --- 5. Serialize evidence items and attribute to profiles (J5.6 / J5.6a) ---
         items_dicts = [
             {
                 "evidence_id": getattr(e, "evidence_id", ""),
@@ -338,11 +338,25 @@ class EvidenceAgent(FunctionalAgent):
             self._domain_profiles,
             fallback_profile=context.execution_profile,
         )
+        # Add spec-required "profile" field (alias for source_profile) to every item
+        for item in items_dicts:
+            item["profile"] = item.get("source_profile", context.execution_profile)
+
+        # Derive requested / contributing / missing profile sets (J5.6a)
+        profiles_requested = [p.name for p in self._domain_profiles] if self._domain_profiles else context.profiles
+        profiles_contributing = [
+            p for p, v in profile_coverage_by_profile.items() if v.get("evidence_count", 0) > 0
+        ]
+        profiles_missing = [
+            p for p, v in profile_coverage_by_profile.items() if v.get("evidence_count", 0) == 0
+        ]
+
         if len(self._domain_profiles) > 1:
             LOGGER.log(
                 PROGRESS,
-                "[EvidenceAgent] profile attribution: %s",
-                {k: v["evidence_count"] for k, v in profile_coverage_by_profile.items()},
+                "[EvidenceAgent] profile attribution: contributing=%s missing=%s",
+                profiles_contributing,
+                profiles_missing,
             )
 
         context.evidence_notes = [
@@ -353,6 +367,9 @@ class EvidenceAgent(FunctionalAgent):
                 "coverage_by_subquestion": coverage_by_subquestion,
                 "evidence_summary": evidence_summary,
                 "profile_coverage_by_profile": profile_coverage_by_profile,
+                "profiles_requested": profiles_requested,
+                "profiles_contributing": profiles_contributing,
+                "profiles_missing": profiles_missing,
             }
         ]
 

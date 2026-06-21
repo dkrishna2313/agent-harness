@@ -325,6 +325,10 @@ class ReportAgent(FunctionalAgent):
             "report_confidence": report_conf,
             "report_summary": report_summary,
             "report_grounding_score": grounding,
+            "profiles_requested": list(context.profiles),
+            "profiles_contributing": qa.get("profiles_contributing", []),
+            "profiles_missing": qa.get("profiles_missing", []),
+            "coverage_status": qa.get("coverage_status", "sufficient"),
         }
 
         LOGGER.log(
@@ -369,11 +373,30 @@ class ReportAgent(FunctionalAgent):
         )
         trace_payload["functional_agents"] = context.to_functional_trace()
 
-        # Multi-profile block (J5.6)
-        trace_payload["profiles"] = context.profiles
+        # Multi-profile block (J5.6 / J5.6a)
+        trace_payload["profiles_requested"] = context.profiles
         trace_payload["profile_count"] = len(context.profiles)
-        if qa.get("profile_coverage"):
-            trace_payload["profile_coverage"] = qa.get("profile_coverage")
+        trace_payload["profiles_contributing"] = qa.get("profiles_contributing", [])
+        trace_payload["profiles_missing"] = qa.get("profiles_missing", [])
+        trace_payload["coverage_status"] = qa.get("coverage_status", "sufficient")
+        # Rich profile coverage: {name: {coverage, evidence_count}}
+        raw_coverage = (
+            evidence_note.get("profile_coverage_by_profile", {}) if evidence_note else {}
+        )
+        if raw_coverage:
+            trace_payload["profile_coverage"] = {
+                pname: {
+                    "coverage": entry.get("coverage_level", "NONE").lower(),
+                    "evidence_count": entry.get("evidence_count", 0),
+                }
+                for pname, entry in raw_coverage.items()
+            }
+        elif qa.get("profile_coverage"):
+            # Fall back to flat dict when raw data not available
+            trace_payload["profile_coverage"] = {
+                k: {"coverage": v, "evidence_count": 0}
+                for k, v in qa["profile_coverage"].items()
+            }
 
         # Planner block (J5.1.7)
         if plan:
@@ -479,11 +502,20 @@ class ReportAgent(FunctionalAgent):
                 "report_grounding_score": grounding,
             }
 
-            # J5.6 – inject profile metadata
-            ro["profiles"] = context.profiles
+            # J5.6a – inject profile coverage metadata
+            ro["profiles_requested"] = context.profiles
             ro["profile_count"] = len(context.profiles)
-            if qa.get("profile_coverage"):
-                ro["profile_coverage"] = qa.get("profile_coverage")
+            ro["profiles_contributing"] = qa.get("profiles_contributing", [])
+            ro["profiles_missing"] = qa.get("profiles_missing", [])
+            ro["coverage_status"] = qa.get("coverage_status", "sufficient")
+            if raw_coverage:
+                ro["profile_coverage"] = {
+                    pname: {
+                        "coverage": entry.get("coverage_level", "NONE").lower(),
+                        "evidence_count": entry.get("evidence_count", 0),
+                    }
+                    for pname, entry in raw_coverage.items()
+                }
 
             ro_path = write_research_object(ro, out_dir=output_path.parent)
             trace_payload["research_object"] = research_object_trace_stub(ro, ro_path)

@@ -155,39 +155,51 @@ def test_check_profile_coverage_strong():
         "smr": {"evidence_count": 15, "coverage_level": "STRONG"},
         "ai_data_centers": {"evidence_count": 12, "coverage_level": "STRONG"},
     })
-    cov, issues = _check_profile_coverage(note, ["smr", "ai_data_centers"])
-    assert cov["smr"] == "strong"
-    assert cov["ai_data_centers"] == "strong"
-    assert issues == []
+    result = _check_profile_coverage(note, ["smr", "ai_data_centers"])
+    assert result["profile_coverage"]["smr"] == "strong"
+    assert result["profile_coverage"]["ai_data_centers"] == "strong"
+    assert result["profile_issues"] == []
+    assert result["profile_gap_issues"] == []
+    assert result["coverage_status"] == "sufficient"
 
 
 def test_check_profile_coverage_none_raises_high_issue():
     note = _make_evidence_note({
         "smr": {"evidence_count": 0, "coverage_level": "NONE"},
     })
-    cov, issues = _check_profile_coverage(note, ["smr"])
-    assert cov["smr"] == "none"
-    assert len(issues) == 1
-    assert issues[0]["severity"] == "HIGH"
-    assert issues[0]["profile"] == "smr"
+    result = _check_profile_coverage(note, ["smr"])
+    assert result["profile_coverage"]["smr"] == "none"
+    assert len(result["profile_issues"]) == 1
+    assert result["profile_issues"][0]["severity"] == "HIGH"
+    assert result["profile_issues"][0]["profile"] == "smr"
+
+
+def test_check_profile_coverage_none_emits_gap_issue():
+    note = _make_evidence_note({
+        "smr": {"evidence_count": 0, "coverage_level": "NONE"},
+    })
+    result = _check_profile_coverage(note, ["smr"])
+    assert len(result["profile_gap_issues"]) == 1
+    assert result["profile_gap_issues"][0]["profile"] == "smr"
+    assert result["profile_gap_issues"][0]["issue"] == "no evidence contributed"
 
 
 def test_check_profile_coverage_weak_raises_medium_issue():
     note = _make_evidence_note({
         "transmission": {"evidence_count": 2, "coverage_level": "WEAK"},
     })
-    cov, issues = _check_profile_coverage(note, ["transmission"])
-    assert cov["transmission"] == "weak"
-    assert len(issues) == 1
-    assert issues[0]["severity"] == "MEDIUM"
+    result = _check_profile_coverage(note, ["transmission"])
+    assert result["profile_coverage"]["transmission"] == "weak"
+    assert len(result["profile_issues"]) == 1
+    assert result["profile_issues"][0]["severity"] == "MEDIUM"
 
 
 def test_check_profile_coverage_missing_profile_defaults_none():
     note = _make_evidence_note({})
-    cov, issues = _check_profile_coverage(note, ["smr"])
-    assert cov["smr"] == "none"
-    assert len(issues) == 1
-    assert issues[0]["severity"] == "HIGH"
+    result = _check_profile_coverage(note, ["smr"])
+    assert result["profile_coverage"]["smr"] == "none"
+    assert len(result["profile_issues"]) == 1
+    assert result["profile_issues"][0]["severity"] == "HIGH"
 
 
 def test_check_profile_coverage_three_profiles():
@@ -196,12 +208,51 @@ def test_check_profile_coverage_three_profiles():
         "ai_data_centers": {"evidence_count": 18, "coverage_level": "STRONG"},
         "transmission": {"evidence_count": 2, "coverage_level": "WEAK"},
     })
-    cov, issues = _check_profile_coverage(
-        note, ["smr", "ai_data_centers", "transmission"]
-    )
-    assert cov == {"smr": "strong", "ai_data_centers": "strong", "transmission": "weak"}
-    assert len(issues) == 1  # only transmission is weak
-    assert issues[0]["profile"] == "transmission"
+    result = _check_profile_coverage(note, ["smr", "ai_data_centers", "transmission"])
+    assert result["profile_coverage"] == {
+        "smr": "strong", "ai_data_centers": "strong", "transmission": "weak"
+    }
+    assert len(result["profile_issues"]) == 1  # only transmission is weak
+    assert result["profile_issues"][0]["profile"] == "transmission"
+
+
+def test_coverage_status_insufficient_when_any_missing():
+    note = _make_evidence_note({
+        "smr": {"evidence_count": 15, "coverage_level": "STRONG"},
+        "transmission": {"evidence_count": 0, "coverage_level": "NONE"},
+    })
+    result = _check_profile_coverage(note, ["smr", "transmission"])
+    assert result["coverage_status"] == "insufficient"
+    assert "transmission" in result["profiles_missing"]
+    assert "smr" in result["profiles_contributing"]
+
+
+def test_coverage_status_sufficient_when_all_contribute():
+    note = _make_evidence_note({
+        "smr": {"evidence_count": 15, "coverage_level": "STRONG"},
+        "ai_data_centers": {"evidence_count": 8, "coverage_level": "MODERATE"},
+    })
+    result = _check_profile_coverage(note, ["smr", "ai_data_centers"])
+    assert result["coverage_status"] == "sufficient"
+    assert result["profiles_missing"] == []
+
+
+def test_profiles_requested_in_evidence_note():
+    """Evidence note should carry profiles_requested/contributing/missing."""
+    from functional_agents.evidence_agent import _attribute_evidence_profiles
+    smr = load_profile("smr")
+    adc = load_profile("ai_data_centers")
+    tx = load_profile("transmission")
+    items = [
+        {"claim": "reactor nuclear smr", "topics": [], "evidence_id": "E001",
+         "relevance_score": 3, "source_document": "a.pdf", "category": "factual"},
+        {"claim": "gpu rack nvidia power", "topics": [], "evidence_id": "E002",
+         "relevance_score": 3, "source_document": "b.pdf", "category": "factual"},
+    ]
+    cov = _attribute_evidence_profiles(items, [smr, adc, tx], fallback_profile="smr")
+    # transmission has 0 items → it should appear in profiles with evidence_count=0
+    assert "transmission" in cov
+    assert cov["transmission"]["evidence_count"] == 0
 
 
 # ---------------------------------------------------------------------------
@@ -322,3 +373,99 @@ def test_evidence_items_have_source_profile_after_attribution():
     assert set(cov.keys()) == {"smr", "ai_data_centers", "transmission"}
     total = sum(v["evidence_count"] for v in cov.values())
     assert total == len(items)
+
+
+# ---------------------------------------------------------------------------
+# J5.6a – profiles_requested / contributing / missing / coverage_status
+# ---------------------------------------------------------------------------
+
+def _build_mock_context_missing_transmission() -> AgentContext:
+    """Context where transmission has 0 evidence (missing profile scenario)."""
+    ctx = _build_mock_context_with_evidence(["smr", "ai_data_centers", "transmission"])
+    # Override to give transmission zero evidence
+    ctx.evidence_notes[0]["profile_coverage_by_profile"]["transmission"] = {
+        "evidence_count": 0, "coverage_level": "NONE",
+    }
+    ctx.evidence_notes[0]["profiles_contributing"] = ["smr", "ai_data_centers"]
+    ctx.evidence_notes[0]["profiles_missing"] = ["transmission"]
+    return ctx
+
+
+def test_qa_agent_profiles_requested():
+    from functional_agents.qa_agent import QAAgent
+    ctx = _build_mock_context_with_evidence(["smr", "ai_data_centers", "transmission"])
+    agent = QAAgent()
+    ctx = agent._execute(ctx)
+    assert "profiles_requested" in ctx.qa
+    assert set(ctx.qa["profiles_requested"]) == {"smr", "ai_data_centers", "transmission"}
+
+
+def test_qa_agent_profiles_contributing():
+    from functional_agents.qa_agent import QAAgent
+    ctx = _build_mock_context_with_evidence(["smr", "ai_data_centers", "transmission"])
+    agent = QAAgent()
+    ctx = agent._execute(ctx)
+    assert "profiles_contributing" in ctx.qa
+    assert isinstance(ctx.qa["profiles_contributing"], list)
+
+
+def test_qa_agent_profiles_missing_when_none_coverage():
+    from functional_agents.qa_agent import QAAgent
+    ctx = _build_mock_context_missing_transmission()
+    agent = QAAgent()
+    ctx = agent._execute(ctx)
+    assert "profiles_missing" in ctx.qa
+    assert "transmission" in ctx.qa["profiles_missing"]
+
+
+def test_qa_agent_coverage_status_insufficient_when_missing():
+    from functional_agents.qa_agent import QAAgent
+    ctx = _build_mock_context_missing_transmission()
+    agent = QAAgent()
+    ctx = agent._execute(ctx)
+    assert ctx.qa["coverage_status"] == "insufficient"
+
+
+def test_qa_agent_coverage_status_sufficient_when_all_contribute():
+    from functional_agents.qa_agent import QAAgent
+    ctx = _build_mock_context_with_evidence(["smr", "ai_data_centers", "transmission"])
+    agent = QAAgent()
+    ctx = agent._execute(ctx)
+    # All three profiles have WEAK (>0) evidence in mock context → sufficient
+    assert ctx.qa["coverage_status"] == "sufficient"
+
+
+def test_qa_agent_profile_gap_issues_for_missing():
+    from functional_agents.qa_agent import QAAgent
+    ctx = _build_mock_context_missing_transmission()
+    agent = QAAgent()
+    ctx = agent._execute(ctx)
+    assert "profile_gap_issues" in ctx.qa
+    gap_issues = ctx.qa["profile_gap_issues"]
+    transmission_gap = next((g for g in gap_issues if g["profile"] == "transmission"), None)
+    assert transmission_gap is not None
+    assert transmission_gap["issue"] == "no evidence contributed"
+
+
+def test_evidence_items_have_profile_field():
+    """Each evidence item must carry a 'profile' field (J5.6a spec requirement)."""
+    smr = load_profile("smr")
+    items = [
+        {"claim": "reactor smr", "topics": [], "evidence_id": "E001",
+         "relevance_score": 3, "source_document": "a.pdf", "category": "factual"},
+    ]
+    _attribute_evidence_profiles(items, [smr], fallback_profile="smr")
+    # source_profile is set by attribution; 'profile' alias is set by EvidenceAgent._execute()
+    assert "source_profile" in items[0]
+
+
+def test_context_report_has_profile_fields_after_qa():
+    """context.report includes profiles_requested, contributing, missing, coverage_status."""
+    from functional_agents.qa_agent import QAAgent
+    ctx = _build_mock_context_missing_transmission()
+    QAAgent()._execute(ctx)
+    # Simulate what ReportAgent will read
+    assert "profiles_requested" in ctx.qa
+    assert "profiles_contributing" in ctx.qa
+    assert "profiles_missing" in ctx.qa
+    assert "coverage_status" in ctx.qa

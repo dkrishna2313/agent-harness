@@ -146,16 +146,25 @@ def _assess_confidence(
 def _check_profile_coverage(
     evidence_note: dict,
     profiles: list[str],
-) -> tuple[dict[str, str], list[dict]]:
-    """Compute per-profile coverage levels and surface any profile-level issues.
+) -> dict:
+    """Compute per-profile coverage and surface profile-level gaps (J5.6 / J5.6a).
 
-    Returns (profile_coverage, profile_issues) where:
-      profile_coverage  – {profile_name: "strong"|"moderate"|"weak"|"none"}
-      profile_issues    – list of issue dicts for weak/missing profiles
+    Returns a dict with keys:
+      profile_coverage     – {name: "strong"|"moderate"|"weak"|"none"}  (flat, for routing)
+      profile_issues       – detailed issue dicts (existing format)
+      profile_gap_issues   – simplified gap dicts: [{profile, issue}]  (spec format)
+      profiles_contributing – names with ≥1 attributed evidence item
+      profiles_missing      – names with 0 attributed evidence items
+      coverage_status       – "sufficient" | "insufficient"
     """
     raw: dict = evidence_note.get("profile_coverage_by_profile", {})
+    # Prefer pre-computed lists from EvidenceAgent; fall back to deriving them
+    contributing_pre: list = evidence_note.get("profiles_contributing", [])
+    missing_pre: list = evidence_note.get("profiles_missing", [])
+
     coverage: dict[str, str] = {}
     issues: list[dict] = []
+    gap_issues: list[dict] = []
 
     for pname in profiles:
         entry = raw.get(pname, {})
@@ -163,6 +172,7 @@ def _check_profile_coverage(
         level = level_raw.lower()
         coverage[pname] = level
         if level == "none":
+            count = entry.get("evidence_count", 0)
             issues.append({
                 "type": "profile_coverage",
                 "profile": pname,
@@ -170,6 +180,7 @@ def _check_profile_coverage(
                 "severity": "HIGH",
                 "message": f"Profile '{pname}' has no attributed evidence",
             })
+            gap_issues.append({"profile": pname, "issue": "no evidence contributed"})
         elif level == "weak":
             count = entry.get("evidence_count", 0)
             issues.append({
@@ -179,8 +190,26 @@ def _check_profile_coverage(
                 "severity": "MEDIUM",
                 "message": f"Profile '{pname}' has weak evidence coverage ({count} item(s))",
             })
+            gap_issues.append({"profile": pname, "issue": f"weak coverage ({count} item(s))"})
 
-    return coverage, issues
+    # Use pre-computed lists when available; otherwise derive from coverage dict
+    if contributing_pre or missing_pre:
+        profiles_contributing = contributing_pre
+        profiles_missing = missing_pre
+    else:
+        profiles_contributing = [p for p in profiles if coverage.get(p, "none") != "none"]
+        profiles_missing = [p for p in profiles if coverage.get(p, "none") == "none"]
+
+    coverage_status = "insufficient" if profiles_missing else "sufficient"
+
+    return {
+        "profile_coverage": coverage,
+        "profile_issues": issues,
+        "profile_gap_issues": gap_issues,
+        "profiles_contributing": profiles_contributing,
+        "profiles_missing": profiles_missing,
+        "coverage_status": coverage_status,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -270,10 +299,14 @@ class QAAgent(FunctionalAgent):
             if coverage_by_subquestion.get(sq, {}).get("coverage", "NONE") != "NONE"
         )
 
-        # --- per-profile coverage (J5.6) ---
-        profile_coverage, profile_issues = _check_profile_coverage(
-            evidence_note, context.profiles
-        )
+        # --- per-profile coverage (J5.6 / J5.6a) ---
+        pc_result = _check_profile_coverage(evidence_note, context.profiles)
+        profile_coverage     = pc_result["profile_coverage"]
+        profile_issues       = pc_result["profile_issues"]
+        profile_gap_issues   = pc_result["profile_gap_issues"]
+        profiles_contributing = pc_result["profiles_contributing"]
+        profiles_missing      = pc_result["profiles_missing"]
+        coverage_status       = pc_result["coverage_status"]
 
         total_issues = (
             len(coverage_issues) + len(evidence_issues)
@@ -298,6 +331,11 @@ class QAAgent(FunctionalAgent):
             "evidence_issues": evidence_issues,
             "contradiction_issues": contradiction_issues,
             "profile_coverage": profile_coverage,
+            "profile_gap_issues": profile_gap_issues,
+            "profiles_requested": list(context.profiles),
+            "profiles_contributing": profiles_contributing,
+            "profiles_missing": profiles_missing,
+            "coverage_status": coverage_status,
             "confidence_assessment": confidence,
             "qa_summary": qa_summary,
         }
