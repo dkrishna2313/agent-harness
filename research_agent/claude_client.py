@@ -26,7 +26,10 @@ from .schemas import (
 )
 
 DEFAULT_MODEL = "claude-sonnet-4-6"
-DEFAULT_EXTRACTION_MODEL = "claude-haiku-4-5-20251001"
+# Haiku is available as an opt-in via ANTHROPIC_EXTRACTION_MODEL env var, but
+# defaults to Sonnet — Haiku extracts significantly fewer items per question
+# which degrades citation coverage in the synthesized memo.
+DEFAULT_EXTRACTION_MODEL = DEFAULT_MODEL
 
 
 class EvidenceExtractionPayload(BaseModel):
