@@ -83,6 +83,27 @@ def _build_executive_summary(
     return "\n\n".join([p1, p2, p3, p4])
 
 
+def _format_citations(
+    ids: list[str],
+    id_to_source: dict[str, str],
+    *,
+    max_citations: int = 3,
+) -> str:
+    """Build benchmark-compatible citation markers for a list of evidence IDs.
+
+    Format matches the scorer regex: [Source: <name>, Evidence: E001]
+    Only IDs that have a known source document are emitted.
+    """
+    markers: list[str] = []
+    for eid in ids:
+        if len(markers) >= max_citations:
+            break
+        source = id_to_source.get(eid, "").strip()
+        if source and eid:
+            markers.append(f"[Source: {source}, Evidence: {eid}]")
+    return " ".join(markers)
+
+
 def _build_key_findings(
     evidence_note: dict[str, Any],
     plan: dict[str, Any],
@@ -90,25 +111,35 @@ def _build_key_findings(
     """Derive evidence-backed findings from subquestion coverage.
 
     Finding text is taken verbatim from the highest-relevance evidence claim
-    for each covered subquestion — no reformulation, no synthesis (J5.4 fix).
+    for each covered subquestion, with benchmark-compatible citation markers
+    appended (J5.4 citation-preservation fix).
+
     Returns (findings, grounding_counts) where grounding_counts has keys
-    'supported_findings' and 'unsupported_findings'.
+    'supported_findings', 'unsupported_findings', and 'citation_count'.
     """
     subquestions: list[str] = plan.get("subquestions", [])
     coverage_by_sq: dict = evidence_note.get("coverage_by_subquestion", {})
     evidence_by_sq: dict = evidence_note.get("evidence_by_subquestion", {})
     evidence_items: list[dict] = evidence_note.get("evidence_items", [])
 
-    # Build lookup from evidence_id to verbatim claim text
-    id_to_claim: dict[str, str] = {
-        e["evidence_id"]: e.get("claim", "").strip()
-        for e in evidence_items
-        if e.get("evidence_id") and e.get("claim", "").strip()
-    }
+    # Build lookups keyed by evidence_id
+    id_to_claim: dict[str, str] = {}
+    id_to_source: dict[str, str] = {}
+    for e in evidence_items:
+        eid = e.get("evidence_id", "")
+        if not eid:
+            continue
+        claim = e.get("claim", "").strip()
+        if claim:
+            id_to_claim[eid] = claim
+        source = e.get("source_document", "").strip()
+        if source:
+            id_to_source[eid] = source
 
     findings: list[dict[str, Any]] = []
     supported = 0
     unsupported = 0
+    total_citations = 0
 
     for sq in subquestions:
         cov = coverage_by_sq.get(sq, {})
@@ -128,9 +159,14 @@ def _build_key_findings(
             unsupported += 1
             continue
 
+        # Append citation markers to the finding text (benchmark format)
+        cite_str = _format_citations(ids, id_to_source)
+        finding_text = f"{claim_text} {cite_str}".strip() if cite_str else claim_text
+        total_citations += cite_str.count("[Source:")
+
         confidence = "HIGH" if level == "STRONG" else "MEDIUM"
         findings.append({
-            "finding": claim_text,          # verbatim evidence claim
+            "finding": finding_text,
             "evidence_count": len(ids),
             "confidence": confidence,
             "supporting_evidence_ids": ids[:10],
@@ -138,7 +174,11 @@ def _build_key_findings(
         })
         supported += 1
 
-    grounding = {"supported_findings": supported, "unsupported_findings": unsupported}
+    grounding = {
+        "supported_findings": supported,
+        "unsupported_findings": unsupported,
+        "citation_count": total_citations,
+    }
     return findings, grounding
 
 
@@ -369,6 +409,7 @@ class ReportAgent(FunctionalAgent):
             "open_question_count": len(open_questions),
             "report_confidence": report_conf,
             "report_grounding_score": grounding,
+            "citation_count": grounding.get("citation_count", 0),
         }
 
         # ------------------------------------------------------------------
