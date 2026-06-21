@@ -1,0 +1,199 @@
+name: transmission
+description: Electric grid transmission infrastructure and interconnection research
+
+topic_keywords:
+  transmission_lines:
+    - transmission line
+    - high voltage
+    - hvdc
+    - hvac
+    - overhead line
+    - underground cable
+    - right of way
+    - corridor
+    - power line
+    - kv
+    - 345kv
+    - 500kv
+    - 765kv
+  interconnection:
+    - interconnection
+    - grid connection
+    - interconnect
+    - generation interconnection
+    - queue
+    - interconnection queue
+    - generator interconnect
+    - grid connection agreement
+    - interconnection study
+  grid_infrastructure:
+    - substation
+    - transformer
+    - switchgear
+    - breaker
+    - capacitor bank
+    - voltage regulator
+    - static var
+    - facts
+    - series capacitor
+  congestion:
+    - congestion
+    - bottleneck
+    - curtailment
+    - constraint
+    - overload
+    - n-1
+    - transmission constraint
+    - path rating
+    - thermal limit
+    - loading
+  grid_operators:
+    - iso
+    - rto
+    - pjm
+    - miso
+    - caiso
+    - ercot
+    - spp
+    - nyiso
+    - neiso
+    - ferc
+    - nerc
+    - balancing authority
+    - system operator
+  permitting:
+    - permitting
+    - siting
+    - eminent domain
+    - easement
+    - environmental review
+    - nepa
+    - eis
+    - permit
+    - right of way
+    - approval
+  capacity:
+    - transmission capacity
+    - available transfer capability
+    - atc
+    - tcc
+    - flowgate
+    - firm transmission
+    - non-firm
+    - transfer capability
+  costs:
+    - transmission cost
+    - network upgrade
+    - facility upgrade
+    - cost allocation
+    - participant funding
+    - regional cost
+    - socialized cost
+    - ratepayer
+
+domain_terms:
+  - transmission
+  - substation
+  - grid
+  - interconnection
+  - congestion
+  - hvdc
+  - hvac
+  - ferc
+  - nerc
+  - iso
+  - rto
+  - curtailment
+  - capacity
+  - voltage
+  - transformer
+  - utility
+
+specificity_terms:
+  - hvdc
+  - hvac
+  - kv
+  - mva
+  - mw
+  - gw
+  - atc
+  - pjm
+  - miso
+  - caiso
+  - ercot
+  - ferc
+  - nerc
+  - n-1
+  - n-2
+  - mw-mile
+
+memo_section_hints:
+  - Transmission Infrastructure Implications
+  - Interconnection Implications
+  - Grid Congestion Implications
+  - Permitting and Siting Implications
+  - Cost Allocation Implications
+  - Research Gaps
+  - Coverage Matrix
+
+evaluator_topic_terms:
+  "transmission infrastructure": [transmission, line, substation, transformer, hvdc, hvac, voltage, corridor]
+  interconnection: [interconnection, queue, interconnect, "grid connection", generator]
+  congestion: [congestion, bottleneck, curtailment, constraint, overload, "thermal limit"]
+  "grid operators": [iso, rto, pjm, miso, caiso, ercot, ferc, nerc, "balancing authority"]
+  permitting: [permit, siting, easement, "eminent domain", nepa, "environmental review"]
+  costs: [cost, "network upgrade", "facility upgrade", "cost allocation", ratepayer]
+
+topic_section_checks: {}
+
+coverage_gap_keywords:
+  "transmission infrastructure": [hvdc, "high voltage", "right of way", overhead, underground]
+  interconnection: ["interconnection queue", "generator interconnect", "grid connection"]
+  congestion: ["transmission constraint", curtailment, "path rating", "thermal limit"]
+  permitting: [permitting, siting, "eminent domain", easement]
+  costs: ["network upgrade cost", "cost allocation", "participant funding"]
+
+perspectives:
+  infrastructure: [transmission, substation, hvdc, hvac, transformer, switchgear, overhead, underground, corridor, kv, voltage, conductor, line]
+  interconnection: [interconnection, "grid connection", queue, interconnect, generator, "generation interconnection", "grid access"]
+  economics: [cost, upgrade, "network upgrade", ratepayer, allocation, million, billion, capex, tariff, rate]
+  regulation: [ferc, nerc, nepa, permit, approval, rto, iso, order, rule, filing, compliance, tariff, standard]
+  operations: [congestion, constraint, curtailment, overload, thermal, loading, outage, maintenance, reliability, n-1, contingency]
+  planning: [plan, study, assessment, expansion, project, upgrade, build, investment, "long-range", IRP]
+
+domain_signals:
+  - transmission
+  - substation
+  - interconnection
+  - hvdc
+  - ferc
+  - pjm
+  - miso
+  - caiso
+  - ercot
+  - "grid congestion"
+  - "transmission constraint"
+  - "network upgrade"
+  - "right of way"
+
+entity_patterns:
+  - name: "PJM"
+    signals: [PJM, pjm]
+  - name: "MISO"
+    signals: [MISO, miso]
+  - name: "CAISO"
+    signals: [CAISO, caiso]
+  - name: "ERCOT"
+    signals: [ERCOT, ercot]
+  - name: "FERC"
+    signals: [FERC, ferc]
+  - name: "NERC"
+    signals: [NERC, nerc]
+
+metric_patterns: {}
+research_gap_checks: {}
+source_quality_hints: {}
+topic_categories: {}
+contradiction_topics: {}
+web_search:
+  enabled: false

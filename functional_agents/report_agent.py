@@ -369,6 +369,12 @@ class ReportAgent(FunctionalAgent):
         )
         trace_payload["functional_agents"] = context.to_functional_trace()
 
+        # Multi-profile block (J5.6)
+        trace_payload["profiles"] = context.profiles
+        trace_payload["profile_count"] = len(context.profiles)
+        if qa.get("profile_coverage"):
+            trace_payload["profile_coverage"] = qa.get("profile_coverage")
+
         # Planner block (J5.1.7)
         if plan:
             trace_payload["planner"] = {
@@ -472,6 +478,12 @@ class ReportAgent(FunctionalAgent):
                 "report_confidence": report_conf,
                 "report_grounding_score": grounding,
             }
+
+            # J5.6 – inject profile metadata
+            ro["profiles"] = context.profiles
+            ro["profile_count"] = len(context.profiles)
+            if qa.get("profile_coverage"):
+                ro["profile_coverage"] = qa.get("profile_coverage")
 
             ro_path = write_research_object(ro, out_dir=output_path.parent)
             trace_payload["research_object"] = research_object_trace_stub(ro, ro_path)

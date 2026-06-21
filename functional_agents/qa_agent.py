@@ -140,6 +140,50 @@ def _assess_confidence(
 
 
 # ---------------------------------------------------------------------------
+# Per-profile coverage (J5.6)
+# ---------------------------------------------------------------------------
+
+def _check_profile_coverage(
+    evidence_note: dict,
+    profiles: list[str],
+) -> tuple[dict[str, str], list[dict]]:
+    """Compute per-profile coverage levels and surface any profile-level issues.
+
+    Returns (profile_coverage, profile_issues) where:
+      profile_coverage  – {profile_name: "strong"|"moderate"|"weak"|"none"}
+      profile_issues    – list of issue dicts for weak/missing profiles
+    """
+    raw: dict = evidence_note.get("profile_coverage_by_profile", {})
+    coverage: dict[str, str] = {}
+    issues: list[dict] = []
+
+    for pname in profiles:
+        entry = raw.get(pname, {})
+        level_raw = entry.get("coverage_level", "NONE")
+        level = level_raw.lower()
+        coverage[pname] = level
+        if level == "none":
+            issues.append({
+                "type": "profile_coverage",
+                "profile": pname,
+                "coverage_level": "NONE",
+                "severity": "HIGH",
+                "message": f"Profile '{pname}' has no attributed evidence",
+            })
+        elif level == "weak":
+            count = entry.get("evidence_count", 0)
+            issues.append({
+                "type": "profile_coverage",
+                "profile": pname,
+                "coverage_level": "WEAK",
+                "severity": "MEDIUM",
+                "message": f"Profile '{pname}' has weak evidence coverage ({count} item(s))",
+            })
+
+    return coverage, issues
+
+
+# ---------------------------------------------------------------------------
 # Next-action decision (J5.5.4)
 # ---------------------------------------------------------------------------
 
@@ -225,7 +269,16 @@ class QAAgent(FunctionalAgent):
             1 for sq in subquestions
             if coverage_by_subquestion.get(sq, {}).get("coverage", "NONE") != "NONE"
         )
-        total_issues = len(coverage_issues) + len(evidence_issues) + len(contradiction_issues)
+
+        # --- per-profile coverage (J5.6) ---
+        profile_coverage, profile_issues = _check_profile_coverage(
+            evidence_note, context.profiles
+        )
+
+        total_issues = (
+            len(coverage_issues) + len(evidence_issues)
+            + len(contradiction_issues) + len(profile_issues)
+        )
 
         qa_summary = {
             "subquestions_total": len(subquestions),
@@ -234,7 +287,9 @@ class QAAgent(FunctionalAgent):
             "coverage_issues": len(coverage_issues),
             "evidence_issues": len(evidence_issues),
             "contradiction_issues": len(contradiction_issues),
+            "profile_issues": len(profile_issues),
             "issues_found": total_issues,
+            "profiles_evaluated": len(context.profiles),
         }
 
         # --- write context.qa (J5.3.1) ---
@@ -242,6 +297,7 @@ class QAAgent(FunctionalAgent):
             "coverage_issues": coverage_issues,
             "evidence_issues": evidence_issues,
             "contradiction_issues": contradiction_issues,
+            "profile_coverage": profile_coverage,
             "confidence_assessment": confidence,
             "qa_summary": qa_summary,
         }
@@ -260,13 +316,14 @@ class QAAgent(FunctionalAgent):
 
         LOGGER.log(
             PROGRESS,
-            "[QAAgent] confidence=%s  issues=%d (coverage=%d evidence=%d contradictions=%d)"
-            "  next_action=%s",
+            "[QAAgent] confidence=%s  issues=%d (coverage=%d evidence=%d "
+            "contradictions=%d profile=%d)  next_action=%s",
             confidence["overall_confidence"],
             total_issues,
             len(coverage_issues),
             len(evidence_issues),
             len(contradiction_issues),
+            len(profile_issues),
             next_action,
         )
 

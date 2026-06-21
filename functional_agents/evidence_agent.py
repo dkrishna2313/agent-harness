@@ -165,6 +165,71 @@ def _build_evidence_summary(
     }
 
 
+def _build_profile_term_sets(domain_profiles: list[Any]) -> dict[str, set[str]]:
+    """Build a keyword set per profile for attribution scoring (J5.6)."""
+    result: dict[str, set[str]] = {}
+    for p in domain_profiles:
+        terms: set[str] = set()
+        for t in (getattr(p, "domain_terms", None) or []):
+            terms.add(t.lower())
+        for kw_list in getattr(p, "topic_keywords", {}).values():
+            for kw in kw_list:
+                terms.add(kw.lower())
+        result[p.name] = terms
+    return result
+
+
+def _attribute_evidence_profiles(
+    items: list[dict],
+    domain_profiles: list[Any],
+    fallback_profile: str,
+) -> dict[str, dict]:
+    """Assign source_profile to each item dict and return per-profile coverage.
+
+    Attribution uses keyword overlap between each item's claim + topics text
+    and each profile's domain_terms + topic_keywords.  Single-profile runs
+    assign all items without scoring.
+
+    Mutates *items* in-place; returns profile_coverage_by_profile dict.
+    """
+    if not domain_profiles:
+        for item in items:
+            item["source_profile"] = fallback_profile
+        return {}
+
+    if len(domain_profiles) == 1:
+        name = domain_profiles[0].name
+        for item in items:
+            item["source_profile"] = name
+        count = len(items)
+        level = "STRONG" if count >= 10 else "MODERATE" if count >= 3 else "WEAK" if count else "NONE"
+        return {name: {"evidence_count": count, "coverage_level": level}}
+
+    term_sets = _build_profile_term_sets(domain_profiles)
+    profile_names = [p.name for p in domain_profiles]
+
+    for item in items:
+        text = " ".join([
+            item.get("claim", ""),
+            " ".join(item.get("topics", [])),
+        ]).lower()
+        scores = {
+            pname: sum(1 for t in terms if t in text)
+            for pname, terms in term_sets.items()
+        }
+        best_score = max(scores.values())
+        best = max(scores, key=lambda k: scores[k]) if best_score > 0 else fallback_profile
+        item["source_profile"] = best
+
+    coverage: dict[str, dict] = {}
+    for pname in profile_names:
+        attributed = sum(1 for e in items if e.get("source_profile") == pname)
+        level = "STRONG" if attributed >= 10 else "MODERATE" if attributed >= 3 else "WEAK" if attributed else "NONE"
+        coverage[pname] = {"evidence_count": attributed, "coverage_level": level}
+
+    return coverage
+
+
 class EvidenceAgent(FunctionalAgent):
     """Runs the research engine and organizes evidence around the research plan (J5.2).
 
@@ -185,12 +250,18 @@ class EvidenceAgent(FunctionalAgent):
         top_evidence: int = 50,
         top_chunks: int = 20,
         domain_profile: Any = None,
+        domain_profiles: list[Any] | None = None,
     ) -> None:
         self._sources_dir = Path(sources_dir)
         self._client = client
         self._top_evidence = top_evidence
         self._top_chunks = top_chunks
         self._domain_profile = domain_profile
+        # Prefer explicit list; fall back to singleton when provided
+        self._domain_profiles: list[Any] = (
+            domain_profiles if domain_profiles is not None
+            else ([domain_profile] if domain_profile is not None else [])
+        )
 
     def _execute(self, context: AgentContext) -> AgentContext:
         from research_agent.log import PROGRESS
@@ -250,24 +321,38 @@ class EvidenceAgent(FunctionalAgent):
             len(investigation_areas),
         )
 
-        # --- 5. Write structured evidence context ---
+        # --- 5. Serialize evidence items and attribute to profiles (J5.6) ---
+        items_dicts = [
+            {
+                "evidence_id": getattr(e, "evidence_id", ""),
+                "claim": getattr(e, "claim", ""),
+                "category": getattr(e, "category", ""),
+                "topics": getattr(e, "topics", []),
+                "relevance_score": getattr(e, "relevance_score", 0),
+                "source_document": getattr(e, "source_document", ""),
+            }
+            for e in evidence_items
+        ]
+        profile_coverage_by_profile = _attribute_evidence_profiles(
+            items_dicts,
+            self._domain_profiles,
+            fallback_profile=context.execution_profile,
+        )
+        if len(self._domain_profiles) > 1:
+            LOGGER.log(
+                PROGRESS,
+                "[EvidenceAgent] profile attribution: %s",
+                {k: v["evidence_count"] for k, v in profile_coverage_by_profile.items()},
+            )
+
         context.evidence_notes = [
             {
-                "evidence_items": [
-                    {
-                        "evidence_id": getattr(e, "evidence_id", ""),
-                        "claim": getattr(e, "claim", ""),
-                        "category": getattr(e, "category", ""),
-                        "topics": getattr(e, "topics", []),
-                        "relevance_score": getattr(e, "relevance_score", 0),
-                        "source_document": getattr(e, "source_document", ""),
-                    }
-                    for e in evidence_items
-                ],
+                "evidence_items": items_dicts,
                 "evidence_by_subquestion": evidence_by_subquestion,
                 "evidence_by_area": evidence_by_area,
                 "coverage_by_subquestion": coverage_by_subquestion,
                 "evidence_summary": evidence_summary,
+                "profile_coverage_by_profile": profile_coverage_by_profile,
             }
         ]
 

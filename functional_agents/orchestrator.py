@@ -251,6 +251,7 @@ class Orchestrator:
                 top_evidence=self._top_evidence,
                 top_chunks=self._top_chunks,
                 domain_profile=self._domain_profile,
+                domain_profiles=loaded_profiles,
             )
 
         def qa_factory() -> QAAgent:
