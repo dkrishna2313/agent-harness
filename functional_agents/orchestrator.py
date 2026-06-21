@@ -2,96 +2,43 @@
 
 Public API
 ----------
-WorkflowState   – canonical state names used in context and traces
-AgentResult     – returned by AgentOrchestrator per agent step
+WorkflowState     – canonical state names (re-exported from context)
+NextAction        – agent routing tokens (re-exported from context)
+AgentResult       – standardised agent return type (re-exported from context)
 AgentOrchestrator – state-machine orchestrator; replaces the fixed loop
-Orchestrator    – thin compatibility wrapper (used by CLI)
+Orchestrator      – thin compatibility wrapper (used by CLI)
 """
 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+import uuid
 from pathlib import Path
 from typing import Any
 
 from research_agent.profile import DomainProfile, load_profile
 from research_agent.research_object import create_research_object
 
-from .context import AgentContext, ContextValidationError
+from .context import (
+    AgentContext,
+    AgentResult,
+    ContextValidationError,
+    NextAction,
+    WorkflowState,
+)
 
 LOGGER = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Workflow state constants (J5.5.3)
-# ---------------------------------------------------------------------------
-
-class WorkflowState:
-    PLANNING  = "PLANNING"
-    EVIDENCE  = "EVIDENCE"
-    QA        = "QA"
-    REPORT    = "REPORT"
-    COMPLETE  = "COMPLETE"
-    ERROR     = "ERROR"
-
-
-# Next-action tokens agents may write into their agent_history entry (J5.5.2)
-class NextAction:
-    CONTINUE          = "CONTINUE"
-    REQUEST_EVIDENCE  = "REQUEST_EVIDENCE"
-    REQUEST_REPLAN    = "REQUEST_REPLAN"
-    REQUEST_QA        = "REQUEST_QA"
-    COMPLETE          = "COMPLETE"
-    ERROR             = "ERROR"
-
-
-# ---------------------------------------------------------------------------
-# AgentResult (J5.5.2)
-# ---------------------------------------------------------------------------
-
-@dataclass
-class AgentResult:
-    """Outcome of a single agent step, read by AgentOrchestrator."""
-
-    status: str           # "success" | "warning" | "error"
-    next_action: str      # NextAction constant
-    summary: str
-    context: AgentContext
 
 
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _last_next_action(ctx: AgentContext) -> str:
-    """Read the next_action from the most recent agent_history entry."""
-    if not ctx.agent_history:
-        return NextAction.CONTINUE
-    return ctx.agent_history[-1].get("next_action", NextAction.CONTINUE)
-
-
-def _last_status(ctx: AgentContext) -> str:
-    if not ctx.agent_history:
-        return "success"
-    return ctx.agent_history[-1].get("status", "success")
-
-
-def _last_summary(ctx: AgentContext) -> str:
-    if not ctx.agent_history:
-        return ""
-    return ctx.agent_history[-1].get("summary", "")
-
-
 def _step(agent: Any, ctx: AgentContext) -> AgentResult:
-    """Run one agent and wrap its outcome as an AgentResult."""
-    ctx = agent.run(ctx)
-    ctx.workflow_path.append(agent.name)
-    return AgentResult(
-        status=_last_status(ctx),
-        next_action=_last_next_action(ctx),
-        summary=_last_summary(ctx),
-        context=ctx,
-    )
+    """Run one agent (returns AgentResult) and append its name to workflow_path."""
+    result = agent.run(ctx)
+    result.context.workflow_path.append(agent.name)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -324,6 +271,7 @@ class Orchestrator:
             profiles=self._profile_names,
             execution_profile=execution_profile,
             research_object=research_object,
+            run_id=uuid.uuid4().hex[:12],
         )
         try:
             ctx.validate()

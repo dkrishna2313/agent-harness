@@ -157,7 +157,7 @@ def _decide_next_action(
                        more evidence retrieval may fill the gaps.
     CONTINUE        — confidence is MEDIUM or HIGH, or iteration limit exceeded.
     """
-    from .orchestrator import NextAction
+    from .context import NextAction
 
     if overall_confidence != "LOW":
         return NextAction.CONTINUE

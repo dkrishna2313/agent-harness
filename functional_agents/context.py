@@ -15,6 +15,28 @@ class ContextValidationError(ValueError):
     """Raised when AgentContext fails pre-flight validation."""
 
 
+# ---------------------------------------------------------------------------
+# Workflow constants (J5.5 / J5.5a) – defined here to avoid circular imports
+# ---------------------------------------------------------------------------
+
+class WorkflowState:
+    PLANNING  = "PLANNING"
+    EVIDENCE  = "EVIDENCE"
+    QA        = "QA"
+    REPORT    = "REPORT"
+    COMPLETE  = "COMPLETE"
+    ERROR     = "ERROR"
+
+
+class NextAction:
+    CONTINUE          = "CONTINUE"
+    REQUEST_EVIDENCE  = "REQUEST_EVIDENCE"
+    REQUEST_REPLAN    = "REQUEST_REPLAN"
+    REQUEST_QA        = "REQUEST_QA"
+    COMPLETE          = "COMPLETE"
+    ERROR             = "ERROR"
+
+
 @dataclass
 class AgentContext:
     """Mutable shared state threaded through each functional agent (J5.0b.1).
@@ -43,6 +65,7 @@ class AgentContext:
     question: str
     profiles: list[str] = field(default_factory=list)
     execution_profile: str = ""
+    run_id: str = ""
 
     # Shared durable state
     research_object: dict[str, Any] = field(default_factory=dict)
@@ -102,3 +125,31 @@ class AgentContext:
             "profiles": self.profiles,
             "execution_profile": self.execution_profile,
         }
+
+
+# ---------------------------------------------------------------------------
+# AgentResult (J5.5a) – standardised return value for every agent's run()
+# ---------------------------------------------------------------------------
+
+@dataclass
+class AgentResult:
+    """Standardised outcome of a single agent's run() call (J5.5a).
+
+    Fields
+    ------
+    status      : "success" | "warning" | "error"
+    next_action : NextAction constant (read by orchestrator for routing)
+    summary     : one-line human-readable outcome
+    context     : the updated AgentContext (orchestrator passes it to next agent)
+    outputs     : agent-specific structured output data
+    metrics     : execution metrics — always includes duration_seconds
+    trace       : per-agent trace block: {agent, run_id, duration_seconds, status}
+    """
+
+    status: str
+    next_action: str
+    summary: str
+    context: "AgentContext"
+    outputs: dict[str, Any] = field(default_factory=dict)
+    metrics: dict[str, Any] = field(default_factory=dict)
+    trace: dict[str, Any] = field(default_factory=dict)
