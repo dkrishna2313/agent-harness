@@ -6,6 +6,7 @@ outputs/*.md
 outputs/*.trace.json
 !outputs/.gitkeep
 .env
-.env
+.cache/web/
+.cache/extraction/
 profile_editor/frontend/node_modules/
 profile_editor/frontend/dist/

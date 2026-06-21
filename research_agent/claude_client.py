@@ -26,6 +26,7 @@ from .schemas import (
 )
 
 DEFAULT_MODEL = "claude-sonnet-4-6"
+DEFAULT_EXTRACTION_MODEL = "claude-haiku-4-5-20251001"
 
 
 class EvidenceExtractionPayload(BaseModel):
@@ -149,14 +150,33 @@ class ClaudeClient:
         self,
         *,
         model: str | None = None,
+        extraction_model: str | None = None,
         api_key: str | None = None,
         max_tokens: int = 4000,
         anthropic_client: Any | None = None,
+        use_extraction_cache: bool = False,
     ) -> None:
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
         self.model = model or os.getenv("ANTHROPIC_MODEL") or DEFAULT_MODEL
+        # Extraction uses a fast cheap model by default; override with env var or arg.
+        self.extraction_model = (
+            extraction_model
+            or os.getenv("ANTHROPIC_EXTRACTION_MODEL")
+            or DEFAULT_EXTRACTION_MODEL
+        )
         self.max_tokens = max_tokens
         self.call_traces: list[ClaudeCallTrace] = []
+
+        from .extraction_cache import ExtractionCache
+        self._extraction_cache: ExtractionCache | None = (
+            ExtractionCache() if use_extraction_cache else None
+        )
+        LOGGER.debug(
+            "ClaudeClient: synthesis_model=%s  extraction_model=%s  cache=%s",
+            self.model,
+            self.extraction_model,
+            "enabled" if self._extraction_cache else "disabled",
+        )
 
         if anthropic_client is not None:
             self._client = anthropic_client
@@ -245,12 +265,23 @@ class ClaudeClient:
         question: str,
         chunks: Sequence[Chunk],
     ) -> list[EvidenceItem]:
+        chunk_list = list(chunks)
+
+        # Cache read — skip LLM call on a hit
+        if self._extraction_cache is not None:
+            cached = self._extraction_cache.get(question, chunk_list)
+            if cached is not None:
+                from research_agent.log import PROGRESS
+                LOGGER.log(PROGRESS, "[extraction_cache] hit  chunks=%d  items=%d", len(chunk_list), len(cached))
+                return cached
+
         payload = self._call_json(
             operation="extract_evidence",
             schema_name="evidence_extraction",
-            prompt=_evidence_chunk_prompt(question, chunks),
+            prompt=_evidence_chunk_prompt(question, chunk_list),
             max_tokens=max(self.max_tokens, 16_000),
             response_schema_name="evidence_extraction_raw",
+            model_override=self.extraction_model,
         )
         raw_items = payload.get("evidence_items", [])
         LOGGER.debug("extract_evidence_from_chunks: raw item count from payload=%d", len(raw_items))
@@ -276,6 +307,11 @@ class ClaudeClient:
         clean = sanitize_evidence_items(validated, stage="claude_extract_from_chunks")
         result = assign_evidence_ids(clean)
         LOGGER.debug("extract_evidence_from_chunks: final EvidenceItem count=%d", len(result))
+
+        # Cache write
+        if self._extraction_cache is not None:
+            self._extraction_cache.put(question, chunk_list, result)
+
         return result
 
     def synthesize_memo(
@@ -314,15 +350,17 @@ class ClaudeClient:
         prompt: str,
         max_tokens: int | None = None,
         response_schema_name: str | None = None,
+        model_override: str | None = None,
     ) -> dict[str, Any] | list[Any]:
         # response_schema_name lets callers use one schema for the tool definition
         # (what Claude sees) and a different, more lenient schema for parsing the
         # response (e.g. evidence_extraction_raw for per-item validation).
         _response_schema = response_schema_name or schema_name
+        _model = model_override or self.model
         request_timestamp = datetime.now(timezone.utc).isoformat()
         try:
             response = self._client.messages.create(
-                model=self.model,
+                model=_model,
                 max_tokens=max_tokens or self.max_tokens,
                 system=SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": prompt}],
@@ -372,7 +410,7 @@ class ClaudeClient:
             self.call_traces.append(
                 ClaudeCallTrace(
                     operation=operation,
-                    model_name=self.model,
+                    model_name=_model,
                     request_timestamp=request_timestamp,
                     success=True,
                     token_usage=_token_usage(response),
@@ -383,7 +421,7 @@ class ClaudeClient:
             self.call_traces.append(
                 ClaudeCallTrace(
                     operation=operation,
-                    model_name=self.model,
+                    model_name=_model,
                     request_timestamp=request_timestamp,
                     success=False,
                     error=str(exc),

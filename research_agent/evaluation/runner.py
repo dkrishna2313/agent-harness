@@ -114,6 +114,7 @@ class EvaluationRunner:
             client = ClaudeClient(
                 model=getattr(template.client, "model", None),
                 api_key=getattr(template.client, "api_key", None),
+                use_extraction_cache=True,
             )
         return DcPowerAgent(
             client=client,
