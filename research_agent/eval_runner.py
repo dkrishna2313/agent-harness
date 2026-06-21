@@ -623,6 +623,66 @@ def regress(
         raise typer.Exit(1)
 
 
+@app.command("citation-audit")
+def citation_audit(
+    report: Annotated[
+        Path,
+        typer.Option(
+            "--report",
+            "-r",
+            exists=True,
+            dir_okay=False,
+            readable=True,
+            help="evaluation_report.json to audit.",
+        ),
+    ] = Path("outputs/evaluation_report.json"),
+    trace: Annotated[
+        Path | None,
+        typer.Option(
+            "--trace",
+            "-t",
+            dir_okay=False,
+            readable=True,
+            help="evaluation.trace.json — provides actual_answer text per question.",
+        ),
+    ] = Path("outputs/evaluation.trace.json"),
+    threshold: Annotated[
+        float,
+        typer.Option(
+            "--threshold",
+            help="Flag questions with citation_score strictly below this value.",
+        ),
+    ] = 1.0,
+) -> None:
+    """Identify benchmark questions with imperfect citation coverage (diagnostic only).
+
+    Reads evaluation_report.json and evaluation.trace.json, flags every question
+    whose citation_score is below --threshold (default 1.0), prints a summary
+    table sorted worst-first, then prints the actual answer text for each flagged
+    question so the gap can be inspected.
+
+    This command is read-only: it does not modify any output files, scores,
+    or benchmark/regression logic.
+
+    Example:
+
+        python3 -m research_agent.eval_runner citation-audit \\
+          --report outputs/evaluation_report.json \\
+          --trace outputs/evaluation.trace.json
+
+        python3 -m research_agent.eval_runner citation-audit \\
+          --report outputs/evaluation_report.json \\
+          --trace outputs/evaluation.trace.json \\
+          --threshold 0.5
+    """
+    from .evaluation.citation_audit import run_citation_audit
+
+    # trace path may not exist (optional) — pass None if missing
+    trace_path = trace if (trace is not None and trace.exists()) else None
+    exit_code = run_citation_audit(report, trace_path, threshold)
+    raise typer.Exit(exit_code)
+
+
 @app.command("audit")
 def audit(
     eval_dir: Annotated[
