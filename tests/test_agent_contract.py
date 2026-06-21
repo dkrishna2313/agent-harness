@@ -1,11 +1,16 @@
-"""J5.5a – Agent contract compliance tests.
+"""J5.5a – Agent contract compliance and validation tests.
 
 Verifies that every functional agent:
-  1. Inherits FunctionalAgent
+  1. Inherits FunctionalAgent (BaseAgent)
   2. run(AgentContext) returns an AgentResult
   3. AgentResult.outputs, .metrics, .trace are present
   4. metrics["duration_seconds"] is a non-negative float
   5. trace has the required keys: agent, run_id, duration_seconds, status
+
+Also covers the contract validator module:
+  6. validate_agent_class() static checks
+  7. validate_agent_result() runtime checks
+  8. build_contract_validation() trace block assembly
 """
 
 from __future__ import annotations
@@ -157,3 +162,137 @@ def test_context_run_id_set():
         research_object={"id": "R-TEST_001"}, run_id="abc123",
     )
     assert ctx.run_id == "abc123"
+
+
+# ---------------------------------------------------------------------------
+# Contract validator – static checks
+# ---------------------------------------------------------------------------
+
+from functional_agents.contract import (
+    validate_agent_class,
+    validate_agent_result,
+    validate_all_classes,
+    build_contract_validation,
+    CONTRACT_VERSION,
+)
+
+
+@pytest.mark.parametrize("cls", _ALL_AGENT_CLASSES)
+def test_validate_agent_class_inherits_base(cls):
+    result = validate_agent_class(cls)
+    assert result["inherits_base_agent"] is True, f"{cls.__name__} fails inherits_base_agent"
+
+
+@pytest.mark.parametrize("cls", _ALL_AGENT_CLASSES)
+def test_validate_agent_class_implements_run(cls):
+    result = validate_agent_class(cls)
+    assert result["implements_run"] is True, f"{cls.__name__} fails implements_run"
+
+
+@pytest.mark.parametrize("cls", _ALL_AGENT_CLASSES)
+def test_validate_agent_class_no_error(cls):
+    result = validate_agent_class(cls)
+    assert result["error"] is None, f"{cls.__name__} has error: {result['error']}"
+
+
+def test_validate_all_classes_returns_all_four():
+    results = validate_all_classes()
+    assert set(results.keys()) == {
+        "PlannerAgent", "EvidenceAgent", "QAAgent", "ReportAgent"
+    }
+
+
+def test_validate_all_classes_all_valid():
+    results = validate_all_classes()
+    for name, r in results.items():
+        assert r["inherits_base_agent"], f"{name} not inheriting base"
+        assert r["implements_run"], f"{name} not implementing run"
+
+
+# ---------------------------------------------------------------------------
+# Contract validator – runtime checks
+# ---------------------------------------------------------------------------
+
+def test_validate_agent_result_valid():
+    ctx = _minimal_context()
+    from functional_agents.context import AgentResult
+    result = AgentResult(
+        status="success", next_action="CONTINUE", summary="ok",
+        context=ctx, outputs={}, metrics={"duration_seconds": 0.1}, trace={},
+    )
+    check = validate_agent_result(result, "TestAgent")
+    assert check["returns_agent_result"] is True
+    assert check["missing_fields"] == []
+    assert check["error"] is None
+
+
+def test_validate_agent_result_wrong_type():
+    check = validate_agent_result("not_a_result", "BadAgent")
+    assert check["returns_agent_result"] is False
+    assert "BadAgent" in check["error"]
+
+
+def test_validate_agent_result_via_stub():
+    agent = _StubAgent()
+    result = agent.run(_minimal_context())
+    check = validate_agent_result(result, agent.name)
+    assert check["returns_agent_result"] is True
+    assert check["missing_fields"] == []
+
+
+# ---------------------------------------------------------------------------
+# build_contract_validation trace block
+# ---------------------------------------------------------------------------
+
+def test_build_contract_validation_structure():
+    class_checks = validate_all_classes()
+    agent = _StubAgent()
+    raw_result = agent.run(_minimal_context())
+    runtime_checks = {"_StubAgent": validate_agent_result(raw_result, "_StubAgent")}
+
+    block = build_contract_validation(class_checks, runtime_checks)
+
+    assert block["contract_version"] == CONTRACT_VERSION
+    assert "agent_contract_valid" in block
+    assert "agents" in block
+
+
+def test_build_contract_validation_per_agent_keys():
+    class_checks = validate_all_classes()
+    # Simulate runtime checks for all four agents (all succeed via stub logic)
+    runtime_checks = {
+        name: {"returns_agent_result": True, "missing_fields": [], "error": None}
+        for name in class_checks
+    }
+    block = build_contract_validation(class_checks, runtime_checks)
+
+    for name in ("PlannerAgent", "EvidenceAgent", "QAAgent", "ReportAgent"):
+        assert name in block["agents"]
+        agent_block = block["agents"][name]
+        assert "inherits_base_agent" in agent_block
+        assert "implements_run" in agent_block
+        assert "returns_agent_result" in agent_block
+
+
+def test_build_contract_validation_valid_when_all_pass():
+    class_checks = validate_all_classes()
+    runtime_checks = {
+        name: {"returns_agent_result": True, "missing_fields": [], "error": None}
+        for name in class_checks
+    }
+    block = build_contract_validation(class_checks, runtime_checks)
+    assert block["agent_contract_valid"] is True
+
+
+def test_build_contract_validation_invalid_when_runtime_fails():
+    class_checks = validate_all_classes()
+    runtime_checks = {
+        name: {"returns_agent_result": False, "missing_fields": ["outputs"], "error": "x"}
+        for name in class_checks
+    }
+    block = build_contract_validation(class_checks, runtime_checks)
+    assert block["agent_contract_valid"] is False
+
+
+def test_contract_version_constant():
+    assert CONTRACT_VERSION == "1.0"

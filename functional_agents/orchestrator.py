@@ -35,9 +35,16 @@ LOGGER = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 def _step(agent: Any, ctx: AgentContext) -> AgentResult:
-    """Run one agent (returns AgentResult) and append its name to workflow_path."""
+    """Run one agent, validate its AgentResult, and append to workflow_path."""
+    from .contract import validate_agent_result
     result = agent.run(ctx)
     result.context.workflow_path.append(agent.name)
+    # Accumulate runtime contract checks for the trace
+    check = validate_agent_result(result, agent.name)
+    runtime_checks: dict = result.context.trace.setdefault("_contract_runtime", {})
+    runtime_checks[agent.name] = check
+    if check.get("error"):
+        LOGGER.warning("[contract] %s", check["error"])
     return result
 
 

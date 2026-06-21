@@ -411,6 +411,14 @@ class ReportAgent(FunctionalAgent):
                 "termination_reason": orchestrator_meta.get("termination_reason", "COMPLETE"),
             }
 
+        # Contract validation block (J5.5a follow-up)
+        from .contract import build_contract_validation, validate_all_classes
+        class_checks = validate_all_classes()
+        runtime_checks = context.trace.get("_contract_runtime", {})
+        trace_payload["contract_validation"] = build_contract_validation(
+            class_checks, runtime_checks
+        )
+
         # Report agent block (J5.4.8)
         trace_payload["report_agent"] = {
             "finding_count": len(findings),
