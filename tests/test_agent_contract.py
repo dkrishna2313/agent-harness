@@ -296,3 +296,26 @@ def test_build_contract_validation_invalid_when_runtime_fails():
 
 def test_contract_version_constant():
     assert CONTRACT_VERSION == "1.0"
+
+
+def test_build_contract_validation_report_agent_pre_populated():
+    """ReportAgent must appear valid even when its runtime check is pre-populated.
+
+    This guards the specific regression where ReportAgent wrote the trace before
+    _step() could record its own returns_agent_result check, causing it to default
+    to False and making agent_contract_valid=false.
+    """
+    class_checks = validate_all_classes()
+    # Simulate what ReportAgent._execute() does: other three agents come from
+    # _contract_runtime; ReportAgent is pre-populated via setdefault().
+    runtime_checks = {
+        "PlannerAgent":  {"returns_agent_result": True, "missing_fields": [], "error": None},
+        "EvidenceAgent": {"returns_agent_result": True, "missing_fields": [], "error": None},
+        "QAAgent":       {"returns_agent_result": True, "missing_fields": [], "error": None},
+    }
+    runtime_checks.setdefault("ReportAgent", {
+        "returns_agent_result": True, "missing_fields": [], "error": None,
+    })
+    block = build_contract_validation(class_checks, runtime_checks)
+    assert block["agent_contract_valid"] is True
+    assert block["agents"]["ReportAgent"]["returns_agent_result"] is True

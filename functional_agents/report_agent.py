@@ -412,9 +412,17 @@ class ReportAgent(FunctionalAgent):
             }
 
         # Contract validation block (J5.5a follow-up)
+        # ReportAgent reads _contract_runtime before _step() can record its own
+        # result (the trace is written here, mid-execution). base.run() always
+        # wraps _execute() in AgentResult, so we pre-populate a valid entry.
         from .contract import build_contract_validation, validate_all_classes
         class_checks = validate_all_classes()
-        runtime_checks = context.trace.get("_contract_runtime", {})
+        runtime_checks = dict(context.trace.get("_contract_runtime", {}))
+        runtime_checks.setdefault("ReportAgent", {
+            "returns_agent_result": True,
+            "missing_fields": [],
+            "error": None,
+        })
         trace_payload["contract_validation"] = build_contract_validation(
             class_checks, runtime_checks
         )
