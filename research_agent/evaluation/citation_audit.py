@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
+
+# Must match the scorer in scorer.py exactly
+_CITATION_RE = re.compile(r"\[Source:\s*[^,\]]+,\s*Evidence:\s*E\d{3}\]")
 
 
 def load_qa_results(report_path: Path, trace_path: Path | None) -> list[dict[str, Any]]:
@@ -32,6 +36,26 @@ def load_qa_results(report_path: Path, trace_path: Path | None) -> list[dict[str
                 report_rows[qid] = dict(row)
 
     return list(report_rows.values())
+
+
+def _detect_citation_patterns(text: str) -> list[str]:
+    """Return all citation marker matches found in *text*."""
+    return _CITATION_RE.findall(text)
+
+
+def _citation_debug(row: dict[str, Any]) -> dict[str, Any]:
+    """Build a citation_debug block for one question record."""
+    actual = row.get("actual_answer", "")
+    patterns = _detect_citation_patterns(actual)
+    return {
+        "evidence_count": row.get("evidence_count", 0),
+        "answer_length": len(actual),
+        "answer_is_truncated": len(actual) >= 500,  # scorer truncates at 500 chars
+        "citation_patterns_detected": patterns,
+        "citation_count_detected": len(patterns),
+        "citation_count_reported": row.get("citation_count", 0),
+        "discrepancy": row.get("citation_count", 0) != len(patterns),
+    }
 
 
 def run_citation_audit(
@@ -81,6 +105,9 @@ def run_citation_audit(
     # --------------------------------------------------------------- detail
     separator = "-" * 50
     for r in flagged:
+        debug = _citation_debug(r)
+        actual = r.get("actual_answer", "")
+
         print()
         print(separator)
         print(f"Question: {r.get('question_id', '')}")
@@ -88,10 +115,32 @@ def run_citation_audit(
         print(f"Citation Count: {r.get('citation_count', 0)}")
         print(f"Overall Score: {r.get('overall_score', 0.0):.2f}")
         print(f"Passed: {str(r.get('passed', '')).lower()}")
-        actual = r.get("actual_answer", "")
+
+        print()
+        print("Citation Debug:")
+        print(f"  Evidence items available : {debug['evidence_count']}")
+        print(f"  Answer length (stored)   : {debug['answer_length']} chars"
+              + (" [TRUNCATED — scorer uses full text]" if debug["answer_is_truncated"] else ""))
+        print(f"  Citation regex applied to: stored actual_answer (500-char window)")
+        patterns = debug["citation_patterns_detected"]
+        if patterns:
+            print(f"  Detected citation patterns ({len(patterns)}):")
+            for p in patterns[:5]:
+                print(f"    {p}")
+            if len(patterns) > 5:
+                print(f"    ... and {len(patterns) - 5} more")
+        else:
+            print("  Detected citation patterns: NONE")
+            print("  Expected format: [Source: <filename>, Evidence: E001]")
+        if debug["discrepancy"]:
+            print(f"  *** DISCREPANCY: reported={debug['citation_count_reported']}  "
+                  f"detected_in_stored_window={debug['citation_count_detected']}")
+            print("  NOTE: scorer runs regex on full answer_text; stored actual_answer")
+            print("        is truncated to 500 chars — regex results may differ.")
+
         if actual:
             print()
-            print("Actual Answer:")
+            print("Actual Answer (stored 500-char window):")
             print(actual)
         print(separator)
 
