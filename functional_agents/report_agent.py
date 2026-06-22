@@ -736,6 +736,21 @@ class ReportAgent(FunctionalAgent):
                 "challenge_synthesis": chal_data.get("challenge_synthesis", ""),
             }
 
+        # Recommendation quality evaluation block (J6.6)
+        rec_eval = context.research_object.get("recommendation_evaluation") if context.research_object else None
+        if rec_eval:
+            agg = rec_eval.get("aggregate", {})
+            trace_payload["recommendation_quality"] = {
+                "recommendation_count": agg.get("recommendation_count", 0),
+                "recommendation_score": agg.get("recommendation_score", 0.0),
+                "mean_evidence_support": agg.get("mean_evidence_support", 0.0),
+                "mean_reasoning": agg.get("mean_reasoning", 0.0),
+                "mean_tradeoff": agg.get("mean_tradeoff", 0.0),
+                "mean_risk": agg.get("mean_risk", 0.0),
+                "mean_actionability": agg.get("mean_actionability", 0.0),
+                "traceability": rec_eval.get("traceability", []),
+            }
+
         # Contradiction hardening block (J6.5a/b/c)
         if context.contradiction_metrics:
             metrics = context.contradiction_metrics

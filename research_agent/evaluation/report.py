@@ -384,6 +384,7 @@ def _agent_evaluation_dict(run: "EvaluationRun") -> dict:
             "evidence_score": s.evidence_score,
             "qa_score": s.qa_score,
             "report_score": s.report_score,
+            "recommendation_score": s.recommendation_score,
             "detail": {
                 "planner": {
                     "investigation_area_count": s.investigation_area_count,
@@ -411,6 +412,7 @@ def _agent_evaluation_dict(run: "EvaluationRun") -> dict:
             "evidence_score": run.evidence_score,
             "qa_score": run.qa_agent_score,
             "report_score": run.report_score,
+            "recommendation_score": run.recommendation_score,
         },
         "per_question": per_question,
     }

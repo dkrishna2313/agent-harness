@@ -1,4 +1,4 @@
-"""Per-agent evaluation scoring (J5.7).
+"""Per-agent evaluation scoring (J5.7 / J6.6).
 
 Derives per-agent quality proxies from ResearchMemo + QAScore produced by the
 benchmark pipeline.  Scores are structural/ratio-based and profile-agnostic —
@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
+
+from .recommendation_evaluator import score_recommendations_from_memo
 
 if TYPE_CHECKING:
     from ..schemas import ResearchMemo
@@ -39,6 +41,7 @@ class AgentScores:
     evidence_score: float = 0.0
     qa_score: float = 0.0
     report_score: float = 0.0
+    recommendation_score: float = 0.0
 
     # ── Planner detail ─────────────────────────────────────────────────────
     investigation_area_count: int = 0
@@ -132,6 +135,10 @@ def score_agents(
         qa_score.citation_score * 0.5 + fact_score * 0.5, 3
     )
 
+    # ── Recommendation (J6.6) ──────────────────────────────────────────────
+    inferences = getattr(memo, "inferences", []) or []
+    scores.recommendation_score = score_recommendations_from_memo(inferences)
+
     return scores
 
 
@@ -143,6 +150,7 @@ def aggregate_agent_scores(all_scores: list[AgentScores]) -> dict[str, float]:
             "evidence_score": 0.0,
             "qa_score": 0.0,
             "report_score": 0.0,
+            "recommendation_score": 0.0,
         }
     n = len(all_scores)
     return {
@@ -150,4 +158,5 @@ def aggregate_agent_scores(all_scores: list[AgentScores]) -> dict[str, float]:
         "evidence_score": round(sum(s.evidence_score for s in all_scores) / n, 4),
         "qa_score": round(sum(s.qa_score for s in all_scores) / n, 4),
         "report_score": round(sum(s.report_score for s in all_scores) / n, 4),
+        "recommendation_score": round(sum(s.recommendation_score for s in all_scores) / n, 4),
     }

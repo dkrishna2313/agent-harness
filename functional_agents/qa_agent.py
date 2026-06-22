@@ -7,6 +7,7 @@ from typing import Any
 
 from .base import FunctionalAgent
 from .context import AgentContext
+from research_agent.evaluation.recommendation_evaluator import evaluate_recommendations
 
 LOGGER = logging.getLogger(__name__)
 
@@ -653,6 +654,27 @@ class QAAgent(FunctionalAgent):
             context.recommendation_portfolio,
         )
 
+        # --- recommendation quality evaluation (J6.6) ---
+        _ev_ids: set[str] = {
+            e.get("evidence_id", "") if isinstance(e, dict) else getattr(e, "evidence_id", "")
+            for ev_list in (context.research_object.get("evidence", []),)
+            for e in ev_list
+        }
+        _hyp_ids: set[str] = {
+            h.get("hypothesis_id", "") if isinstance(h, dict) else getattr(h, "hypothesis_id", "")
+            for h in context.hypotheses
+        }
+        _ch_ids: set[str] = {
+            c.get("challenge_id", "") if isinstance(c, dict) else getattr(c, "challenge_id", "")
+            for c in context.hypothesis_challenges
+        }
+        recommendation_evaluation = evaluate_recommendations(
+            context.recommendations,
+            evidence_ids=_ev_ids - {""},
+            hypothesis_ids=_hyp_ids - {""},
+            challenge_ids=_ch_ids - {""},
+        )
+
         # --- contradiction hardening validation (J6.5a) ---
         contradiction_hardening_validation = _validate_contradiction_hardening(context)
 
@@ -678,6 +700,7 @@ class QAAgent(FunctionalAgent):
             "hypothesis_validation": hypothesis_validation,
             "challenge_validation": challenge_validation,
             "recommendation_validation": recommendation_validation,
+            "recommendation_evaluation": recommendation_evaluation,
             "contradiction_validation": contradiction_hardening_validation,
             "contradiction_decision_validation": contradiction_decision_validation,
             "numeric_semantic_validation": numeric_semantic_validation,
@@ -686,6 +709,7 @@ class QAAgent(FunctionalAgent):
         # --- update Research Object (J5.3.7) ---
         if ro:
             ro["qa"] = context.qa
+            ro["recommendation_evaluation"] = recommendation_evaluation
 
         # --- decide next workflow action (J5.5.4 / J5.5.8) ---
         next_action = _decide_next_action(
