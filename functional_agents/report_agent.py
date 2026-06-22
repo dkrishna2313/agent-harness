@@ -736,9 +736,10 @@ class ReportAgent(FunctionalAgent):
                 "challenge_synthesis": chal_data.get("challenge_synthesis", ""),
             }
 
-        # Contradiction hardening block (J6.5a)
+        # Contradiction hardening block (J6.5a/b/c)
         if context.contradiction_metrics:
             metrics = context.contradiction_metrics
+            eligibility = metrics.get("eligibility_engine", {})
             trace_payload["contradiction_hardening"] = {
                 "candidate_count": metrics.get("candidate_count", 0),
                 "suppressed_count": metrics.get("suppressed_count", 0),
@@ -747,6 +748,13 @@ class ReportAgent(FunctionalAgent):
                 "scope_filtering_present": metrics.get("scope_filtering_present", False),
                 "entity_filtering_present": metrics.get("entity_filtering_present", False),
                 "temporal_filtering_present": metrics.get("temporal_filtering_present", False),
+                "product_filtering_present": metrics.get("product_filtering_present", False),
+                "context_filtering_present": metrics.get("context_filtering_present", False),
+                "eligibility_engine": {
+                    "candidate_pairs": eligibility.get("candidate_pairs", 0),
+                    "eligible_pairs": eligibility.get("eligible_pairs", 0),
+                    "suppressed_pairs": eligibility.get("suppressed_pairs", 0),
+                },
             }
 
         # Contract validation block (J5.5a follow-up)

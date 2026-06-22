@@ -78,7 +78,12 @@ class ChallengeAgent(FunctionalAgent):
         if not profile_coverage and context.profiles:
             profile_coverage = {p: "unknown" for p in context.profiles}
 
-        contradictions: list[dict] = context.research_object.get("contradictions", [])
+        # J6.5c: use validated_contradictions (post-suppression) when available
+        contradictions: list[dict] = (
+            context.validated_contradictions
+            or context.research_object.get("validated_contradictions", [])
+            or context.research_object.get("contradictions", [])
+        )
         research_gaps: list[dict] = context.research_object.get("gaps", [])
 
         challenge_payload = self._generate_challenges(

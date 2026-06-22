@@ -385,7 +385,7 @@ def _validate_challenges(
 # ---------------------------------------------------------------------------
 
 def _validate_contradiction_hardening(context: "AgentContext") -> dict[str, Any]:
-    """Check that the contradiction hardening pipeline ran and suppressed false positives (J6.5a)."""
+    """Check that the contradiction hardening pipeline ran and suppressed false positives (J6.5a/b/c)."""
     metrics: dict = context.contradiction_metrics or {}
     suppressed_count: int = metrics.get("suppressed_count", 0)
     final_count: int = metrics.get("final_count", 0)
@@ -401,6 +401,11 @@ def _validate_contradiction_hardening(context: "AgentContext") -> dict[str, Any]
     temporal_filtering_present = bool(
         by_reason.get("temporal_progression", 0) or metrics.get("temporal_filtering_present")
     )
+    context_filtering_present = bool(
+        by_reason.get("context_mismatch", 0) or metrics.get("context_filtering_present")
+    )
+
+    eligibility_engine = metrics.get("eligibility_engine", {})
 
     issues: list[str] = []
     if not metrics:
@@ -410,9 +415,49 @@ def _validate_contradiction_hardening(context: "AgentContext") -> dict[str, Any]
         "scope_filtering_present": scope_filtering_present,
         "entity_filtering_present": entity_filtering_present,
         "temporal_filtering_present": temporal_filtering_present,
+        "context_filtering_present": context_filtering_present,
         "suppressed_count": suppressed_count,
         "final_count": final_count,
         "by_reason": by_reason,
+        "eligibility_engine": eligibility_engine,
+        "issues": issues,
+    }
+
+
+def _validate_contradiction_decision_logic(context: "AgentContext") -> dict[str, Any]:
+    """J6.5c: Validate that the eligibility engine ran and key filtering gates are active."""
+    metrics: dict = context.contradiction_metrics or {}
+    eligibility_engine: dict = metrics.get("eligibility_engine", {})
+    by_reason: dict = metrics.get("by_reason", {})
+
+    eligibility_engine_present = bool(eligibility_engine)
+    scope_filtering_present = bool(
+        by_reason.get("scope_mismatch", 0) or by_reason.get("metric_scope_mismatch", 0)
+        or metrics.get("scope_filtering_present")
+    )
+    entity_filtering_present = bool(
+        by_reason.get("entity_mismatch", 0) or metrics.get("entity_filtering_present")
+    )
+    context_filtering_present = bool(
+        by_reason.get("context_mismatch", 0) or metrics.get("context_filtering_present")
+    )
+
+    suppressed = eligibility_engine.get("suppressed_pairs", metrics.get("suppressed_count", 0))
+    eligible = eligibility_engine.get("eligible_pairs", metrics.get("final_count", 0))
+    candidate = eligibility_engine.get("candidate_pairs", metrics.get("candidate_count", 0))
+
+    issues: list[str] = []
+    if not eligibility_engine_present:
+        issues.append("eligibility_engine not present in contradiction_metrics")
+
+    return {
+        "eligibility_engine_present": eligibility_engine_present,
+        "scope_filtering_present": scope_filtering_present,
+        "entity_filtering_present": entity_filtering_present,
+        "context_filtering_present": context_filtering_present,
+        "candidate_pairs": candidate,
+        "suppressed_pairs": suppressed,
+        "eligible_pairs": eligible,
         "issues": issues,
     }
 
@@ -578,6 +623,9 @@ class QAAgent(FunctionalAgent):
         # --- contradiction hardening validation (J6.5a) ---
         contradiction_hardening_validation = _validate_contradiction_hardening(context)
 
+        # --- contradiction decision logic validation (J6.5c) ---
+        contradiction_decision_validation = _validate_contradiction_decision_logic(context)
+
         # --- write context.qa (J5.3.1) ---
         context.qa = {
             "coverage_issues": coverage_issues,
@@ -595,6 +643,7 @@ class QAAgent(FunctionalAgent):
             "challenge_validation": challenge_validation,
             "recommendation_validation": recommendation_validation,
             "contradiction_validation": contradiction_hardening_validation,
+            "contradiction_decision_validation": contradiction_decision_validation,
         }
 
         # --- update Research Object (J5.3.7) ---

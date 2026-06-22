@@ -544,6 +544,87 @@ _RE_FUTURE_PROJECTION = re.compile(
     re.IGNORECASE,
 )
 
+# ---------------------------------------------------------------------------
+# J6.5c – Comparison context classification
+# ---------------------------------------------------------------------------
+
+_RE_CTX_EXAMPLE = re.compile(
+    r"\bfor\s+example\b|\bfor\s+instance\b|\be\.g\b|\billustrat\w+\b"
+    r"|\bhypothetical\b|\bconsider\s+a\s+(?:scenario|case|deployment)\b"
+    r"|\bexample\s+(?:deployment|data.cent\w*|facility|use.?case|rack)\b"
+    r"|\bsimple\s+example\b|\bsample\s+(?:deployment|rack)\b"
+    r"|\bsuch\s+as\s+(?:a|an)\b",
+    re.IGNORECASE,
+)
+_RE_CTX_REFERENCE = re.compile(
+    r"\breference\s+(?:architecture|design|configuration|rack|deployment)\b"
+    r"|\bstandard\s+(?:configuration|rack|design|deployment)\b"
+    r"|\btypical\s+(?:rack|configuration|data.cent\w*|deployment|design)\b"
+    r"|\bcanonical\s+(?:rack|design|deployment)\b"
+    r"|\barchitecture\s+(?:calls?\s+for|requires?|specif\w+)\b",
+    re.IGNORECASE,
+)
+_RE_CTX_INDUSTRY_AVG = re.compile(
+    r"\bindustry\s+average\b|\baverage\s+(?:across|data.cent\w+|facility|rack)\b"
+    r"|\bmost\s+(?:data.cent\w+|facilities|deployments|hyperscalers?)\b"
+    r"|\btypically\s+(?:see|require|use|draw|consume|reach)\b"
+    r"|\bacross\s+the\s+industry\b|\bgenerally\s+(?:require|draw|consume|see)\b"
+    r"|\bindustry.wide\b|\bmarket\s+average\b|\bnorm\s+(?:is|for)\b",
+    re.IGNORECASE,
+)
+_RE_CTX_VENDOR = re.compile(
+    r"\bnvidia\s+(?:rates?|claims?|specif\w+|states?|announc\w+|sheet)\b"
+    r"|\bvendor\s+(?:spec|claim|rating|data.sheet)\b"
+    r"|\bdata\s+sheet\b|\bproduct\s+spec\w*\b|\bmanufacturer\s+(?:spec|claim|rating)\b"
+    r"|\bspec(?:ified|ification)\s+(?:calls?\s+for|states?|shows?|gives?)\b",
+    re.IGNORECASE,
+)
+
+
+def _classify_comparison_context(claim: str) -> str:
+    """Classify the deployment/measurement context of *claim* (J6.5c).
+
+    Returns one of:
+        example_deployment    – illustrative / hypothetical figures
+        reference_architecture – reference / standard / typical design
+        industry_average       – average across deployments, not a single site
+        vendor_claim           – product-specific vendor spec or data sheet
+        future_projection      – projected, planned, roadmap target
+        current_deployment     – operating today, existing installation
+        unknown                – insufficient signal
+    """
+    if _RE_CTX_EXAMPLE.search(claim):
+        return "example_deployment"
+    if _RE_CTX_REFERENCE.search(claim):
+        return "reference_architecture"
+    if _RE_CTX_INDUSTRY_AVG.search(claim):
+        return "industry_average"
+    if _RE_CTX_VENDOR.search(claim):
+        return "vendor_claim"
+    # Fall back to temporal kind
+    kind = _extract_numeric_kind_from_text(claim)
+    if kind == "target":
+        return "future_projection"
+    if kind == "current":
+        return "current_deployment"
+    return "unknown"
+
+
+# Pairs of contexts that cannot produce a meaningful contradiction.
+# When both contexts are known and form one of these pairs, suppress.
+_INCOMPATIBLE_CONTEXT_PAIRS: frozenset[frozenset[str]] = frozenset({
+    # Illustrative examples cannot contradict concrete measurements
+    frozenset({"example_deployment", "reference_architecture"}),
+    frozenset({"example_deployment", "current_deployment"}),
+    frozenset({"example_deployment", "future_projection"}),
+    frozenset({"example_deployment", "vendor_claim"}),
+    frozenset({"example_deployment", "industry_average"}),
+    # Vendor spec for one product vs industry-wide average are different populations
+    frozenset({"vendor_claim", "industry_average"}),
+    # Backstop for current vs future (Gate 6 catches most cases; this catches the rest)
+    frozenset({"current_deployment", "future_projection"}),
+})
+
 
 def _extract_numeric_kind_from_text(text: str) -> str:
     """Return the temporal kind of a numeric claim: 'current', 'target', 'rate', or 'unknown'."""
@@ -975,6 +1056,36 @@ def _check_numeric_conflict(
                 ))
             continue
 
+        # Gate 6.5 (J6.5c): comparison context incompatibility
+        _ctx_a = _classify_comparison_context(a.claim)
+        _ctx_b = _classify_comparison_context(b.claim)
+        # example_deployment suppresses against anything — illustrative figures
+        # are never a basis for contradiction with concrete measurements.
+        _ctx_fire = (
+            _ctx_a == "example_deployment" or _ctx_b == "example_deployment"
+            or (
+                _ctx_a != "unknown" and _ctx_b != "unknown"
+                and frozenset({_ctx_a, _ctx_b}) in _INCOMPATIBLE_CONTEXT_PAIRS
+            )
+        )
+        if _ctx_fire:
+            if out_suppressed is not None:
+                out_suppressed.append(SuppressedComparison(
+                    evidence_a_id=a.evidence_id or "?",
+                    evidence_b_id=b.evidence_id or "?",
+                    evidence_a_claim=a.claim,
+                    evidence_b_claim=b.claim,
+                    reason="context_mismatch",
+                    scope_a=scope_a,
+                    scope_b=scope_b,
+                    detail=(
+                        f"Unit '{unit}': context '{_ctx_a}' ({val_a} {unit}) "
+                        f"vs '{_ctx_b}' ({val_b} {unit}) — "
+                        f"incompatible measurement contexts cannot contradict."
+                    ),
+                ))
+            continue
+
         # Gate 7 (J6.5b): range vs point-value compatibility
         _range_a = _extract_range_for_unit(claim_a, unit)
         _range_b = _extract_range_for_unit(claim_b, unit)
@@ -1157,6 +1268,34 @@ def _check_categorical_conflict(
                     ))
                 continue
 
+            # Gate 6.5 (J6.5c): comparison context incompatibility
+            _cat_ctx_a = _classify_comparison_context(a.claim)
+            _cat_ctx_b = _classify_comparison_context(b.claim)
+            _cat_ctx_fire = (
+                _cat_ctx_a == "example_deployment" or _cat_ctx_b == "example_deployment"
+                or (
+                    _cat_ctx_a != "unknown" and _cat_ctx_b != "unknown"
+                    and frozenset({_cat_ctx_a, _cat_ctx_b}) in _INCOMPATIBLE_CONTEXT_PAIRS
+                )
+            )
+            if _cat_ctx_fire:
+                if out_suppressed is not None:
+                    out_suppressed.append(SuppressedComparison(
+                        evidence_a_id=a.evidence_id or "?",
+                        evidence_b_id=b.evidence_id or "?",
+                        evidence_a_claim=a.claim,
+                        evidence_b_claim=b.claim,
+                        reason="context_mismatch",
+                        scope_a=scope_a,
+                        scope_b=scope_b,
+                        detail=(
+                            f"Categorical '{matched_a}' vs '{matched_b}': "
+                            f"context '{_cat_ctx_a}' vs '{_cat_ctx_b}' — "
+                            f"incompatible measurement contexts."
+                        ),
+                    ))
+                continue
+
             severity, topic = _categorical_severity_topic(matched_a, matched_b)
             return Contradiction(
                 contradiction_id="",
@@ -1297,6 +1436,13 @@ def compute_suppression_metrics(
             or by_reason.get("generation_progression", 0)
         ),
         "range_filtering_present": bool(by_reason.get("range_average_compatible", 0)),
+        "context_filtering_present": bool(by_reason.get("context_mismatch", 0)),
+        # J6.5c – eligibility engine summary (candidate → eligible → final)
+        "eligibility_engine": {
+            "candidate_pairs": final_count + suppressed_count,
+            "eligible_pairs": final_count,
+            "suppressed_pairs": suppressed_count,
+        },
     }
 
 
