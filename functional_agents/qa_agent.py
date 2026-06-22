@@ -496,6 +496,30 @@ def _validate_contradiction_decision_logic(context: "AgentContext") -> dict[str,
     }
 
 
+def _validate_recommendation_evaluation(context: "AgentContext") -> dict[str, Any]:
+    """Validate that recommendation_evaluation metadata is present and complete (J6.6a)."""
+    rec_eval = context.qa.get("recommendation_evaluation", {})
+    scored = rec_eval.get("recommendation_scores", [])
+    traceability = rec_eval.get("traceability", [])
+
+    scores_present = len(scored) > 0
+    dim_keys = {"evidence_support_score", "reasoning_score", "tradeoff_score", "risk_score", "actionability_score"}
+    dimension_scores_present = scores_present and all(
+        dim_keys.issubset(s.keys()) for s in scored
+    )
+    traceability_present = len(traceability) > 0
+    warnings_present = "recommendation_warnings" in rec_eval
+    summary_present = "recommendation_summary" in rec_eval
+
+    return {
+        "scores_present": scores_present,
+        "traceability_present": traceability_present,
+        "dimension_scores_present": dimension_scores_present,
+        "warnings_present": warnings_present,
+        "summary_present": summary_present,
+    }
+
+
 def _validate_recommendations(
     recommendations: list[dict],
     portfolio: dict,
@@ -702,9 +726,14 @@ class QAAgent(FunctionalAgent):
             "recommendation_validation": recommendation_validation,
             "recommendation_evaluation": recommendation_evaluation,
             "contradiction_validation": contradiction_hardening_validation,
+            # populated after context.qa is set — see below
+            "recommendation_evaluation_validation": {},
             "contradiction_decision_validation": contradiction_decision_validation,
             "numeric_semantic_validation": numeric_semantic_validation,
         }
+
+        # --- recommendation_evaluation_validation requires context.qa to be set first ---
+        context.qa["recommendation_evaluation_validation"] = _validate_recommendation_evaluation(context)
 
         # --- update Research Object (J5.3.7) ---
         if ro:

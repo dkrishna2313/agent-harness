@@ -56,12 +56,13 @@ class EvaluationRun:
     # J5.7 — per-question agent evaluation scores
     agent_scores: list[AgentScores] = field(default_factory=list)
 
-    # J5.7 / J6.6 — aggregate agent scores (computed in _compute_aggregates)
+    # J5.7 / J6.6 / J6.6a — aggregate agent scores (computed in _compute_aggregates)
     planner_score: float = 0.0
     evidence_score: float = 0.0
     qa_agent_score: float = 0.0
     report_score: float = 0.0
     recommendation_score: float = 0.0
+    recommendation_dimension_summary: dict = field(default_factory=dict)
 
 
 class EvaluationRunner:
@@ -408,6 +409,7 @@ def _compute_aggregates(result: EvaluationRun) -> None:
     result.qa_agent_score = agg["qa_score"]
     result.report_score = agg["report_score"]
     result.recommendation_score = agg["recommendation_score"]
+    result.recommendation_dimension_summary = agg.get("recommendation_dimension_summary", {})
 
 
 def _write_qa_research_object(

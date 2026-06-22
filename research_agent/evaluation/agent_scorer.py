@@ -16,7 +16,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from .recommendation_evaluator import score_recommendations_from_memo
+from .recommendation_evaluator import (
+    score_recommendations_from_memo,
+    score_recommendation_dimensions_from_memo,
+)
 
 if TYPE_CHECKING:
     from ..schemas import ResearchMemo
@@ -42,6 +45,13 @@ class AgentScores:
     qa_score: float = 0.0
     report_score: float = 0.0
     recommendation_score: float = 0.0
+
+    # ── Recommendation dimension breakdown (J6.6a) ─────────────────────────
+    rec_evidence_support: float = 0.0
+    rec_reasoning: float = 0.0
+    rec_tradeoff: float = 0.0
+    rec_risk: float = 0.0
+    rec_actionability: float = 0.0
 
     # ── Planner detail ─────────────────────────────────────────────────────
     investigation_area_count: int = 0
@@ -135,8 +145,14 @@ def score_agents(
         qa_score.citation_score * 0.5 + fact_score * 0.5, 3
     )
 
-    # ── Recommendation (J6.6) ──────────────────────────────────────────────
+    # ── Recommendation (J6.6 / J6.6a) ─────────────────────────────────────
     inferences = getattr(memo, "inferences", []) or []
+    dims = score_recommendation_dimensions_from_memo(inferences)
+    scores.rec_evidence_support = dims["evidence_support"]
+    scores.rec_reasoning        = dims["reasoning"]
+    scores.rec_tradeoff         = dims["tradeoff"]
+    scores.rec_risk             = dims["risk"]
+    scores.rec_actionability    = dims["actionability"]
     scores.recommendation_score = score_recommendations_from_memo(inferences)
 
     return scores
@@ -151,6 +167,13 @@ def aggregate_agent_scores(all_scores: list[AgentScores]) -> dict[str, float]:
             "qa_score": 0.0,
             "report_score": 0.0,
             "recommendation_score": 0.0,
+            "recommendation_dimension_summary": {
+                "evidence_support": 0.0,
+                "reasoning": 0.0,
+                "tradeoff": 0.0,
+                "risk": 0.0,
+                "actionability": 0.0,
+            },
         }
     n = len(all_scores)
     return {
@@ -159,4 +182,11 @@ def aggregate_agent_scores(all_scores: list[AgentScores]) -> dict[str, float]:
         "qa_score": round(sum(s.qa_score for s in all_scores) / n, 4),
         "report_score": round(sum(s.report_score for s in all_scores) / n, 4),
         "recommendation_score": round(sum(s.recommendation_score for s in all_scores) / n, 4),
+        "recommendation_dimension_summary": {
+            "evidence_support": round(sum(s.rec_evidence_support for s in all_scores) / n, 4),
+            "reasoning":        round(sum(s.rec_reasoning        for s in all_scores) / n, 4),
+            "tradeoff":         round(sum(s.rec_tradeoff         for s in all_scores) / n, 4),
+            "risk":             round(sum(s.rec_risk             for s in all_scores) / n, 4),
+            "actionability":    round(sum(s.rec_actionability    for s in all_scores) / n, 4),
+        },
     }

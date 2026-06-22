@@ -154,6 +154,109 @@ def _build_challenges_section(
     return "\n".join(lines)
 
 
+def _build_recommendation_evaluation_section(rec_eval: dict) -> str:
+    """Render a Recommendation Evaluation table section for the markdown report (J6.6a)."""
+    if not rec_eval:
+        return ""
+    scored = rec_eval.get("recommendation_scores", [])
+    if not scored:
+        return ""
+
+    lines = [
+        "## Recommendation Evaluation",
+        "",
+        "| Recommendation | Evidence | Reasoning | Tradeoff | Risk | Actionability | Score |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for s in scored:
+        rid = s.get("recommendation_id", "")
+        title = s.get("title", "")
+        label = f"{rid}: {title[:55]}…" if len(title) > 55 else f"{rid}: {title}"
+        penalty = f" ⚠ {s['primary_penalty']}" if s.get("primary_penalty") else ""
+        lines.append(
+            f"| {label}{penalty} "
+            f"| {s.get('evidence_support_score', 0):.2f} "
+            f"| {s.get('reasoning_score', 0):.2f} "
+            f"| {s.get('tradeoff_score', 0):.2f} "
+            f"| {s.get('risk_score', 0):.2f} "
+            f"| {s.get('actionability_score', 0):.2f} "
+            f"| **{s.get('aggregate_score', s.get('recommendation_score', 0)):.3f}** |"
+        )
+
+    agg = rec_eval.get("aggregate", {})
+    rec_summary = rec_eval.get("recommendation_summary", {})
+    warnings = rec_eval.get("recommendation_warnings", [])
+
+    lines += [
+        "",
+        f"**Portfolio score:** {agg.get('recommendation_score', 0):.3f}  "
+        f"| Lowest: {rec_summary.get('lowest_score', 0):.3f}  "
+        f"| Highest: {rec_summary.get('highest_score', 0):.3f}",
+    ]
+
+    if warnings:
+        lines += ["", "**Warnings:**", ""]
+        for w in warnings:
+            lines.append(
+                f"- `{w['recommendation_id']}` — {w['issue']} "
+                f"(score: {w.get('aggregate_score', 0):.3f})"
+            )
+
+    return "\n".join(lines)
+
+
+def _write_recommendation_observability_trace(rec_eval: dict, report_path: "Path") -> None:
+    """Write j66a_recommendation_observability.trace.json alongside the report (J6.6a)."""
+    import json
+    from pathlib import Path
+
+    trace_path = Path(report_path).parent / "j66a_recommendation_observability.trace.json"
+    latest_trace_path = Path(report_path).parent / "latest_recommendation_observability.trace.json"
+
+    scored = rec_eval.get("recommendation_scores", [])
+    agg = rec_eval.get("aggregate", {})
+    rec_summary = rec_eval.get("recommendation_summary", {})
+    warnings = rec_eval.get("recommendation_warnings", [])
+
+    payload = {
+        "trace_type": "recommendation_observability",
+        "recommendation_evaluation": {
+            "recommendation_summary": rec_summary,
+            "recommendation_score": agg.get("recommendation_score", 0.0),
+            "recommendation_dimension_summary": {
+                "evidence_support": agg.get("mean_evidence_support", 0.0),
+                "reasoning": agg.get("mean_reasoning", 0.0),
+                "tradeoff": agg.get("mean_tradeoff", 0.0),
+                "risk": agg.get("mean_risk", 0.0),
+                "actionability": agg.get("mean_actionability", 0.0),
+            },
+            "recommendation_warnings": warnings,
+            "per_recommendation": [
+                {
+                    "recommendation_id": s.get("recommendation_id", ""),
+                    "title": s.get("title", ""),
+                    "evidence_support_score": s.get("evidence_support_score", 0.0),
+                    "reasoning_score": s.get("reasoning_score", 0.0),
+                    "tradeoff_score": s.get("tradeoff_score", 0.0),
+                    "risk_score": s.get("risk_score", 0.0),
+                    "actionability_score": s.get("actionability_score", 0.0),
+                    "aggregate_score": s.get("aggregate_score", s.get("recommendation_score", 0.0)),
+                    "missing_evidence_links": s.get("missing_evidence_links", False),
+                    "primary_penalty": s.get("primary_penalty"),
+                    "supporting_evidence": s.get("traceability", {}).get("evidence_ids", []),
+                    "supporting_hypotheses": s.get("traceability", {}).get("hypothesis_ids", []),
+                    "supporting_challenges": s.get("traceability", {}).get("challenge_ids", []),
+                }
+                for s in scored
+            ],
+            "traceability": rec_eval.get("traceability", []),
+        },
+    }
+
+    trace_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    latest_trace_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+
+
 def _build_recommendations_section(
     recommendations: list[dict[str, Any]],
     portfolio: dict[str, Any],
@@ -579,6 +682,14 @@ class ReportAgent(FunctionalAgent):
             report_content = report_content.rstrip("\n") + "\n\n" + _build_recommendations_section(
                 context.recommendations, context.recommendation_portfolio
             )
+        _rec_eval_for_md = (
+            context.research_object.get("recommendation_evaluation")
+            if context.research_object else None
+        )
+        if _rec_eval_for_md:
+            _rec_eval_section = _build_recommendation_evaluation_section(_rec_eval_for_md)
+            if _rec_eval_section:
+                report_content = report_content.rstrip("\n") + "\n\n" + _rec_eval_section
         output_path = write_markdown(report_content, self._out_path)
         context.artifacts["report_path"] = str(output_path)
         context.artifacts["trace_path"] = str(output_path.with_suffix(".trace.json"))
@@ -736,20 +847,45 @@ class ReportAgent(FunctionalAgent):
                 "challenge_synthesis": chal_data.get("challenge_synthesis", ""),
             }
 
-        # Recommendation quality evaluation block (J6.6)
+        # Recommendation quality evaluation block (J6.6 / J6.6a)
         rec_eval = context.research_object.get("recommendation_evaluation") if context.research_object else None
         if rec_eval:
             agg = rec_eval.get("aggregate", {})
+            rec_summary = rec_eval.get("recommendation_summary", {})
             trace_payload["recommendation_quality"] = {
                 "recommendation_count": agg.get("recommendation_count", 0),
                 "recommendation_score": agg.get("recommendation_score", 0.0),
-                "mean_evidence_support": agg.get("mean_evidence_support", 0.0),
-                "mean_reasoning": agg.get("mean_reasoning", 0.0),
-                "mean_tradeoff": agg.get("mean_tradeoff", 0.0),
-                "mean_risk": agg.get("mean_risk", 0.0),
-                "mean_actionability": agg.get("mean_actionability", 0.0),
+                "recommendation_summary": rec_summary,
+                "recommendation_warnings": rec_eval.get("recommendation_warnings", []),
+                "dimension_summary": {
+                    "evidence_support": agg.get("mean_evidence_support", 0.0),
+                    "reasoning": agg.get("mean_reasoning", 0.0),
+                    "tradeoff": agg.get("mean_tradeoff", 0.0),
+                    "risk": agg.get("mean_risk", 0.0),
+                    "actionability": agg.get("mean_actionability", 0.0),
+                },
+                "per_recommendation": [
+                    {
+                        "recommendation_id": s.get("recommendation_id", ""),
+                        "title": s.get("title", ""),
+                        "evidence_support_score": s.get("evidence_support_score", 0.0),
+                        "reasoning_score": s.get("reasoning_score", 0.0),
+                        "tradeoff_score": s.get("tradeoff_score", 0.0),
+                        "risk_score": s.get("risk_score", 0.0),
+                        "actionability_score": s.get("actionability_score", 0.0),
+                        "aggregate_score": s.get("aggregate_score", s.get("recommendation_score", 0.0)),
+                        "missing_evidence_links": s.get("missing_evidence_links", False),
+                        "primary_penalty": s.get("primary_penalty"),
+                        "supporting_evidence": s.get("traceability", {}).get("evidence_ids", []),
+                        "supporting_hypotheses": s.get("traceability", {}).get("hypothesis_ids", []),
+                        "supporting_challenges": s.get("traceability", {}).get("challenge_ids", []),
+                    }
+                    for s in rec_eval.get("recommendation_scores", [])
+                ],
                 "traceability": rec_eval.get("traceability", []),
             }
+            # Write dedicated observability trace file (J6.6a)
+            _write_recommendation_observability_trace(rec_eval, output_path)
 
         # Contradiction hardening block (J6.5a/b/c)
         if context.contradiction_metrics:

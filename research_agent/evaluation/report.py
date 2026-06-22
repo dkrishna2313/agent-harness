@@ -33,11 +33,13 @@ def build_json_report(run: EvaluationRun, *, run_meta: dict | None = None) -> di
             ),
             "known_limitation_cases": len(known_limitation),
             "benchmark_errors": len(benchmark_errors) + len(run.validation_errors),
-            # J5.7 — aggregate agent scores (also in agent_evaluation block)
+            # J5.7 / J6.6 / J6.6a — aggregate agent scores (also in agent_evaluation block)
             "planner_score": run.planner_score,
             "evidence_score": run.evidence_score,
             "qa_agent_score": run.qa_agent_score,
             "report_score": run.report_score,
+            "recommendation_score": run.recommendation_score,
+            "recommendation_dimension_summary": run.recommendation_dimension_summary,
         },
         "domain_scores": run.domain_scores,
         "qa_results": [_qa_score_dict(s) for s in run.qa_scores],
@@ -100,6 +102,13 @@ def build_md_report(run: EvaluationRun, *, run_meta: dict | None = None) -> str:
         f"| Contradiction accuracy | {_pct(run.contradiction_accuracy)} |",
         f"| Q&A passed | {sum(1 for s in run.qa_scores if s.passed)}/{len(run.qa_scores)} |",
         f"| Contradiction tests passed | {sum(1 for s in run.contradiction_scores if s.correct)}/{len(run.contradiction_scores)} |",
+        f"| Recommendation score | {_pct(run.recommendation_score)} |",
+        "",
+        "---",
+        "",
+        "## Recommendation Evaluation",
+        "",
+        *_recommendation_evaluation_section(run),
         "",
         "---",
         "",
@@ -315,6 +324,54 @@ def _pct(value: float) -> str:
     return f"{value:.1%}"
 
 
+def _recommendation_evaluation_section(run: "EvaluationRun") -> list[str]:
+    """Build Recommendation Evaluation markdown lines for the benchmark report (J6.6a)."""
+    lines: list[str] = []
+    ds = run.recommendation_dimension_summary
+    if not ds:
+        lines.append("_No recommendation dimension data available._")
+        return lines
+
+    lines += [
+        "### Dimension Summary",
+        "",
+        "| Dimension | Mean Score |",
+        "|---|---|",
+        f"| Evidence Support | {_pct(ds.get('evidence_support', 0.0))} |",
+        f"| Reasoning | {_pct(ds.get('reasoning', 0.0))} |",
+        f"| Tradeoff Awareness | {_pct(ds.get('tradeoff', 0.0))} |",
+        f"| Risk Identification | {_pct(ds.get('risk', 0.0))} |",
+        f"| Actionability | {_pct(ds.get('actionability', 0.0))} |",
+        f"| **Recommendation Score** | **{_pct(run.recommendation_score)}** |",
+        "",
+    ]
+
+    # Per-question recommendation scores if available
+    rec_rows = [
+        s for s in run.agent_scores
+        if s.recommendation_score > 0
+    ]
+    if rec_rows:
+        lines += [
+            "### Per-Question Recommendation Scores",
+            "",
+            "| Question | Domain | Evidence | Reasoning | Tradeoff | Risk | Actionability | Score |",
+            "|---|---|---|---|---|---|---|---|",
+        ]
+        for s in rec_rows:
+            lines.append(
+                f"| {s.question_id} | {s.domain} "
+                f"| {_pct(s.rec_evidence_support)} "
+                f"| {_pct(s.rec_reasoning)} "
+                f"| {_pct(s.rec_tradeoff)} "
+                f"| {_pct(s.rec_risk)} "
+                f"| {_pct(s.rec_actionability)} "
+                f"| **{_pct(s.recommendation_score)}** |"
+            )
+
+    return lines
+
+
 def _qa_score_dict(s: QAScore) -> dict:
     return {
         "question_id": s.question_id,
@@ -385,6 +442,13 @@ def _agent_evaluation_dict(run: "EvaluationRun") -> dict:
             "qa_score": s.qa_score,
             "report_score": s.report_score,
             "recommendation_score": s.recommendation_score,
+            "recommendation_dimensions": {
+                "evidence_support": s.rec_evidence_support,
+                "reasoning": s.rec_reasoning,
+                "tradeoff": s.rec_tradeoff,
+                "risk": s.rec_risk,
+                "actionability": s.rec_actionability,
+            },
             "detail": {
                 "planner": {
                     "investigation_area_count": s.investigation_area_count,
@@ -413,6 +477,7 @@ def _agent_evaluation_dict(run: "EvaluationRun") -> dict:
             "qa_score": run.qa_agent_score,
             "report_score": run.report_score,
             "recommendation_score": run.recommendation_score,
+            "recommendation_dimension_summary": run.recommendation_dimension_summary,
         },
         "per_question": per_question,
     }

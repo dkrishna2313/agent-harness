@@ -148,6 +148,43 @@ def _score_actionability(rec: dict) -> float:
 
 
 # ---------------------------------------------------------------------------
+# Diagnostics helpers
+# ---------------------------------------------------------------------------
+
+_PENALTY_THRESHOLD = 0.50  # dimension score below this is a "significant penalty"
+
+
+def _identify_primary_penalty(
+    ev_sup: float,
+    reasoning: float,
+    tradeoff: float,
+    risk: float,
+    actionability: float,
+) -> str | None:
+    """Return the name of the lowest-scoring dimension if it falls below the penalty
+    threshold, weighted by its contribution to the aggregate score.  Returns None
+    when all dimensions are healthy (≥ threshold)."""
+    weighted: list[tuple[float, str]] = [
+        (ev_sup   * _DIMENSION_WEIGHTS["evidence_support"], "missing_evidence_links"),
+        (reasoning * _DIMENSION_WEIGHTS["reasoning"],       "weak_reasoning"),
+        (tradeoff  * _DIMENSION_WEIGHTS["tradeoff"],        "no_tradeoff_awareness"),
+        (risk      * _DIMENSION_WEIGHTS["risk"],            "no_risk_identification"),
+        (actionability * _DIMENSION_WEIGHTS["actionability"], "low_actionability"),
+    ]
+    raw: list[tuple[float, str]] = [
+        (ev_sup,   "missing_evidence_links"),
+        (reasoning, "weak_reasoning"),
+        (tradeoff,  "no_tradeoff_awareness"),
+        (risk,      "no_risk_identification"),
+        (actionability, "low_actionability"),
+    ]
+    worst_raw = min(raw, key=lambda t: t[0])
+    if worst_raw[0] < _PENALTY_THRESHOLD:
+        return worst_raw[1]
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -186,6 +223,13 @@ def score_single_recommendation(
         3,
     )
 
+    # Diagnostics
+    missing_evidence_links = len(rec.get("supporting_evidence", [])) == 0
+    primary_penalty = _identify_primary_penalty(ev_sup, reasoning, tradeoff, risk, actionability)
+
+    traceability = build_recommendation_traceability(rec)
+    traceability["missing_evidence_links"] = missing_evidence_links
+
     return {
         "recommendation_id": rec.get("id", ""),
         "title": rec.get("title", ""),
@@ -195,7 +239,10 @@ def score_single_recommendation(
         "risk_score": risk,
         "actionability_score": actionability,
         "recommendation_score": aggregate,
-        "traceability": build_recommendation_traceability(rec),
+        "aggregate_score": aggregate,  # alias for spec compatibility
+        "missing_evidence_links": missing_evidence_links,
+        "primary_penalty": primary_penalty,
+        "traceability": traceability,
     }
 
 
@@ -224,20 +271,28 @@ def evaluate_recommendations(
         "traceability": [...]             # traceability records
     }
     """
+    _EMPTY: dict = {
+        "recommendation_scores": [],
+        "aggregate": {
+            "recommendation_count": 0,
+            "mean_evidence_support": 0.0,
+            "mean_reasoning": 0.0,
+            "mean_tradeoff": 0.0,
+            "mean_risk": 0.0,
+            "mean_actionability": 0.0,
+            "recommendation_score": 0.0,
+        },
+        "recommendation_summary": {
+            "recommendation_count": 0,
+            "average_score": 0.0,
+            "lowest_score": 0.0,
+            "highest_score": 0.0,
+        },
+        "recommendation_warnings": [],
+        "traceability": [],
+    }
     if not recommendations:
-        return {
-            "recommendation_scores": [],
-            "aggregate": {
-                "recommendation_count": 0,
-                "mean_evidence_support": 0.0,
-                "mean_reasoning": 0.0,
-                "mean_tradeoff": 0.0,
-                "mean_risk": 0.0,
-                "mean_actionability": 0.0,
-                "recommendation_score": 0.0,
-            },
-            "traceability": [],
-        }
+        return _EMPTY
 
     ev_ids = evidence_ids or set()
     hyp_ids = hypothesis_ids or set()
@@ -252,7 +307,24 @@ def evaluate_recommendations(
     def _mean(key: str) -> float:
         return round(sum(s[key] for s in scored) / n, 3)
 
+    all_scores = [s["recommendation_score"] for s in scored]
     traceability = [s["traceability"] for s in scored]
+
+    # Collect warnings for any recommendation with a primary penalty
+    warnings: list[dict] = []
+    for s in scored:
+        if s.get("primary_penalty"):
+            warnings.append({
+                "recommendation_id": s["recommendation_id"],
+                "issue": s["primary_penalty"],
+                "aggregate_score": s["recommendation_score"],
+            })
+        elif s.get("missing_evidence_links"):
+            warnings.append({
+                "recommendation_id": s["recommendation_id"],
+                "issue": "missing_evidence_links",
+                "aggregate_score": s["recommendation_score"],
+            })
 
     return {
         "recommendation_scores": scored,
@@ -265,6 +337,13 @@ def evaluate_recommendations(
             "mean_actionability": _mean("actionability_score"),
             "recommendation_score": _mean("recommendation_score"),
         },
+        "recommendation_summary": {
+            "recommendation_count": n,
+            "average_score": round(sum(all_scores) / n, 3),
+            "lowest_score": round(min(all_scores), 3),
+            "highest_score": round(max(all_scores), 3),
+        },
+        "recommendation_warnings": warnings,
         "traceability": traceability,
     }
 
@@ -294,20 +373,86 @@ def build_recommendation_traceability(rec: dict) -> dict:
 # functional-pipeline recommendations — inferences serve as a proxy)
 # ---------------------------------------------------------------------------
 
+_RE_LOGICAL_CONN = re.compile(
+    r"\bbecause\b|\bsince\b|\btherefore\b|\bthus\b|\bconsequently\b|\bhence\b",
+    re.IGNORECASE,
+)
+_RE_RISK_WORD = re.compile(
+    r"\brisk\b|\bchallenge\b|\bbarrier\b|\bconstraint\b|\bfail\b|\bhazard\b",
+    re.IGNORECASE,
+)
+
+
+def score_recommendation_dimensions_from_memo(memo_inferences: list[str]) -> dict[str, float]:
+    """Return per-dimension proxy scores from ResearchMemo.inferences.
+
+    Used in the benchmark evaluation path where functional-pipeline
+    RecommendationAgent output is not available.  Scores are estimates only —
+    each dimension uses lightweight text heuristics on the inference strings.
+    """
+    n = len(memo_inferences)
+    if n == 0:
+        return {
+            "evidence_support": 0.1,
+            "reasoning": 0.1,
+            "tradeoff": 0.1,
+            "risk": 0.1,
+            "actionability": 0.1,
+        }
+
+    # evidence_support: inferences with citation-style patterns ("according to", "data shows")
+    re_evidence = re.compile(
+        r"\baccording\s+to\b|\bdata\s+shows?\b|\bevidence\s+suggests?\b"
+        r"|\bsource\b|\bcited\b|\breport\b|\bstudy\b|\banalysis\b",
+        re.IGNORECASE,
+    )
+    ev_fraction = sum(1 for inf in memo_inferences if re_evidence.search(inf)) / n
+
+    # reasoning: logical connectors present
+    logic_fraction = sum(1 for inf in memo_inferences if _RE_LOGICAL_CONN.search(inf)) / n
+
+    # tradeoff: tradeoff keywords
+    trade_fraction = sum(
+        1 for inf in memo_inferences
+        if any(kw in inf.lower() for kw in _TRADEOFF_KEYWORDS)
+    ) / n
+
+    # risk: risk words
+    risk_fraction = sum(1 for inf in memo_inferences if _RE_RISK_WORD.search(inf)) / n
+
+    # actionability: action verbs + length
+    actionable_count = sum(
+        1 for inf in memo_inferences
+        if len(inf) >= 60 and any(v in inf.lower() for v in _ACTION_VERBS)
+    )
+    action_fraction = actionable_count / n
+
+    count_bonus = min(0.30, n / 4.0 * 0.30)  # up to +0.30 for having ≥4 inferences
+
+    def _score(fraction: float) -> float:
+        return round(min(1.0, 0.40 + fraction * 0.60 + count_bonus), 3)
+
+    return {
+        "evidence_support": _score(ev_fraction),
+        "reasoning": _score(logic_fraction),
+        "tradeoff": _score(trade_fraction),
+        "risk": _score(risk_fraction),
+        "actionability": _score(action_fraction),
+    }
+
+
 def score_recommendations_from_memo(memo_inferences: list[str]) -> float:
-    """Return a 0–1 recommendation proxy score from ResearchMemo.inferences.
+    """Return a 0–1 composite recommendation proxy score from ResearchMemo.inferences.
 
     Used in the benchmark evaluation path where functional-pipeline
     RecommendationAgent output is not available.
     """
-    n = len(memo_inferences)
-    if n == 0:
-        return 0.1  # minimal credit
-    # Count inferences that look actionable (≥ 60 chars with action verb)
-    actionable = sum(
-        1 for inf in memo_inferences
-        if len(inf) >= 60 and any(v in inf.lower() for v in _ACTION_VERBS)
+    dims = score_recommendation_dimensions_from_memo(memo_inferences)
+    return round(
+        dims["evidence_support"] * _DIMENSION_WEIGHTS["evidence_support"]
+        + dims["reasoning"]      * _DIMENSION_WEIGHTS["reasoning"]
+        + dims["tradeoff"]       * _DIMENSION_WEIGHTS["tradeoff"]
+        + dims["risk"]           * _DIMENSION_WEIGHTS["risk"]
+        + dims["actionability"]  * _DIMENSION_WEIGHTS["actionability"],
+        3,
     )
-    count_score = min(1.0, n / 4.0)        # ≥4 inferences → full credit
-    quality_score = min(1.0, actionable / max(1, n))
-    return round(count_score * 0.5 + quality_score * 0.5, 3)
