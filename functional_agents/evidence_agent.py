@@ -373,6 +373,13 @@ class EvidenceAgent(FunctionalAgent):
             }
         ]
 
+        # --- 5b. Contradiction hardening metadata (J6.5a) ---
+        memo_meta = getattr(memo, "metadata", {}) or {}
+        validated_contradictions: list[dict] = memo_meta.get("contradictions", [])
+        contradiction_metrics: dict = memo_meta.get("contradiction_metrics", {})
+        context.validated_contradictions = validated_contradictions
+        context.contradiction_metrics = contradiction_metrics
+
         # --- 6. Update Research Object (J5.2.6) ---
         if context.research_object:
             ro = context.research_object
@@ -382,6 +389,9 @@ class EvidenceAgent(FunctionalAgent):
             ro["evidence_by_area"] = evidence_by_area
             ro["coverage_by_subquestion"] = coverage_by_subquestion
             ro["evidence_summary"] = evidence_summary
+            ro["validated_contradictions"] = validated_contradictions
+            ro["contradiction_metrics"] = contradiction_metrics
+            ro["suppressed_contradictions"] = memo_meta.get("suppressed_comparisons", [])
 
         # --- 7. Agent history (J5.2.8) ---
         self._record(

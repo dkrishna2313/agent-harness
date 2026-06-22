@@ -736,6 +736,19 @@ class ReportAgent(FunctionalAgent):
                 "challenge_synthesis": chal_data.get("challenge_synthesis", ""),
             }
 
+        # Contradiction hardening block (J6.5a)
+        if context.contradiction_metrics:
+            metrics = context.contradiction_metrics
+            trace_payload["contradiction_hardening"] = {
+                "candidate_count": metrics.get("candidate_count", 0),
+                "suppressed_count": metrics.get("suppressed_count", 0),
+                "final_count": metrics.get("final_count", 0),
+                "by_reason": metrics.get("by_reason", {}),
+                "scope_filtering_present": metrics.get("scope_filtering_present", False),
+                "entity_filtering_present": metrics.get("entity_filtering_present", False),
+                "temporal_filtering_present": metrics.get("temporal_filtering_present", False),
+            }
+
         # Contract validation block (J5.5a follow-up)
         # ReportAgent reads _contract_runtime before _step() can record its own
         # result (the trace is written here, mid-execution). base.run() always

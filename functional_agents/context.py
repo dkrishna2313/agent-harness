@@ -92,6 +92,9 @@ class AgentContext:
     surviving_hypotheses: list[dict[str, Any]] = field(default_factory=list)
     recommendations: list[dict[str, Any]] = field(default_factory=list)
     recommendation_portfolio: dict[str, Any] = field(default_factory=dict)
+    # J6.5a – validated (post-suppression) contradictions and suppression metrics
+    validated_contradictions: list[dict[str, Any]] = field(default_factory=list)
+    contradiction_metrics: dict[str, Any] = field(default_factory=dict)
     qa_notes: list[dict[str, Any]] = field(default_factory=list)
     qa: dict[str, Any] = field(default_factory=dict)
     report: dict[str, Any] = field(default_factory=dict)

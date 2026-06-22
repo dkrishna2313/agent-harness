@@ -622,6 +622,7 @@ class MockClaudeClient:
         evidence_items: list[dict],
         decision_model: dict,
         research_strategy: dict,
+        validated_contradictions: list[dict] | None = None,
     ) -> "RecommendationPayload":
         """Return deterministic recommendations derived from surviving hypotheses."""
         ev_ids = [e.get("evidence_id", "") for e in evidence_items if e.get("evidence_id")]
@@ -809,6 +810,7 @@ class ClaudeClient:
         evidence_items: list[dict],
         decision_model: dict,
         research_strategy: dict,
+        validated_contradictions: list[dict] | None = None,
     ) -> RecommendationPayload:
         """Generate actionable recommendations from challenged hypotheses (J6.5)."""
         payload = self._call_json(
@@ -817,6 +819,7 @@ class ClaudeClient:
             prompt=_recommendation_prompt(
                 hypotheses, surviving_hypotheses, hypothesis_challenges,
                 evidence_items, decision_model, research_strategy,
+                validated_contradictions=validated_contradictions or [],
             ),
             max_tokens=10000,
         )
@@ -1457,6 +1460,7 @@ def _recommendation_prompt(
     evidence_items: list[dict],
     decision_model: dict,
     research_strategy: dict,
+    validated_contradictions: list[dict] | None = None,
 ) -> str:
     """Build the RecommendationAgent prompt (J6.5)."""
     objective = decision_model.get("objective", "")
@@ -1495,6 +1499,16 @@ def _recommendation_prompt(
 
     areas_text = "\n".join(f"  - {a}" for a in decision_areas[:6]) or "  (not specified)"
 
+    # J6.5a – validated contradictions block
+    contra_lines = ""
+    for c in (validated_contradictions or [])[:10]:
+        cid = c.get("contradiction_id", "?")
+        topic = c.get("topic", "")
+        sev = c.get("severity", "")
+        claim_a = c.get("evidence_a_claim", "")[:80]
+        claim_b = c.get("evidence_b_claim", "")[:80]
+        contra_lines += f"  {cid} [{sev}] {topic}: \"{claim_a}\" vs \"{claim_b}\"\n"
+
     return f"""\
 You are a strategic advisor translating challenged hypotheses into actionable recommendations.
 
@@ -1508,6 +1522,9 @@ Decision Areas:
 
 ## Evidence Available (up to 20 items)
 {ev_lines or "  (none)"}
+
+## Validated Contradictions (post-suppression, use to flag risks)
+{contra_lines or "  (none detected)"}
 
 ---
 

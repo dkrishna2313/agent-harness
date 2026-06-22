@@ -341,6 +341,10 @@ _INCOMPATIBLE_SCOPE_PAIRS: frozenset[frozenset[str]] = frozenset({
     frozenset({"node", "rack"}),
     frozenset({"node", "cluster"}),
     frozenset({"node", "facility"}),
+    # J6.5a – rack vs campus-scale scopes (e.g. 132 kW/rack vs 100 MW campus)
+    frozenset({"rack", "cluster"}),
+    frozenset({"rack", "facility"}),
+    frozenset({"cluster", "facility"}),
     frozenset({"unit", "fleet"}),
     frozenset({"unit", "country"}),
     frozenset({"unit", "province"}),
@@ -459,6 +463,25 @@ _RE_CURRENT = re.compile(
     r"\bcurrent\b|\btoday\b|\bexisting\b|\bpresent\b|\bnow\b|\boperating\b",
     re.IGNORECASE,
 )
+
+# J6.5a – temporal kind detector (used by Gate 6 in _check_numeric_conflict)
+_RE_FUTURE_PROJECTION = re.compile(
+    r"\bby\s+20[3-9]\d\b|\bproject(?:ed|ion)\b|\bforecast\b|\bexpect(?:ed)?\b"
+    r"|\bpipeline\b|\bplanned\b|\bproposes?\b|\broadmap\b|\bfuture\b",
+    re.IGNORECASE,
+)
+
+
+def _extract_numeric_kind_from_text(text: str) -> str:
+    """Return the temporal kind of a numeric claim: 'current', 'target', 'rate', or 'unknown'."""
+    if _RE_RATE.search(text):
+        return "rate"
+    if _RE_TARGET.search(text) or _RE_FUTURE_PROJECTION.search(text):
+        return "target"
+    if _RE_CURRENT.search(text):
+        return "current"
+    return "unknown"
+
 
 # ---- Year context patterns -----------------------------------------------
 
@@ -838,6 +861,28 @@ def _check_numeric_conflict(
                 ))
             continue
 
+        # Gate 6 (J6.5a): temporal progression — current state vs future target
+        kind_a = _extract_numeric_kind_from_text(claim_a)
+        kind_b = _extract_numeric_kind_from_text(claim_b)
+        _temporal_pair = frozenset({kind_a, kind_b})
+        if _temporal_pair in (frozenset({"current", "target"}), frozenset({"current", "rate"})):
+            if out_suppressed is not None:
+                out_suppressed.append(SuppressedComparison(
+                    evidence_a_id=a.evidence_id or "?",
+                    evidence_b_id=b.evidence_id or "?",
+                    evidence_a_claim=a.claim,
+                    evidence_b_claim=b.claim,
+                    reason="temporal_progression",
+                    scope_a=scope_a,
+                    scope_b=scope_b,
+                    detail=(
+                        f"Unit '{unit}': temporal kinds differ — "
+                        f"A is '{kind_a}' ({val_a} {unit}), B is '{kind_b}' ({val_b} {unit}). "
+                        f"Current state vs future projection/rate are not contradictions."
+                    ),
+                ))
+            continue
+
         if val_a == 0 and val_b == 0:
             continue
         denom = max(val_a, val_b)
@@ -1062,6 +1107,39 @@ def _check_duration_conflict(
             f"do not overlap."
         ),
     )
+
+
+# ---------------------------------------------------------------------------
+# J6.5a – Suppression metrics
+# ---------------------------------------------------------------------------
+
+def compute_suppression_metrics(
+    suppressed: list[SuppressedComparison],
+    final_count: int,
+) -> dict:
+    """Return suppression metrics for the Research Object and QA trace.
+
+    Parameters
+    ----------
+    suppressed:
+        List collected via ``out_suppressed`` in ``detect_contradictions``.
+    final_count:
+        Number of confirmed contradictions (len of detect_contradictions return).
+    """
+    by_reason: dict[str, int] = {}
+    for s in suppressed:
+        by_reason[s.reason] = by_reason.get(s.reason, 0) + 1
+    suppressed_count = len(suppressed)
+    return {
+        "candidate_count": final_count + suppressed_count,
+        "suppressed_count": suppressed_count,
+        "final_count": final_count,
+        "by_reason": by_reason,
+        "scope_filtering_present": by_reason.get("scope_mismatch", 0) > 0
+            or by_reason.get("metric_scope_mismatch", 0) > 0,
+        "entity_filtering_present": by_reason.get("entity_mismatch", 0) > 0,
+        "temporal_filtering_present": by_reason.get("temporal_progression", 0) > 0,
+    }
 
 
 # ---------------------------------------------------------------------------

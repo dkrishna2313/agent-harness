@@ -8,7 +8,7 @@ from collections.abc import Iterable, Sequence
 
 from .chunker import chunk_documents, compute_chunk_diagnostics
 from .claude_client import LLMClient, MockClaudeClient, aggregate_call_traces
-from .contradiction import detect_contradictions, enrich_evidence_items, build_extraction_stats
+from .contradiction import detect_contradictions, enrich_evidence_items, build_extraction_stats, compute_suppression_metrics
 from .evidence_enricher import enrich_evidence_with_metadata, build_evidence_density_stats
 from .perspectives import build_diversity_metrics, detect_domain, select_diverse_evidence
 from .coverage import compute_coverage_matrix
@@ -262,6 +262,7 @@ class DcPowerAgent:
             memo = memo.model_copy(update={"evidence": evidence})
             suppressed: list = []
             contradictions = detect_contradictions(evidence, source_quality_map, profile=self.profile, out_suppressed=suppressed)
+            contradiction_metrics = compute_suppression_metrics(suppressed, len(contradictions))
             research_gaps = detect_gaps(question, evidence, self.profile)
             coverage_matrix = compute_coverage_matrix(
                 question, evidence,
@@ -280,6 +281,7 @@ class DcPowerAgent:
                     **retrieval_meta,
                     "contradictions": [c.model_dump() for c in contradictions],
                     "suppressed_comparisons": [s.model_dump() for s in suppressed],
+                    "contradiction_metrics": contradiction_metrics,
                     "extraction_stats": extraction_stats,
                     "evidence_density": evidence_density,
                     "retrieval_diversity": retrieval_diversity_mock,
@@ -436,6 +438,7 @@ class DcPowerAgent:
         retrieval_diversity = build_diversity_metrics(evidence, _diversity_domain)
         suppressed: list = []
         contradictions = detect_contradictions(evidence, source_quality_map, profile=self.profile, out_suppressed=suppressed)
+        contradiction_metrics = compute_suppression_metrics(suppressed, len(contradictions))
         research_gaps = detect_gaps(question, evidence, self.profile)
         coverage_matrix = compute_coverage_matrix(
             question, evidence,
@@ -463,6 +466,7 @@ class DcPowerAgent:
                     **retrieval_meta,
                     "contradictions": [c.model_dump() for c in contradictions],
                     "suppressed_comparisons": [s.model_dump() for s in suppressed],
+                    "contradiction_metrics": contradiction_metrics,
                     "extraction_stats": extraction_stats,
                     "evidence_density": evidence_density,
                     "research_gaps": [g.model_dump() for g in research_gaps],

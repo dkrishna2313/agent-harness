@@ -65,6 +65,13 @@ class RecommendationAgent(FunctionalAgent):
         evidence_note = context.evidence_notes[0] if context.evidence_notes else {}
         evidence_items: list[dict] = evidence_note.get("evidence_items", [])
 
+        # J6.5a — prefer validated (post-suppression) contradictions when available
+        validated_contradictions: list[dict] = (
+            context.validated_contradictions
+            or context.research_object.get("validated_contradictions", [])
+            if context.research_object else context.validated_contradictions
+        )
+
         rec_payload = self._generate_recommendations(
             hypotheses=hypotheses,
             surviving_hypotheses=context.surviving_hypotheses,
@@ -72,6 +79,7 @@ class RecommendationAgent(FunctionalAgent):
             evidence_items=evidence_items,
             decision_model=context.decision_model,
             research_strategy=context.research_strategy,
+            validated_contradictions=validated_contradictions,
         )
 
         recs_as_dicts = [r.model_dump() for r in rec_payload.recommendations]
@@ -130,6 +138,7 @@ class RecommendationAgent(FunctionalAgent):
         evidence_items: list[dict],
         decision_model: dict,
         research_strategy: dict,
+        validated_contradictions: list[dict] | None = None,
     ):
         """Call the LLM client to generate recommendations."""
         if self._client is None:
@@ -140,6 +149,7 @@ class RecommendationAgent(FunctionalAgent):
             return self._client.generate_recommendations(
                 hypotheses, surviving_hypotheses, hypothesis_challenges,
                 evidence_items, decision_model, research_strategy,
+                validated_contradictions=validated_contradictions or [],
             )
 
         LOGGER.warning("[RecommendationAgent] client does not support generate_recommendations — using mock")

@@ -384,6 +384,39 @@ def _validate_challenges(
 # Recommendation validation (J6.5)
 # ---------------------------------------------------------------------------
 
+def _validate_contradiction_hardening(context: "AgentContext") -> dict[str, Any]:
+    """Check that the contradiction hardening pipeline ran and suppressed false positives (J6.5a)."""
+    metrics: dict = context.contradiction_metrics or {}
+    suppressed_count: int = metrics.get("suppressed_count", 0)
+    final_count: int = metrics.get("final_count", 0)
+    by_reason: dict = metrics.get("by_reason", {})
+
+    scope_filtering_present = bool(
+        by_reason.get("scope_mismatch", 0) or by_reason.get("metric_scope_mismatch", 0)
+        or metrics.get("scope_filtering_present")
+    )
+    entity_filtering_present = bool(
+        by_reason.get("entity_mismatch", 0) or metrics.get("entity_filtering_present")
+    )
+    temporal_filtering_present = bool(
+        by_reason.get("temporal_progression", 0) or metrics.get("temporal_filtering_present")
+    )
+
+    issues: list[str] = []
+    if not metrics:
+        issues.append("contradiction_metrics not populated — EvidenceAgent may not have run")
+
+    return {
+        "scope_filtering_present": scope_filtering_present,
+        "entity_filtering_present": entity_filtering_present,
+        "temporal_filtering_present": temporal_filtering_present,
+        "suppressed_count": suppressed_count,
+        "final_count": final_count,
+        "by_reason": by_reason,
+        "issues": issues,
+    }
+
+
 def _validate_recommendations(
     recommendations: list[dict],
     portfolio: dict,
@@ -542,6 +575,9 @@ class QAAgent(FunctionalAgent):
             context.recommendation_portfolio,
         )
 
+        # --- contradiction hardening validation (J6.5a) ---
+        contradiction_hardening_validation = _validate_contradiction_hardening(context)
+
         # --- write context.qa (J5.3.1) ---
         context.qa = {
             "coverage_issues": coverage_issues,
@@ -558,6 +594,7 @@ class QAAgent(FunctionalAgent):
             "hypothesis_validation": hypothesis_validation,
             "challenge_validation": challenge_validation,
             "recommendation_validation": recommendation_validation,
+            "contradiction_validation": contradiction_hardening_validation,
         }
 
         # --- update Research Object (J5.3.7) ---
