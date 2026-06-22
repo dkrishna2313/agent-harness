@@ -79,6 +79,7 @@ class AgentOrchestrator:
         hypothesis_factory: Any = None,
         challenge_factory: Any = None,
         recommendation_factory: Any = None,
+        improvement_factory: Any = None,
         max_iterations: int = 3,
     ) -> None:
         self._problem_framing_factory   = problem_framing_factory
@@ -86,6 +87,7 @@ class AgentOrchestrator:
         self._hypothesis_factory        = hypothesis_factory
         self._challenge_factory         = challenge_factory
         self._recommendation_factory    = recommendation_factory
+        self._improvement_factory       = improvement_factory
         self._planner_factory  = planner_factory
         self._evidence_factory = evidence_factory
         self._qa_factory       = qa_factory
@@ -207,7 +209,17 @@ class AgentOrchestrator:
                         state = WorkflowState.REPORT
 
                 else:
-                    state = WorkflowState.REPORT
+                    state = (
+                        WorkflowState.RECOMMENDATION_IMPROVEMENT
+                        if self._improvement_factory is not None
+                        else WorkflowState.REPORT
+                    )
+
+            # ---- RECOMMENDATION IMPROVEMENT (J6.7) --------------------------
+            elif state == WorkflowState.RECOMMENDATION_IMPROVEMENT:
+                result = _step(self._improvement_factory(), ctx)
+                ctx = result.context
+                state = WorkflowState.REPORT
 
             # ---- REPORT -----------------------------------------------------
             elif state == WorkflowState.REPORT:
@@ -312,7 +324,8 @@ class Orchestrator:
         from .research_strategy_agent   import ResearchStrategyAgent
         from .hypothesis_agent          import HypothesisAgent
         from .challenge_agent           import ChallengeAgent
-        from .recommendation_agent      import RecommendationAgent
+        from .recommendation_agent                import RecommendationAgent
+        from .recommendation_improvement_agent   import RecommendationImprovementAgent
 
         execution_profile = self._profile_names[0] if self._profile_names else ""
         mock_mode = self._client is not None and getattr(self._client, "is_mock", False)
@@ -342,6 +355,9 @@ class Orchestrator:
 
         def recommendation_factory() -> RecommendationAgent:
             return RecommendationAgent(client=self._client, domain_profiles=loaded_profiles)
+
+        def improvement_factory() -> RecommendationImprovementAgent:
+            return RecommendationImprovementAgent()
 
         def planner_factory() -> PlannerAgent:
             return PlannerAgent(client=self._client, domain_profiles=loaded_profiles)
@@ -407,6 +423,7 @@ class Orchestrator:
             hypothesis_factory=hypothesis_factory,
             challenge_factory=challenge_factory,
             recommendation_factory=recommendation_factory,
+            improvement_factory=improvement_factory,
             planner_factory=planner_factory,
             evidence_factory=evidence_factory,
             qa_factory=qa_factory,

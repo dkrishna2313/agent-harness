@@ -26,8 +26,9 @@ class WorkflowState:
     EVIDENCE    = "EVIDENCE"
     HYPOTHESIS  = "HYPOTHESIS"
     CHALLENGE       = "CHALLENGE"
-    RECOMMENDATION  = "RECOMMENDATION"
-    QA              = "QA"
+    RECOMMENDATION              = "RECOMMENDATION"
+    RECOMMENDATION_IMPROVEMENT  = "RECOMMENDATION_IMPROVEMENT"
+    QA                          = "QA"
     REPORT      = "REPORT"
     COMPLETE    = "COMPLETE"
     ERROR       = "ERROR"
@@ -92,6 +93,7 @@ class AgentContext:
     surviving_hypotheses: list[dict[str, Any]] = field(default_factory=list)
     recommendations: list[dict[str, Any]] = field(default_factory=list)
     recommendation_portfolio: dict[str, Any] = field(default_factory=dict)
+    recommendation_improvement: dict[str, Any] = field(default_factory=dict)
     # J6.5a – validated (post-suppression) contradictions and suppression metrics
     validated_contradictions: list[dict[str, Any]] = field(default_factory=list)
     contradiction_metrics: dict[str, Any] = field(default_factory=dict)

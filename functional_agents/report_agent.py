@@ -205,6 +205,42 @@ def _build_recommendation_evaluation_section(rec_eval: dict) -> str:
     return "\n".join(lines)
 
 
+def _build_recommendation_improvement_section(improvement: dict) -> str:
+    """Render a Recommendation Improvement table section for the markdown report (J6.7)."""
+    records = improvement.get("improvement_records", [])
+    metrics = improvement.get("improvement_metrics", {})
+    if not records:
+        return ""
+
+    lines = [
+        "## Recommendation Improvement",
+        "",
+        "| Recommendation | Before | After | Delta | Weakness Addressed |",
+        "|---|---|---|---|---|",
+    ]
+    for r in records:
+        rid = r.get("recommendation_id", "")
+        before = r.get("before_score", 0.0)
+        after = r.get("after_score", 0.0)
+        delta = r.get("delta", 0.0)
+        sign = "+" if delta >= 0 else ""
+        weaknesses = ", ".join(r.get("weaknesses_addressed", []))
+        lines.append(
+            f"| {rid} | {before:.3f} | {after:.3f} | {sign}{delta:.3f} | {weaknesses} |"
+        )
+
+    lines += [
+        "",
+        f"**{metrics.get('recommendations_improved', 0)} of "
+        f"{metrics.get('recommendations_improved', 0) + metrics.get('recommendations_unchanged', 0)} "
+        f"recommendations improved.** "
+        f"Average score: {metrics.get('average_score_before', 0):.3f} → "
+        f"{metrics.get('average_score_after', 0):.3f} "
+        f"(Δ {metrics.get('average_delta', 0):+.3f})",
+    ]
+    return "\n".join(lines)
+
+
 def _write_recommendation_observability_trace(rec_eval: dict, report_path: "Path") -> None:
     """Write j66a_recommendation_observability.trace.json alongside the report (J6.6a)."""
     import json
@@ -690,6 +726,11 @@ class ReportAgent(FunctionalAgent):
             _rec_eval_section = _build_recommendation_evaluation_section(_rec_eval_for_md)
             if _rec_eval_section:
                 report_content = report_content.rstrip("\n") + "\n\n" + _rec_eval_section
+        _improvement_data = context.recommendation_improvement
+        if _improvement_data and _improvement_data.get("improvement_records"):
+            _improvement_section = _build_recommendation_improvement_section(_improvement_data)
+            if _improvement_section:
+                report_content = report_content.rstrip("\n") + "\n\n" + _improvement_section
         output_path = write_markdown(report_content, self._out_path)
         context.artifacts["report_path"] = str(output_path)
         context.artifacts["trace_path"] = str(output_path.with_suffix(".trace.json"))
@@ -908,6 +949,11 @@ class ReportAgent(FunctionalAgent):
                 },
                 "numeric_semantics": metrics.get("numeric_semantics", {}),
             }
+
+        # Recommendation improvement block (J6.7)
+        improvement_data = context.trace.get("_recommendation_improvement")
+        if improvement_data:
+            trace_payload["recommendation_improvement"] = improvement_data
 
         # Contract validation block (J5.5a follow-up)
         # ReportAgent reads _contract_runtime before _step() can record its own
