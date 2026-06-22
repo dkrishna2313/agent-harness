@@ -77,11 +77,13 @@ class AgentOrchestrator:
         problem_framing_factory: Any = None,
         research_strategy_factory: Any = None,
         hypothesis_factory: Any = None,
+        challenge_factory: Any = None,
         max_iterations: int = 3,
     ) -> None:
         self._problem_framing_factory   = problem_framing_factory
         self._research_strategy_factory = research_strategy_factory
         self._hypothesis_factory        = hypothesis_factory
+        self._challenge_factory         = challenge_factory
         self._planner_factory  = planner_factory
         self._evidence_factory = evidence_factory
         self._qa_factory       = qa_factory
@@ -139,6 +141,16 @@ class AgentOrchestrator:
             # ---- HYPOTHESIS (J6.3) ------------------------------------------
             elif state == WorkflowState.HYPOTHESIS:
                 result = _step(self._hypothesis_factory(), ctx)
+                ctx = result.context
+                state = (
+                    WorkflowState.CHALLENGE
+                    if self._challenge_factory is not None
+                    else WorkflowState.QA
+                )
+
+            # ---- CHALLENGE (J6.4) -------------------------------------------
+            elif state == WorkflowState.CHALLENGE:
+                result = _step(self._challenge_factory(), ctx)
                 ctx = result.context
                 state = WorkflowState.QA
 
@@ -229,6 +241,7 @@ class Orchestrator:
         top_evidence: int = 50,
         top_chunks: int = 20,
         max_iterations: int = 3,
+        web_search: bool = False,
     ) -> None:
         self._profile_names  = profile_names
         self._sources_dir    = Path(sources_dir)
@@ -237,6 +250,7 @@ class Orchestrator:
         self._top_evidence   = top_evidence
         self._top_chunks     = top_chunks
         self._max_iterations = max_iterations
+        self._web_search     = web_search
 
         from research_agent.log import PROGRESS
 
@@ -248,6 +262,13 @@ class Orchestrator:
                 LOGGER.log(PROGRESS, "Execution profile loaded: %s", profile_names[0])
             except FileNotFoundError as exc:
                 LOGGER.warning("Could not load profile %r: %s", profile_names[0], exc)
+
+        # Patch web search into the execution profile when requested via CLI flag
+        if web_search and self._domain_profile is not None:
+            from research_agent.profile import WebSearchConfig
+            self._domain_profile = self._domain_profile.model_copy(update={
+                "web_search": WebSearchConfig(enabled=True, max_results=5, max_pages=5)
+            })
 
         # Verify supporting profiles (warn on missing; don't abort)
         for name in profile_names[1:]:
@@ -278,6 +299,7 @@ class Orchestrator:
         from .problem_framing_agent     import ProblemFramingAgent
         from .research_strategy_agent   import ResearchStrategyAgent
         from .hypothesis_agent          import HypothesisAgent
+        from .challenge_agent           import ChallengeAgent
 
         execution_profile = self._profile_names[0] if self._profile_names else ""
         mock_mode = self._client is not None and getattr(self._client, "is_mock", False)
@@ -301,6 +323,9 @@ class Orchestrator:
 
         def hypothesis_factory() -> HypothesisAgent:
             return HypothesisAgent(client=self._client, domain_profiles=loaded_profiles)
+
+        def challenge_factory() -> ChallengeAgent:
+            return ChallengeAgent(client=self._client, domain_profiles=loaded_profiles)
 
         def planner_factory() -> PlannerAgent:
             return PlannerAgent(client=self._client, domain_profiles=loaded_profiles)
@@ -333,7 +358,7 @@ class Orchestrator:
             profile_names=self._profile_names or None,
             profile_source="cli_argument",
             sources_dir=self._sources_dir,
-            web_search=False,
+            web_search=self._web_search,
             mock_mode=mock_mode,
         )
 
@@ -364,6 +389,7 @@ class Orchestrator:
             problem_framing_factory=problem_framing_factory if goal else None,
             research_strategy_factory=research_strategy_factory if goal else None,
             hypothesis_factory=hypothesis_factory,
+            challenge_factory=challenge_factory,
             planner_factory=planner_factory,
             evidence_factory=evidence_factory,
             qa_factory=qa_factory,

@@ -35,10 +35,11 @@ def _agent_classes() -> list[type]:
     from .problem_framing_agent     import ProblemFramingAgent
     from .research_strategy_agent   import ResearchStrategyAgent
     from .hypothesis_agent          import HypothesisAgent
+    from .challenge_agent           import ChallengeAgent
     return [
         ProblemFramingAgent, ResearchStrategyAgent,
         PlannerAgent, EvidenceAgent,
-        HypothesisAgent,
+        HypothesisAgent, ChallengeAgent,
         QAAgent, ReportAgent,
     ]
 

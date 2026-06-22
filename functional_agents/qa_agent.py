@@ -314,6 +314,73 @@ def _validate_hypotheses(hypotheses: list[dict]) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Challenge validation (J6.4)
+# ---------------------------------------------------------------------------
+
+def _validate_challenges(
+    challenges: list[dict],
+    surviving: list[dict],
+    hypotheses: list[dict],
+) -> dict[str, Any]:
+    """Check that challenge output meets structural quality requirements."""
+    hypothesis_ids = {h.get("id", "") for h in hypotheses}
+    challenged_ids = {c.get("hypothesis_id", "") for c in challenges}
+    surviving_ids = {s.get("hypothesis_id", "") for s in surviving}
+
+    issues: list[str] = []
+
+    if not challenges:
+        return {
+            "challenges_present": False,
+            "challenge_count": 0,
+            "all_hypotheses_challenged": False,
+            "all_have_falsification_tests": False,
+            "surviving_hypotheses_present": False,
+            "issues": ["No challenges generated"],
+        }
+
+    all_challenged = hypothesis_ids <= challenged_ids
+    all_have_falsification = all(
+        isinstance(c.get("falsification_tests"), list) and len(c.get("falsification_tests", [])) > 0
+        for c in challenges
+    )
+    all_have_hidden_assumptions = all(
+        isinstance(c.get("hidden_assumptions"), list) and len(c.get("hidden_assumptions", [])) > 0
+        for c in challenges
+    )
+    valid_robustness = all(
+        c.get("robustness") in ("low", "medium", "high") for c in challenges
+    )
+    valid_survival = all(
+        s.get("survival_status") in ("strong", "moderate", "weak") for s in surviving
+    )
+
+    if not all_challenged:
+        missing = hypothesis_ids - challenged_ids
+        issues.append(f"Hypotheses not challenged: {', '.join(sorted(missing))}")
+    if not all_have_falsification:
+        issues.append("One or more challenges missing falsification tests")
+    if not all_have_hidden_assumptions:
+        issues.append("One or more challenges missing hidden assumptions")
+    if not valid_robustness:
+        issues.append("One or more challenges have invalid robustness value")
+    if surviving and not valid_survival:
+        issues.append("One or more surviving hypotheses have invalid survival_status")
+
+    return {
+        "challenges_present": True,
+        "challenge_count": len(challenges),
+        "all_hypotheses_challenged": all_challenged,
+        "all_have_falsification_tests": all_have_falsification,
+        "all_have_hidden_assumptions": all_have_hidden_assumptions,
+        "robustness_valid": valid_robustness,
+        "surviving_hypotheses_present": len(surviving) > 0,
+        "surviving_hypothesis_count": len(surviving),
+        "issues": issues,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Agent
 # ---------------------------------------------------------------------------
 
@@ -388,6 +455,13 @@ class QAAgent(FunctionalAgent):
         # --- hypothesis validation (J6.3) ---
         hypothesis_validation = _validate_hypotheses(context.hypotheses)
 
+        # --- challenge validation (J6.4) ---
+        challenge_validation = _validate_challenges(
+            context.hypothesis_challenges,
+            context.surviving_hypotheses,
+            context.hypotheses,
+        )
+
         # --- write context.qa (J5.3.1) ---
         context.qa = {
             "coverage_issues": coverage_issues,
@@ -402,6 +476,7 @@ class QAAgent(FunctionalAgent):
             "confidence_assessment": confidence,
             "qa_summary": qa_summary,
             "hypothesis_validation": hypothesis_validation,
+            "challenge_validation": challenge_validation,
         }
 
         # --- update Research Object (J5.3.7) ---

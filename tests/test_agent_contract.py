@@ -200,7 +200,7 @@ def test_validate_all_classes_returns_all_agents():
     assert set(results.keys()) == {
         "ProblemFramingAgent", "ResearchStrategyAgent",
         "PlannerAgent", "EvidenceAgent",
-        "HypothesisAgent",
+        "HypothesisAgent", "ChallengeAgent",
         "QAAgent", "ReportAgent",
     }
 

@@ -197,12 +197,71 @@ class HypothesisPayload(BaseModel):
     )
 
 
+class ChallengeItem(BaseModel):
+    """Challenge analysis for one hypothesis (J6.4)."""
+
+    hypothesis_id: str = Field(description="The hypothesis ID this challenge addresses, e.g. 'H1'")
+    challenge_summary: str = Field(description="1-3 sentence summary of the main challenge")
+    hidden_assumptions: list[str] = Field(
+        default_factory=list,
+        description="Implicit assumptions the hypothesis relies on that are unverified",
+    )
+    weak_evidence: list[str] = Field(
+        default_factory=list,
+        description="Evidence quality issues: vendor projections, thin data, unsupported claims",
+    )
+    contradicting_evidence: list[str] = Field(
+        default_factory=list,
+        description="Evidence IDs (Exxx) that contradict or weaken the hypothesis",
+    )
+    missing_evidence: list[str] = Field(
+        default_factory=list,
+        description="Evidence that is absent but needed to validate the hypothesis",
+    )
+    falsification_tests: list[str] = Field(
+        default_factory=list,
+        description="Specific observable conditions that would invalidate the hypothesis",
+    )
+    robustness: str = Field(
+        default="medium",
+        description="Overall robustness of the hypothesis: 'low', 'medium', or 'high'",
+    )
+
+
+class SurvivingHypothesis(BaseModel):
+    """Post-challenge survival status for one hypothesis (J6.4)."""
+
+    hypothesis_id: str = Field(description="The hypothesis ID")
+    survival_status: str = Field(
+        description="'strong', 'moderate', or 'weak' — how well the hypothesis survived challenges"
+    )
+    reason: str = Field(description="1-2 sentence rationale for the survival status")
+
+
+class ChallengePayload(BaseModel):
+    """Structured output for ChallengeAgent (J6.4)."""
+
+    hypothesis_challenges: list[ChallengeItem] = Field(
+        default_factory=list,
+        description="One ChallengeItem per hypothesis",
+    )
+    surviving_hypotheses: list[SurvivingHypothesis] = Field(
+        default_factory=list,
+        description="Survival status for each hypothesis after challenge analysis",
+    )
+    challenge_synthesis: str = Field(
+        default="",
+        description="1-2 sentence overview of which hypotheses survived best and why",
+    )
+
+
 _SCHEMA_ADAPTERS = {
     "research_plan": TypeAdapter(ResearchPlan),
     "research_planning": TypeAdapter(ResearchPlanningPayload),
     "problem_framing": TypeAdapter(DecisionModelPayload),
     "research_strategy": TypeAdapter(ResearchStrategyPayload),
     "hypothesis_generation": TypeAdapter(HypothesisPayload),
+    "challenge_generation": TypeAdapter(ChallengePayload),
     # Used for the tool-definition schema sent to Claude (strict EvidenceItem types).
     "evidence_extraction": TypeAdapter(EvidenceExtractionPayload),
     # Used for response validation (lenient — items validated per-item in extract_evidence).
@@ -421,6 +480,80 @@ class MockClaudeClient:
             ),
         )
 
+    def generate_challenges(
+        self,
+        hypotheses: list[dict],
+        evidence_items: list[dict],
+        contradictions: list[dict],
+        research_gaps: list[dict],
+        profile_coverage: dict,
+    ) -> "ChallengePayload":
+        """Return deterministic challenges for each hypothesis."""
+        challenges = []
+        surviving = []
+        # Map hypothesis IDs to robustness so we can vary them deterministically
+        robustness_cycle = ["medium", "low", "high"]
+        status_cycle = ["moderate", "weak", "strong"]
+
+        # Collect evidence IDs for cross-referencing
+        ev_ids = [e.get("evidence_id", "") for e in evidence_items if e.get("evidence_id")]
+        contra_ids = [c.get("evidence_id_1", "") or c.get("item_a_id", "") for c in contradictions if c]
+
+        for i, h in enumerate(hypotheses):
+            hid = h.get("id", f"H{i+1}")
+            title = h.get("title", "")
+            sup_ev = h.get("supporting_evidence", [])
+            con_ev = h.get("contradicting_evidence", [])
+            gaps = h.get("evidence_gaps", [])
+            robustness = robustness_cycle[i % 3]
+            status = status_cycle[i % 3]
+
+            challenges.append(ChallengeItem(
+                hypothesis_id=hid,
+                challenge_summary=(
+                    f"Hypothesis '{title[:60]}' relies on unverified assumptions "
+                    "and is constrained by evidence gaps that limit confidence."
+                ),
+                hidden_assumptions=[
+                    f"Assumes {title[:40]} conditions remain stable over the decision horizon",
+                    "Assumes current regulatory and market frameworks persist",
+                    "Assumes decision-maker has operational capacity to execute the implied strategy",
+                ],
+                weak_evidence=[
+                    "Relies on vendor projections rather than independently verified operating data",
+                    "Evidence base is skewed toward early-stage deployments, not at-scale operations",
+                ] + ([f"Supporting evidence ({sup_ev[0]}) from a single source type"] if sup_ev else []),
+                contradicting_evidence=con_ev[:2] or contra_ids[:1],
+                missing_evidence=gaps[:2] or [
+                    "Independent third-party cost and performance benchmarks",
+                    "Long-run operational data from comparable deployments",
+                ],
+                falsification_tests=[
+                    f"If the primary assumption underlying '{hid}' is refuted by new data, downgrade immediately",
+                    "If regulatory timeline slips by more than 18 months, reassess viability",
+                    "If independent cost data diverges >30% from vendor projections, reject supporting evidence",
+                ],
+                robustness=robustness,
+            ))
+            surviving.append(SurvivingHypothesis(
+                hypothesis_id=hid,
+                survival_status=status,
+                reason=(
+                    f"{hid} survives as '{status}': the core mechanism is plausible "
+                    "but evidence gaps and hidden assumptions limit immediate confidence."
+                ),
+            ))
+
+        return ChallengePayload(
+            hypothesis_challenges=challenges,
+            surviving_hypotheses=surviving,
+            challenge_synthesis=(
+                f"Challenge analysis reviewed {len(hypotheses)} hypothesis/hypotheses. "
+                "No single hypothesis is strongly confirmed; all carry material assumptions "
+                "that require further evidence before strategic commitment."
+            ),
+        )
+
 
 class ClaudeClient:
     """Thin Anthropic SDK wrapper for structured research calls."""
@@ -517,9 +650,28 @@ class ClaudeClient:
                 decision_model, research_strategy,
                 evidence_items, profile_coverage, contradictions,
             ),
-            max_tokens=3000,
+            max_tokens=8000,
         )
         return HypothesisPayload.model_validate(payload)
+
+    def generate_challenges(
+        self,
+        hypotheses: list[dict],
+        evidence_items: list[dict],
+        contradictions: list[dict],
+        research_gaps: list[dict],
+        profile_coverage: dict,
+    ) -> ChallengePayload:
+        """Challenge each hypothesis to surface weaknesses and surviving strength (J6.4)."""
+        payload = self._call_json(
+            operation="generate_challenges",
+            schema_name="challenge_generation",
+            prompt=_challenge_prompt(
+                hypotheses, evidence_items, contradictions, research_gaps, profile_coverage,
+            ),
+            max_tokens=10000,
+        )
+        return ChallengePayload.model_validate(payload)
 
     def plan_research_question(
         self,
@@ -1052,6 +1204,98 @@ Instructions:
 3. Hypotheses should be mutually distinguishable — avoid restating the same claim.
 
 4. Write a 1-2 sentence synthesis_note summarising the hypothesis landscape.
+
+Return structured JSON only.
+"""
+
+
+def _challenge_prompt(
+    hypotheses: list[dict],
+    evidence_items: list[dict],
+    contradictions: list[dict],
+    research_gaps: list[dict],
+    profile_coverage: dict,
+) -> str:
+    """Build the ChallengeAgent prompt (J6.4)."""
+    hyp_lines = ""
+    for h in hypotheses:
+        hid = h.get("id", "?")
+        title = h.get("title", "")
+        summary = h.get("summary", "")
+        sup = ", ".join(h.get("supporting_evidence", [])[:5]) or "none"
+        con = ", ".join(h.get("contradicting_evidence", [])[:5]) or "none"
+        gaps = "; ".join(h.get("evidence_gaps", [])[:3]) or "none stated"
+        conf = h.get("confidence", "medium")
+        hyp_lines += (
+            f"\n{hid}: {title}\n"
+            f"  Summary: {summary}\n"
+            f"  Supporting evidence: {sup}\n"
+            f"  Contradicting evidence: {con}\n"
+            f"  Evidence gaps: {gaps}\n"
+            f"  Confidence: {conf}\n"
+        )
+
+    ev_lines = ""
+    for e in evidence_items[:20]:
+        eid = e.get("evidence_id", "")
+        claim = e.get("claim", "")[:120]
+        src = e.get("source_document", "")
+        ev_lines += f"  {eid}: {claim} (source: {src})\n"
+
+    contra_lines = ""
+    for c in contradictions[:5]:
+        cid = c.get("contradiction_id", "?")
+        topic = c.get("topic", "")
+        sev = c.get("severity", "")
+        contra_lines += f"  {cid} [{sev}]: {topic}\n"
+
+    gap_lines = ""
+    for g in research_gaps[:5]:
+        gap_lines += f"  - {g.get('gap', g) if isinstance(g, dict) else g}\n"
+
+    cov_lines = "\n".join(
+        f"  {pname}: {level}" for pname, level in profile_coverage.items()
+    ) or "  (not available)"
+
+    return f"""\
+You are a rigorous intellectual adversary tasked with stress-testing strategic hypotheses.
+
+## Hypotheses to Challenge
+{hyp_lines}
+
+## Evidence Available (up to 20 items)
+{ev_lines or "  (none)"}
+
+## Known Contradictions
+{contra_lines or "  (none)"}
+
+## Research Gaps
+{gap_lines or "  (none)"}
+
+## Profile Coverage
+{cov_lines}
+
+---
+
+## Your Task
+
+For EACH hypothesis above, produce a ChallengeItem with:
+
+1. challenge_summary — 1-3 sentences on the main weakness
+2. hidden_assumptions — 2-4 implicit assumptions the hypothesis relies on (things it takes for granted without evidence)
+3. weak_evidence — 2-3 specific evidence quality problems (e.g. vendor projections, single-source claims, outdated data)
+4. contradicting_evidence — list evidence IDs (Exxx) from the evidence list above that weaken this hypothesis; explain briefly why each matters
+5. missing_evidence — 2-3 types of evidence that are absent but would be needed to validate the hypothesis
+6. falsification_tests — 2-3 specific, observable conditions that would definitively invalidate the hypothesis
+7. robustness — "high" (withstands most challenges), "medium" (withstands some), or "low" (undermined by major gaps or contradictions)
+
+Then produce a SurvivingHypothesis for each:
+- survival_status: "strong" (core logic intact), "moderate" (survives with caveats), "weak" (significant doubts)
+- reason: 1-2 sentences explaining the survival status
+
+Finally, write a 1-2 sentence challenge_synthesis summarising which hypotheses survived best and why.
+
+Be adversarial. Your job is to find problems, not validate. Do not restate the hypothesis — critique it.
 
 Return structured JSON only.
 """

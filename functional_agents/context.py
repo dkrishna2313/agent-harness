@@ -25,6 +25,7 @@ class WorkflowState:
     PLANNING    = "PLANNING"
     EVIDENCE    = "EVIDENCE"
     HYPOTHESIS  = "HYPOTHESIS"
+    CHALLENGE   = "CHALLENGE"
     QA          = "QA"
     REPORT      = "REPORT"
     COMPLETE    = "COMPLETE"
@@ -86,6 +87,8 @@ class AgentContext:
     plan: dict[str, Any] = field(default_factory=dict)
     evidence_notes: list[dict[str, Any]] = field(default_factory=list)
     hypotheses: list[dict[str, Any]] = field(default_factory=list)
+    hypothesis_challenges: list[dict[str, Any]] = field(default_factory=list)
+    surviving_hypotheses: list[dict[str, Any]] = field(default_factory=list)
     qa_notes: list[dict[str, Any]] = field(default_factory=list)
     qa: dict[str, Any] = field(default_factory=dict)
     report: dict[str, Any] = field(default_factory=dict)

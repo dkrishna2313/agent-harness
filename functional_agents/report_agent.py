@@ -76,6 +76,84 @@ def _build_hypotheses_section(hypotheses: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def _build_challenges_section(
+    challenges: list[dict[str, Any]],
+    surviving: list[dict[str, Any]],
+) -> str:
+    """Render the Hypothesis Challenges section for the markdown report (J6.4)."""
+    if not challenges:
+        return ""
+
+    # Build a survival lookup
+    survival_by_id: dict[str, dict] = {s["hypothesis_id"]: s for s in surviving}
+
+    lines = [
+        "## Hypothesis Challenges",
+        "",
+        "> The Challenge Agent adversarially stress-tested each hypothesis.",
+        "> Robustness scores and survival statuses reflect weaknesses in evidence and assumptions.",
+        "",
+        "| Hypothesis | Robustness | Key Challenge | Survival Status |",
+        "|---|---|---|---|",
+    ]
+
+    for c in challenges:
+        hid = c.get("hypothesis_id", "?")
+        robustness = c.get("robustness", "—").capitalize()
+        summary = c.get("challenge_summary", "")[:80]
+        sv = survival_by_id.get(hid, {})
+        status = sv.get("survival_status", "—").capitalize()
+        lines.append(f"| **{hid}** | {robustness} | {summary} | {status} |")
+
+    lines.append("")
+
+    for c in challenges:
+        hid = c.get("hypothesis_id", "?")
+        sv = survival_by_id.get(hid, {})
+        robustness = c.get("robustness", "—").capitalize()
+        summary = c.get("challenge_summary", "")
+        assumptions = c.get("hidden_assumptions", [])
+        weak_ev = c.get("weak_evidence", [])
+        contra_ev = c.get("contradicting_evidence", [])
+        missing = c.get("missing_evidence", [])
+        falsification = c.get("falsification_tests", [])
+        survival_status = sv.get("survival_status", "—").capitalize()
+        survival_reason = sv.get("reason", "")
+
+        lines += [
+            f"### Challenge: {hid}",
+            "",
+            summary,
+            "",
+            f"**Robustness:** {robustness}  |  **Survival:** {survival_status}",
+            "",
+            f"*{survival_reason}*",
+            "",
+        ]
+        if assumptions:
+            lines.append("**Hidden Assumptions:**")
+            lines.extend(f"- {a}" for a in assumptions)
+            lines.append("")
+        if weak_ev:
+            lines.append("**Weak Evidence:**")
+            lines.extend(f"- {w}" for w in weak_ev)
+            lines.append("")
+        if contra_ev:
+            ev_str = ", ".join(contra_ev) if isinstance(contra_ev, list) else str(contra_ev)
+            lines.append(f"**Contradicting Evidence:** {ev_str}")
+            lines.append("")
+        if missing:
+            lines.append("**Missing Evidence:**")
+            lines.extend(f"- {m}" for m in missing)
+            lines.append("")
+        if falsification:
+            lines.append("**Falsification Tests:**")
+            lines.extend(f"- {f}" for f in falsification)
+            lines.append("")
+
+    return "\n".join(lines)
+
+
 def _build_executive_summary(
     question: str,
     plan: dict[str, Any],
@@ -390,6 +468,8 @@ class ReportAgent(FunctionalAgent):
             "profiles_missing": qa.get("profiles_missing", []),
             "coverage_status": qa.get("coverage_status", "sufficient"),
             "hypotheses": context.hypotheses,
+            "hypothesis_challenges": context.hypothesis_challenges,
+            "surviving_hypotheses": context.surviving_hypotheses,
         }
 
         LOGGER.log(
@@ -404,6 +484,10 @@ class ReportAgent(FunctionalAgent):
         report_content = memo_to_markdown(memo)
         if context.hypotheses:
             report_content = report_content.rstrip("\n") + "\n\n" + _build_hypotheses_section(context.hypotheses)
+        if context.hypothesis_challenges:
+            report_content = report_content.rstrip("\n") + "\n\n" + _build_challenges_section(
+                context.hypothesis_challenges, context.surviving_hypotheses
+            )
         output_path = write_markdown(report_content, self._out_path)
         context.artifacts["report_path"] = str(output_path)
         context.artifacts["trace_path"] = str(output_path.with_suffix(".trace.json"))
@@ -535,6 +619,18 @@ class ReportAgent(FunctionalAgent):
                 "hypothesis_count": len(hypotheses),
                 "synthesis_note": hyp_data.get("synthesis_note", ""),
                 "hypotheses": hypotheses,
+            }
+
+        # Challenge generation block (J6.4)
+        chal_data = context.trace.get("_challenges")
+        if chal_data:
+            challenges = chal_data.get("hypothesis_challenges", [])
+            surviving = chal_data.get("surviving_hypotheses", [])
+            trace_payload["challenge_generation"] = {
+                "challenge_count": len(challenges),
+                "surviving_hypotheses": surviving,
+                "hypothesis_challenges": challenges,
+                "challenge_synthesis": chal_data.get("challenge_synthesis", ""),
             }
 
         # Contract validation block (J5.5a follow-up)
