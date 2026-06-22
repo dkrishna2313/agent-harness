@@ -451,6 +451,18 @@ class ReportAgent(FunctionalAgent):
                 "evidence_requirements": pf_data.get("evidence_requirements", []),
             }
 
+        # Research strategy block (J6.2) — present only in goal-driven runs
+        rs_data = context.trace.get("_research_strategy")
+        if rs_data:
+            trace_payload["research_strategy"] = {
+                "profile_priorities": rs_data.get("profile_priorities", {}),
+                "research_question_priorities": rs_data.get("research_question_priorities", []),
+                "required_evidence": rs_data.get("required_evidence", []),
+                "source_priorities": rs_data.get("source_priorities", []),
+                "coverage_targets": rs_data.get("coverage_targets", {}),
+                "strategy_rationale": rs_data.get("strategy_rationale", ""),
+            }
+
         # Contract validation block (J5.5a follow-up)
         # ReportAgent reads _contract_runtime before _step() can record its own
         # result (the trace is written here, mid-execution). base.run() always

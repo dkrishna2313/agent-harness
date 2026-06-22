@@ -75,9 +75,11 @@ class AgentOrchestrator:
         qa_factory: Any,
         report_factory: Any,
         problem_framing_factory: Any = None,
+        research_strategy_factory: Any = None,
         max_iterations: int = 3,
     ) -> None:
-        self._problem_framing_factory = problem_framing_factory
+        self._problem_framing_factory   = problem_framing_factory
+        self._research_strategy_factory = research_strategy_factory
         self._planner_factory  = planner_factory
         self._evidence_factory = evidence_factory
         self._qa_factory       = qa_factory
@@ -103,6 +105,16 @@ class AgentOrchestrator:
             # ---- PROBLEM FRAMING (J6.1) -------------------------------------
             if state == WorkflowState.PROBLEM_FRAMING:
                 result = _step(self._problem_framing_factory(), ctx)
+                ctx = result.context
+                state = (
+                    WorkflowState.RESEARCH_STRATEGY
+                    if self._research_strategy_factory is not None
+                    else WorkflowState.PLANNING
+                )
+
+            # ---- RESEARCH STRATEGY (J6.2) -----------------------------------
+            elif state == WorkflowState.RESEARCH_STRATEGY:
+                result = _step(self._research_strategy_factory(), ctx)
                 ctx = result.context
                 state = WorkflowState.PLANNING
 
@@ -247,11 +259,12 @@ class Orchestrator:
 
     def _run_internal(self, *, question: str, goal: str) -> AgentContext:
         """Shared implementation for question-driven and goal-driven runs."""
-        from .planner_agent          import PlannerAgent
-        from .evidence_agent         import EvidenceAgent
-        from .qa_agent               import QAAgent
-        from .report_agent           import ReportAgent
-        from .problem_framing_agent  import ProblemFramingAgent
+        from .planner_agent             import PlannerAgent
+        from .evidence_agent            import EvidenceAgent
+        from .qa_agent                  import QAAgent
+        from .report_agent              import ReportAgent
+        from .problem_framing_agent     import ProblemFramingAgent
+        from .research_strategy_agent   import ResearchStrategyAgent
 
         execution_profile = self._profile_names[0] if self._profile_names else ""
         mock_mode = self._client is not None and getattr(self._client, "is_mock", False)
@@ -269,6 +282,9 @@ class Orchestrator:
         # Agent factories — called fresh for each invocation in the loop
         def problem_framing_factory() -> ProblemFramingAgent:
             return ProblemFramingAgent(client=self._client, domain_profiles=loaded_profiles)
+
+        def research_strategy_factory() -> ResearchStrategyAgent:
+            return ResearchStrategyAgent(client=self._client, domain_profiles=loaded_profiles)
 
         def planner_factory() -> PlannerAgent:
             return PlannerAgent(client=self._client, domain_profiles=loaded_profiles)
@@ -330,6 +346,7 @@ class Orchestrator:
         # Hand off to the adaptive orchestrator
         orchestrator = AgentOrchestrator(
             problem_framing_factory=problem_framing_factory if goal else None,
+            research_strategy_factory=research_strategy_factory if goal else None,
             planner_factory=planner_factory,
             evidence_factory=evidence_factory,
             qa_factory=qa_factory,

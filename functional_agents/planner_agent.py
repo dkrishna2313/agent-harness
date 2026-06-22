@@ -38,6 +38,7 @@ class PlannerAgent(FunctionalAgent):
             context.question,
             profiles_context,
             decision_model=context.decision_model or None,
+            research_strategy=context.research_strategy or None,
         )
 
         context.plan = {
@@ -105,6 +106,7 @@ class PlannerAgent(FunctionalAgent):
         question: str,
         profiles_context: list[dict],
         decision_model: dict | None = None,
+        research_strategy: dict | None = None,
     ):
         """Call the LLM client to generate the research plan.
 
@@ -142,7 +144,9 @@ class PlannerAgent(FunctionalAgent):
 
         if hasattr(self._client, "plan_research_question"):
             return self._client.plan_research_question(
-                question, profiles_context, decision_model=decision_model
+                question, profiles_context,
+                decision_model=decision_model,
+                research_strategy=research_strategy,
             )
 
         # Fallback for clients that predate this method

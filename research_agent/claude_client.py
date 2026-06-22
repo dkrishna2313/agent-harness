@@ -111,10 +111,44 @@ class DecisionModelPayload(BaseModel):
     )
 
 
+class ResearchStrategyPayload(BaseModel):
+    """Structured output for ResearchStrategyAgent (J6.2).
+
+    Translates the Decision Model into an executable research plan that guides
+    profile selection, evidence gathering, and coverage targeting.
+    """
+
+    profile_priorities: dict[str, int] = Field(
+        default_factory=dict,
+        description="Profile name → integer priority rank (1 = highest). Lists all profiles in order of relevance to the decision model.",
+    )
+    research_question_priorities: list[dict] = Field(
+        default_factory=list,
+        description='Ordered list of {question: str, priority: int} dicts ranked by decision impact.',
+    )
+    required_evidence: list[str] = Field(
+        default_factory=list,
+        description="Specific evidence items needed (e.g. 'AI power demand forecasts', 'SMR deployment schedules')",
+    )
+    source_priorities: list[str] = Field(
+        default_factory=list,
+        description="Source types in priority order (e.g. 'regulatory filings', 'grid operator reports')",
+    )
+    coverage_targets: dict[str, str] = Field(
+        default_factory=dict,
+        description="Topic/area → required coverage level: 'strong', 'moderate', or 'light'",
+    )
+    strategy_rationale: str = Field(
+        default="",
+        description="2-3 sentence explanation of the strategy choices",
+    )
+
+
 _SCHEMA_ADAPTERS = {
     "research_plan": TypeAdapter(ResearchPlan),
     "research_planning": TypeAdapter(ResearchPlanningPayload),
     "problem_framing": TypeAdapter(DecisionModelPayload),
+    "research_strategy": TypeAdapter(ResearchStrategyPayload),
     # Used for the tool-definition schema sent to Claude (strict EvidenceItem types).
     "evidence_extraction": TypeAdapter(EvidenceExtractionPayload),
     # Used for response validation (lenient — items validated per-item in extract_evidence).
@@ -145,6 +179,7 @@ class MockClaudeClient:
         question: str,
         profiles_context: list[dict],
         decision_model: dict | None = None,
+        research_strategy: dict | None = None,
     ) -> ResearchPlanningPayload:
         q = question.lower()
         if any(w in q for w in ("compare", "vs", "versus", "difference between")):
@@ -197,6 +232,36 @@ class MockClaudeClient:
                 "What are the strategic options and their trade-offs?",
             ],
             evidence_requirements=["Market data", "Technical specifications", "Case studies", "Analyst reports"],
+        )
+
+    def generate_research_strategy(
+        self,
+        decision_model: dict,
+        profiles_context: list[dict],
+    ) -> "ResearchStrategyPayload":
+        """Return a deterministic research strategy from a decision model."""
+        profiles = [p.get("name", "") for p in profiles_context if p.get("name")]
+        rqs = decision_model.get("research_questions", [])
+        areas = decision_model.get("decision_areas", [])
+        uncertainties = decision_model.get("critical_uncertainties", [])
+        evidence_reqs = decision_model.get("evidence_requirements", [])
+        return ResearchStrategyPayload(
+            profile_priorities={p: i + 1 for i, p in enumerate(profiles)},
+            research_question_priorities=[
+                {"question": q, "priority": i + 1} for i, q in enumerate(rqs)
+            ],
+            required_evidence=evidence_reqs or [
+                "Primary data sources",
+                "Expert assessments",
+                "Quantitative benchmarks",
+            ],
+            source_priorities=["primary research", "industry reports", "expert analysis", "case studies"],
+            coverage_targets={
+                **{area: "strong" for area in areas[:2]},
+                **{area: "moderate" for area in areas[2:]},
+                **{u: "strong" for u in uncertainties[:1]},
+            },
+            strategy_rationale="Mock strategy: profiles ranked by order, questions ranked by position, coverage targets set to strong/moderate.",
         )
 
 
@@ -265,17 +330,36 @@ class ClaudeClient:
         )
         return DecisionModelPayload.model_validate(payload)
 
+    def generate_research_strategy(
+        self,
+        decision_model: dict,
+        profiles_context: list[dict],
+    ) -> ResearchStrategyPayload:
+        """Transform a Decision Model into an executable research strategy (J6.2)."""
+        payload = self._call_json(
+            operation="generate_research_strategy",
+            schema_name="research_strategy",
+            prompt=_strategy_prompt(decision_model, profiles_context),
+            max_tokens=2000,
+        )
+        return ResearchStrategyPayload.model_validate(payload)
+
     def plan_research_question(
         self,
         question: str,
         profiles_context: list[dict],
         decision_model: dict | None = None,
+        research_strategy: dict | None = None,
     ) -> ResearchPlanningPayload:
         """Classify the question and generate a structured research plan (J5.1 / J6.1a)."""
         payload = self._call_json(
             operation="plan_research_question",
             schema_name="research_planning",
-            prompt=_planning_prompt(question, profiles_context, decision_model=decision_model),
+            prompt=_planning_prompt(
+                question, profiles_context,
+                decision_model=decision_model,
+                research_strategy=research_strategy,
+            ),
             max_tokens=2000,
         )
         return ResearchPlanningPayload.model_validate(payload)
@@ -606,8 +690,9 @@ def _planning_prompt(
     question: str,
     profiles_context: list[dict],
     decision_model: dict | None = None,
+    research_strategy: dict | None = None,
 ) -> str:
-    """Build the PlannerAgent prompt for question classification and decomposition (J5.1 / J6.1a)."""
+    """Build the PlannerAgent prompt for question classification and decomposition (J5.1 / J6.1a / J6.2)."""
     profile_lines = ""
     for p in profiles_context:
         name = p.get("name", "unknown")
@@ -631,13 +716,33 @@ Decision Model (pre-derived from business goal — use this to ground your plan)
 Your subquestions and investigation areas should be aligned with the Decision Model above.
 """
 
+    # Research Strategy context — injected when available (J6.2)
+    rs_section = ""
+    if research_strategy:
+        rq_prios = research_strategy.get("research_question_priorities", [])
+        rq_ordered = "; ".join(
+            rqp.get("question", "") for rqp in sorted(rq_prios, key=lambda x: x.get("priority", 99))
+        )
+        coverage = ", ".join(
+            f"{k}={v}" for k, v in list(research_strategy.get("coverage_targets", {}).items())[:5]
+        )
+        rs_section = f"""
+Research Strategy (use this to prioritise subquestions and structure your plan):
+  Priority questions (most important first): {rq_ordered}
+  Required evidence: {', '.join(research_strategy.get('required_evidence', [])[:4])}
+  Source priorities: {', '.join(research_strategy.get('source_priorities', [])[:4])}
+  Coverage targets: {coverage}
+
+Align your subquestions with the priority question order above.
+"""
+
     return f"""You are a research planning agent. Analyze the question below and produce a structured research plan.
 
 Question:
 {question}
 
 Domain profiles loaded:{profile_lines if profile_lines else " (none)"}
-{dm_section}
+{dm_section}{rs_section}
 Instructions:
 1. Classify the research_type as exactly one of:
    - FACT_LOOKUP: asking for a specific fact, number, or definition
@@ -689,6 +794,54 @@ Instructions:
 4. Generate 3-6 specific, answerable research questions derived directly from the goal and decision areas. Draw on the domain profiles to make questions specific and actionable.
 
 5. List 2-5 evidence requirements — the types of evidence needed to answer the research questions (e.g. "Benchmark performance data", "Vendor cost sheets", "Industry analyst reports").
+
+Return structured JSON only.
+"""
+
+
+def _strategy_prompt(decision_model: dict, profiles_context: list[dict]) -> str:
+    """Build the ResearchStrategyAgent prompt (J6.2)."""
+    profile_lines = ""
+    for p in profiles_context:
+        name = p.get("name", "unknown")
+        desc = p.get("description", "")
+        topics = ", ".join(p.get("key_topics", []))
+        profile_lines += f"\n- {name}: {desc}"
+        if topics:
+            profile_lines += f" (key topics: {topics})"
+
+    dm_areas = "\n".join(f"  - {a}" for a in decision_model.get("decision_areas", []))
+    dm_questions = "\n".join(f"  {i+1}. {q}" for i, q in enumerate(decision_model.get("research_questions", [])))
+    dm_uncertainties = "\n".join(f"  - {u}" for u in decision_model.get("critical_uncertainties", []))
+    dm_evidence = "\n".join(f"  - {e}" for e in decision_model.get("evidence_requirements", []))
+
+    return f"""You are a research strategy agent. Given a Decision Model and available domain profiles, produce an executable research strategy.
+
+Decision Model:
+  Objective: {decision_model.get("objective", "")}
+  Decision Areas:
+{dm_areas}
+  Research Questions:
+{dm_questions}
+  Critical Uncertainties:
+{dm_uncertainties}
+  Evidence Requirements:
+{dm_evidence}
+
+Domain Profiles:{profile_lines if profile_lines else " (none)"}
+
+Instructions:
+1. Rank each profile by its relevance to this decision model (1 = most relevant). Include all available profiles.
+
+2. Order the research questions by decision impact — most important first. Return a list of {{question, priority}} objects.
+
+3. List the specific evidence items needed to satisfy the decision model's evidence requirements. Be concrete (e.g. "AI power demand forecasts 2024–2030" not just "forecasts").
+
+4. List source types in priority order (e.g. "grid operator reports", "peer-reviewed studies", "vendor datasheets").
+
+5. For each decision area and critical uncertainty, assign a coverage target: "strong", "moderate", or "light".
+
+6. Write 2-3 sentences explaining the strategic choices.
 
 Return structured JSON only.
 """

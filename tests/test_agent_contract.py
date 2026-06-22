@@ -198,7 +198,8 @@ def test_validate_agent_class_no_error(cls):
 def test_validate_all_classes_returns_all_agents():
     results = validate_all_classes()
     assert set(results.keys()) == {
-        "ProblemFramingAgent", "PlannerAgent", "EvidenceAgent", "QAAgent", "ReportAgent"
+        "ProblemFramingAgent", "ResearchStrategyAgent",
+        "PlannerAgent", "EvidenceAgent", "QAAgent", "ReportAgent",
     }
 
 

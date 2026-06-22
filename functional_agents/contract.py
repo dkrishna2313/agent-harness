@@ -28,12 +28,13 @@ _REQUIRED_RESULT_FIELDS = ("status", "outputs", "metrics", "trace")
 
 def _agent_classes() -> list[type]:
     """Return all concrete agent classes (lazy import avoids cycles)."""
-    from .planner_agent          import PlannerAgent
-    from .evidence_agent         import EvidenceAgent
-    from .qa_agent               import QAAgent
-    from .report_agent           import ReportAgent
-    from .problem_framing_agent  import ProblemFramingAgent
-    return [ProblemFramingAgent, PlannerAgent, EvidenceAgent, QAAgent, ReportAgent]
+    from .planner_agent             import PlannerAgent
+    from .evidence_agent            import EvidenceAgent
+    from .qa_agent                  import QAAgent
+    from .report_agent              import ReportAgent
+    from .problem_framing_agent     import ProblemFramingAgent
+    from .research_strategy_agent   import ResearchStrategyAgent
+    return [ProblemFramingAgent, ResearchStrategyAgent, PlannerAgent, EvidenceAgent, QAAgent, ReportAgent]
 
 
 FUNCTIONAL_AGENT_CLASSES: list[type] = []  # populated on first call to _agent_classes()

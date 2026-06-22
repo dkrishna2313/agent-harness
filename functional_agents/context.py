@@ -20,7 +20,8 @@ class ContextValidationError(ValueError):
 # ---------------------------------------------------------------------------
 
 class WorkflowState:
-    PROBLEM_FRAMING = "PROBLEM_FRAMING"
+    PROBLEM_FRAMING   = "PROBLEM_FRAMING"
+    RESEARCH_STRATEGY = "RESEARCH_STRATEGY"
     PLANNING  = "PLANNING"
     EVIDENCE  = "EVIDENCE"
     QA        = "QA"
@@ -74,6 +75,8 @@ class AgentContext:
     # Goal-driven input (J6.1) — alternative entry point to question-driven
     goal: str = ""
     decision_model: dict[str, Any] = field(default_factory=dict)
+    # Research strategy output of ResearchStrategyAgent (J6.2)
+    research_strategy: dict[str, Any] = field(default_factory=dict)
 
     # Shared durable state
     research_object: dict[str, Any] = field(default_factory=dict)
