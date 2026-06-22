@@ -440,6 +440,17 @@ class ReportAgent(FunctionalAgent):
                 "termination_reason": orchestrator_meta.get("termination_reason", "COMPLETE"),
             }
 
+        # Problem framing block (J6.1a) — present only in goal-driven runs
+        pf_data = context.trace.get("_problem_framing")
+        if pf_data:
+            trace_payload["problem_framing"] = {
+                "objective": pf_data.get("objective", ""),
+                "decision_areas": pf_data.get("decision_areas", []),
+                "critical_uncertainties": pf_data.get("critical_uncertainties", []),
+                "research_questions": pf_data.get("research_questions", []),
+                "evidence_requirements": pf_data.get("evidence_requirements", []),
+            }
+
         # Contract validation block (J5.5a follow-up)
         # ReportAgent reads _contract_runtime before _step() can record its own
         # result (the trace is written here, mid-execution). base.run() always
@@ -518,7 +529,10 @@ class ReportAgent(FunctionalAgent):
                 }
 
             ro_path = write_research_object(ro, out_dir=output_path.parent)
-            trace_payload["research_object"] = research_object_trace_stub(ro, ro_path)
+            ro_stub = research_object_trace_stub(ro, ro_path)
+            trace_payload["research_object"] = ro_stub
+            # J6.1a — surface RO validation as a top-level trace block
+            trace_payload["research_object_validation"] = ro_stub.get("research_object_validation", {})
             context.research_object = ro
             context.artifacts["research_object_path"] = str(ro_path)
 

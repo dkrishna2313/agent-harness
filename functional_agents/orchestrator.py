@@ -298,6 +298,7 @@ class Orchestrator:
         research_object = create_research_object(
             question=ro_question,
             profile_name=execution_profile or None,
+            profile_names=self._profile_names or None,
             profile_source="cli_argument",
             sources_dir=self._sources_dir,
             web_search=False,

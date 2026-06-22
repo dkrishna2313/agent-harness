@@ -195,10 +195,10 @@ def test_validate_agent_class_no_error(cls):
     assert result["error"] is None, f"{cls.__name__} has error: {result['error']}"
 
 
-def test_validate_all_classes_returns_all_four():
+def test_validate_all_classes_returns_all_agents():
     results = validate_all_classes()
     assert set(results.keys()) == {
-        "PlannerAgent", "EvidenceAgent", "QAAgent", "ReportAgent"
+        "ProblemFramingAgent", "PlannerAgent", "EvidenceAgent", "QAAgent", "ReportAgent"
     }
 
 

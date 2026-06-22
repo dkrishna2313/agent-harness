@@ -144,6 +144,7 @@ class MockClaudeClient:
         self,
         question: str,
         profiles_context: list[dict],
+        decision_model: dict | None = None,
     ) -> ResearchPlanningPayload:
         q = question.lower()
         if any(w in q for w in ("compare", "vs", "versus", "difference between")):
@@ -156,20 +157,27 @@ class MockClaudeClient:
             research_type = "RESEARCH"
 
         profiles_used = [p.get("name", "") for p in profiles_context if p.get("name")]
-        subquestions = [
+        # Seed from decision model when available (goal-driven runs)
+        subquestions = (
+            list(decision_model.get("research_questions", []))
+            if decision_model else []
+        ) or [
             f"What are the key facts about: {question}?",
             "What evidence exists in the available sources?",
             "What are the main constraints or limitations?",
             "What are the practical implications?",
             "What gaps remain in the available evidence?",
         ]
-        investigation_areas = ["Overview", "Key Facts", "Evidence Quality", "Implications", "Open Questions"]
+        investigation_areas = (
+            list(decision_model.get("decision_areas", []))
+            if decision_model else []
+        ) or ["Overview", "Key Facts", "Evidence Quality", "Implications", "Open Questions"]
         return ResearchPlanningPayload(
             research_type=research_type,
             subquestions=subquestions,
             investigation_areas=investigation_areas,
             profiles_used=profiles_used,
-            reasoning="Mock deterministic plan.",
+            reasoning="Mock plan seeded from decision model." if decision_model else "Mock deterministic plan.",
         )
 
     def frame_problem(
@@ -261,12 +269,13 @@ class ClaudeClient:
         self,
         question: str,
         profiles_context: list[dict],
+        decision_model: dict | None = None,
     ) -> ResearchPlanningPayload:
-        """Classify the question and generate a structured research plan (J5.1)."""
+        """Classify the question and generate a structured research plan (J5.1 / J6.1a)."""
         payload = self._call_json(
             operation="plan_research_question",
             schema_name="research_planning",
-            prompt=_planning_prompt(question, profiles_context),
+            prompt=_planning_prompt(question, profiles_context, decision_model=decision_model),
             max_tokens=2000,
         )
         return ResearchPlanningPayload.model_validate(payload)
@@ -593,8 +602,12 @@ def aggregate_call_traces(call_traces: Sequence[ClaudeCallTrace]) -> dict[str, A
     }
 
 
-def _planning_prompt(question: str, profiles_context: list[dict]) -> str:
-    """Build the PlannerAgent prompt for question classification and decomposition (J5.1)."""
+def _planning_prompt(
+    question: str,
+    profiles_context: list[dict],
+    decision_model: dict | None = None,
+) -> str:
+    """Build the PlannerAgent prompt for question classification and decomposition (J5.1 / J6.1a)."""
     profile_lines = ""
     for p in profiles_context:
         name = p.get("name", "unknown")
@@ -604,13 +617,27 @@ def _planning_prompt(question: str, profiles_context: list[dict]) -> str:
         if topics:
             profile_lines += f" (key topics: {topics})"
 
+    # Decision Model context — injected when available (goal-driven runs)
+    dm_section = ""
+    if decision_model:
+        dm_section = f"""
+Decision Model (pre-derived from business goal — use this to ground your plan):
+  Objective: {decision_model.get('objective', '')}
+  Decision areas: {', '.join(decision_model.get('decision_areas', []))}
+  Critical uncertainties: {', '.join(decision_model.get('critical_uncertainties', []))}
+  Research questions: {'; '.join(decision_model.get('research_questions', []))}
+  Evidence requirements: {', '.join(decision_model.get('evidence_requirements', []))}
+
+Your subquestions and investigation areas should be aligned with the Decision Model above.
+"""
+
     return f"""You are a research planning agent. Analyze the question below and produce a structured research plan.
 
 Question:
 {question}
 
 Domain profiles loaded:{profile_lines if profile_lines else " (none)"}
-
+{dm_section}
 Instructions:
 1. Classify the research_type as exactly one of:
    - FACT_LOOKUP: asking for a specific fact, number, or definition
@@ -620,9 +647,11 @@ Instructions:
 
 2. Generate 3-7 focused subquestions that decompose the main question into
    answerable parts. Draw on the domain profiles to make subquestions specific.
+   If a Decision Model is provided, map subquestions to the research_questions above.
 
 3. Generate 4-8 investigation areas (short topic labels like "Power Requirements",
    "Deployment Timeline", "Economics") that structure the research.
+   If a Decision Model is provided, align areas with the decision_areas above.
 
 4. List which profile names informed this plan in profiles_used.
 

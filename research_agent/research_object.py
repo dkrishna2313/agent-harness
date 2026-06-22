@@ -158,6 +158,7 @@ def create_research_object(
     *,
     question: str,
     profile_name: str | None = None,
+    profile_names: list[str] | None = None,
     profile_source: str = "unset",
     sources_dir: str | Path | None = None,
     web_search: bool = False,
@@ -170,8 +171,11 @@ def create_research_object(
     Parameters
     ----------
     profile_name:
-        The profile to record.  Must come from the caller's execution context —
-        never inferred inside this function.
+        The primary/execution profile.  Must come from the caller's execution
+        context — never inferred inside this function.
+    profile_names:
+        All profiles loaded for this run (J6.1a multi-profile model).
+        Defaults to [profile_name] when not provided.
     profile_source:
         Where the profile value originated: "cli_argument", "benchmark_mapping",
         or "unset".
@@ -179,6 +183,12 @@ def create_research_object(
     now = datetime.now(timezone.utc).isoformat()
     research_id = _new_research_id(question_id)
     _rtype = _classify_research_type(question)
+    # Multi-profile model (J6.1a): profiles[] is the authoritative list.
+    _profiles: list[str] = (
+        profile_names if profile_names
+        else ([profile_name] if profile_name else [])
+    )
+    _primary = _profiles[0] if _profiles else profile_name
     return {
         "research_id": research_id,
         "created_at": now,
@@ -186,6 +196,10 @@ def create_research_object(
         "status": "running",
         # Core research intent
         "question": question,
+        # Multi-profile model (J6.1a)
+        "profiles": _profiles,
+        "primary_profile": _primary,
+        # Legacy singular field retained for backward compatibility
         "profile": profile_name,
         "profile_source": profile_source,
         # Run configuration
@@ -381,16 +395,23 @@ def validate_research_object(obj: dict[str, Any]) -> list[str]:
 # ---------------------------------------------------------------------------
 
 def research_object_trace_stub(obj: dict[str, Any], ro_path: Path) -> dict[str, Any]:
-    """Return the compact trace fragment (J4.5.5 / J4.5a.6 / J4.5b.5 / J4.5c.7)."""
+    """Return the compact trace fragment (J4.5.5 / J4.5a.6 / J4.5b.5 / J4.5c.7 / J6.1a)."""
     errors = validate_research_object(obj)
     pv = obj.get("profile_validation", {})
     profile = obj.get("profile")
     profile_source = obj.get("profile_source", "unset")
     profile_valid = pv.get("valid", profile is not None)
+    profiles = obj.get("profiles", [profile] if profile else [])
+    primary_profile = obj.get("primary_profile", profile)
+    decision_model = obj.get("decision_model")
     return {
         "research_id": obj["research_id"],
         "path": str(ro_path),
         "status": obj.get("status", "completed"),
+        # Multi-profile model (J6.1a)
+        "profiles": profiles,
+        "primary_profile": primary_profile,
+        # Legacy singular field
         "profile": profile,
         "profile_valid": profile_valid,
         "profile_resolution": {
@@ -401,4 +422,9 @@ def research_object_trace_stub(obj: dict[str, Any], ro_path: Path) -> dict[str, 
         },
         "validation_status": "valid" if not errors else "invalid",
         "validation_errors": errors,
+        # J6.1a — research object validation block
+        "research_object_validation": {
+            "decision_model_present": decision_model is not None,
+            "profiles_valid": bool(profiles),
+        },
     }

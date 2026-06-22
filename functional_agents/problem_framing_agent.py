@@ -61,6 +61,9 @@ class ProblemFramingAgent(FunctionalAgent):
             context.research_object["decision_model"] = dm_dict
             context.research_object["goal"] = context.goal
 
+        # Stash in trace so ReportAgent can emit the problem_framing block
+        context.trace["_problem_framing"] = dm_dict
+
         # Populate question from the first research question (enables downstream agents)
         if decision_model.research_questions and not context.question.strip():
             context.question = decision_model.research_questions[0]
@@ -90,6 +93,7 @@ class ProblemFramingAgent(FunctionalAgent):
             decision_areas_count=len(decision_model.decision_areas),
             critical_uncertainties_count=len(decision_model.critical_uncertainties),
             research_questions_count=len(decision_model.research_questions),
+            evidence_requirements_count=len(decision_model.evidence_requirements),
         )
         return context
 

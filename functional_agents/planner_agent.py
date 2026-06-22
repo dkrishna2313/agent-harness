@@ -34,7 +34,11 @@ class PlannerAgent(FunctionalAgent):
 
         profiles_context = self._build_profiles_context(context)
 
-        plan = self._generate_plan(context.question, profiles_context)
+        plan = self._generate_plan(
+            context.question,
+            profiles_context,
+            decision_model=context.decision_model or None,
+        )
 
         context.plan = {
             "question": context.question,
@@ -96,28 +100,50 @@ class PlannerAgent(FunctionalAgent):
                 result.append({"name": name, "description": "", "key_topics": []})
         return result
 
-    def _generate_plan(self, question: str, profiles_context: list[dict]):
-        """Call the LLM client to generate the research plan."""
+    def _generate_plan(
+        self,
+        question: str,
+        profiles_context: list[dict],
+        decision_model: dict | None = None,
+    ):
+        """Call the LLM client to generate the research plan.
+
+        When a Decision Model is provided (goal-driven runs), it is passed to
+        the planning prompt so the plan is grounded in the pre-derived research
+        questions and decision areas rather than re-deriving them from scratch.
+        """
         from research_agent.claude_client import ResearchPlanningPayload
 
         if self._client is None:
             LOGGER.warning("[PlannerAgent] no client provided — using mock plan")
+            # In goal-driven mode, seed the plan from the decision model
+            subquestions = (
+                list(decision_model.get("research_questions", []))
+                if decision_model else []
+            ) or [
+                f"What are the key facts about: {question}?",
+                "What evidence exists in the available sources?",
+                "What are the main constraints or limitations?",
+                "What are the practical implications?",
+                "What gaps remain in the available evidence?",
+            ]
+            investigation_areas = (
+                list(decision_model.get("decision_areas", []))
+                if decision_model else []
+            ) or ["Overview", "Key Facts", "Evidence Quality", "Implications", "Open Questions"]
             return ResearchPlanningPayload(
                 research_type="RESEARCH",
-                subquestions=[
-                    f"What are the key facts about: {question}?",
-                    "What evidence exists in the available sources?",
-                    "What are the main constraints or limitations?",
-                    "What are the practical implications?",
-                    "What gaps remain in the available evidence?",
-                ],
-                investigation_areas=["Overview", "Key Facts", "Evidence Quality", "Implications", "Open Questions"],
+                subquestions=subquestions,
+                investigation_areas=investigation_areas,
                 profiles_used=[p.get("name", "") for p in profiles_context],
-                reasoning="No client available; using default plan structure.",
+                reasoning="No client available; plan seeded from decision model." if decision_model
+                    else "No client available; using default plan structure.",
             )
 
         if hasattr(self._client, "plan_research_question"):
-            return self._client.plan_research_question(question, profiles_context)
+            return self._client.plan_research_question(
+                question, profiles_context, decision_model=decision_model
+            )
 
         # Fallback for clients that predate this method
         LOGGER.warning("[PlannerAgent] client does not support plan_research_question — using mock plan")

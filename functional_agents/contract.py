@@ -27,12 +27,13 @@ _REQUIRED_RESULT_FIELDS = ("status", "outputs", "metrics", "trace")
 
 
 def _agent_classes() -> list[type]:
-    """Return all four concrete agent classes (lazy import avoids cycles)."""
-    from .planner_agent  import PlannerAgent
-    from .evidence_agent import EvidenceAgent
-    from .qa_agent       import QAAgent
-    from .report_agent   import ReportAgent
-    return [PlannerAgent, EvidenceAgent, QAAgent, ReportAgent]
+    """Return all concrete agent classes (lazy import avoids cycles)."""
+    from .planner_agent          import PlannerAgent
+    from .evidence_agent         import EvidenceAgent
+    from .qa_agent               import QAAgent
+    from .report_agent           import ReportAgent
+    from .problem_framing_agent  import ProblemFramingAgent
+    return [ProblemFramingAgent, PlannerAgent, EvidenceAgent, QAAgent, ReportAgent]
 
 
 FUNCTIONAL_AGENT_CLASSES: list[type] = []  # populated on first call to _agent_classes()
@@ -166,9 +167,14 @@ def build_contract_validation(
             entry["missing_fields"] = rc["missing_fields"]
         agents[name] = entry
 
+    # An agent passes if it satisfies static checks AND, if it actually ran
+    # (i.e. is present in runtime_checks), the runtime check too.
+    # Agents registered statically but not executed in this run (e.g.
+    # ProblemFramingAgent in question-driven runs) are not penalised.
     agent_contract_valid = all(
-        v["inherits_base_agent"] and v["implements_run"] and v["returns_agent_result"]
-        for v in agents.values()
+        v["inherits_base_agent"] and v["implements_run"] and
+        (v["returns_agent_result"] if name in runtime_checks else True)
+        for name, v in agents.items()
     ) if agents else False
 
     return {
