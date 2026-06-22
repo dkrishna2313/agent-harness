@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import logging
 from collections.abc import Iterable, Sequence
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .chunker import chunk_documents, compute_chunk_diagnostics
 from .claude_client import LLMClient, MockClaudeClient, aggregate_call_traces
@@ -166,6 +167,51 @@ _SPECIFICITY_TERMS = {
 }
 
 
+_EXTRACTION_BATCH_SIZE = 8   # chunks per parallel LLM call
+_EXTRACTION_WORKERS    = 4   # concurrent threads
+
+
+def _extract_parallel(
+    client: LLMClient,
+    question: str,
+    chunks: list,
+    *,
+    batch_size: int = _EXTRACTION_BATCH_SIZE,
+    workers: int = _EXTRACTION_WORKERS,
+) -> list[EvidenceItem]:
+    """Split chunks into batches and extract evidence concurrently.
+
+    Falls back to the single-call path when there is only one batch.
+    Results are merged and re-numbered by assign_evidence_ids.
+    """
+    if len(chunks) <= batch_size:
+        return client.extract_evidence_from_chunks(question, chunks)
+
+    batches = [chunks[i : i + batch_size] for i in range(0, len(chunks), batch_size)]
+    from research_agent.log import PROGRESS
+    LOGGER.log(
+        PROGRESS,
+        "Parallel extraction: %d chunks → %d batches × %d workers",
+        len(chunks), len(batches), min(workers, len(batches)),
+    )
+
+    all_items: list[EvidenceItem] = []
+    with ThreadPoolExecutor(max_workers=min(workers, len(batches))) as pool:
+        futures = {
+            pool.submit(client.extract_evidence_from_chunks, question, batch): i
+            for i, batch in enumerate(batches)
+        }
+        # Collect in submission order so IDs are deterministic
+        ordered: dict[int, list[EvidenceItem]] = {}
+        for future in as_completed(futures):
+            idx = futures[future]
+            ordered[idx] = future.result()
+        for idx in sorted(ordered):
+            all_items.extend(ordered[idx])
+
+    return assign_evidence_ids(all_items)
+
+
 class DcPowerAgent:
     """Simple local-documents research agent."""
 
@@ -176,10 +222,12 @@ class DcPowerAgent:
         top_evidence: int = DEFAULT_TOP_EVIDENCE,
         top_chunks: int = DEFAULT_TOP_CHUNKS,
         profile: DomainProfile | None = None,
+        extraction_workers: int = _EXTRACTION_WORKERS,
     ) -> None:
         self.client = client or MockClaudeClient()
         self.top_evidence = max(1, top_evidence)
         self.top_chunks = max(1, top_chunks)
+        self.extraction_workers = extraction_workers
         # Use the supplied profile, or the default ai_data_centers profile.
         self.profile: DomainProfile = profile if profile is not None else get_default_profile()
         # K1.0 – shared disk cache for downloaded web pages
@@ -360,7 +408,10 @@ class DcPowerAgent:
 
         LOGGER.log(PROGRESS, "Starting evidence extraction from %d chunks", len(selected_chunks))
         try:
-            evidence = self.client.extract_evidence_from_chunks(question, selected_chunks)
+            evidence = _extract_parallel(
+                self.client, question, list(selected_chunks),
+                workers=self.extraction_workers,
+            )
         except Exception as exc:
             message = f"evidence extraction failed: {exc}"
             LOGGER.error("Claude %s", message)
