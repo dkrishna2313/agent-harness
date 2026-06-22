@@ -424,6 +424,39 @@ def _validate_contradiction_hardening(context: "AgentContext") -> dict[str, Any]
     }
 
 
+def _validate_numeric_semantics(context: "AgentContext") -> dict[str, Any]:
+    """J6.5d: Validate that numeric semantic gates ran and classified correctly."""
+    metrics: dict = context.contradiction_metrics or {}
+    by_reason: dict = metrics.get("by_reason", {})
+    ns: dict = metrics.get("numeric_semantics", {})
+
+    threshold_filtering_present = bool(
+        by_reason.get("threshold_vs_measurement", 0)
+        or metrics.get("threshold_filtering_present")
+    )
+    historical_filtering_present = bool(
+        by_reason.get("historical_progression", 0)
+        or metrics.get("historical_filtering_present")
+    )
+    range_logic_present = bool(
+        by_reason.get("range_average_compatible", 0)
+        or metrics.get("range_filtering_present")
+    )
+
+    return {
+        "range_logic_present": range_logic_present,
+        "threshold_logic_present": threshold_filtering_present,
+        "historical_logic_present": historical_filtering_present,
+        "projection_logic_present": bool(
+            by_reason.get("temporal_progression", 0)
+            or by_reason.get("projection_progression", 0)
+            or metrics.get("temporal_filtering_present")
+        ),
+        "numeric_semantics": ns,
+        "issues": [],
+    }
+
+
 def _validate_contradiction_decision_logic(context: "AgentContext") -> dict[str, Any]:
     """J6.5c: Validate that the eligibility engine ran and key filtering gates are active."""
     metrics: dict = context.contradiction_metrics or {}
@@ -626,6 +659,9 @@ class QAAgent(FunctionalAgent):
         # --- contradiction decision logic validation (J6.5c) ---
         contradiction_decision_validation = _validate_contradiction_decision_logic(context)
 
+        # --- numeric semantic validation (J6.5d) ---
+        numeric_semantic_validation = _validate_numeric_semantics(context)
+
         # --- write context.qa (J5.3.1) ---
         context.qa = {
             "coverage_issues": coverage_issues,
@@ -644,6 +680,7 @@ class QAAgent(FunctionalAgent):
             "recommendation_validation": recommendation_validation,
             "contradiction_validation": contradiction_hardening_validation,
             "contradiction_decision_validation": contradiction_decision_validation,
+            "numeric_semantic_validation": numeric_semantic_validation,
         }
 
         # --- update Research Object (J5.3.7) ---

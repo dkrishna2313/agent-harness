@@ -755,6 +755,7 @@ class ReportAgent(FunctionalAgent):
                     "eligible_pairs": eligibility.get("eligible_pairs", 0),
                     "suppressed_pairs": eligibility.get("suppressed_pairs", 0),
                 },
+                "numeric_semantics": metrics.get("numeric_semantics", {}),
             }
 
         # Contract validation block (J5.5a follow-up)

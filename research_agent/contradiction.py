@@ -508,6 +508,92 @@ def build_extraction_stats(items: list[EvidenceItem]) -> dict:
 
 _CONTEXT_WINDOW = 80  # characters examined around a matched value
 
+# ---------------------------------------------------------------------------
+# J6.5d – Numeric Semantic Classifier
+# ---------------------------------------------------------------------------
+
+# Keywords immediately before a NUMBER UNIT that indicate the number is a
+# technology threshold / limit, not a measured rack power value.
+_RE_NS_THRESHOLD_BEFORE = re.compile(
+    r"\bpower\s+densit\w+\s+above\s*\Z"       # "rack power densities above [N] kW"
+    r"|\bdensit\w+\s+above\s*\Z"               # "densities above [N] kW"
+    r"|\binadequate\s+(?:for\s+\w+\s+)?above\s*\Z"  # "inadequate ... above [N]"
+    r"|\badequate\s+(?:for\s+\w+\s+)?below\s*\Z"    # "adequate ... below [N]"
+    r"|\bbecomes?\s+\w+\s+(?:above|below)\s*\Z"     # "becomes inadequate above [N]"
+    r"|\beffective\s+(?:up\s+to|below)\s*\Z"
+    r"|\bviable\s+(?:up\s+to|below)\s*\Z"
+    r"|\bthreshold\s+of\s*\Z"
+    r"|\blimit\s+of\s*\Z"
+    r"|\bup\s+to\s*\Z",                        # "effective up to [N] kW"
+    re.IGNORECASE,
+)
+
+# Keywords in the vicinity of a number that mark it as historical/reference context.
+_RE_NS_HISTORICAL = re.compile(
+    r"\bcloud\s+era\b|\btraditional\b|\blegacy\b|\bconventional\b"
+    r"|\bprevious(?:ly)?\b|\bhistoric(?:al(?:ly)?)?\b|\bolder\s+generation\b"
+    r"|\bpre.(?:ai|gpu|generative|llm)\b|\bbefore\s+(?:ai|llm|gen\s*ai)\b"
+    r"|\btypically\s+operat\w+\b|\bstandard\s+(?:rack|server)\b"
+    r"|\b20[01]\d\s+era\b",
+    re.IGNORECASE,
+)
+
+# "compared to traditional/standard/legacy X" sub-clauses that introduce
+# reference numbers that should not be compared against AI-era measurements.
+_RE_NS_COMPARISON_CLAUSE = re.compile(
+    r"\bcompared\s+to\s+(?:traditional|conventional|standard|legacy|older|previous|typical)\b"
+    r"|\bversus\s+(?:traditional|conventional|standard)\b"
+    r"|\bunlike\s+(?:traditional|conventional|standard)\b",
+    re.IGNORECASE,
+)
+
+
+def _find_value_position(claim: str, value: float, unit: str) -> int | None:
+    """Return the character offset of 'value unit' in *claim* (case-insensitive)."""
+    val_int = int(value)
+    val_str = str(val_int) if value == float(val_int) else str(value)
+    for pat in (
+        rf"\b{re.escape(val_str)}\s*{re.escape(unit)}\b",
+        rf"\b{re.escape(unit)}\s*{re.escape(val_str)}\b",
+    ):
+        m = re.search(pat, claim, re.IGNORECASE)
+        if m:
+            return m.start()
+    return None
+
+
+def _classify_value_semantic(claim: str, value: float, unit: str) -> str:
+    """Return the semantic role of *value* in *claim* (J6.5d).
+
+    Returns one of:
+        primary              – a direct measurement of the subject
+        threshold            – a technology limit/boundary, not a rack power figure
+        historical_comparison – a reference value for an older era or comparison class
+    """
+    pos = _find_value_position(claim, value, unit)
+    if pos is None:
+        return "primary"
+
+    # 120 chars before the value and 80 chars after it
+    window_before = claim[max(0, pos - 120):pos]
+    window_after = claim[pos:min(len(claim), pos + 80)]
+
+    # Threshold: "rack power densities above N kW", "adequate below N kW", etc.
+    if _RE_NS_THRESHOLD_BEFORE.search(window_before[-50:]):
+        return "threshold"
+
+    # Historical: "cloud era", "traditional", etc. in the window around the value
+    combined = window_before[-80:] + window_after
+    if _RE_NS_HISTORICAL.search(combined):
+        return "historical_comparison"
+
+    # Comparison sub-clause: "compared to traditional server racks at N kW"
+    if _RE_NS_COMPARISON_CLAUSE.search(window_before):
+        return "historical_comparison"
+
+    return "primary"
+
+
 # J6.5b – range extraction for range-vs-average compatibility gate
 def _extract_range_for_unit(text: str, unit: str) -> tuple[float, float] | None:
     """Extract [lo, hi] bounds from a range expression like '30–100 kW' in *text*."""
@@ -1126,6 +1212,45 @@ def _check_numeric_conflict(
                     ))
                 continue
 
+        # Gate 8 (J6.5d): numeric semantic classification
+        # Suppress when either extracted value is a threshold or historical reference.
+        _sem_a = _classify_value_semantic(claim_a, val_a, unit)
+        _sem_b = _classify_value_semantic(claim_b, val_b, unit)
+        if _sem_a == "threshold" or _sem_b == "threshold":
+            if out_suppressed is not None:
+                out_suppressed.append(SuppressedComparison(
+                    evidence_a_id=a.evidence_id or "?",
+                    evidence_b_id=b.evidence_id or "?",
+                    evidence_a_claim=a.claim,
+                    evidence_b_claim=b.claim,
+                    reason="threshold_vs_measurement",
+                    scope_a=scope_a,
+                    scope_b=scope_b,
+                    detail=(
+                        f"Unit '{unit}': sem_a='{_sem_a}' ({val_a} {unit}), "
+                        f"sem_b='{_sem_b}' ({val_b} {unit}) — "
+                        f"threshold/limit values cannot contradict measurements."
+                    ),
+                ))
+            continue
+        if _sem_a == "historical_comparison" or _sem_b == "historical_comparison":
+            if out_suppressed is not None:
+                out_suppressed.append(SuppressedComparison(
+                    evidence_a_id=a.evidence_id or "?",
+                    evidence_b_id=b.evidence_id or "?",
+                    evidence_a_claim=a.claim,
+                    evidence_b_claim=b.claim,
+                    reason="historical_progression",
+                    scope_a=scope_a,
+                    scope_b=scope_b,
+                    detail=(
+                        f"Unit '{unit}': sem_a='{_sem_a}' ({val_a} {unit}), "
+                        f"sem_b='{_sem_b}' ({val_b} {unit}) — "
+                        f"historical reference values represent technology progression."
+                    ),
+                ))
+            continue
+
         if val_a == 0 and val_b == 0:
             continue
         denom = max(val_a, val_b)
@@ -1437,6 +1562,15 @@ def compute_suppression_metrics(
         ),
         "range_filtering_present": bool(by_reason.get("range_average_compatible", 0)),
         "context_filtering_present": bool(by_reason.get("context_mismatch", 0)),
+        # J6.5d – numeric semantic suppression flags
+        "threshold_filtering_present": bool(by_reason.get("threshold_vs_measurement", 0)),
+        "historical_filtering_present": bool(by_reason.get("historical_progression", 0)),
+        # J6.5d – numeric semantics sub-breakdown
+        "numeric_semantics": {
+            "threshold_vs_measurement": by_reason.get("threshold_vs_measurement", 0),
+            "historical_progression": by_reason.get("historical_progression", 0),
+            "range_contains_value": by_reason.get("range_average_compatible", 0),
+        },
         # J6.5c – eligibility engine summary (candidate → eligible → final)
         "eligibility_engine": {
             "candidate_pairs": final_count + suppressed_count,
