@@ -78,12 +78,14 @@ class AgentOrchestrator:
         research_strategy_factory: Any = None,
         hypothesis_factory: Any = None,
         challenge_factory: Any = None,
+        recommendation_factory: Any = None,
         max_iterations: int = 3,
     ) -> None:
         self._problem_framing_factory   = problem_framing_factory
         self._research_strategy_factory = research_strategy_factory
         self._hypothesis_factory        = hypothesis_factory
         self._challenge_factory         = challenge_factory
+        self._recommendation_factory    = recommendation_factory
         self._planner_factory  = planner_factory
         self._evidence_factory = evidence_factory
         self._qa_factory       = qa_factory
@@ -151,6 +153,16 @@ class AgentOrchestrator:
             # ---- CHALLENGE (J6.4) -------------------------------------------
             elif state == WorkflowState.CHALLENGE:
                 result = _step(self._challenge_factory(), ctx)
+                ctx = result.context
+                state = (
+                    WorkflowState.RECOMMENDATION
+                    if self._recommendation_factory is not None
+                    else WorkflowState.QA
+                )
+
+            # ---- RECOMMENDATION (J6.5) --------------------------------------
+            elif state == WorkflowState.RECOMMENDATION:
+                result = _step(self._recommendation_factory(), ctx)
                 ctx = result.context
                 state = WorkflowState.QA
 
@@ -300,6 +312,7 @@ class Orchestrator:
         from .research_strategy_agent   import ResearchStrategyAgent
         from .hypothesis_agent          import HypothesisAgent
         from .challenge_agent           import ChallengeAgent
+        from .recommendation_agent      import RecommendationAgent
 
         execution_profile = self._profile_names[0] if self._profile_names else ""
         mock_mode = self._client is not None and getattr(self._client, "is_mock", False)
@@ -326,6 +339,9 @@ class Orchestrator:
 
         def challenge_factory() -> ChallengeAgent:
             return ChallengeAgent(client=self._client, domain_profiles=loaded_profiles)
+
+        def recommendation_factory() -> RecommendationAgent:
+            return RecommendationAgent(client=self._client, domain_profiles=loaded_profiles)
 
         def planner_factory() -> PlannerAgent:
             return PlannerAgent(client=self._client, domain_profiles=loaded_profiles)
@@ -390,6 +406,7 @@ class Orchestrator:
             research_strategy_factory=research_strategy_factory if goal else None,
             hypothesis_factory=hypothesis_factory,
             challenge_factory=challenge_factory,
+            recommendation_factory=recommendation_factory,
             planner_factory=planner_factory,
             evidence_factory=evidence_factory,
             qa_factory=qa_factory,

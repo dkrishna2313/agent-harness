@@ -255,6 +255,65 @@ class ChallengePayload(BaseModel):
     )
 
 
+class RecommendationItem(BaseModel):
+    """A single actionable recommendation derived from challenged hypotheses (J6.5)."""
+
+    id: str = Field(description="Short identifier, e.g. 'R1'")
+    title: str = Field(description="One-line recommendation title")
+    summary: str = Field(description="2-4 sentence explanation of what to do and why")
+    priority: str = Field(default="medium", description="'high', 'medium', or 'low'")
+    time_horizon: str = Field(
+        default="near_term",
+        description="'near_term' (2026-2030), 'medium_term' (2030-2035), or 'long_term' (2035+)",
+    )
+    supported_by_hypotheses: list[str] = Field(
+        default_factory=list,
+        description="Hypothesis IDs (H1, H2, …) that justify this recommendation",
+    )
+    supporting_evidence: list[str] = Field(
+        default_factory=list,
+        description="Evidence IDs (Exxx) that directly support this recommendation",
+    )
+    key_risks: list[str] = Field(
+        default_factory=list,
+        description="Specific risks that could undermine this recommendation",
+    )
+    trigger_conditions: list[str] = Field(
+        default_factory=list,
+        description="Future events that would change or activate this recommendation",
+    )
+    confidence: str = Field(default="medium", description="'high', 'medium', or 'low'")
+    confidence_rationale: str = Field(
+        default="",
+        description="1-2 sentences explaining the confidence level",
+    )
+
+
+class RecommendationPortfolio(BaseModel):
+    """Time-horizon grouping of recommendation IDs (J6.5)."""
+
+    near_term: list[str] = Field(default_factory=list, description="Recommendation IDs for 2026-2030")
+    medium_term: list[str] = Field(default_factory=list, description="Recommendation IDs for 2030-2035")
+    long_term: list[str] = Field(default_factory=list, description="Recommendation IDs for 2035+")
+
+
+class RecommendationPayload(BaseModel):
+    """Structured output for RecommendationAgent (J6.5)."""
+
+    recommendations: list[RecommendationItem] = Field(
+        default_factory=list,
+        description="3-5 actionable recommendations derived from surviving hypotheses",
+    )
+    recommendation_portfolio: RecommendationPortfolio = Field(
+        default_factory=RecommendationPortfolio,
+        description="Recommendations grouped by time horizon",
+    )
+    synthesis_note: str = Field(
+        default="",
+        description="1-2 sentence overview of the recommendation set",
+    )
+
+
 _SCHEMA_ADAPTERS = {
     "research_plan": TypeAdapter(ResearchPlan),
     "research_planning": TypeAdapter(ResearchPlanningPayload),
@@ -262,6 +321,7 @@ _SCHEMA_ADAPTERS = {
     "research_strategy": TypeAdapter(ResearchStrategyPayload),
     "hypothesis_generation": TypeAdapter(HypothesisPayload),
     "challenge_generation": TypeAdapter(ChallengePayload),
+    "recommendation_generation": TypeAdapter(RecommendationPayload),
     # Used for the tool-definition schema sent to Claude (strict EvidenceItem types).
     "evidence_extraction": TypeAdapter(EvidenceExtractionPayload),
     # Used for response validation (lenient — items validated per-item in extract_evidence).
@@ -554,6 +614,74 @@ class MockClaudeClient:
             ),
         )
 
+    def generate_recommendations(
+        self,
+        hypotheses: list[dict],
+        surviving_hypotheses: list[dict],
+        hypothesis_challenges: list[dict],
+        evidence_items: list[dict],
+        decision_model: dict,
+        research_strategy: dict,
+    ) -> "RecommendationPayload":
+        """Return deterministic recommendations derived from surviving hypotheses."""
+        ev_ids = [e.get("evidence_id", "") for e in evidence_items if e.get("evidence_id")]
+        horizon_cycle = ["near_term", "medium_term", "near_term", "long_term"]
+        priority_cycle = ["high", "medium", "high", "low"]
+        confidence_cycle = ["medium", "low", "medium", "high"]
+        status_by_id = {s.get("hypothesis_id", ""): s.get("survival_status", "moderate") for s in surviving_hypotheses}
+
+        recs = []
+        for i, h in enumerate(hypotheses):
+            hid = h.get("id", f"H{i+1}")
+            title = h.get("title", "")
+            horizon = horizon_cycle[i % 4]
+            priority = priority_cycle[i % 4]
+            confidence = confidence_cycle[i % 4]
+            survival = status_by_id.get(hid, "moderate")
+            sup_ev = ev_ids[i*2 : i*2+3] if len(ev_ids) > i*2 else ev_ids[:2]
+            challenge = hypothesis_challenges[i] if i < len(hypothesis_challenges) else {}
+            _raw_risks = challenge.get("key_risks") or challenge.get("weak_evidence") or []
+            risks = _raw_risks[:2] if _raw_risks else [
+                f"Evidence supporting {hid} may not generalise at scale",
+                "Execution capacity may be constrained in target timeframe",
+            ]
+
+            recs.append(RecommendationItem(
+                id=f"R{i+1}",
+                title=f"Act on {title[:50]}",
+                summary=(
+                    f"Based on {hid} (survival: {survival}), this recommendation addresses "
+                    f"the core strategic implication. "
+                    f"Confidence is {confidence} given the challenge findings."
+                ),
+                priority=priority,
+                time_horizon=horizon,
+                supported_by_hypotheses=[hid],
+                supporting_evidence=sup_ev,
+                key_risks=risks[:2] if isinstance(risks, list) else [str(risks)],
+                trigger_conditions=[
+                    f"When leading indicators for {hid} confirm trajectory",
+                    "When regulatory or market conditions change materially",
+                ],
+                confidence=confidence,
+                confidence_rationale=f"Inherits from {hid} survival status '{survival}'; challenge findings constrain confidence.",
+            ))
+
+        near = [r.id for r in recs if r.time_horizon == "near_term"]
+        mid = [r.id for r in recs if r.time_horizon == "medium_term"]
+        lng = [r.id for r in recs if r.time_horizon == "long_term"]
+
+        return RecommendationPayload(
+            recommendations=recs,
+            recommendation_portfolio=RecommendationPortfolio(
+                near_term=near, medium_term=mid, long_term=lng,
+            ),
+            synthesis_note=(
+                f"{len(recs)} recommendations generated from {len(hypotheses)} challenged hypotheses. "
+                "Near-term actions focus on highest-survival hypotheses."
+            ),
+        )
+
 
 class ClaudeClient:
     """Thin Anthropic SDK wrapper for structured research calls."""
@@ -672,6 +800,27 @@ class ClaudeClient:
             max_tokens=10000,
         )
         return ChallengePayload.model_validate(payload)
+
+    def generate_recommendations(
+        self,
+        hypotheses: list[dict],
+        surviving_hypotheses: list[dict],
+        hypothesis_challenges: list[dict],
+        evidence_items: list[dict],
+        decision_model: dict,
+        research_strategy: dict,
+    ) -> RecommendationPayload:
+        """Generate actionable recommendations from challenged hypotheses (J6.5)."""
+        payload = self._call_json(
+            operation="generate_recommendations",
+            schema_name="recommendation_generation",
+            prompt=_recommendation_prompt(
+                hypotheses, surviving_hypotheses, hypothesis_challenges,
+                evidence_items, decision_model, research_strategy,
+            ),
+            max_tokens=10000,
+        )
+        return RecommendationPayload.model_validate(payload)
 
     def plan_research_question(
         self,
@@ -1296,6 +1445,89 @@ Then produce a SurvivingHypothesis for each:
 Finally, write a 1-2 sentence challenge_synthesis summarising which hypotheses survived best and why.
 
 Be adversarial. Your job is to find problems, not validate. Do not restate the hypothesis — critique it.
+
+Return structured JSON only.
+"""
+
+
+def _recommendation_prompt(
+    hypotheses: list[dict],
+    surviving_hypotheses: list[dict],
+    hypothesis_challenges: list[dict],
+    evidence_items: list[dict],
+    decision_model: dict,
+    research_strategy: dict,
+) -> str:
+    """Build the RecommendationAgent prompt (J6.5)."""
+    objective = decision_model.get("objective", "")
+    decision_areas = decision_model.get("decision_areas", [])
+
+    # Survival lookup
+    survival_by_id = {s.get("hypothesis_id", ""): s for s in surviving_hypotheses}
+    challenge_by_id = {c.get("hypothesis_id", ""): c for c in hypothesis_challenges}
+
+    hyp_lines = ""
+    for h in hypotheses:
+        hid = h.get("id", "?")
+        title = h.get("title", "")
+        summary = h.get("summary", "")
+        sup = ", ".join(h.get("supporting_evidence", [])[:4]) or "none"
+        sv = survival_by_id.get(hid, {})
+        status = sv.get("survival_status", "unknown")
+        reason = sv.get("reason", "")
+        ch = challenge_by_id.get(hid, {})
+        robustness = ch.get("robustness", "unknown")
+        key_challenge = ch.get("challenge_summary", "")[:100]
+        hyp_lines += (
+            f"\n{hid}: {title}  [survival={status}, robustness={robustness}]\n"
+            f"  Summary: {summary}\n"
+            f"  Supporting evidence: {sup}\n"
+            f"  Survival reason: {reason}\n"
+            f"  Key challenge: {key_challenge}\n"
+        )
+
+    ev_lines = ""
+    for e in evidence_items[:20]:
+        eid = e.get("evidence_id", "")
+        claim = e.get("claim", "")[:120]
+        src = e.get("source_document", "")
+        ev_lines += f"  {eid}: {claim} (source: {src})\n"
+
+    areas_text = "\n".join(f"  - {a}" for a in decision_areas[:6]) or "  (not specified)"
+
+    return f"""\
+You are a strategic advisor translating challenged hypotheses into actionable recommendations.
+
+## Decision Context
+Objective: {objective}
+Decision Areas:
+{areas_text}
+
+## Hypotheses with Challenge Results
+{hyp_lines}
+
+## Evidence Available (up to 20 items)
+{ev_lines or "  (none)"}
+
+---
+
+## Your Task
+
+Generate 3-5 strategic recommendations. Each recommendation must:
+
+1. Be DERIVED from one or more surviving hypotheses — do not invent new strategic logic
+2. Be grounded in specific evidence IDs from the evidence list above
+3. Include key risks that could undermine it
+4. Include trigger conditions — future events that change or activate the recommendation
+5. Be classified by time horizon: "near_term" (2026-2030), "medium_term" (2030-2035), or "long_term" (2035+)
+6. Have a confidence level ("high"/"medium"/"low") that reflects the underlying hypothesis robustness and challenge findings
+
+Rules:
+- Recommendations from "weak" survival hypotheses should have LOW priority and LOW confidence
+- Recommendations from "strong" or "moderate" survival hypotheses may have MEDIUM or HIGH priority
+- Do not repeat hypothesis summaries as recommendations — translate them into specific actions
+- Include a recommendation_portfolio that groups recommendation IDs by time horizon
+- Write a 1-2 sentence synthesis_note summarising the recommendation set
 
 Return structured JSON only.
 """

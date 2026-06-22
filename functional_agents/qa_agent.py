@@ -381,6 +381,80 @@ def _validate_challenges(
 
 
 # ---------------------------------------------------------------------------
+# Recommendation validation (J6.5)
+# ---------------------------------------------------------------------------
+
+def _validate_recommendations(
+    recommendations: list[dict],
+    portfolio: dict,
+) -> dict[str, Any]:
+    """Check that recommendation output meets structural quality requirements."""
+    if not recommendations:
+        return {
+            "recommendations_present": False,
+            "recommendation_count": 0,
+            "all_have_evidence": False,
+            "all_have_hypothesis_links": False,
+            "all_have_confidence": False,
+            "all_have_time_horizon": False,
+            "portfolio_present": False,
+            "issues": ["No recommendations generated"],
+        }
+
+    issues: list[str] = []
+    valid_horizons = {"near_term", "medium_term", "long_term"}
+    valid_confidence = {"high", "medium", "low"}
+    valid_priority = {"high", "medium", "low"}
+
+    all_have_evidence = all(
+        isinstance(r.get("supporting_evidence"), list) and len(r.get("supporting_evidence", [])) > 0
+        for r in recommendations
+    )
+    all_have_hyp_links = all(
+        isinstance(r.get("supported_by_hypotheses"), list) and len(r.get("supported_by_hypotheses", [])) > 0
+        for r in recommendations
+    )
+    all_have_confidence = all(
+        r.get("confidence") in valid_confidence for r in recommendations
+    )
+    all_have_horizon = all(
+        r.get("time_horizon") in valid_horizons for r in recommendations
+    )
+    all_have_priority = all(
+        r.get("priority") in valid_priority for r in recommendations
+    )
+
+    if not all_have_evidence:
+        issues.append("One or more recommendations missing supporting evidence IDs")
+    if not all_have_hyp_links:
+        issues.append("One or more recommendations missing hypothesis links")
+    if not all_have_confidence:
+        issues.append("One or more recommendations have invalid confidence value")
+    if not all_have_horizon:
+        issues.append("One or more recommendations have invalid time_horizon value")
+    if not all_have_priority:
+        issues.append("One or more recommendations have invalid priority value")
+
+    portfolio_present = bool(portfolio and (
+        portfolio.get("near_term") or portfolio.get("medium_term") or portfolio.get("long_term")
+    ))
+    if not portfolio_present:
+        issues.append("Recommendation portfolio is empty or missing")
+
+    return {
+        "recommendations_present": True,
+        "recommendation_count": len(recommendations),
+        "all_have_evidence": all_have_evidence,
+        "all_have_hypothesis_links": all_have_hyp_links,
+        "all_have_confidence": all_have_confidence,
+        "all_have_time_horizon": all_have_horizon,
+        "all_have_priority": all_have_priority,
+        "portfolio_present": portfolio_present,
+        "issues": issues,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Agent
 # ---------------------------------------------------------------------------
 
@@ -462,6 +536,12 @@ class QAAgent(FunctionalAgent):
             context.hypotheses,
         )
 
+        # --- recommendation validation (J6.5) ---
+        recommendation_validation = _validate_recommendations(
+            context.recommendations,
+            context.recommendation_portfolio,
+        )
+
         # --- write context.qa (J5.3.1) ---
         context.qa = {
             "coverage_issues": coverage_issues,
@@ -477,6 +557,7 @@ class QAAgent(FunctionalAgent):
             "qa_summary": qa_summary,
             "hypothesis_validation": hypothesis_validation,
             "challenge_validation": challenge_validation,
+            "recommendation_validation": recommendation_validation,
         }
 
         # --- update Research Object (J5.3.7) ---

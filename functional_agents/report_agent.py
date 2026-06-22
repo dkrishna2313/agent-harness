@@ -154,6 +154,91 @@ def _build_challenges_section(
     return "\n".join(lines)
 
 
+def _build_recommendations_section(
+    recommendations: list[dict[str, Any]],
+    portfolio: dict[str, Any],
+) -> str:
+    """Render the Strategic Recommendations section for the markdown report (J6.5)."""
+    if not recommendations:
+        return ""
+
+    _HORIZON_LABEL = {
+        "near_term": "Near-term (2026–2030)",
+        "medium_term": "Medium-term (2030–2035)",
+        "long_term": "Long-term (2035+)",
+    }
+
+    lines = [
+        "## Strategic Recommendations",
+        "",
+        "> Recommendations are derived from surviving hypotheses and are grounded in evidence.",
+        "> They should be reviewed against the Hypothesis Challenges section before acting.",
+        "",
+        "| Recommendation | Priority | Confidence | Time Horizon |",
+        "|---|---|---|---|",
+    ]
+
+    for r in recommendations:
+        rid = r.get("id", "?")
+        title = r.get("title", "")
+        priority = r.get("priority", "—").capitalize()
+        conf = r.get("confidence", "—").capitalize()
+        horizon = _HORIZON_LABEL.get(r.get("time_horizon", ""), r.get("time_horizon", "—"))
+        lines.append(f"| **{rid}** — {title} | {priority} | {conf} | {horizon} |")
+
+    lines.append("")
+
+    for r in recommendations:
+        rid = r.get("id", "?")
+        title = r.get("title", "")
+        summary = r.get("summary", "")
+        priority = r.get("priority", "—").capitalize()
+        conf = r.get("confidence", "—").capitalize()
+        rationale = r.get("confidence_rationale", "")
+        horizon = _HORIZON_LABEL.get(r.get("time_horizon", ""), r.get("time_horizon", "—"))
+        hyp_links = r.get("supported_by_hypotheses", [])
+        ev_links = r.get("supporting_evidence", [])
+        risks = r.get("key_risks", [])
+        triggers = r.get("trigger_conditions", [])
+
+        lines += [
+            f"### {rid}: {title}",
+            "",
+            summary,
+            "",
+            f"**Priority:** {priority}  |  **Confidence:** {conf}  |  **Time Horizon:** {horizon}",
+            "",
+            f"*{rationale}*",
+            "",
+        ]
+        if hyp_links:
+            lines.append(f"**Supported by:** {', '.join(hyp_links)}")
+            lines.append("")
+        if ev_links:
+            lines.append(f"**Evidence:** {', '.join(ev_links)}")
+            lines.append("")
+        if risks:
+            lines.append("**Key Risks:**")
+            lines.extend(f"- {risk}" for risk in risks)
+            lines.append("")
+        if triggers:
+            lines.append("**Trigger Conditions:**")
+            lines.extend(f"- {t}" for t in triggers)
+            lines.append("")
+
+    # Portfolio summary
+    if portfolio:
+        lines += ["### Recommendation Portfolio", ""]
+        for key in ("near_term", "medium_term", "long_term"):
+            ids = portfolio.get(key, [])
+            if ids:
+                label = _HORIZON_LABEL.get(key, key)
+                lines.append(f"**{label}:** {', '.join(ids)}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 def _build_executive_summary(
     question: str,
     plan: dict[str, Any],
@@ -470,6 +555,8 @@ class ReportAgent(FunctionalAgent):
             "hypotheses": context.hypotheses,
             "hypothesis_challenges": context.hypothesis_challenges,
             "surviving_hypotheses": context.surviving_hypotheses,
+            "recommendations": context.recommendations,
+            "recommendation_portfolio": context.recommendation_portfolio,
         }
 
         LOGGER.log(
@@ -487,6 +574,10 @@ class ReportAgent(FunctionalAgent):
         if context.hypothesis_challenges:
             report_content = report_content.rstrip("\n") + "\n\n" + _build_challenges_section(
                 context.hypothesis_challenges, context.surviving_hypotheses
+            )
+        if context.recommendations:
+            report_content = report_content.rstrip("\n") + "\n\n" + _build_recommendations_section(
+                context.recommendations, context.recommendation_portfolio
             )
         output_path = write_markdown(report_content, self._out_path)
         context.artifacts["report_path"] = str(output_path)
@@ -619,6 +710,18 @@ class ReportAgent(FunctionalAgent):
                 "hypothesis_count": len(hypotheses),
                 "synthesis_note": hyp_data.get("synthesis_note", ""),
                 "hypotheses": hypotheses,
+            }
+
+        # Recommendation generation block (J6.5)
+        rec_data = context.trace.get("_recommendations")
+        if rec_data:
+            recs = rec_data.get("recommendations", [])
+            portfolio = rec_data.get("recommendation_portfolio", {})
+            trace_payload["recommendation_generation"] = {
+                "recommendation_count": len(recs),
+                "recommendations": recs,
+                "recommendation_portfolio": portfolio,
+                "synthesis_note": rec_data.get("synthesis_note", ""),
             }
 
         # Challenge generation block (J6.4)
