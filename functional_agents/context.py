@@ -22,12 +22,13 @@ class ContextValidationError(ValueError):
 class WorkflowState:
     PROBLEM_FRAMING   = "PROBLEM_FRAMING"
     RESEARCH_STRATEGY = "RESEARCH_STRATEGY"
-    PLANNING  = "PLANNING"
-    EVIDENCE  = "EVIDENCE"
-    QA        = "QA"
-    REPORT    = "REPORT"
-    COMPLETE  = "COMPLETE"
-    ERROR     = "ERROR"
+    PLANNING    = "PLANNING"
+    EVIDENCE    = "EVIDENCE"
+    HYPOTHESIS  = "HYPOTHESIS"
+    QA          = "QA"
+    REPORT      = "REPORT"
+    COMPLETE    = "COMPLETE"
+    ERROR       = "ERROR"
 
 
 class NextAction:
@@ -84,6 +85,7 @@ class AgentContext:
     # Per-agent detailed notes
     plan: dict[str, Any] = field(default_factory=dict)
     evidence_notes: list[dict[str, Any]] = field(default_factory=list)
+    hypotheses: list[dict[str, Any]] = field(default_factory=list)
     qa_notes: list[dict[str, Any]] = field(default_factory=list)
     qa: dict[str, Any] = field(default_factory=dict)
     report: dict[str, Any] = field(default_factory=dict)

@@ -76,10 +76,12 @@ class AgentOrchestrator:
         report_factory: Any,
         problem_framing_factory: Any = None,
         research_strategy_factory: Any = None,
+        hypothesis_factory: Any = None,
         max_iterations: int = 3,
     ) -> None:
         self._problem_framing_factory   = problem_framing_factory
         self._research_strategy_factory = research_strategy_factory
+        self._hypothesis_factory        = hypothesis_factory
         self._planner_factory  = planner_factory
         self._evidence_factory = evidence_factory
         self._qa_factory       = qa_factory
@@ -127,6 +129,16 @@ class AgentOrchestrator:
             # ---- EVIDENCE ---------------------------------------------------
             elif state == WorkflowState.EVIDENCE:
                 result = _step(self._evidence_factory(), ctx)
+                ctx = result.context
+                state = (
+                    WorkflowState.HYPOTHESIS
+                    if self._hypothesis_factory is not None
+                    else WorkflowState.QA
+                )
+
+            # ---- HYPOTHESIS (J6.3) ------------------------------------------
+            elif state == WorkflowState.HYPOTHESIS:
+                result = _step(self._hypothesis_factory(), ctx)
                 ctx = result.context
                 state = WorkflowState.QA
 
@@ -265,6 +277,7 @@ class Orchestrator:
         from .report_agent              import ReportAgent
         from .problem_framing_agent     import ProblemFramingAgent
         from .research_strategy_agent   import ResearchStrategyAgent
+        from .hypothesis_agent          import HypothesisAgent
 
         execution_profile = self._profile_names[0] if self._profile_names else ""
         mock_mode = self._client is not None and getattr(self._client, "is_mock", False)
@@ -285,6 +298,9 @@ class Orchestrator:
 
         def research_strategy_factory() -> ResearchStrategyAgent:
             return ResearchStrategyAgent(client=self._client, domain_profiles=loaded_profiles)
+
+        def hypothesis_factory() -> HypothesisAgent:
+            return HypothesisAgent(client=self._client, domain_profiles=loaded_profiles)
 
         def planner_factory() -> PlannerAgent:
             return PlannerAgent(client=self._client, domain_profiles=loaded_profiles)
@@ -347,6 +363,7 @@ class Orchestrator:
         orchestrator = AgentOrchestrator(
             problem_framing_factory=problem_framing_factory if goal else None,
             research_strategy_factory=research_strategy_factory if goal else None,
+            hypothesis_factory=hypothesis_factory,
             planner_factory=planner_factory,
             evidence_factory=evidence_factory,
             qa_factory=qa_factory,

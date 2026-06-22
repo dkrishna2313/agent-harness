@@ -16,6 +16,66 @@ LOGGER = logging.getLogger(__name__)
 # Narrative synthesis helpers (J5.4)
 # ---------------------------------------------------------------------------
 
+def _build_hypotheses_section(hypotheses: list[dict[str, Any]]) -> str:
+    """Render the Strategic Hypotheses section for the markdown report (J6.3)."""
+    if not hypotheses:
+        return ""
+
+    lines = [
+        "## Strategic Hypotheses",
+        "",
+        "> These are candidate interpretations of the evidence, not established facts.",
+        "> They should be evaluated and tested before informing decisions.",
+        "",
+        "| Hypothesis | Confidence | Supporting Evidence | Key Uncertainty |",
+        "|---|---|---|---|",
+    ]
+
+    for h in hypotheses:
+        hid = h.get("id", "?")
+        title = h.get("title", "")
+        conf = h.get("confidence", "—").capitalize()
+        sup_ev = ", ".join(h.get("supporting_evidence", [])[:3]) or "—"
+        gaps = h.get("evidence_gaps", [])
+        uncertainty = gaps[0] if gaps else (h.get("confidence_rationale", "")[:60] or "—")
+        lines.append(f"| **{hid}** — {title} | {conf} | {sup_ev} | {uncertainty} |")
+
+    lines.append("")
+
+    for h in hypotheses:
+        hid = h.get("id", "?")
+        title = h.get("title", "")
+        summary = h.get("summary", "")
+        conf = h.get("confidence", "—").capitalize()
+        rationale = h.get("confidence_rationale", "")
+        implications = h.get("decision_implications", [])
+        disconfirming = h.get("disconfirming_evidence_needed", [])
+        con_ev = h.get("contradicting_evidence", [])
+
+        lines += [
+            f"### {hid}: {title}",
+            "",
+            summary,
+            "",
+            f"**Confidence:** {conf}  ",
+            f"*{rationale}*",
+            "",
+        ]
+        if implications:
+            lines.append("**Decision Implications:**")
+            lines.extend(f"- {imp}" for imp in implications)
+            lines.append("")
+        if con_ev:
+            lines.append(f"**Contradicting Evidence:** {', '.join(con_ev)}")
+            lines.append("")
+        if disconfirming:
+            lines.append("**This hypothesis would be weakened by:**")
+            lines.extend(f"- {d}" for d in disconfirming)
+            lines.append("")
+
+    return "\n".join(lines)
+
+
 def _build_executive_summary(
     question: str,
     plan: dict[str, Any],
@@ -329,6 +389,7 @@ class ReportAgent(FunctionalAgent):
             "profiles_contributing": qa.get("profiles_contributing", []),
             "profiles_missing": qa.get("profiles_missing", []),
             "coverage_status": qa.get("coverage_status", "sufficient"),
+            "hypotheses": context.hypotheses,
         }
 
         LOGGER.log(
@@ -338,9 +399,12 @@ class ReportAgent(FunctionalAgent):
         )
 
         # ------------------------------------------------------------------
-        # Write markdown report (existing behaviour)
+        # Write markdown report (existing behaviour + Strategic Hypotheses)
         # ------------------------------------------------------------------
-        output_path = write_markdown(memo_to_markdown(memo), self._out_path)
+        report_content = memo_to_markdown(memo)
+        if context.hypotheses:
+            report_content = report_content.rstrip("\n") + "\n\n" + _build_hypotheses_section(context.hypotheses)
+        output_path = write_markdown(report_content, self._out_path)
         context.artifacts["report_path"] = str(output_path)
         context.artifacts["trace_path"] = str(output_path.with_suffix(".trace.json"))
 
@@ -461,6 +525,16 @@ class ReportAgent(FunctionalAgent):
                 "source_priorities": rs_data.get("source_priorities", []),
                 "coverage_targets": rs_data.get("coverage_targets", {}),
                 "strategy_rationale": rs_data.get("strategy_rationale", ""),
+            }
+
+        # Hypothesis generation block (J6.3)
+        hyp_data = context.trace.get("_hypotheses")
+        if hyp_data:
+            hypotheses = hyp_data.get("hypotheses", [])
+            trace_payload["hypothesis_generation"] = {
+                "hypothesis_count": len(hypotheses),
+                "synthesis_note": hyp_data.get("synthesis_note", ""),
+                "hypotheses": hypotheses,
             }
 
         # Contract validation block (J5.5a follow-up)

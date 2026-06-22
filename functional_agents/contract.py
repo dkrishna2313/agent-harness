@@ -34,7 +34,13 @@ def _agent_classes() -> list[type]:
     from .report_agent              import ReportAgent
     from .problem_framing_agent     import ProblemFramingAgent
     from .research_strategy_agent   import ResearchStrategyAgent
-    return [ProblemFramingAgent, ResearchStrategyAgent, PlannerAgent, EvidenceAgent, QAAgent, ReportAgent]
+    from .hypothesis_agent          import HypothesisAgent
+    return [
+        ProblemFramingAgent, ResearchStrategyAgent,
+        PlannerAgent, EvidenceAgent,
+        HypothesisAgent,
+        QAAgent, ReportAgent,
+    ]
 
 
 FUNCTIONAL_AGENT_CLASSES: list[type] = []  # populated on first call to _agent_classes()

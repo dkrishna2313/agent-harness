@@ -254,6 +254,66 @@ def _decide_next_action(
 
 
 # ---------------------------------------------------------------------------
+# Hypothesis validation (J6.3)
+# ---------------------------------------------------------------------------
+
+def _validate_hypotheses(hypotheses: list[dict]) -> dict[str, Any]:
+    """Check that the hypothesis set meets structural quality requirements."""
+    if not hypotheses:
+        return {
+            "hypotheses_present": False,
+            "hypothesis_count": 0,
+            "all_have_evidence_mapping": False,
+            "all_have_confidence": False,
+            "all_have_decision_implications": False,
+            "all_have_disconfirming_evidence_needs": False,
+            "issues": ["No hypotheses generated"],
+        }
+
+    issues: list[str] = []
+
+    has_mapping = all(
+        isinstance(h.get("supporting_evidence"), list)
+        or isinstance(h.get("contradicting_evidence"), list)
+        or isinstance(h.get("evidence_gaps"), list)
+        for h in hypotheses
+    )
+    has_confidence = all(
+        h.get("confidence") in ("high", "medium", "low") for h in hypotheses
+    )
+    has_implications = all(
+        isinstance(h.get("decision_implications"), list) and len(h.get("decision_implications", [])) > 0
+        for h in hypotheses
+    )
+    has_disconfirming = all(
+        isinstance(h.get("disconfirming_evidence_needed"), list)
+        and len(h.get("disconfirming_evidence_needed", [])) > 0
+        for h in hypotheses
+    )
+
+    if not has_mapping:
+        issues.append("One or more hypotheses missing evidence mapping")
+    if not has_confidence:
+        issues.append("One or more hypotheses missing valid confidence level")
+    if not has_implications:
+        issues.append("One or more hypotheses missing decision implications")
+    if not has_disconfirming:
+        issues.append("One or more hypotheses missing disconfirming evidence needs")
+    if len(hypotheses) < 3:
+        issues.append(f"Only {len(hypotheses)} hypothesis/hypotheses generated (minimum 3 required)")
+
+    return {
+        "hypotheses_present": True,
+        "hypothesis_count": len(hypotheses),
+        "all_have_evidence_mapping": has_mapping,
+        "all_have_confidence": has_confidence,
+        "all_have_decision_implications": has_implications,
+        "all_have_disconfirming_evidence_needs": has_disconfirming,
+        "issues": issues,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Agent
 # ---------------------------------------------------------------------------
 
@@ -325,6 +385,9 @@ class QAAgent(FunctionalAgent):
             "profiles_evaluated": len(context.profiles),
         }
 
+        # --- hypothesis validation (J6.3) ---
+        hypothesis_validation = _validate_hypotheses(context.hypotheses)
+
         # --- write context.qa (J5.3.1) ---
         context.qa = {
             "coverage_issues": coverage_issues,
@@ -338,6 +401,7 @@ class QAAgent(FunctionalAgent):
             "coverage_status": coverage_status,
             "confidence_assessment": confidence,
             "qa_summary": qa_summary,
+            "hypothesis_validation": hypothesis_validation,
         }
 
         # --- update Research Object (J5.3.7) ---

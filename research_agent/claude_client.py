@@ -144,11 +144,65 @@ class ResearchStrategyPayload(BaseModel):
     )
 
 
+class HypothesisItem(BaseModel):
+    """A single competing hypothesis (J6.3)."""
+
+    id: str = Field(description="Short identifier, e.g. 'H1'")
+    title: str = Field(description="One-line hypothesis title")
+    summary: str = Field(description="2-4 sentence explanation of the hypothesis")
+    type: str = Field(
+        default="general",
+        description="Hypothesis category, e.g. 'constraint_dominant', 'technology_option', 'portfolio_strategy'",
+    )
+    supporting_evidence: list[str] = Field(
+        default_factory=list,
+        description="Evidence IDs (Exxx) that support this hypothesis",
+    )
+    contradicting_evidence: list[str] = Field(
+        default_factory=list,
+        description="Evidence IDs that contradict or weaken this hypothesis",
+    )
+    evidence_gaps: list[str] = Field(
+        default_factory=list,
+        description="Types of evidence that are absent but needed to test this hypothesis",
+    )
+    confidence: str = Field(
+        default="medium",
+        description="Confidence level: 'high', 'medium', or 'low'",
+    )
+    confidence_rationale: str = Field(
+        default="",
+        description="1-2 sentence explanation of why this confidence level was assigned",
+    )
+    decision_implications: list[str] = Field(
+        default_factory=list,
+        description="Concrete strategic implications for the original decision",
+    )
+    disconfirming_evidence_needed: list[str] = Field(
+        default_factory=list,
+        description="Specific evidence that would weaken or invalidate this hypothesis",
+    )
+
+
+class HypothesisPayload(BaseModel):
+    """Structured output for HypothesisAgent (J6.3)."""
+
+    hypotheses: list[HypothesisItem] = Field(
+        default_factory=list,
+        description="3-5 competing hypotheses generated from evidence and decision model",
+    )
+    synthesis_note: str = Field(
+        default="",
+        description="1-2 sentence overview of the hypothesis landscape",
+    )
+
+
 _SCHEMA_ADAPTERS = {
     "research_plan": TypeAdapter(ResearchPlan),
     "research_planning": TypeAdapter(ResearchPlanningPayload),
     "problem_framing": TypeAdapter(DecisionModelPayload),
     "research_strategy": TypeAdapter(ResearchStrategyPayload),
+    "hypothesis_generation": TypeAdapter(HypothesisPayload),
     # Used for the tool-definition schema sent to Claude (strict EvidenceItem types).
     "evidence_extraction": TypeAdapter(EvidenceExtractionPayload),
     # Used for response validation (lenient — items validated per-item in extract_evidence).
@@ -265,6 +319,109 @@ class MockClaudeClient:
         )
 
 
+    def generate_hypotheses(
+        self,
+        decision_model: dict,
+        research_strategy: dict,
+        evidence_items: list[dict],
+        profile_coverage: dict,
+        contradictions: list[dict],
+    ) -> "HypothesisPayload":
+        """Return deterministic competing hypotheses from evidence and context."""
+        decision_areas = decision_model.get("decision_areas", ["Area A", "Area B", "Area C"])
+        objective = decision_model.get("objective", "Evaluate the strategic opportunity")
+        # Sample evidence IDs from evidence_items
+        ev_ids = [e.get("evidence_id", "") for e in evidence_items if e.get("evidence_id")]
+        sup1 = ev_ids[:2] if len(ev_ids) >= 2 else ev_ids
+        sup2 = ev_ids[2:4] if len(ev_ids) >= 4 else ev_ids[:1]
+        con1 = ev_ids[4:5] if len(ev_ids) >= 5 else []
+
+        h1 = HypothesisItem(
+            id="H1",
+            title=f"{decision_areas[0] if decision_areas else 'Structural constraints'} dominate the strategic outlook",
+            summary=(
+                f"The primary factor shaping {objective} is {decision_areas[0] if decision_areas else 'structural constraints'}. "
+                "Evidence points to foundational limitations that constrain near-term options. "
+                "Actors who address these constraints first will gain a durable advantage."
+            ),
+            type="constraint_dominant",
+            supporting_evidence=sup1,
+            contradicting_evidence=con1,
+            evidence_gaps=["Region-specific constraint data", "Time-series projections"],
+            confidence="medium",
+            confidence_rationale="Supported by available evidence but limited by sparse longitudinal data.",
+            decision_implications=[
+                f"Prioritise addressing {decision_areas[0] if decision_areas else 'constraints'} first",
+                "Build contingency plans for constraint-limited scenarios",
+                "Invest in monitoring of leading constraint indicators",
+            ],
+            disconfirming_evidence_needed=[
+                f"Evidence that {decision_areas[0] if decision_areas else 'constraints'} are being resolved faster than projected",
+                "Data showing alternative pathways circumvent the constraint",
+            ],
+        )
+
+        h2 = HypothesisItem(
+            id="H2",
+            title=f"{decision_areas[1] if len(decision_areas) > 1 else 'Technology options'} unlock mid-term opportunities",
+            summary=(
+                f"Emerging developments in {decision_areas[1] if len(decision_areas) > 1 else 'technology'} "
+                "create viable pathways that are not yet reflected in current market positioning. "
+                "Decision-makers who take early positions on these options will outperform later entrants. "
+                "The risk is in the timing — too early or too late both carry penalties."
+            ),
+            type="technology_option",
+            supporting_evidence=sup2,
+            contradicting_evidence=[],
+            evidence_gaps=["Forward-looking cost trajectory data", "Deployment schedule evidence"],
+            confidence="low",
+            confidence_rationale="Hypothesis is plausible but evidence is sparse; requires more forward-looking data.",
+            decision_implications=[
+                "Maintain optionality by avoiding irreversible commitments near-term",
+                "Monitor leading indicators of technology readiness",
+                f"Consider staged entry into {decision_areas[1] if len(decision_areas) > 1 else 'technology'} plays",
+            ],
+            disconfirming_evidence_needed=[
+                "Evidence that deployment costs are not declining",
+                "Evidence of regulatory barriers blocking near-term adoption",
+            ],
+        )
+
+        h3 = HypothesisItem(
+            id="H3",
+            title="Hybrid portfolio strategy outperforms single-path approaches",
+            summary=(
+                "No single strategic path dominates across all scenarios. "
+                "A diversified approach across multiple decision areas reduces variance and preserves optionality. "
+                "The evidence base, while incomplete, suggests that the uncertainty profile favours a portfolio over a concentrated bet."
+            ),
+            type="portfolio_strategy",
+            supporting_evidence=ev_ids[-1:] if ev_ids else [],
+            contradicting_evidence=[],
+            evidence_gaps=["Portfolio-level outcome studies", "Cross-strategy comparative data"],
+            confidence="medium",
+            confidence_rationale="Consistent with general decision theory; the specific evidence base is thin.",
+            decision_implications=[
+                "Structure decisions as a portfolio with defined allocation thresholds",
+                "Avoid over-commitment to any single technology or market pathway",
+                "Build governance mechanisms to rebalance as uncertainty resolves",
+            ],
+            disconfirming_evidence_needed=[
+                "Evidence that one pathway clearly dominates on cost-risk terms",
+                "Evidence that portfolio management costs outweigh diversification benefits",
+            ],
+        )
+
+        return HypothesisPayload(
+            hypotheses=[h1, h2, h3],
+            synthesis_note=(
+                f"Three competing hypotheses span the strategic landscape for: {objective}. "
+                "H1 reflects a constraint-driven view, H2 an opportunity-driven view, "
+                "and H3 a portfolio view. Evidence gaps are significant across all three."
+            ),
+        )
+
+
 class ClaudeClient:
     """Thin Anthropic SDK wrapper for structured research calls."""
 
@@ -343,6 +500,26 @@ class ClaudeClient:
             max_tokens=2000,
         )
         return ResearchStrategyPayload.model_validate(payload)
+
+    def generate_hypotheses(
+        self,
+        decision_model: dict,
+        research_strategy: dict,
+        evidence_items: list[dict],
+        profile_coverage: dict,
+        contradictions: list[dict],
+    ) -> HypothesisPayload:
+        """Generate competing hypotheses from evidence and context (J6.3)."""
+        payload = self._call_json(
+            operation="generate_hypotheses",
+            schema_name="hypothesis_generation",
+            prompt=_hypothesis_prompt(
+                decision_model, research_strategy,
+                evidence_items, profile_coverage, contradictions,
+            ),
+            max_tokens=3000,
+        )
+        return HypothesisPayload.model_validate(payload)
 
     def plan_research_question(
         self,
@@ -794,6 +971,87 @@ Instructions:
 4. Generate 3-6 specific, answerable research questions derived directly from the goal and decision areas. Draw on the domain profiles to make questions specific and actionable.
 
 5. List 2-5 evidence requirements — the types of evidence needed to answer the research questions (e.g. "Benchmark performance data", "Vendor cost sheets", "Industry analyst reports").
+
+Return structured JSON only.
+"""
+
+
+def _hypothesis_prompt(
+    decision_model: dict,
+    research_strategy: dict,
+    evidence_items: list[dict],
+    profile_coverage: dict,
+    contradictions: list[dict],
+) -> str:
+    """Build the HypothesisAgent prompt (J6.3)."""
+    objective = decision_model.get("objective", "")
+    areas = ", ".join(decision_model.get("decision_areas", []))
+    uncertainties = "\n".join(f"  - {u}" for u in decision_model.get("critical_uncertainties", []))
+
+    # Summarise evidence (max 20 items for prompt size)
+    ev_lines = ""
+    for e in evidence_items[:20]:
+        eid = e.get("evidence_id", "?")
+        claim = e.get("claim", e.get("text", ""))[:120]
+        source = e.get("source_document", "")
+        ev_lines += f"\n  [{eid}] {claim} (source: {source})"
+
+    # Contradictions
+    contra_lines = ""
+    for c in contradictions[:5]:
+        contra_lines += f"\n  - {c.get('topic', '?')}: {c.get('summary', '')[:100]}"
+
+    # Coverage summary
+    coverage_lines = ""
+    for profile, level in list(profile_coverage.items())[:6]:
+        coverage_lines += f"\n  - {profile}: {level}"
+
+    rq_list = "\n".join(
+        f"  {i+1}. {rqp.get('question', '')}"
+        for i, rqp in enumerate(
+            sorted(research_strategy.get("research_question_priorities", []), key=lambda x: x.get("priority", 99))
+        )
+    )
+
+    return f"""You are a strategic analysis agent. Generate 3-5 competing hypotheses that explain the evidence gathered for this decision.
+
+Decision Objective:
+{objective}
+
+Decision Areas: {areas}
+
+Critical Uncertainties:
+{uncertainties if uncertainties else "  (none listed)"}
+
+Research Questions (priority order):
+{rq_list if rq_list else "  (none)"}
+
+Evidence Collected (up to 20 items):
+{ev_lines if ev_lines else "  (no evidence available)"}
+
+Profile Coverage:{coverage_lines if coverage_lines else " (none)"}
+
+Contradictions Detected:{contra_lines if contra_lines else " (none)"}
+
+Instructions:
+1. Generate 3-5 COMPETING hypotheses. Each should represent a meaningfully different strategic interpretation of the evidence.
+
+2. For each hypothesis, include:
+   - id: "H1", "H2", etc.
+   - title: one-line hypothesis
+   - summary: 2-4 sentences explaining the hypothesis
+   - type: one of constraint_dominant, technology_option, portfolio_strategy, market_timing, risk_concentration, or similar
+   - supporting_evidence: list of evidence IDs (from the list above) that support it
+   - contradicting_evidence: list of evidence IDs that weaken or contradict it
+   - evidence_gaps: list of evidence types that are absent but needed to test it
+   - confidence: "high", "medium", or "low"
+   - confidence_rationale: 1-2 sentences explaining the confidence level
+   - decision_implications: 2-4 concrete strategic implications
+   - disconfirming_evidence_needed: 2-3 specific evidence items that would invalidate this hypothesis
+
+3. Hypotheses should be mutually distinguishable — avoid restating the same claim.
+
+4. Write a 1-2 sentence synthesis_note summarising the hypothesis landscape.
 
 Return structured JSON only.
 """
