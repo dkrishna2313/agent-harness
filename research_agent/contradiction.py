@@ -94,6 +94,61 @@ _UNIT_TO_TOPIC: dict[str, str] = {
 # A claim matching A and another matching B are in opposition.
 # ---------------------------------------------------------------------------
 
+# J6.5b – Known distinct product model pairs that cannot contradict each other.
+# Each entry is (family_A_keywords, family_B_keywords).  When a claim contains
+# keywords from family_A and the other claim contains keywords from family_B
+# (or vice versa), the comparison is suppressed.
+_DISTINCT_PRODUCT_PAIRS: list[tuple[frozenset[str], frozenset[str]]] = [
+    # NVL form-factor size mismatch (same generation, different chassis sizes)
+    (frozenset({"nvl8"}),  frozenset({"nvl36"})),
+    (frozenset({"nvl8"}),  frozenset({"nvl72"})),
+    (frozenset({"nvl36"}), frozenset({"nvl72"})),
+    # System-class mismatch (DGX server vs HGX baseboard)
+    (frozenset({"dgx"}), frozenset({"hgx"})),
+    # Generation progression: Blackwell → Rubin
+    (frozenset({"gb200", "blackwell", "b200", "b300", "b100"}),
+     frozenset({"rubin", "vera rubin", "r100"})),
+    # Generation progression: Hopper → Blackwell
+    (frozenset({"hopper", "h100", "h200"}),
+     frozenset({"gb200", "blackwell", "b200", "b300"})),
+    # Generation progression: Hopper → Rubin
+    (frozenset({"hopper", "h100", "h200"}),
+     frozenset({"rubin", "vera rubin"})),
+]
+
+# Generation families — used to classify suppression reason as generation_progression
+_GENERATION_FAMILIES: list[frozenset[str]] = [
+    frozenset({"hopper", "h100", "h200"}),
+    frozenset({"gb200", "blackwell", "b200", "b300", "b100"}),
+    frozenset({"rubin", "vera rubin", "r100"}),
+]
+
+
+def _product_compatibility_check(claim_a: str, claim_b: str) -> tuple[bool, str]:
+    """Return (is_compatible, suppression_reason) for two claims.
+
+    suppression_reason is "" when compatible.
+    suppression_reason is "generation_progression" for cross-generation comparisons.
+    suppression_reason is "product_mismatch" for same-gen different-product comparisons.
+    """
+    t_a = claim_a.lower()
+    t_b = claim_b.lower()
+
+    for family_a, family_b in _DISTINCT_PRODUCT_PAIRS:
+        has_a_in_a = bool(family_a & {kw for kw in family_a if kw in t_a})
+        has_b_in_b = bool(family_b & {kw for kw in family_b if kw in t_b})
+        has_b_in_a = bool(family_b & {kw for kw in family_b if kw in t_a})
+        has_a_in_b = bool(family_a & {kw for kw in family_a if kw in t_b})
+
+        if (has_a_in_a and has_b_in_b) or (has_b_in_a and has_a_in_b):
+            combined = family_a | family_b
+            is_gen = any(combined & g for g in _GENERATION_FAMILIES)
+            reason = "generation_progression" if is_gen else "product_mismatch"
+            return False, reason
+
+    return True, ""
+
+
 EXCLUSIVE_PAIRS: list[tuple[set[str], set[str]]] = [
     (
         {"air cool", "air-cool", "air cooled", "air-cooled"},
@@ -227,6 +282,8 @@ _NODE_TERMS: tuple[str, ...] = (
     "server node",
     "gpu node",
     "compute node",
+    "per server",     # J6.5b: "per server" means node-level measurement
+    "each server",    # J6.5b: "each server" is node-level
 )
 
 # Cluster / data-centre aggregate
@@ -286,6 +343,9 @@ def _extract_scope(text: str) -> str:
     t = text.lower()
 
     # ---- Hardware scopes (fine → coarse) ----
+    # J6.5b: chip/die is a component-level scope (finer than shelf/PSU)
+    if re.search(r"\bgpu\s+chip\b|\bchip\s+(?:power|tdp|die)\b|\bper\s+(?:gpu|chip|die)\b", t):
+        return "component"
     if any(kw in t for kw in _COMPONENT_TERMS):
         return "component"
     if any(kw in t for kw in _TRAY_TERMS):
@@ -447,6 +507,19 @@ def build_extraction_stats(items: list[EvidenceItem]) -> dict:
 # ---------------------------------------------------------------------------
 
 _CONTEXT_WINDOW = 80  # characters examined around a matched value
+
+# J6.5b – range extraction for range-vs-average compatibility gate
+def _extract_range_for_unit(text: str, unit: str) -> tuple[float, float] | None:
+    """Extract [lo, hi] bounds from a range expression like '30–100 kW' in *text*."""
+    pattern = re.compile(
+        rf"\b(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\+?\s*{re.escape(unit)}\b",
+        re.IGNORECASE,
+    )
+    m = pattern.search(text)
+    if m:
+        return float(m.group(1)), float(m.group(2))
+    return None
+
 
 _RE_RATE = re.compile(
     r"per\s+year|/\s*year|per\s+annum|annually|per\s+month|/\s*month"
@@ -822,6 +895,25 @@ def _check_numeric_conflict(
                 ))
             continue
 
+        # Gate 3.5 (J6.5b): product / generation mismatch
+        _prod_compat, _prod_reason = _product_compatibility_check(a.claim, b.claim)
+        if not _prod_compat:
+            if out_suppressed is not None:
+                out_suppressed.append(SuppressedComparison(
+                    evidence_a_id=a.evidence_id or "?",
+                    evidence_b_id=b.evidence_id or "?",
+                    evidence_a_claim=a.claim,
+                    evidence_b_claim=b.claim,
+                    reason=_prod_reason,
+                    scope_a=scope_a,
+                    scope_b=scope_b,
+                    detail=(
+                        f"Unit '{unit}': {_prod_reason} — claims reference "
+                        f"different product models or GPU generations."
+                    ),
+                ))
+            continue
+
         # Gate 4: scope compatibility
         if not _scopes_compatible(scope_a, scope_b):
             if out_suppressed is not None:
@@ -882,6 +974,46 @@ def _check_numeric_conflict(
                     ),
                 ))
             continue
+
+        # Gate 7 (J6.5b): range vs point-value compatibility
+        _range_a = _extract_range_for_unit(claim_a, unit)
+        _range_b = _extract_range_for_unit(claim_b, unit)
+        if _range_a and not _range_b:
+            _lo, _hi = _range_a
+            if _lo * 0.85 <= val_b <= _hi * 1.15:
+                if out_suppressed is not None:
+                    out_suppressed.append(SuppressedComparison(
+                        evidence_a_id=a.evidence_id or "?",
+                        evidence_b_id=b.evidence_id or "?",
+                        evidence_a_claim=a.claim,
+                        evidence_b_claim=b.claim,
+                        reason="range_average_compatible",
+                        scope_a=scope_a,
+                        scope_b=scope_b,
+                        detail=(
+                            f"Unit '{unit}': A states range [{_lo}, {_hi}] {unit}, "
+                            f"B states {val_b} {unit} which falls within that range."
+                        ),
+                    ))
+                continue
+        elif _range_b and not _range_a:
+            _lo, _hi = _range_b
+            if _lo * 0.85 <= val_a <= _hi * 1.15:
+                if out_suppressed is not None:
+                    out_suppressed.append(SuppressedComparison(
+                        evidence_a_id=a.evidence_id or "?",
+                        evidence_b_id=b.evidence_id or "?",
+                        evidence_a_claim=a.claim,
+                        evidence_b_claim=b.claim,
+                        reason="range_average_compatible",
+                        scope_a=scope_a,
+                        scope_b=scope_b,
+                        detail=(
+                            f"Unit '{unit}': B states range [{_lo}, {_hi}] {unit}, "
+                            f"A states {val_a} {unit} which falls within that range."
+                        ),
+                    ))
+                continue
 
         if val_a == 0 and val_b == 0:
             continue
@@ -960,6 +1092,25 @@ def _check_categorical_conflict(
                         detail=(
                             f"Categorical '{matched_a}' vs '{matched_b}': "
                             f"entity '{a.entity}' vs '{b.entity}' — different subjects."
+                        ),
+                    ))
+                continue
+
+            # Gate 3.5 (J6.5b): product / generation mismatch
+            _cat_compat, _cat_reason = _product_compatibility_check(a.claim, b.claim)
+            if not _cat_compat:
+                if out_suppressed is not None:
+                    out_suppressed.append(SuppressedComparison(
+                        evidence_a_id=a.evidence_id or "?",
+                        evidence_b_id=b.evidence_id or "?",
+                        evidence_a_claim=a.claim,
+                        evidence_b_claim=b.claim,
+                        reason=_cat_reason,
+                        scope_a=scope_a,
+                        scope_b=scope_b,
+                        detail=(
+                            f"Categorical '{matched_a}' vs '{matched_b}': "
+                            f"{_cat_reason} — different products or GPU generations."
                         ),
                     ))
                 continue
@@ -1135,10 +1286,17 @@ def compute_suppression_metrics(
         "suppressed_count": suppressed_count,
         "final_count": final_count,
         "by_reason": by_reason,
-        "scope_filtering_present": by_reason.get("scope_mismatch", 0) > 0
-            or by_reason.get("metric_scope_mismatch", 0) > 0,
-        "entity_filtering_present": by_reason.get("entity_mismatch", 0) > 0,
-        "temporal_filtering_present": by_reason.get("temporal_progression", 0) > 0,
+        "scope_filtering_present": bool(
+            by_reason.get("scope_mismatch", 0)
+            or by_reason.get("metric_scope_mismatch", 0)
+        ),
+        "entity_filtering_present": bool(by_reason.get("entity_mismatch", 0)),
+        "temporal_filtering_present": bool(by_reason.get("temporal_progression", 0)),
+        "product_filtering_present": bool(
+            by_reason.get("product_mismatch", 0)
+            or by_reason.get("generation_progression", 0)
+        ),
+        "range_filtering_present": bool(by_reason.get("range_average_compatible", 0)),
     }
 
 
