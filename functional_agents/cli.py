@@ -266,5 +266,67 @@ def profile_compare_cmd(
         raise typer.Exit(code=1)
 
 
+@app.command("corpus-validate")
+def corpus_validate_cmd(
+    out: Annotated[
+        Path,
+        typer.Option("--out", "-o", help="Output directory for corpus validation report and JSON."),
+    ] = Path("outputs"),
+    top_n: Annotated[
+        int,
+        typer.Option("--top-n", help="Evidence items retrieved per run."),
+    ] = 18,
+    log_level: Annotated[
+        str | None,
+        typer.Option("--log-level", help="Logging level."),
+    ] = None,
+) -> None:
+    """Run the J5.6c profile corpus validation.
+
+    Executes three runs against a 60-item source-attributed corpus (32
+    ai_data_centers items from NVIDIA/ASHRAE/hyperscalers + 28 transmission
+    items from PJM/MISO/ERCOT/FERC/NERC) and proves that profile selection
+    produces profile-specific source pools.  Writes
+    j56c_profile_corpus_report.md and j56c_profile_corpus.json.  Exits with
+    code 1 if source pools are not measurably different.
+    """
+    _configure_logging(verbose=False, log_level=log_level or "INFO")
+
+    from .profile_corpus_validator import (
+        run_corpus_validation,
+        build_corpus_report,
+        write_corpus_artifacts,
+    )
+
+    results = run_corpus_validation(n=top_n)
+    bv = results["behavioral_validation"]
+    sims = results["similarity_matrix"]
+    runs = results["runs"]
+
+    write_corpus_artifacts(results, Path(out))
+
+    report = build_corpus_report(results)
+    typer.echo(report)
+
+    for rid, run in runs.items():
+        prs = run.get("profile_retrieval_summary", {})
+        for profile, summary in prs.items():
+            sources = summary.get("evidence_sources", [])
+            typer.echo(f"{rid.upper()} / {profile}: {len(sources)} sources — {', '.join(sources[:5])}{'…' if len(sources) > 5 else ''}")
+    typer.echo("")
+    typer.echo(f"A vs B source Jaccard   : {sims['a_vs_b']['source_similarity']:.3f}")
+    typer.echo(f"A vs B evidence Jaccard : {sims['a_vs_b']['evidence_similarity']:.3f}")
+    typer.echo("")
+    for key, val in bv.items():
+        label = key.replace("_", " ").title()
+        typer.echo(f"{label:<42}: {'YES' if val else 'NO'}")
+    typer.echo(f"\nReport: {out}/j56c_profile_corpus_report.md")
+
+    if not all(bv.values()):
+        failed = [k for k, v in bv.items() if not v]
+        typer.echo(f"FAIL: behavioral validation criteria not met: {', '.join(failed)}", err=True)
+        raise typer.Exit(code=1)
+
+
 if __name__ == "__main__":
     app()
