@@ -496,6 +496,21 @@ def _validate_contradiction_decision_logic(context: "AgentContext") -> dict[str,
     }
 
 
+def _validate_scenario(context: "AgentContext") -> dict[str, Any]:
+    """Validate scenario analysis output produced by ScenarioAgent (J6.8)."""
+    scenario_analysis = getattr(context, "scenario_analysis", {}) or {}
+    scenarios = scenario_analysis.get("scenarios", [])
+    rec_stress_test = scenario_analysis.get("recommendation_stress_test", [])
+    return {
+        "scenarios_present":                  len(scenarios) > 0,
+        "scenario_count":                     len(scenarios),
+        "recommendation_stress_test_present": len(rec_stress_test) > 0,
+        "robustness_scores_present":          all(
+            "robustness_score" in r for r in rec_stress_test
+        ) if rec_stress_test else False,
+    }
+
+
 def _validate_recommendation_evaluation(context: "AgentContext") -> dict[str, Any]:
     """Validate that recommendation_evaluation metadata is present and complete (J6.6a)."""
     rec_eval = context.qa.get("recommendation_evaluation", {})
@@ -730,10 +745,14 @@ class QAAgent(FunctionalAgent):
             "recommendation_evaluation_validation": {},
             "contradiction_decision_validation": contradiction_decision_validation,
             "numeric_semantic_validation": numeric_semantic_validation,
+            # scenario analysis validation (J6.8) — re-validated from context.scenario_analysis
+            "scenario_validation": {},
         }
 
         # --- recommendation_evaluation_validation requires context.qa to be set first ---
         context.qa["recommendation_evaluation_validation"] = _validate_recommendation_evaluation(context)
+        # --- scenario_validation (J6.8) — re-validates ScenarioAgent output ---
+        context.qa["scenario_validation"] = _validate_scenario(context)
 
         # --- update Research Object (J5.3.7) ---
         if ro:

@@ -241,6 +241,76 @@ def _build_recommendation_improvement_section(improvement: dict) -> str:
     return "\n".join(lines)
 
 
+def _build_scenario_section(scenario_analysis: dict) -> str:
+    """Render a Scenario Analysis section for the markdown report (J6.8)."""
+    scenarios = scenario_analysis.get("scenarios", [])
+    rec_stress_test = scenario_analysis.get("recommendation_stress_test", [])
+    summary = scenario_analysis.get("summary", {})
+    if not scenarios:
+        return ""
+
+    lines: list[str] = [
+        "## Scenario Analysis",
+        "",
+        f"Three plausible futures were evaluated across "
+        f"{summary.get('recommendations_stress_tested', 0)} recommendations. "
+        f"Average robustness score: **{summary.get('average_robustness_score', 0):.3f}**.",
+        "",
+        "### Scenarios",
+        "",
+        "| Scenario | Description | Power | Grid Timelines | Probability |",
+        "|----------|-------------|-------|----------------|-------------|",
+    ]
+    for s in scenarios:
+        name = s.get("name", "")
+        desc = s.get("description", "")[:80] + ("…" if len(s.get("description", "")) > 80 else "")
+        assum = s.get("assumptions", {})
+        power = assum.get("power_availability", "—").replace("_", " ")
+        grid = assum.get("grid_interconnection_timelines", "—").replace("_", " ")
+        prob = f"{int(s.get('probability', 0) * 100)}%"
+        lines.append(f"| {name} | {desc} | {power} | {grid} | {prob} |")
+
+    if rec_stress_test:
+        lines += [
+            "",
+            "### Recommendation Robustness",
+            "",
+            "| Recommendation | Base Case | Upside Case | Downside Case | Robustness |",
+            "|----------------|-----------|-------------|---------------|------------|",
+        ]
+        for r in rec_stress_test:
+            rid = r.get("recommendation_id", "")
+            fit = r.get("scenario_fit", {})
+            rob = r.get("robustness_score", 0.0)
+            lines.append(
+                f"| {rid} | {fit.get('base_case', '—')} | "
+                f"{fit.get('upside_case', '—')} | "
+                f"{fit.get('downside_case', '—')} | "
+                f"**{rob:.3f}** |"
+            )
+
+    # Downside adjustments
+    downside_adj = [
+        (r["recommendation_id"], adj["adjustment"])
+        for r in rec_stress_test
+        for adj in r.get("scenario_adjustments", [])
+        if adj.get("scenario") == "downside_case"
+    ]
+    if downside_adj:
+        lines += [
+            "",
+            "### Downside-Case Adjustments",
+            "",
+            "| Recommendation | Adjustment |",
+            "|----------------|------------|",
+        ]
+        for rid, adj in downside_adj:
+            lines.append(f"| {rid} | {adj} |")
+
+    lines.append("")
+    return "\n".join(lines)
+
+
 def _write_recommendation_observability_trace(rec_eval: dict, report_path: "Path") -> None:
     """Write j66a_recommendation_observability.trace.json alongside the report (J6.6a)."""
     import json
@@ -731,6 +801,10 @@ class ReportAgent(FunctionalAgent):
             _improvement_section = _build_recommendation_improvement_section(_improvement_data)
             if _improvement_section:
                 report_content = report_content.rstrip("\n") + "\n\n" + _improvement_section
+        if context.scenario_analysis:
+            _scenario_section = _build_scenario_section(context.scenario_analysis)
+            if _scenario_section:
+                report_content = report_content.rstrip("\n") + "\n\n" + _scenario_section
         output_path = write_markdown(report_content, self._out_path)
         context.artifacts["report_path"] = str(output_path)
         context.artifacts["trace_path"] = str(output_path.with_suffix(".trace.json"))
@@ -954,6 +1028,11 @@ class ReportAgent(FunctionalAgent):
         improvement_data = context.trace.get("_recommendation_improvement")
         if improvement_data:
             trace_payload["recommendation_improvement"] = improvement_data
+
+        # Scenario analysis block (J6.8)
+        scenario_data = context.trace.get("_scenario_analysis")
+        if scenario_data:
+            trace_payload["scenario_analysis"] = scenario_data
 
         # Contract validation block (J5.5a follow-up)
         # ReportAgent reads _contract_runtime before _step() can record its own
