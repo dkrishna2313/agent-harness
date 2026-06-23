@@ -207,5 +207,64 @@ def scenario_validate_cmd(
         raise typer.Exit(code=1)
 
 
+@app.command("profile-compare")
+def profile_compare_cmd(
+    out: Annotated[
+        Path,
+        typer.Option("--out", "-o", help="Output directory for comparison report and JSON."),
+    ] = Path("outputs"),
+    top_n: Annotated[
+        int,
+        typer.Option("--top-n", help="Evidence items retrieved per run."),
+    ] = 18,
+    log_level: Annotated[
+        str | None,
+        typer.Option("--log-level", help="Logging level."),
+    ] = None,
+) -> None:
+    """Run the J5.6b profile-driven retrieval validation.
+
+    Executes the same goal three times with different profile selections
+    (Run A: ai_data_centers, Run B: transmission, Run C: both) using a
+    50-item synthetic evidence corpus scored against real profile term sets.
+    Reports evidence, finding, and recommendation overlap with Jaccard
+    similarity metrics.  Exits with code 1 if profiles do not produce
+    measurably different outputs.
+    """
+    _configure_logging(verbose=False, log_level=log_level or "INFO")
+
+    from .profile_comparison import run_all, build_comparison_report, write_artifacts
+
+    results = run_all(n=top_n)
+    bv = results["behavioral_validation"]
+    sims = results["similarity_matrix"]
+    runs = results["runs"]
+
+    write_artifacts(results, Path(out))
+
+    report = build_comparison_report(results)
+    typer.echo(report)
+
+    # Key metrics summary
+    typer.echo(f"Run A evidence: {runs['run_a']['evidence_count']} items  keywords={runs['run_a']['finding_keywords']}")
+    typer.echo(f"Run B evidence: {runs['run_b']['evidence_count']} items  keywords={runs['run_b']['finding_keywords']}")
+    typer.echo(f"Run C evidence: {runs['run_c']['evidence_count']} items  keywords={runs['run_c']['finding_keywords']}")
+    typer.echo("")
+    typer.echo(f"A vs B evidence similarity : {sims['a_vs_b']['evidence_similarity']:.3f}")
+    typer.echo(f"A vs B finding similarity  : {sims['a_vs_b']['finding_similarity']:.3f}")
+    typer.echo(f"A vs B rec similarity      : {sims['a_vs_b']['recommendation_similarity']:.3f}")
+    typer.echo("")
+    typer.echo(f"Retrieval changed    : {'YES' if bv['retrieval_changed'] else 'NO'}")
+    typer.echo(f"Evidence changed     : {'YES' if bv['evidence_changed'] else 'NO'}")
+    typer.echo(f"Findings changed     : {'YES' if bv['findings_changed'] else 'NO'}")
+    typer.echo(f"Recommendations changed: {'YES' if bv['recommendations_changed'] else 'NO'}")
+    typer.echo(f"Report written to    : {out}/j56b_profile_comparison_report.md")
+
+    if not all(bv.values()):
+        failed = [k for k, v in bv.items() if not v]
+        typer.echo(f"FAIL: behavioral validation criteria not met: {', '.join(failed)}", err=True)
+        raise typer.Exit(code=1)
+
+
 if __name__ == "__main__":
     app()
