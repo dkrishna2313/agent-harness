@@ -79,6 +79,7 @@ class AgentOrchestrator:
         hypothesis_factory: Any = None,
         challenge_factory: Any = None,
         recommendation_factory: Any = None,
+        multi_profile_factory: Any = None,
         scenario_factory: Any = None,
         improvement_factory: Any = None,
         max_iterations: int = 3,
@@ -88,6 +89,7 @@ class AgentOrchestrator:
         self._hypothesis_factory        = hypothesis_factory
         self._challenge_factory         = challenge_factory
         self._recommendation_factory    = recommendation_factory
+        self._multi_profile_factory     = multi_profile_factory
         self._scenario_factory          = scenario_factory
         self._improvement_factory       = improvement_factory
         self._planner_factory  = planner_factory
@@ -167,6 +169,20 @@ class AgentOrchestrator:
             # ---- RECOMMENDATION (J6.5) --------------------------------------
             elif state == WorkflowState.RECOMMENDATION:
                 result = _step(self._recommendation_factory(), ctx)
+                ctx = result.context
+                state = (
+                    WorkflowState.MULTI_PROFILE
+                    if self._multi_profile_factory is not None
+                    else (
+                        WorkflowState.SCENARIO
+                        if self._scenario_factory is not None
+                        else WorkflowState.QA
+                    )
+                )
+
+            # ---- MULTI-PROFILE (J5.6a) --------------------------------------
+            elif state == WorkflowState.MULTI_PROFILE:
+                result = _step(self._multi_profile_factory(), ctx)
                 ctx = result.context
                 state = (
                     WorkflowState.SCENARIO
@@ -339,6 +355,7 @@ class Orchestrator:
         from .recommendation_agent               import RecommendationAgent
         from .scenario_agent                     import ScenarioAgent
         from .recommendation_improvement_agent   import RecommendationImprovementAgent
+        from .multi_profile_agent                import MultiProfileAgent
 
         execution_profile = self._profile_names[0] if self._profile_names else ""
         mock_mode = self._client is not None and getattr(self._client, "is_mock", False)
@@ -368,6 +385,9 @@ class Orchestrator:
 
         def recommendation_factory() -> RecommendationAgent:
             return RecommendationAgent(client=self._client, domain_profiles=loaded_profiles)
+
+        def multi_profile_factory() -> MultiProfileAgent:
+            return MultiProfileAgent()
 
         def scenario_factory() -> ScenarioAgent:
             return ScenarioAgent()
@@ -439,6 +459,7 @@ class Orchestrator:
             hypothesis_factory=hypothesis_factory,
             challenge_factory=challenge_factory,
             recommendation_factory=recommendation_factory,
+            multi_profile_factory=multi_profile_factory,
             scenario_factory=scenario_factory,
             improvement_factory=improvement_factory,
             planner_factory=planner_factory,

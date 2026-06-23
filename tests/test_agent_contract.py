@@ -25,10 +25,11 @@ from functional_agents.qa_agent import QAAgent
 from functional_agents.report_agent import ReportAgent
 from functional_agents.scenario_agent import ScenarioAgent
 from functional_agents.recommendation_improvement_agent import RecommendationImprovementAgent
+from functional_agents.multi_profile_agent import MultiProfileAgent
 
 _ALL_AGENT_CLASSES = [
     PlannerAgent, EvidenceAgent, QAAgent, ReportAgent,
-    ScenarioAgent, RecommendationImprovementAgent,
+    ScenarioAgent, RecommendationImprovementAgent, MultiProfileAgent,
 ]
 
 
@@ -206,7 +207,7 @@ def test_validate_all_classes_returns_all_agents():
         "ProblemFramingAgent", "ResearchStrategyAgent",
         "PlannerAgent", "EvidenceAgent",
         "HypothesisAgent", "ChallengeAgent", "RecommendationAgent",
-        "ScenarioAgent", "RecommendationImprovementAgent",
+        "MultiProfileAgent", "ScenarioAgent", "RecommendationImprovementAgent",
         "QAAgent", "ReportAgent",
     }
 

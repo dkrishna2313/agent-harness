@@ -27,6 +27,7 @@ class WorkflowState:
     HYPOTHESIS  = "HYPOTHESIS"
     CHALLENGE       = "CHALLENGE"
     RECOMMENDATION              = "RECOMMENDATION"
+    MULTI_PROFILE               = "MULTI_PROFILE"
     SCENARIO                    = "SCENARIO"
     RECOMMENDATION_IMPROVEMENT  = "RECOMMENDATION_IMPROVEMENT"
     QA                          = "QA"
@@ -94,6 +95,7 @@ class AgentContext:
     surviving_hypotheses: list[dict[str, Any]] = field(default_factory=list)
     recommendations: list[dict[str, Any]] = field(default_factory=list)
     recommendation_portfolio: dict[str, Any] = field(default_factory=dict)
+    multi_profile_analysis: dict[str, Any] = field(default_factory=dict)
     scenarios: list[dict[str, Any]] = field(default_factory=list)
     scenario_analysis: dict[str, Any] = field(default_factory=dict)
     recommendation_improvement: dict[str, Any] = field(default_factory=dict)

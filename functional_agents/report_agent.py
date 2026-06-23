@@ -1076,6 +1076,24 @@ class ReportAgent(FunctionalAgent):
         if improvement_data:
             trace_payload["recommendation_improvement"] = improvement_data
 
+        # Multi-profile validation block (J5.6a)
+        multi_profile_data = context.trace.get("_multi_profile")
+        if multi_profile_data:
+            trace_payload["multi_profile_validation"] = multi_profile_data.get(
+                "multi_profile_validation", multi_profile_data
+            )
+        elif context.multi_profile_analysis:
+            mpa = context.multi_profile_analysis
+            trace_payload["multi_profile_validation"] = {
+                "profiles_requested":   mpa.get("profiles_requested", []),
+                "profiles_contributing": mpa.get("profiles_contributing", []),
+                "profiles_missing":     mpa.get("profiles_missing", []),
+                "coverage_status":      mpa.get("coverage_status", "unknown"),
+                "profile_coverage":     mpa.get("profile_coverage", {}),
+                "profile_influence":    mpa.get("profile_influence", {}),
+                "missing_profile_diagnostics": mpa.get("missing_profile_diagnostics", []),
+            }
+
         # Scenario analysis block (J6.8)
         scenario_data = context.trace.get("_scenario_analysis")
         if scenario_data:
