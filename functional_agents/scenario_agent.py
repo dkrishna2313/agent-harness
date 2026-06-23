@@ -253,7 +253,11 @@ def generate_scenarios(context: AgentContext) -> list[dict[str, Any]]:
     for i, tmpl in enumerate(_SCENARIO_TEMPLATES):
         start = i * chunk
         ev_chunk = all_ev_ids[start: start + chunk] if n else []
-        scenarios.append({**tmpl, "evidence_ids": ev_chunk})
+        scenarios.append({
+            **tmpl,
+            "evidence_ids": ev_chunk,
+            "supporting_evidence": ev_chunk,  # spec alias (J6.8a)
+        })
 
     return scenarios
 
@@ -288,13 +292,19 @@ def stress_test_recommendations(
                 "adjustment":   _scenario_adjustment_upside(rec),
             })
 
+        # Build adjustments dict (spec J6.8a) alongside the existing list
+        adjustments_dict: dict[str, str] = {
+            a["scenario"]: a["adjustment"] for a in adjustments
+        }
+
         results.append({
             "recommendation_id":    rec.get("id", ""),
             "title":                rec.get("title", ""),
             "scenario_fit":         fit,
             "robustness_score":     robustness,
             "scenario_risks":       scenario_risks,
-            "scenario_adjustments": adjustments,
+            "scenario_adjustments": adjustments,   # list form (existing)
+            "adjustments":          adjustments_dict,  # dict form (J6.8a)
         })
 
     return results

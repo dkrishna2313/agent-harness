@@ -1,9 +1,13 @@
 {
-  "research_id": "R-SMR_001",
-  "created_at": "2026-06-19T19:30:30.672101+00:00",
-  "updated_at": "2026-06-19T19:30:30.672281+00:00",
+  "research_id": "R-SMR_011",
+  "created_at": "2026-06-23T02:57:11.599336+00:00",
+  "updated_at": "2026-06-23T02:57:11.599645+00:00",
   "status": "completed",
-  "question": "What regulatory approvals are required before a small modular reactor can begin commercial operation in the United States?",
+  "question": "What is the output capacity of the BWRX-300, and what type of reactor technology does it use?",
+  "profiles": [
+    "smr"
+  ],
+  "primary_profile": "smr",
   "profile": "smr",
   "profile_source": "benchmark_domain_mapping",
   "run_config": {
@@ -12,28 +16,153 @@
     "mock_mode": false,
     "model_name": null
   },
-  "subquestions": [],
+  "research_type": "FACT_LOOKUP",
+  "subquestions": [
+    "What is the specific answer to: What is the output capacity of the BWRX-300, and what type of reactor technology does it use?",
+    "What sources contain this information?",
+    "Are there any caveats or conditions on this fact?"
+  ],
+  "investigation_areas": [
+    "Overview",
+    "Key Findings",
+    "Open Questions"
+  ],
   "retrieval_plan": {
-    "source_count": 1
+    "web_search": {
+      "dependency_status": {
+        "duckduckgo_search": "ok (ddgs)",
+        "requests": "ok",
+        "trafilatura": "ok",
+        "all_available": true
+      },
+      "query": "What is the output capacity of the BWRX-300, and what type of reactor technology does it use?",
+      "provider": "DuckDuckGoSearchProvider",
+      "search_error": null,
+      "search_results_returned": 5,
+      "search_results": [
+        {
+          "title": "BWRX-300 - Fermi Energy",
+          "url": "https://fermi.ee/en/bwrx-300/",
+          "snippet": "The BWRX-300 is the latest, tenth generation of BWR designs developed by GE Hitachi Nuclear Energy.It is a small modular reactor with an electrical capacity of 300 megawatts, using naturally circulati"
+        },
+        {
+          "title": "Canada's first modular nuclear reactor to power 1.2 million homes",
+          "url": "https://interestingengineering.com/energy/small-modular-reactor-project-in-canada",
+          "snippet": "This pioneering BWRX-300 reactor is projected to generate 300 megawatts (MW) of clean, reliable electricity, enough to power the equivalent of 300,000 homes."
+        },
+        {
+          "title": "GE Hitachi Signs Contract for the First North... | GE Vernova News",
+          "url": "https://www.gevernova.com/news/press-releases/ge-hitachi-signs-contract-for-the-first-north-american-small-modular-reactor",
+          "snippet": "Specifically, the BWRX-300 leverages a unique combination of existing fuel that is currently used in operating reactors (and does not require HALEU), plant simplifications, proven components and a des"
+        },
+        {
+          "title": "GE Hitachi’s BWRX-300 Small Modular Reactor Gets Another Win",
+          "url": "https://www.powermag.com/ge-hitachis-bwrx-300-small-modular-reactor-gets-another-win/?oly_enc_id=5568E7128245G3Y",
+          "snippet": "The BWRX-300 is the 10th evolution of GE’s boiling water reactor (BWR) design.However, the specific reactor model is much smaller than the ones used in the nuclear plants of our northern neighbors, wh"
+        },
+        {
+          "title": "The BWRX-300 Keeps It Simple—and Small—to Pair Well With... | NEI",
+          "url": "https://www.nei.org/news/2021/bwrx-300-small-simple-wind-solar",
+          "snippet": "The BWRX-300 automatically turns itself off as soon as any issue is detected and does not require complex safety systems to do so. Small Is Beautiful—And Useful. Smaller means simpler."
+        }
+      ],
+      "pages_attempted": 5,
+      "downloaded_urls": [
+        "https://fermi.ee/en/bwrx-300/",
+        "https://interestingengineering.com/energy/small-modular-reactor-project-in-canada",
+        "https://www.gevernova.com/news/press-releases/ge-hitachi-signs-contract-for-the-first-north-american-small-modular-reactor",
+        "https://www.powermag.com/ge-hitachis-bwrx-300-small-modular-reactor-gets-another-win/?oly_enc_id=5568E7128245G3Y",
+        "https://www.nei.org/news/2021/bwrx-300-small-simple-wind-solar"
+      ],
+      "failed_urls": [],
+      "cache_hits": 5,
+      "documents_fetched": 5,
+      "extracted_characters": 24397,
+      "download_details": [
+        {
+          "url": "https://fermi.ee/en/bwrx-300/",
+          "title": "BWRX-300 - Fermi Energy",
+          "source": "cache",
+          "error": null,
+          "chars": 5187
+        },
+        {
+          "url": "https://interestingengineering.com/energy/small-modular-reactor-project-in-canada",
+          "title": "Canada's first modular nuclear reactor to power 1.2 million homes",
+          "source": "cache",
+          "error": null,
+          "chars": 4481
+        },
+        {
+          "url": "https://www.gevernova.com/news/press-releases/ge-hitachi-signs-contract-for-the-first-north-american-small-modular-reactor",
+          "title": "GE Hitachi Signs Contract for the First North... | GE Vernova News",
+          "source": "cache",
+          "error": null,
+          "chars": 3819
+        },
+        {
+          "url": "https://www.powermag.com/ge-hitachis-bwrx-300-small-modular-reactor-gets-another-win/?oly_enc_id=5568E7128245G3Y",
+          "title": "GE Hitachi’s BWRX-300 Small Modular Reactor Gets Another Win",
+          "source": "cache",
+          "error": null,
+          "chars": 6315
+        },
+        {
+          "url": "https://www.nei.org/news/2021/bwrx-300-small-simple-wind-solar",
+          "title": "The BWRX-300 Keeps It Simple—and Small—to Pair Well With... | NEI",
+          "source": "cache",
+          "error": null,
+          "chars": 4595
+        }
+      ],
+      "chunks_created": 5
+    },
+    "source_count": 5
   },
   "evidence_ids": [
-    "E001"
+    "E003",
+    "E004",
+    "E005",
+    "E002",
+    "E001",
+    "E007",
+    "E008",
+    "E006"
   ],
-  "evidence_topics": {},
+  "evidence_topics": {
+    "output capacity": 6,
+    "reactor technology": 7,
+    "BWR": 6,
+    "natural circulation": 3,
+    "SMR": 1,
+    "net electrical output": 1,
+    "thermal output": 1,
+    "direct cycle": 1,
+    "light water reactor": 1,
+    "power generation": 1,
+    "single circuit": 1,
+    "10th generation": 1,
+    "passive safety": 1,
+    "fuel type": 1
+  },
   "findings": [
-    "The sole evidence item confirms that none of the supplied source documents contain information about SMR regulatory approvals; all sources exclusively cover NVIDIA GPU architectures, AI computing platforms, and related infrastructure."
+    "The BWRX-300 is a 300 MWe water-cooled, natural circulation Small Modular Reactor (SMR) and is the tenth generation of the Boiling Water Reactor (BWR), evolved from the NRC-licensed 1,520 MWe ESBWR.",
+    "The BWRX-300 has a net electrical output of 300 MWe to the grid, a thermal output of 870 MWth, and in-house consumption of 10–30 MWe, using a direct-cycle BWR design with a Rankine thermodynamic cycle.",
+    "The BWRX-300 net capacity to the electric grid is 270–290 MWe (net to grid), with a single core thermal power of 870 MWth and in-house plant consumption of 10–30 MWe.",
+    "The BWRX-300 is a 300-megawatt electric light water reactor based on proven and licensed boiling water reactor (BWR) technology, with GE Hitachi aiming to reduce plant size by 90% compared to large-scale BWRs.",
+    "The BWRX-300 uses a natural circulation primary circuit (no forced circulation pumps), a direct thermodynamic cycle (Rankine), a dry underground containment vessel, and GNF2 fuel bundles in a 4-metre diameter reactor pressure vessel."
   ],
   "contradictions": [],
   "research_gaps": [],
   "outputs": {
-    "question_id": "SMR_001"
+    "question_id": "SMR_011"
   },
   "summary": {
-    "evidence_count": 1,
-    "citation_count": 1,
+    "evidence_count": 8,
+    "citation_count": 8,
     "contradictions_found": 0,
     "research_gaps_found": 0,
-    "coverage_score": 0.0
+    "coverage_score": 0.36
   },
   "owner": null,
   "assigned_agent": null,
@@ -45,5 +174,340 @@
     "actual_profile": "smr",
     "source": "benchmark_domain_mapping",
     "valid": true
-  }
+  },
+  "scenarios": [
+    {
+      "scenario_id": "S1",
+      "name": "Base Case",
+      "description": "AI demand grows strongly; grid and permitting constraints remain material but manageable with early planning and proactive interconnection agreements.",
+      "assumptions": {
+        "ai_demand_growth": "strong",
+        "power_availability": "moderate",
+        "grid_interconnection_timelines": "standard_2_to_4_years",
+        "transmission_constraints": "material",
+        "cooling_technology_readiness": "improving",
+        "capital_availability": "adequate",
+        "regulatory_permitting": "standard"
+      },
+      "critical_uncertainties": [
+        "pace of grid interconnection queue resolution",
+        "cooling supply chain scale-up speed"
+      ],
+      "probability": 0.5,
+      "evidence_ids": [
+        "E001",
+        "E002",
+        "E003"
+      ],
+      "supporting_evidence": [
+        "E001",
+        "E002",
+        "E003"
+      ]
+    },
+    {
+      "scenario_id": "S2",
+      "name": "Upside Case",
+      "description": "Grid interconnection, power procurement, and cooling supply chains improve faster than expected; capital remains abundant and permitting streamlines.",
+      "assumptions": {
+        "ai_demand_growth": "very_strong",
+        "power_availability": "improving",
+        "grid_interconnection_timelines": "accelerated_under_2_years",
+        "transmission_constraints": "easing",
+        "cooling_technology_readiness": "mature",
+        "capital_availability": "abundant",
+        "regulatory_permitting": "streamlined"
+      },
+      "critical_uncertainties": [
+        "pace of permitting reform implementation",
+        "rate of cooling technology commoditisation"
+      ],
+      "probability": 0.25,
+      "evidence_ids": [
+        "E004",
+        "E005",
+        "E006"
+      ],
+      "supporting_evidence": [
+        "E004",
+        "E005",
+        "E006"
+      ]
+    },
+    {
+      "scenario_id": "S3",
+      "name": "Downside Case",
+      "description": "AI load growth outpaces grid expansion; permitting slows and power constraints become binding, compressing development timelines and stranding early investments.",
+      "assumptions": {
+        "ai_demand_growth": "strong",
+        "power_availability": "constrained",
+        "grid_interconnection_timelines": "delayed_over_5_years",
+        "transmission_constraints": "binding",
+        "cooling_technology_readiness": "limited",
+        "capital_availability": "tightening",
+        "regulatory_permitting": "restrictive"
+      },
+      "critical_uncertainties": [
+        "severity of grid interconnection delays",
+        "regulatory response to power demand growth",
+        "capital market appetite for constrained-location assets"
+      ],
+      "probability": 0.25,
+      "evidence_ids": [
+        "E007",
+        "E008",
+        "E009"
+      ],
+      "supporting_evidence": [
+        "E007",
+        "E008",
+        "E009"
+      ]
+    }
+  ],
+  "scenario_analysis": {
+    "scenarios": [
+      {
+        "scenario_id": "S1",
+        "name": "Base Case",
+        "description": "AI demand grows strongly; grid and permitting constraints remain material but manageable with early planning and proactive interconnection agreements.",
+        "assumptions": {
+          "ai_demand_growth": "strong",
+          "power_availability": "moderate",
+          "grid_interconnection_timelines": "standard_2_to_4_years",
+          "transmission_constraints": "material",
+          "cooling_technology_readiness": "improving",
+          "capital_availability": "adequate",
+          "regulatory_permitting": "standard"
+        },
+        "critical_uncertainties": [
+          "pace of grid interconnection queue resolution",
+          "cooling supply chain scale-up speed"
+        ],
+        "probability": 0.5,
+        "evidence_ids": [
+          "E001",
+          "E002",
+          "E003"
+        ],
+        "supporting_evidence": [
+          "E001",
+          "E002",
+          "E003"
+        ]
+      },
+      {
+        "scenario_id": "S2",
+        "name": "Upside Case",
+        "description": "Grid interconnection, power procurement, and cooling supply chains improve faster than expected; capital remains abundant and permitting streamlines.",
+        "assumptions": {
+          "ai_demand_growth": "very_strong",
+          "power_availability": "improving",
+          "grid_interconnection_timelines": "accelerated_under_2_years",
+          "transmission_constraints": "easing",
+          "cooling_technology_readiness": "mature",
+          "capital_availability": "abundant",
+          "regulatory_permitting": "streamlined"
+        },
+        "critical_uncertainties": [
+          "pace of permitting reform implementation",
+          "rate of cooling technology commoditisation"
+        ],
+        "probability": 0.25,
+        "evidence_ids": [
+          "E004",
+          "E005",
+          "E006"
+        ],
+        "supporting_evidence": [
+          "E004",
+          "E005",
+          "E006"
+        ]
+      },
+      {
+        "scenario_id": "S3",
+        "name": "Downside Case",
+        "description": "AI load growth outpaces grid expansion; permitting slows and power constraints become binding, compressing development timelines and stranding early investments.",
+        "assumptions": {
+          "ai_demand_growth": "strong",
+          "power_availability": "constrained",
+          "grid_interconnection_timelines": "delayed_over_5_years",
+          "transmission_constraints": "binding",
+          "cooling_technology_readiness": "limited",
+          "capital_availability": "tightening",
+          "regulatory_permitting": "restrictive"
+        },
+        "critical_uncertainties": [
+          "severity of grid interconnection delays",
+          "regulatory response to power demand growth",
+          "capital market appetite for constrained-location assets"
+        ],
+        "probability": 0.25,
+        "evidence_ids": [
+          "E007",
+          "E008",
+          "E009"
+        ],
+        "supporting_evidence": [
+          "E007",
+          "E008",
+          "E009"
+        ]
+      }
+    ],
+    "recommendation_stress_test": [
+      {
+        "recommendation_id": "R1",
+        "title": "Establish Power-Secured Site Portfolio with Grid Interconnection Priority",
+        "scenario_fit": {
+          "base_case": "strong",
+          "upside_case": "strong",
+          "downside_case": "strong"
+        },
+        "robustness_score": 1.0,
+        "scenario_risks": {
+          "base_case": [],
+          "upside_case": [],
+          "downside_case": [
+            "Grid interconnection delays may extend deployment timelines by 2+ years beyond plan",
+            "Power capacity constraints could force site redesign or relocation after commitment",
+            "Tightening capital markets increase cost of project finance and may reduce IRR below hurdle"
+          ]
+        },
+        "scenario_adjustments": [
+          {
+            "scenario": "upside_case",
+            "scenario_id": "S2",
+            "adjustment": "Accelerate timeline and scale of investment to capture the upside opportunity ahead of competitors; front-load capital commitments while supply chains are improving."
+          }
+        ],
+        "adjustments": {
+          "upside_case": "Accelerate timeline and scale of investment to capture the upside opportunity ahead of competitors; front-load capital commitments while supply chains are improving."
+        }
+      },
+      {
+        "recommendation_id": "R2",
+        "title": "Deploy Direct Liquid Cooling Infrastructure as Standard for High-Density AI Racks",
+        "scenario_fit": {
+          "base_case": "strong",
+          "upside_case": "strong",
+          "downside_case": "strong"
+        },
+        "robustness_score": 1.0,
+        "scenario_risks": {
+          "base_case": [],
+          "upside_case": [],
+          "downside_case": [
+            "Grid interconnection delays may extend deployment timelines by 2+ years beyond plan",
+            "Power capacity constraints could force site redesign or relocation after commitment",
+            "Cooling supply chain shortages increase equipment lead times and inflate capital cost",
+            "Tightening capital markets increase cost of project finance and may reduce IRR below hurdle"
+          ]
+        },
+        "scenario_adjustments": [
+          {
+            "scenario": "upside_case",
+            "scenario_id": "S2",
+            "adjustment": "Accelerate timeline and scale of investment to capture the upside opportunity ahead of competitors; front-load capital commitments while supply chains are improving."
+          }
+        ],
+        "adjustments": {
+          "upside_case": "Accelerate timeline and scale of investment to capture the upside opportunity ahead of competitors; front-load capital commitments while supply chains are improving."
+        }
+      },
+      {
+        "recommendation_id": "R3",
+        "title": "Structure AI Infrastructure CapEx as Phased Options to Preserve Flexibility",
+        "scenario_fit": {
+          "base_case": "strong",
+          "upside_case": "strong",
+          "downside_case": "strong"
+        },
+        "robustness_score": 1.0,
+        "scenario_risks": {
+          "base_case": [],
+          "upside_case": [],
+          "downside_case": [
+            "Grid interconnection delays may extend deployment timelines by 2+ years beyond plan",
+            "Power capacity constraints could force site redesign or relocation after commitment",
+            "Cooling supply chain shortages increase equipment lead times and inflate capital cost",
+            "Tightening capital markets increase cost of project finance and may reduce IRR below hurdle"
+          ]
+        },
+        "scenario_adjustments": [
+          {
+            "scenario": "upside_case",
+            "scenario_id": "S2",
+            "adjustment": "Accelerate timeline and scale of investment to capture the upside opportunity ahead of competitors; front-load capital commitments while supply chains are improving."
+          }
+        ],
+        "adjustments": {
+          "upside_case": "Accelerate timeline and scale of investment to capture the upside opportunity ahead of competitors; front-load capital commitments while supply chains are improving."
+        }
+      },
+      {
+        "recommendation_id": "R4",
+        "title": "Commission Regional Inference Capacity with Grid-Resilient Power Design",
+        "scenario_fit": {
+          "base_case": "strong",
+          "upside_case": "strong",
+          "downside_case": "strong"
+        },
+        "robustness_score": 1.0,
+        "scenario_risks": {
+          "base_case": [],
+          "upside_case": [],
+          "downside_case": [
+            "Grid interconnection delays may extend deployment timelines by 2+ years beyond plan",
+            "Power capacity constraints could force site redesign or relocation after commitment"
+          ]
+        },
+        "scenario_adjustments": [
+          {
+            "scenario": "upside_case",
+            "scenario_id": "S2",
+            "adjustment": "Accelerate timeline and scale of investment to capture the upside opportunity ahead of competitors; front-load capital commitments while supply chains are improving."
+          }
+        ],
+        "adjustments": {
+          "upside_case": "Accelerate timeline and scale of investment to capture the upside opportunity ahead of competitors; front-load capital commitments while supply chains are improving."
+        }
+      },
+      {
+        "recommendation_id": "R5",
+        "title": "Develop Proactive Regulatory and Permitting Strategy for Power-Intensive Facilities",
+        "scenario_fit": {
+          "base_case": "strong",
+          "upside_case": "strong",
+          "downside_case": "strong"
+        },
+        "robustness_score": 1.0,
+        "scenario_risks": {
+          "base_case": [],
+          "upside_case": [],
+          "downside_case": [
+            "Grid interconnection delays may extend deployment timelines by 2+ years beyond plan",
+            "Power capacity constraints could force site redesign or relocation after commitment"
+          ]
+        },
+        "scenario_adjustments": [
+          {
+            "scenario": "upside_case",
+            "scenario_id": "S2",
+            "adjustment": "Accelerate timeline and scale of investment to capture the upside opportunity ahead of competitors; front-load capital commitments while supply chains are improving."
+          }
+        ],
+        "adjustments": {
+          "upside_case": "Accelerate timeline and scale of investment to capture the upside opportunity ahead of competitors; front-load capital commitments while supply chains are improving."
+        }
+      }
+    ],
+    "summary": {
+      "scenario_count": 3,
+      "recommendations_stress_tested": 5,
+      "average_robustness_score": 1.0
+    }
+  },
+  "_j68a_validation_note": "Scenario fields populated by J6.8a validation harness using synthetic AI infrastructure recommendations; full pipeline RO written on functional run."
 }

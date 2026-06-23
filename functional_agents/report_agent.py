@@ -242,7 +242,7 @@ def _build_recommendation_improvement_section(improvement: dict) -> str:
 
 
 def _build_scenario_section(scenario_analysis: dict) -> str:
-    """Render a Scenario Analysis section for the markdown report (J6.8)."""
+    """Render a Scenario Analysis section for the markdown report (J6.8 / J6.8a)."""
     scenarios = scenario_analysis.get("scenarios", [])
     rec_stress_test = scenario_analysis.get("recommendation_stress_test", [])
     summary = scenario_analysis.get("summary", {})
@@ -256,19 +256,52 @@ def _build_scenario_section(scenario_analysis: dict) -> str:
         f"{summary.get('recommendations_stress_tested', 0)} recommendations. "
         f"Average robustness score: **{summary.get('average_robustness_score', 0):.3f}**.",
         "",
-        "### Scenarios",
+    ]
+
+    # Per-scenario subsections
+    for s in scenarios:
+        name = s.get("name", "")
+        sid = s.get("scenario_id", "")
+        desc = s.get("description", "")
+        prob = f"{int(s.get('probability', 0) * 100)}%"
+        assum = s.get("assumptions", {})
+        uncertainties = s.get("critical_uncertainties", [])
+
+        lines += [
+            f"### {name}",
+            "",
+            desc,
+            "",
+            f"**Probability:** {prob}",
+            "",
+            "**Key Assumptions:**",
+            "",
+        ]
+        for k, v in assum.items():
+            label = k.replace("_", " ").title()
+            val = str(v).replace("_", " ")
+            lines.append(f"- {label}: {val}")
+        if uncertainties:
+            lines += ["", "**Critical Uncertainties:**", ""]
+            for u in uncertainties:
+                lines.append(f"- {u}")
+        lines.append("")
+
+    # Summary table
+    lines += [
+        "### Scenarios Summary",
         "",
-        "| Scenario | Description | Power | Grid Timelines | Probability |",
-        "|----------|-------------|-------|----------------|-------------|",
+        "| Scenario | AI Demand | Power | Grid Timelines | Probability |",
+        "|----------|-----------|-------|----------------|-------------|",
     ]
     for s in scenarios:
         name = s.get("name", "")
-        desc = s.get("description", "")[:80] + ("…" if len(s.get("description", "")) > 80 else "")
         assum = s.get("assumptions", {})
+        demand = assum.get("ai_demand_growth", "—").replace("_", " ")
         power = assum.get("power_availability", "—").replace("_", " ")
         grid = assum.get("grid_interconnection_timelines", "—").replace("_", " ")
         prob = f"{int(s.get('probability', 0) * 100)}%"
-        lines.append(f"| {name} | {desc} | {power} | {grid} | {prob} |")
+        lines.append(f"| {name} | {demand} | {power} | {grid} | {prob} |")
 
     if rec_stress_test:
         lines += [
@@ -291,20 +324,34 @@ def _build_scenario_section(scenario_analysis: dict) -> str:
 
     # Downside adjustments
     downside_adj = [
-        (r["recommendation_id"], adj["adjustment"])
+        (r["recommendation_id"], r["adjustments"].get("downside_case", ""))
         for r in rec_stress_test
-        for adj in r.get("scenario_adjustments", [])
-        if adj.get("scenario") == "downside_case"
+        if r.get("adjustments", {}).get("downside_case")
+    ]
+    upside_adj = [
+        (r["recommendation_id"], r["adjustments"].get("upside_case", ""))
+        for r in rec_stress_test
+        if r.get("adjustments", {}).get("upside_case")
     ]
     if downside_adj:
         lines += [
             "",
-            "### Downside-Case Adjustments",
+            "### Downside Case — Scenario Adjustments",
             "",
             "| Recommendation | Adjustment |",
             "|----------------|------------|",
         ]
         for rid, adj in downside_adj:
+            lines.append(f"| {rid} | {adj} |")
+    if upside_adj:
+        lines += [
+            "",
+            "### Upside Case — Scenario Adjustments",
+            "",
+            "| Recommendation | Adjustment |",
+            "|----------------|------------|",
+        ]
+        for rid, adj in upside_adj:
             lines.append(f"| {rid} | {adj} |")
 
     lines.append("")

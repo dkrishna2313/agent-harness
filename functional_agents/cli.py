@@ -165,5 +165,47 @@ def stress_test_cmd(
         raise typer.Exit(code=1)
 
 
+@app.command("scenario-validate")
+def scenario_validate_cmd(
+    out: Annotated[
+        Path,
+        typer.Option("--out", "-o", help="Output directory for trace and research-object artefacts."),
+    ] = Path("outputs"),
+    log_level: Annotated[
+        str | None,
+        typer.Option("--log-level", help="Logging level."),
+    ] = None,
+) -> None:
+    """Run the J6.8a scenario analysis validation harness.
+
+    Exercises ScenarioAgent end-to-end with synthetic AI infrastructure
+    recommendations (power / cooling / capital / grid types), writes
+    j68a_scenario_validation.trace.json, and updates
+    latest_research_object.json to prove Base / Upside / Downside
+    scenarios are generated and used.
+    """
+    _configure_logging(verbose=False, log_level=log_level or "INFO")
+
+    from .scenario_validation import run_scenario_validation, build_validation_report
+
+    results = run_scenario_validation(out_path=out)
+
+    report = build_validation_report(results)
+    typer.echo(report)
+
+    qa = results["qa_validation"]
+    summary = results["scenario_analysis_summary"]
+
+    typer.echo(f"\nScenarios generated        : {summary.get('scenario_count', 0)}")
+    typer.echo(f"Recommendations stress-tested: {summary.get('recommendations_stress_tested', 0)}")
+    typer.echo(f"Average robustness score    : {summary.get('average_robustness_score', 0):.3f}")
+    typer.echo(f"QA validated               : {'YES' if qa.get('scenarios_present') else 'NO'}")
+    typer.echo(f"Trace written to           : {out}/j68a_scenario_validation.trace.json")
+
+    if not qa.get("scenarios_present"):
+        typer.echo("FAIL: no scenarios generated.", err=True)
+        raise typer.Exit(code=1)
+
+
 if __name__ == "__main__":
     app()
