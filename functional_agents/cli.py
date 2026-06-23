@@ -14,7 +14,7 @@ from research_agent.cli import _configure_logging
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 
 
-@app.command()
+@app.command("run")
 def main(
     question: Annotated[str, typer.Argument(help="Research question to answer. Omit if using --goal.")] = "",
     goal: Annotated[
