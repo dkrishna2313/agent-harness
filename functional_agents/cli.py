@@ -42,6 +42,10 @@ def main(
         bool,
         typer.Option("--mock", help="Use deterministic mock client instead of Claude."),
     ] = False,
+    use_extraction_cache: Annotated[
+        bool,
+        typer.Option("--use-extraction-cache", help="Cache chunk extractions to disk (.cache/extraction/). Speeds up repeat runs on the same sources."),
+    ] = False,
     web_search: Annotated[
         bool,
         typer.Option("--web-search", help="Enable web search retrieval."),
@@ -78,19 +82,7 @@ def main(
     profile_names = [p.strip() for p in profiles.split(",") if p.strip()]
 
     # Build client
-    client = _build_client(mock=mock, model=model)
-
-    # Apply web search to profile if requested
-    if web_search and profile_names:
-        try:
-            from research_agent.profile import load_profile
-            from research_agent.profile import WebSearchConfig
-            base = load_profile(profile_names[0])
-            base = base.model_copy(update={
-                "web_search": WebSearchConfig(enabled=True, max_results=5, max_pages=5)
-            })
-        except Exception:
-            pass
+    client = _build_client(mock=mock, model=model, use_extraction_cache=use_extraction_cache)
 
     from .orchestrator import Orchestrator
 
@@ -101,6 +93,7 @@ def main(
         client=client,
         top_evidence=top_evidence,
         top_chunks=top_chunks,
+        web_search=web_search,
     )
 
     try:
@@ -115,7 +108,7 @@ def main(
     typer.echo(f"Report:     {ctx.artifacts.get('report_path', ctx.artifacts)}")
 
 
-def _build_client(*, mock: bool, model: str | None):
+def _build_client(*, mock: bool, model: str | None, use_extraction_cache: bool = False):
     from research_agent.claude_client import ClaudeClient, MockClaudeClient
 
     if mock:
@@ -124,10 +117,52 @@ def _build_client(*, mock: bool, model: str | None):
         logging.warning("ANTHROPIC_API_KEY missing — using mock client.")
         return MockClaudeClient()
     try:
-        return ClaudeClient(model=model)
+        return ClaudeClient(model=model, use_extraction_cache=use_extraction_cache)
     except Exception as exc:
         logging.error("Claude client setup failed: %s — using mock.", exc)
         return MockClaudeClient()
+
+
+@app.command("stress-test")
+def stress_test_cmd(
+    out: Annotated[
+        Path,
+        typer.Option("--out", "-o", help="Output directory / base path for stress-test artefacts."),
+    ] = Path("outputs/j67a_stress_test"),
+    log_level: Annotated[
+        str | None,
+        typer.Option("--log-level", help="Logging level."),
+    ] = None,
+) -> None:
+    """Run the J6.7a recommendation improvement stress test.
+
+    Generates four synthetic weak recommendations (one isolated weakness each),
+    evaluates them, runs the improvement agent, re-evaluates, and writes a
+    before/after proof report.  Exits with code 1 if no recommendation improves.
+    """
+    _configure_logging(verbose=False, log_level=log_level or "INFO")
+
+    from .recommendation_stress_test import run_stress_test, build_report_section
+
+    results = run_stress_test(out_path=out)
+
+    qa = results["qa_validation"]
+    metrics = results["improvement_metrics"]
+
+    typer.echo(f"Recommendations tested : {len(results['synthetic_recommendations'])}")
+    typer.echo(f"Recommendations improved: {metrics['recommendations_improved']}")
+    typer.echo(f"Average score before   : {metrics['average_score_before']:.3f}")
+    typer.echo(f"Average score after    : {metrics['average_score_after']:.3f}")
+    typer.echo(f"Average delta          : +{metrics['average_delta']:.3f}")
+    typer.echo(f"Loop validated         : {'YES' if qa['improvement_loop_validated'] else 'NO'}")
+
+    # Print markdown table to stdout for quick inspection
+    typer.echo("")
+    typer.echo(build_report_section(results))
+
+    if not qa["improvement_loop_validated"]:
+        typer.echo("FAIL: improvement loop not validated — no recommendation improved.", err=True)
+        raise typer.Exit(code=1)
 
 
 if __name__ == "__main__":
