@@ -7,6 +7,7 @@ import logging
 from collections.abc import Iterable, Sequence
 
 from .chunker import chunk_documents, compute_chunk_diagnostics, compute_evidence_yield_metrics
+from .evidence_recovery import attribute_evidence_to_chunks, run_recovery_pass, compute_zero_yield_documents
 from .claude_client import LLMClient, MockClaudeClient, aggregate_call_traces
 from .contradiction import detect_contradictions, enrich_evidence_items, build_extraction_stats, compute_suppression_metrics
 from .evidence_enricher import enrich_evidence_with_metadata, build_evidence_density_stats
@@ -256,7 +257,18 @@ class DcPowerAgent:
             evidence = enrich_evidence_with_metadata(evidence, self.profile)
             extraction_stats = build_extraction_stats(evidence)
             evidence_density = build_evidence_density_stats(evidence, len(chunks))
-            # JH1 – evidence yield metrics
+            # JH1 – post-extraction attribution: set source_chunk_id by matching snippets
+            evidence = attribute_evidence_to_chunks(evidence, chunks)
+            # JH1a – recovery pass: extract from high-signal zero-evidence chunks
+            _recovery = run_recovery_pass(
+                chunks, selected_chunks, evidence, chunk_diagnostics,
+                question=question,
+                source_quality_map=source_quality_map,
+                profile=self.profile,
+            )
+            evidence = list(evidence) + _recovery.recovered_items
+            zero_yield_docs = compute_zero_yield_documents(chunks, evidence, documents)
+            # JH1 – evidence yield metrics (after attribution + recovery)
             evidence_yield = compute_evidence_yield_metrics(
                 chunks, selected_chunks, evidence, documents_loaded=len(documents)
             )
@@ -289,6 +301,11 @@ class DcPowerAgent:
                     "extraction_stats": extraction_stats,
                     "evidence_density": evidence_density,
                     "evidence_yield": evidence_yield,
+                    "evidence_yield_before_recovery": _recovery.yield_before,
+                    "evidence_yield_after_recovery": _recovery.yield_after,
+                    "evidence_recovery": _recovery.recovery_metrics,
+                    "high_signal_missed_chunks": _recovery.missed_chunk_queue,
+                    "zero_yield_documents": zero_yield_docs,
                     "retrieval_diversity": retrieval_diversity_mock,
                     "research_gaps": [g.model_dump() for g in research_gaps],
                     "coverage_matrix": [a.model_dump() for a in coverage_matrix],
@@ -436,7 +453,18 @@ class DcPowerAgent:
         evidence = enrich_evidence_with_metadata(evidence, self.profile)
         extraction_stats = build_extraction_stats(evidence)
         evidence_density = build_evidence_density_stats(evidence, len(chunks))
-        # JH1 – evidence yield metrics
+        # JH1 – post-extraction attribution: set source_chunk_id by matching snippets
+        evidence = attribute_evidence_to_chunks(evidence, chunks)
+        # JH1a – recovery pass: extract from high-signal zero-evidence chunks
+        _recovery = run_recovery_pass(
+            chunks, selected_chunks, evidence, chunk_diagnostics,
+            question=question,
+            source_quality_map=source_quality_map,
+            profile=self.profile,
+        )
+        evidence = list(evidence) + _recovery.recovered_items
+        zero_yield_docs = compute_zero_yield_documents(chunks, evidence, documents)
+        # JH1 – evidence yield metrics (after attribution + recovery)
         evidence_yield = compute_evidence_yield_metrics(
             chunks, selected_chunks, evidence, documents_loaded=len(documents)
         )
@@ -479,6 +507,11 @@ class DcPowerAgent:
                     "extraction_stats": extraction_stats,
                     "evidence_density": evidence_density,
                     "evidence_yield": evidence_yield,
+                    "evidence_yield_before_recovery": _recovery.yield_before,
+                    "evidence_yield_after_recovery": _recovery.yield_after,
+                    "evidence_recovery": _recovery.recovery_metrics,
+                    "high_signal_missed_chunks": _recovery.missed_chunk_queue,
+                    "zero_yield_documents": zero_yield_docs,
                     "research_gaps": [g.model_dump() for g in research_gaps],
                     "coverage_matrix": [a.model_dump() for a in coverage_matrix],
                     "source_quality_map": sq_map_serialized,

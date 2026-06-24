@@ -304,6 +304,31 @@ def is_high_priority_section(text: str) -> bool:
     return any(p.search(header_zone) for p in _HIGH_PRIORITY_SECTION_PATTERNS)
 
 
+_HARD_BOILERPLATE_PATTERNS: list[re.Pattern] = [
+    re.compile(r"table\s+of\s+contents", re.I),
+    re.compile(r"all rights reserved", re.I),
+    re.compile(r"©\s*\d{4}", re.I),
+    re.compile(r"copyright\s+\d{4}", re.I),
+    re.compile(r"confidential\s+and\s+proprietary", re.I),
+    re.compile(r"^\s*(?:\[\d+\]|\d+\.)\s+[A-Z].*doi:", re.I | re.M),  # reference list
+]
+
+
+def _is_hard_boilerplate_text(text: str) -> bool:
+    """Return True only for unambiguous non-evidence patterns (TOC, copyright, references)."""
+    return sum(1 for p in _HARD_BOILERPLATE_PATTERNS if p.search(text)) >= 1
+
+
+def _has_override_signals(signals: "CandidateSignals") -> bool:
+    """Return True when signals are strong enough to override a boilerplate classification."""
+    return (
+        signals.numeric_claim_count >= 10
+        or signals.unit_count >= 8
+        or signals.policy_or_standard_terms >= 10
+        or signals.named_entity_count >= 75
+    )
+
+
 def classify_chunk(chunk_id: str, text: str) -> ChunkClassification:
     """Classify a chunk and return its type, priority, and candidate signals.
 
@@ -316,8 +341,27 @@ def classify_chunk(chunk_id: str, text: str) -> ChunkClassification:
     """
     signals = compute_candidate_signals(text)
 
+    # ── JH1a: high-signal override — never skip a factually rich chunk ───────
+    # Hard boilerplate patterns (TOC, copyright, reference lists) still skip.
+    # For everything else, if the signals are strong enough, classify as
+    # evidence_dense regardless of other boilerplate heuristics.
+    _is_hard_boilerplate = _is_hard_boilerplate_text(text)
+
+    if not _is_hard_boilerplate and _has_override_signals(signals):
+        return ChunkClassification(
+            chunk_id=chunk_id,
+            chunk_type="evidence_dense",
+            extraction_priority="high",
+            candidate_signals=signals,
+            classification_reason=(
+                f"signal_override: strong factual signals prevent boilerplate skip "
+                f"(numeric={signals.numeric_claim_count}, units={signals.unit_count}, "
+                f"policy={signals.policy_or_standard_terms}, entities={signals.named_entity_count})"
+            ),
+        )
+
     # ── boilerplate / reference short-circuits ──────────────────────────────
-    if is_boilerplate(text):
+    if _is_hard_boilerplate or is_boilerplate(text):
         return ChunkClassification(
             chunk_id=chunk_id,
             chunk_type="boilerplate",

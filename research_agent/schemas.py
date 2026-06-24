@@ -138,6 +138,9 @@ class EvidenceItem(BaseModel):
     topics: list[str] = Field(default_factory=list)  # profile topics this evidence belongs to
     # J3.2 – retrieval diversity; populated by evidence_enricher.
     perspective: str = ""  # research dimension, e.g. "economics" | "fuel" | "cooling"
+    # JH1a – recovery pass fields
+    recovered: bool = False
+    recovery_reason: str = ""  # numeric_claim | policy_claim | timeline_claim | technical_spec | market_projection | grid_constraint | other
 
 
 class ResearchPlan(BaseModel):
