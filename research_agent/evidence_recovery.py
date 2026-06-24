@@ -131,6 +131,7 @@ class RecoveryResult:
     recovery_metrics: dict[str, Any] = field(default_factory=dict)
     yield_before: dict[str, Any] = field(default_factory=dict)
     yield_after: dict[str, Any] = field(default_factory=dict)
+    category_normalization: list[dict[str, str]] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -241,6 +242,7 @@ def recover_evidence_from_chunk(
     question: str,
     source_quality_map: dict | None = None,
     profile: Any = None,
+    out_normalizations: list | None = None,
 ) -> list:
     """Extract evidence from a chunk using signal-driven (not keyword) logic.
 
@@ -256,6 +258,7 @@ def recover_evidence_from_chunk(
         _relevance_for_snippet,
         _confidence_for_snippet,
         _keywords,
+        _normalize_category,
     )
 
     query_terms = _keywords(question)
@@ -275,7 +278,10 @@ def recover_evidence_from_chunk(
         seen.add(key)
 
         snippet = sentence[:500]
-        category = _category_for_snippet(snippet, profile)
+        raw_category = _category_for_snippet(snippet, profile)
+        category = _normalize_category(raw_category)
+        if out_normalizations is not None and raw_category != category:
+            out_normalizations.append({"raw": raw_category, "normalized": category})
         score = sum(1 for t in query_terms if t in snippet.lower())
 
         if source_quality_map and chunk.document_name in source_quality_map:
@@ -349,12 +355,14 @@ def run_recovery_pass(
 
     all_raw_recovered: list = []
     chunk_recovery_map: dict[str, int] = {}   # chunk_id → recovered count
+    all_normalizations: list[dict[str, str]] = []
 
     for chunk in eligible:
         raw = recover_evidence_from_chunk(
             chunk, question,
             source_quality_map=source_quality_map,
             profile=profile,
+            out_normalizations=all_normalizations,
         )
         chunk_recovery_map[chunk.chunk_id] = len(raw)
         all_raw_recovered.extend(raw)
@@ -417,6 +425,7 @@ def run_recovery_pass(
         recovery_metrics=recovery_metrics,
         yield_before=yield_before_snapshot,
         yield_after=yield_after_snapshot,
+        category_normalization=all_normalizations,
     )
 
 

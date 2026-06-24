@@ -305,6 +305,7 @@ class DcPowerAgent:
                     "evidence_yield_after_recovery": _recovery.yield_after,
                     "evidence_recovery": _recovery.recovery_metrics,
                     "high_signal_missed_chunks": _recovery.missed_chunk_queue,
+                    "category_normalization": _recovery.category_normalization,
                     "zero_yield_documents": zero_yield_docs,
                     "retrieval_diversity": retrieval_diversity_mock,
                     "research_gaps": [g.model_dump() for g in research_gaps],
@@ -511,6 +512,7 @@ class DcPowerAgent:
                     "evidence_yield_after_recovery": _recovery.yield_after,
                     "evidence_recovery": _recovery.recovery_metrics,
                     "high_signal_missed_chunks": _recovery.missed_chunk_queue,
+                    "category_normalization": _recovery.category_normalization,
                     "zero_yield_documents": zero_yield_docs,
                     "research_gaps": [g.model_dump() for g in research_gaps],
                     "coverage_matrix": [a.model_dump() for a in coverage_matrix],
@@ -940,7 +942,20 @@ _VALID_EVIDENCE_CATEGORIES: frozenset[str] = frozenset({
 # Profile topics use human-readable names (e.g. "backup/resiliency") that differ
 # from the tighter Literal set used by EvidenceItem.
 _CATEGORY_NORM: dict[str, str] = {
+    # Profile topic aliases → canonical EvidenceCategory
     "backup/resiliency": "resiliency",
+    "backup":            "resiliency",
+    "resilience":        "resiliency",
+    "rack":              "rack architecture",
+    "reactor":           "reactor design",
+    "grid":              "grid integration",
+    "deployment":        "deployment timeline",
+    "fuel":              "fuel cycle",
+    "waste":             "waste management",
+    "nuclear safety":    "safety",
+    "design":            "reactor design",
+    "timeline":          "deployment timeline",
+    "integration":       "grid integration",
 }
 
 
