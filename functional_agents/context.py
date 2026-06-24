@@ -31,6 +31,7 @@ class WorkflowState:
     SCENARIO                     = "SCENARIO"
     RECOMMENDATION_IMPROVEMENT   = "RECOMMENDATION_IMPROVEMENT"
     RECOMMENDATION_SYNTHESIS     = "RECOMMENDATION_SYNTHESIS"
+    STRATEGIC_OPTIONS            = "STRATEGIC_OPTIONS"
     QA                           = "QA"
     REPORT      = "REPORT"
     COMPLETE    = "COMPLETE"
@@ -104,6 +105,12 @@ class AgentContext:
     synthesis_validation: dict[str, Any] = field(default_factory=dict)
     recommendation_profile_balance: dict[str, Any] = field(default_factory=dict)
     synthesis_tradeoffs: list[dict[str, Any]] = field(default_factory=list)
+    # J7.1 — strategic option generation
+    strategic_options: list[dict[str, Any]] = field(default_factory=list)
+    strategic_option_comparison: dict[str, Any] = field(default_factory=dict)
+    option_scenario_robustness: dict[str, Any] = field(default_factory=dict)
+    preferred_option: dict[str, Any] = field(default_factory=dict)
+    strategic_option_portfolio: dict[str, Any] = field(default_factory=dict)
     # J6.5a – validated (post-suppression) contradictions and suppression metrics
     validated_contradictions: list[dict[str, Any]] = field(default_factory=list)
     contradiction_metrics: dict[str, Any] = field(default_factory=dict)

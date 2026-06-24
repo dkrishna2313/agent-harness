@@ -587,6 +587,153 @@ def _write_recommendation_observability_trace(rec_eval: dict, report_path: "Path
     latest_trace_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
+def _build_strategic_options_section(
+    strategic_options: list[dict[str, Any]],
+    comparison: dict[str, Any],
+    robustness: dict[str, Any],
+    preferred: dict[str, Any],
+    portfolio: dict[str, Any],
+) -> str:
+    """Render Strategic Options section for the markdown report (J7.1)."""
+    if not strategic_options:
+        return ""
+
+    criteria = comparison.get("criteria", [])
+    scores = comparison.get("scores", {})
+
+    lines: list[str] = [
+        "## Strategic Options",
+        "",
+        "> The following strategic options represent distinct investable paths. "
+        "Each is a different strategic posture — not minor variations — and should "
+        "be evaluated against the organisation's risk appetite and resource position.",
+        "",
+    ]
+
+    # --- Option summaries ---
+    for opt in strategic_options:
+        oid = opt.get("option_id", "?")
+        title = opt.get("title", "")
+        posture = opt.get("posture", "").replace("_", " ").title()
+        logic = opt.get("strategic_logic", "")
+        where = opt.get("where_to_play", "")
+        how = opt.get("how_to_win", "")
+        risks = opt.get("risks", [])
+        caps = opt.get("required_capabilities", [])
+        deps = opt.get("dependencies", [])
+        horizon = opt.get("time_horizon", "near_term").replace("_", " ")
+        supporting_recs = opt.get("supporting_recommendations", [])
+        profiles = opt.get("contributing_profiles", [])
+
+        lines += [
+            f"### {oid}: {title}",
+            "",
+            f"**Posture:** {posture}  |  **Time Horizon:** {horizon}",
+            "",
+            f"**Strategic Logic:** {logic}",
+            "",
+            f"**Where to Play:** {where}",
+            "",
+            f"**How to Win:** {how}",
+            "",
+        ]
+        if caps:
+            lines.append("**Required Capabilities:**")
+            lines.extend(f"- {c}" for c in caps)
+            lines.append("")
+        if deps:
+            lines.append("**Dependencies:**")
+            lines.extend(f"- {d}" for d in deps)
+            lines.append("")
+        if risks:
+            lines.append("**Key Risks:**")
+            lines.extend(f"- {r}" for r in risks)
+            lines.append("")
+        if supporting_recs:
+            lines.append(f"**Supporting Recommendations:** {', '.join(supporting_recs)}")
+            lines.append("")
+        if profiles:
+            lines.append(f"**Contributing Profiles:** {', '.join(profiles)}")
+            lines.append("")
+
+    # --- Option comparison matrix ---
+    lines += [
+        "## Option Comparison",
+        "",
+    ]
+    if criteria and scores:
+        header = "| Criterion | " + " | ".join(scores.keys()) + " |"
+        divider = "|---|" + "---|" * len(scores)
+        lines += [header, divider]
+        for criterion in criteria:
+            row = f"| {criterion.replace('_', ' ').title()} | "
+            row += " | ".join(
+                scores.get(oid, {}).get(criterion, "—") for oid in scores
+            ) + " |"
+            lines.append(row)
+        lines.append("")
+
+    # --- Scenario robustness ---
+    if robustness:
+        lines += [
+            "## Scenario Sensitivities",
+            "",
+        ]
+        # Collect all scenario names across options
+        all_scenarios: list[str] = []
+        for sc_map in robustness.values():
+            for sc in sc_map:
+                if sc not in all_scenarios:
+                    all_scenarios.append(sc)
+
+        if all_scenarios:
+            opt_ids = list(robustness.keys())
+            header = "| Scenario | " + " | ".join(opt_ids) + " |"
+            divider = "|---|" + "---|" * len(opt_ids)
+            lines += [header, divider]
+            for sc in all_scenarios:
+                row = f"| {sc.replace('_', ' ').title()} | "
+                row += " | ".join(
+                    str(robustness.get(oid, {}).get(sc, "—")) for oid in opt_ids
+                ) + " |"
+                lines.append(row)
+            lines.append("")
+
+    # --- Preferred option ---
+    lines += ["## Preferred Strategic Posture", ""]
+    pref_id = preferred.get("option_id", "none")
+    pref_rationale = preferred.get("rationale", "")
+    pref_recommendation = preferred.get("recommendation", "")
+    if pref_id == "portfolio":
+        portfolio_options = preferred.get("portfolio_options", [])
+        lines += [
+            f"**Preferred:** Portfolio blend of {', '.join(portfolio_options)}",
+            "",
+            pref_recommendation,
+            "",
+        ]
+    else:
+        lines += [
+            f"**Preferred Option:** {pref_id}",
+            "",
+            pref_recommendation,
+            "",
+        ]
+    if pref_rationale:
+        lines += [f"*{pref_rationale}*", ""]
+
+    # --- Option portfolio ---
+    if portfolio:
+        lines += ["## Recommended Next Moves", "", "**Staged Option Portfolio:**", ""]
+        for horizon, option_ids in portfolio.items():
+            if option_ids:
+                horizon_label = horizon.replace("_", " ").title()
+                lines.append(f"- **{horizon_label}:** {', '.join(option_ids)}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 def _build_recommendations_section(
     recommendations: list[dict[str, Any]],
     portfolio: dict[str, Any],
@@ -1042,6 +1189,16 @@ class ReportAgent(FunctionalAgent):
             )
             if _ps_section:
                 report_content = report_content.rstrip("\n") + "\n\n" + _ps_section
+        if context.strategic_options:
+            _so_section = _build_strategic_options_section(
+                context.strategic_options,
+                context.strategic_option_comparison,
+                context.option_scenario_robustness,
+                context.preferred_option,
+                context.strategic_option_portfolio,
+            )
+            if _so_section:
+                report_content = report_content.rstrip("\n") + "\n\n" + _so_section
         output_path = write_markdown(report_content, self._out_path)
         context.artifacts["report_path"] = str(output_path)
         context.artifacts["trace_path"] = str(output_path.with_suffix(".trace.json"))
@@ -1270,6 +1427,11 @@ class ReportAgent(FunctionalAgent):
         synthesis_data = context.trace.get("_recommendation_synthesis")
         if synthesis_data:
             trace_payload["recommendation_synthesis"] = synthesis_data
+
+        # Strategic options block (J7.1)
+        strategic_options_data = context.trace.get("_strategic_options")
+        if strategic_options_data:
+            trace_payload["strategic_options"] = strategic_options_data
 
         # Multi-profile validation block (J5.6a)
         multi_profile_data = context.trace.get("_multi_profile")
