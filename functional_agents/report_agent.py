@@ -362,6 +362,7 @@ def _build_profile_synthesis_section(
     multi_profile_analysis: dict[str, Any],
     recommendations: list[dict[str, Any]],
     hypotheses: list[dict[str, Any]],
+    synthesis_tradeoffs: list[dict[str, Any]] | None = None,
 ) -> str:
     """Render Multi-Profile Synthesis section (J6.8b).
 
@@ -451,29 +452,39 @@ def _build_profile_synthesis_section(
         )
         lines.append("")
 
-    # Tradeoffs
+    # Tradeoffs — use structured tradeoffs from RecommendationSynthesisAgent if available
     lines += ["### Tradeoffs", ""]
-    has_ai_dc      = "ai_data_centers" in profiles_contributing
-    has_tx         = "transmission"    in profiles_contributing
-    if has_ai_dc and has_tx:
+    has_ai_dc = "ai_data_centers" in profiles_contributing
+    has_tx    = "transmission"    in profiles_contributing
+    if synthesis_tradeoffs:
+        for t in synthesis_tradeoffs:
+            dim_a = t.get("dimension_a", "")
+            dim_b = t.get("dimension_b", "")
+            desc  = t.get("description", "")
+            impl  = t.get("implication", "")
+            lines += [
+                f"**{dim_a} vs. {dim_b}**",
+                "",
+                desc,
+                "",
+            ]
+            if impl:
+                lines += [f"*Implication:* {impl}", ""]
+    elif has_ai_dc and has_tx:
         lines += [
             "**Compute availability vs. Grid availability**",
             "",
-            "The highest-performing AI factory locations — those with low-latency "
-            "fibre connectivity, available land, and existing power infrastructure — "
-            "may not have sufficient transmission capacity to serve high-density GPU "
-            "clusters (100–1,000+ MW). Interconnection queue timelines of 3–6 years "
-            "mean that grid access must be secured years before facility commissioning.",
+            "The highest-performing AI factory locations may not have sufficient "
+            "transmission capacity to serve high-density GPU clusters (100–1,000+ MW). "
+            "Interconnection queue timelines of 3–6 years mean grid access must be "
+            "secured years before facility commissioning.",
             "",
             "**Site selection implication:** optimise jointly for compute readiness "
-            "(GPU rack density, cooling capacity) and grid readiness (transmission "
-            "headroom, interconnection queue position, utility coordination maturity). "
-            "Single-dimension optimisation will surface sites that are either "
-            "compute-ready but grid-constrained, or grid-connected but compute-unsuitable.",
+            "and grid readiness. Single-dimension optimisation surfaces sites that are "
+            "compute-ready but grid-constrained or grid-connected but compute-unsuitable.",
             "",
-            "**Capital sequencing implication:** grid access investments (transmission "
-            "studies, utility agreements, interconnection deposits) have long lead times "
-            "and low sunk costs; they should precede large compute capital commitments.",
+            "**Capital sequencing implication:** grid access investments have long "
+            "lead times and low sunk costs; they should precede large compute commitments.",
             "",
         ]
     else:
@@ -1027,6 +1038,7 @@ class ReportAgent(FunctionalAgent):
                 context.multi_profile_analysis,
                 context.recommendations,
                 context.hypotheses,
+                synthesis_tradeoffs=context.synthesis_tradeoffs or None,
             )
             if _ps_section:
                 report_content = report_content.rstrip("\n") + "\n\n" + _ps_section
@@ -1253,6 +1265,11 @@ class ReportAgent(FunctionalAgent):
         improvement_data = context.trace.get("_recommendation_improvement")
         if improvement_data:
             trace_payload["recommendation_improvement"] = improvement_data
+
+        # Recommendation synthesis block (J6.8c)
+        synthesis_data = context.trace.get("_recommendation_synthesis")
+        if synthesis_data:
+            trace_payload["recommendation_synthesis"] = synthesis_data
 
         # Multi-profile validation block (J5.6a)
         multi_profile_data = context.trace.get("_multi_profile")

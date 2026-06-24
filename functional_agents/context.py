@@ -27,10 +27,11 @@ class WorkflowState:
     HYPOTHESIS  = "HYPOTHESIS"
     CHALLENGE       = "CHALLENGE"
     RECOMMENDATION              = "RECOMMENDATION"
-    MULTI_PROFILE               = "MULTI_PROFILE"
-    SCENARIO                    = "SCENARIO"
-    RECOMMENDATION_IMPROVEMENT  = "RECOMMENDATION_IMPROVEMENT"
-    QA                          = "QA"
+    MULTI_PROFILE                = "MULTI_PROFILE"
+    SCENARIO                     = "SCENARIO"
+    RECOMMENDATION_IMPROVEMENT   = "RECOMMENDATION_IMPROVEMENT"
+    RECOMMENDATION_SYNTHESIS     = "RECOMMENDATION_SYNTHESIS"
+    QA                           = "QA"
     REPORT      = "REPORT"
     COMPLETE    = "COMPLETE"
     ERROR       = "ERROR"
@@ -99,6 +100,10 @@ class AgentContext:
     scenarios: list[dict[str, Any]] = field(default_factory=list)
     scenario_analysis: dict[str, Any] = field(default_factory=dict)
     recommendation_improvement: dict[str, Any] = field(default_factory=dict)
+    # J6.8c — cross-profile synthesis outputs
+    synthesis_validation: dict[str, Any] = field(default_factory=dict)
+    recommendation_profile_balance: dict[str, Any] = field(default_factory=dict)
+    synthesis_tradeoffs: list[dict[str, Any]] = field(default_factory=list)
     # J6.5a – validated (post-suppression) contradictions and suppression metrics
     validated_contradictions: list[dict[str, Any]] = field(default_factory=list)
     contradiction_metrics: dict[str, Any] = field(default_factory=dict)

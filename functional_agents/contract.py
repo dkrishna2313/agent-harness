@@ -40,12 +40,13 @@ def _agent_classes() -> list[type]:
     from .scenario_agent                      import ScenarioAgent
     from .recommendation_improvement_agent   import RecommendationImprovementAgent
     from .multi_profile_agent                import MultiProfileAgent
+    from .recommendation_synthesis_agent    import RecommendationSynthesisAgent
     return [
         ProblemFramingAgent, ResearchStrategyAgent,
         PlannerAgent, EvidenceAgent,
         HypothesisAgent, ChallengeAgent, RecommendationAgent,
         MultiProfileAgent, ScenarioAgent, RecommendationImprovementAgent,
-        QAAgent, ReportAgent,
+        RecommendationSynthesisAgent, QAAgent, ReportAgent,
     ]
 
 

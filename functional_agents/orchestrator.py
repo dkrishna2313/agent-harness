@@ -82,6 +82,7 @@ class AgentOrchestrator:
         multi_profile_factory: Any = None,
         scenario_factory: Any = None,
         improvement_factory: Any = None,
+        synthesis_factory: Any = None,
         max_iterations: int = 3,
     ) -> None:
         self._problem_framing_factory   = problem_framing_factory
@@ -92,6 +93,7 @@ class AgentOrchestrator:
         self._multi_profile_factory     = multi_profile_factory
         self._scenario_factory          = scenario_factory
         self._improvement_factory       = improvement_factory
+        self._synthesis_factory         = synthesis_factory
         self._planner_factory  = planner_factory
         self._evidence_factory = evidence_factory
         self._qa_factory       = qa_factory
@@ -237,15 +239,26 @@ class AgentOrchestrator:
                         state = WorkflowState.REPORT
 
                 else:
-                    state = (
-                        WorkflowState.RECOMMENDATION_IMPROVEMENT
-                        if self._improvement_factory is not None
-                        else WorkflowState.REPORT
-                    )
+                    if self._improvement_factory is not None:
+                        state = WorkflowState.RECOMMENDATION_IMPROVEMENT
+                    elif self._synthesis_factory is not None:
+                        state = WorkflowState.RECOMMENDATION_SYNTHESIS
+                    else:
+                        state = WorkflowState.REPORT
 
             # ---- RECOMMENDATION IMPROVEMENT (J6.7) --------------------------
             elif state == WorkflowState.RECOMMENDATION_IMPROVEMENT:
                 result = _step(self._improvement_factory(), ctx)
+                ctx = result.context
+                state = (
+                    WorkflowState.RECOMMENDATION_SYNTHESIS
+                    if self._synthesis_factory is not None
+                    else WorkflowState.REPORT
+                )
+
+            # ---- RECOMMENDATION SYNTHESIS (J6.8c) ---------------------------
+            elif state == WorkflowState.RECOMMENDATION_SYNTHESIS:
+                result = _step(self._synthesis_factory(), ctx)
                 ctx = result.context
                 state = WorkflowState.REPORT
 
@@ -356,6 +369,7 @@ class Orchestrator:
         from .scenario_agent                     import ScenarioAgent
         from .recommendation_improvement_agent   import RecommendationImprovementAgent
         from .multi_profile_agent                import MultiProfileAgent
+        from .recommendation_synthesis_agent    import RecommendationSynthesisAgent
 
         execution_profile = self._profile_names[0] if self._profile_names else ""
         mock_mode = self._client is not None and getattr(self._client, "is_mock", False)
@@ -394,6 +408,9 @@ class Orchestrator:
 
         def improvement_factory() -> RecommendationImprovementAgent:
             return RecommendationImprovementAgent()
+
+        def synthesis_factory() -> RecommendationSynthesisAgent:
+            return RecommendationSynthesisAgent()
 
         def planner_factory() -> PlannerAgent:
             return PlannerAgent(client=self._client, domain_profiles=loaded_profiles)
@@ -462,6 +479,7 @@ class Orchestrator:
             multi_profile_factory=multi_profile_factory,
             scenario_factory=scenario_factory,
             improvement_factory=improvement_factory,
+            synthesis_factory=synthesis_factory,
             planner_factory=planner_factory,
             evidence_factory=evidence_factory,
             qa_factory=qa_factory,
