@@ -358,6 +358,172 @@ def _build_scenario_section(scenario_analysis: dict) -> str:
     return "\n".join(lines)
 
 
+def _build_profile_synthesis_section(
+    multi_profile_analysis: dict[str, Any],
+    recommendations: list[dict[str, Any]],
+    hypotheses: list[dict[str, Any]],
+) -> str:
+    """Render Multi-Profile Synthesis section (J6.8b).
+
+    Emits per-profile finding groups, integrated recommendations, tradeoff
+    narrative, profile balance table, and synthesis coverage validation.
+    Only rendered when ≥2 profiles contributed.
+    """
+    profiles_contributing: list[str] = multi_profile_analysis.get("profiles_contributing", [])
+    if len(profiles_contributing) < 2:
+        return ""
+
+    attributed_findings: list[dict] = multi_profile_analysis.get("attributed_findings", hypotheses)
+    attributed_recs: list[dict] = multi_profile_analysis.get("attributed_recommendations", recommendations)
+    profile_balance: dict[str, float] = multi_profile_analysis.get("profile_balance", {})
+    synthesis_val: dict[str, int] = multi_profile_analysis.get("synthesis_validation", {})
+    rec_audit: dict[str, list] = multi_profile_analysis.get("recommendation_profile_audit", {})
+    profile_influence: dict = multi_profile_analysis.get("profile_influence", {})
+
+    lines: list[str] = [
+        "## Multi-Profile Synthesis",
+        "",
+        "> This section synthesises findings and recommendations across all contributing profiles, "
+        "identifies cross-profile tradeoffs, and reports coverage balance.",
+        "",
+    ]
+
+    # Per-profile perspective subsections
+    for profile in profiles_contributing:
+        label = profile.replace("_", " ").title()
+        lines += [f"### {label} Perspective", ""]
+
+        # Findings attributed to this profile
+        profile_findings = [
+            f for f in attributed_findings
+            if profile in f.get("contributing_profiles", [])
+        ]
+        if profile_findings:
+            lines.append("**Key Findings:**")
+            for f in profile_findings[:3]:
+                title = f.get("title", f.get("summary", ""))[:120]
+                lines.append(f"- {title}")
+            lines.append("")
+        else:
+            lines.append("*No findings exclusively attributed to this profile.*")
+            lines.append("")
+
+        # Recommendations attributed to this profile
+        profile_recs = [
+            r for r in attributed_recs
+            if profile in r.get("contributing_profiles", [])
+        ]
+        if profile_recs:
+            lines.append("**Recommendations:**")
+            for r in profile_recs[:3]:
+                rid = r.get("id", r.get("recommendation_id", ""))
+                title = r.get("title", "")[:100]
+                lines.append(f"- **{rid}**: {title}")
+            lines.append("")
+
+        # Evidence count from influence
+        ev_count = profile_influence.get(profile, {}).get("evidence", 0)
+        lines.append(f"*Evidence items: {ev_count}*")
+        lines.append("")
+
+    # Integrated recommendations (attributed to 2+ profiles)
+    integrated = [
+        r for r in attributed_recs
+        if len(r.get("contributing_profiles", [])) >= 2
+    ]
+    lines += ["### Integrated Strategy", ""]
+    if integrated:
+        lines.append(
+            "The following recommendations draw on evidence from multiple profiles, "
+            "integrating compute and grid infrastructure considerations:"
+        )
+        lines.append("")
+        for r in integrated:
+            rid = r.get("id", r.get("recommendation_id", ""))
+            title = r.get("title", "")
+            profiles_str = ", ".join(r.get("contributing_profiles", []))
+            lines.append(f"- **{rid}** ({profiles_str}): {title}")
+        lines.append("")
+    else:
+        lines.append(
+            "No single recommendation was attributed to all contributing profiles. "
+            "See individual profile sections above for profile-specific recommendations."
+        )
+        lines.append("")
+
+    # Tradeoffs
+    lines += ["### Tradeoffs", ""]
+    has_ai_dc      = "ai_data_centers" in profiles_contributing
+    has_tx         = "transmission"    in profiles_contributing
+    if has_ai_dc and has_tx:
+        lines += [
+            "**Compute availability vs. Grid availability**",
+            "",
+            "The highest-performing AI factory locations — those with low-latency "
+            "fibre connectivity, available land, and existing power infrastructure — "
+            "may not have sufficient transmission capacity to serve high-density GPU "
+            "clusters (100–1,000+ MW). Interconnection queue timelines of 3–6 years "
+            "mean that grid access must be secured years before facility commissioning.",
+            "",
+            "**Site selection implication:** optimise jointly for compute readiness "
+            "(GPU rack density, cooling capacity) and grid readiness (transmission "
+            "headroom, interconnection queue position, utility coordination maturity). "
+            "Single-dimension optimisation will surface sites that are either "
+            "compute-ready but grid-constrained, or grid-connected but compute-unsuitable.",
+            "",
+            "**Capital sequencing implication:** grid access investments (transmission "
+            "studies, utility agreements, interconnection deposits) have long lead times "
+            "and low sunk costs; they should precede large compute capital commitments.",
+            "",
+        ]
+    else:
+        lines.append("No cross-profile tradeoffs identified for the current profile combination.")
+        lines.append("")
+
+    # Profile balance table
+    if profile_balance:
+        lines += [
+            "### Profile Balance",
+            "",
+            "Recommendation weight by contributing profile:",
+            "",
+            "| Profile | Weight |",
+            "|---------|--------|",
+        ]
+        for p, frac in sorted(profile_balance.items()):
+            label = p.replace("_", " ").title()
+            lines.append(f"| {label} | {frac:.0%} |")
+        lines.append("")
+
+    # Synthesis validation block
+    if synthesis_val:
+        lines += [
+            "### Synthesis Coverage Validation",
+            "",
+            "| Metric | Count |",
+            "|--------|-------|",
+        ]
+        for key, val in synthesis_val.items():
+            label = key.replace("_", " ").title()
+            lines.append(f"| {label} | {val} |")
+        lines.append("")
+
+    # Recommendation profile audit
+    if rec_audit:
+        lines += [
+            "### Recommendation Profile Audit",
+            "",
+            "| Recommendation | Contributing Profiles |",
+            "|----------------|----------------------|",
+        ]
+        for rid, profiles in sorted(rec_audit.items()):
+            ps = ", ".join(profiles) if profiles else "—"
+            lines.append(f"| {rid} | {ps} |")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 def _write_recommendation_observability_trace(rec_eval: dict, report_path: "Path") -> None:
     """Write j66a_recommendation_observability.trace.json alongside the report (J6.6a)."""
     import json
@@ -467,6 +633,10 @@ def _build_recommendations_section(
             f"*{rationale}*",
             "",
         ]
+        contrib_profiles = r.get("contributing_profiles", [])
+        if contrib_profiles:
+            lines.append(f"**Profiles:** {', '.join(contrib_profiles)}")
+            lines.append("")
         if hyp_links:
             lines.append(f"**Supported by:** {', '.join(hyp_links)}")
             lines.append("")
@@ -852,6 +1022,14 @@ class ReportAgent(FunctionalAgent):
             _scenario_section = _build_scenario_section(context.scenario_analysis)
             if _scenario_section:
                 report_content = report_content.rstrip("\n") + "\n\n" + _scenario_section
+        if context.multi_profile_analysis and len(context.profiles) > 1:
+            _ps_section = _build_profile_synthesis_section(
+                context.multi_profile_analysis,
+                context.recommendations,
+                context.hypotheses,
+            )
+            if _ps_section:
+                report_content = report_content.rstrip("\n") + "\n\n" + _ps_section
         output_path = write_markdown(report_content, self._out_path)
         context.artifacts["report_path"] = str(output_path)
         context.artifacts["trace_path"] = str(output_path.with_suffix(".trace.json"))

@@ -166,6 +166,69 @@ def compute_profile_influence(
 # Missing profile diagnostics
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Profile balance, synthesis validation, recommendation audit (J6.8b)
+# ---------------------------------------------------------------------------
+
+def _compute_profile_balance(
+    recommendations: list[dict[str, Any]],
+    profiles: list[str],
+) -> dict[str, float]:
+    """Return fraction of recommendation profile-touches per profile.
+
+    Each recommendation may contribute to multiple profiles (once per profile
+    in ``contributing_profiles``).  The result sums to 1.0 over all profiles.
+    If no profile touches are recorded, equal weight is returned.
+    """
+    counts: dict[str, int] = {p: 0 for p in profiles}
+    total = 0
+    for r in recommendations:
+        for p in r.get("contributing_profiles", []):
+            if p in counts:
+                counts[p] += 1
+                total += 1
+    if total == 0:
+        n = len(profiles)
+        return {p: round(1.0 / n, 3) if n else 0.0 for p in profiles}
+    return {p: round(counts[p] / total, 3) for p in profiles}
+
+
+def _compute_synthesis_validation(
+    profiles_requested: list[str],
+    profiles_contributing: list[str],
+    attributed_findings: list[dict[str, Any]],
+    attributed_recs: list[dict[str, Any]],
+) -> dict[str, int]:
+    """Return synthesis coverage counts for all four required fields."""
+    profiles_in_findings = {
+        p
+        for f in attributed_findings
+        for p in f.get("contributing_profiles", [])
+    }
+    profiles_in_recs = {
+        p
+        for r in attributed_recs
+        for p in r.get("contributing_profiles", [])
+    }
+    return {
+        "profiles_requested":                  len(profiles_requested),
+        "profiles_contributing":               len(profiles_contributing),
+        "profiles_represented_in_findings":    len(profiles_in_findings),
+        "profiles_represented_in_recommendations": len(profiles_in_recs),
+    }
+
+
+def _build_recommendation_profile_audit(
+    attributed_recs: list[dict[str, Any]],
+) -> dict[str, list[str]]:
+    """Return {rec_id: [profiles]} for every recommendation."""
+    audit: dict[str, list[str]] = {}
+    for i, r in enumerate(attributed_recs):
+        rid = r.get("id") or r.get("recommendation_id") or f"R{i + 1}"
+        audit[str(rid)] = list(r.get("contributing_profiles", []))
+    return audit
+
+
 def diagnose_missing_profiles(
     profiles_requested: list[str],
     profiles_contributing: list[str],
@@ -297,6 +360,13 @@ def build_multi_profile_analysis(context: AgentContext) -> dict[str, Any]:
         else ("partial" if n_con > 0 else "insufficient")
     )
 
+    # J6.8b additions
+    profile_balance = _compute_profile_balance(attributed_recs, profiles_requested)
+    synthesis_validation = _compute_synthesis_validation(
+        profiles_requested, profiles_contributing, attributed_findings, attributed_recs
+    )
+    recommendation_profile_audit = _build_recommendation_profile_audit(attributed_recs)
+
     return {
         "profiles_requested":   profiles_requested,
         "profiles_contributing": profiles_contributing,
@@ -308,6 +378,10 @@ def build_multi_profile_analysis(context: AgentContext) -> dict[str, Any]:
         "attributed_findings":  attributed_findings,
         "attributed_recommendations": attributed_recs,
         "evidence_profile_map_size": len(ev_map),
+        # J6.8b
+        "profile_balance":               profile_balance,
+        "synthesis_validation":          synthesis_validation,
+        "recommendation_profile_audit":  recommendation_profile_audit,
     }
 
 
@@ -346,9 +420,10 @@ class MultiProfileAgent(FunctionalAgent):
 
         # QA validation block
         context.qa["multi_profile_validation"] = {
-            "requested_profiles":   len(analysis["profiles_requested"]),
+            "requested_profiles":    len(analysis["profiles_requested"]),
             "contributing_profiles": len(analysis["profiles_contributing"]),
-            "coverage_status":      analysis["coverage_status"],
+            "coverage_status":       analysis["coverage_status"],
+            "synthesis_validation":  analysis["synthesis_validation"],
         }
 
         # Research Object
@@ -362,6 +437,10 @@ class MultiProfileAgent(FunctionalAgent):
                 "profile_coverage":     analysis["profile_coverage"],
                 "profile_influence":    analysis["profile_influence"],
                 "missing_profile_diagnostics": analysis["missing_profile_diagnostics"],
+                # J6.8b
+                "profile_balance":              analysis["profile_balance"],
+                "synthesis_validation":         analysis["synthesis_validation"],
+                "recommendation_profile_audit": analysis["recommendation_profile_audit"],
             }
 
         # Trace
@@ -374,6 +453,10 @@ class MultiProfileAgent(FunctionalAgent):
                 "profile_coverage":     analysis["profile_coverage"],
                 "profile_influence":    analysis["profile_influence"],
                 "missing_profile_diagnostics": analysis["missing_profile_diagnostics"],
+                # J6.8b
+                "profile_balance":              analysis["profile_balance"],
+                "synthesis_validation":         analysis["synthesis_validation"],
+                "recommendation_profile_audit": analysis["recommendation_profile_audit"],
             }
         }
 

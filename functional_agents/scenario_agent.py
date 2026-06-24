@@ -32,7 +32,8 @@ _SCENARIO_TEMPLATES: list[dict[str, Any]] = [
         "name": "Base Case",
         "description": (
             "AI demand grows strongly; grid and permitting constraints remain material "
-            "but manageable with early planning and proactive interconnection agreements."
+            "but manageable with early planning and proactive interconnection agreements. "
+            "Transmission expansion proceeds at historical rates, with 3–5 year queue timelines."
         ),
         "assumptions": {
             "ai_demand_growth": "strong",
@@ -42,10 +43,16 @@ _SCENARIO_TEMPLATES: list[dict[str, Any]] = [
             "cooling_technology_readiness": "improving",
             "capital_availability": "adequate",
             "regulatory_permitting": "standard",
+            # J6.8b — transmission dimensions
+            "transmission_availability": "moderate",
+            "grid_congestion_level": "moderate",
+            "interconnection_queue_delay": "standard_3_to_5_years",
+            "utility_coordination": "standard",
         },
         "critical_uncertainties": [
             "pace of grid interconnection queue resolution",
             "cooling supply chain scale-up speed",
+            "transmission congestion relief timelines",
         ],
         "probability": 0.50,
     },
@@ -54,7 +61,8 @@ _SCENARIO_TEMPLATES: list[dict[str, Any]] = [
         "name": "Upside Case",
         "description": (
             "Grid interconnection, power procurement, and cooling supply chains improve "
-            "faster than expected; capital remains abundant and permitting streamlines."
+            "faster than expected; capital remains abundant and permitting streamlines. "
+            "Transmission expansion accelerates via policy reform; congestion eases."
         ),
         "assumptions": {
             "ai_demand_growth": "very_strong",
@@ -64,10 +72,16 @@ _SCENARIO_TEMPLATES: list[dict[str, Any]] = [
             "cooling_technology_readiness": "mature",
             "capital_availability": "abundant",
             "regulatory_permitting": "streamlined",
+            # J6.8b — transmission dimensions
+            "transmission_availability": "improving",
+            "grid_congestion_level": "low",
+            "interconnection_queue_delay": "accelerated_under_2_years",
+            "utility_coordination": "proactive",
         },
         "critical_uncertainties": [
             "pace of permitting reform implementation",
             "rate of cooling technology commoditisation",
+            "speed of FERC interconnection order implementation",
         ],
         "probability": 0.25,
     },
@@ -76,7 +90,9 @@ _SCENARIO_TEMPLATES: list[dict[str, Any]] = [
         "name": "Downside Case",
         "description": (
             "AI load growth outpaces grid expansion; permitting slows and power constraints "
-            "become binding, compressing development timelines and stranding early investments."
+            "become binding, compressing development timelines and stranding early investments. "
+            "Transmission bottlenecks worsen; interconnection queues extend beyond 6 years; "
+            "grid congestion constrains site selection for new AI facilities."
         ),
         "assumptions": {
             "ai_demand_growth": "strong",
@@ -86,11 +102,18 @@ _SCENARIO_TEMPLATES: list[dict[str, Any]] = [
             "cooling_technology_readiness": "limited",
             "capital_availability": "tightening",
             "regulatory_permitting": "restrictive",
+            # J6.8b — transmission dimensions
+            "transmission_availability": "constrained",
+            "grid_congestion_level": "high",
+            "interconnection_queue_delay": "delayed_over_6_years",
+            "utility_coordination": "limited",
         },
         "critical_uncertainties": [
             "severity of grid interconnection delays",
             "regulatory response to power demand growth",
             "capital market appetite for constrained-location assets",
+            "transmission congestion impact on site viability",
+            "interconnection queue backlog clearance timeline",
         ],
         "probability": 0.25,
     },
@@ -109,6 +132,15 @@ _COOLING_KW: frozenset[str] = frozenset({
 })
 _CAPITAL_KW: frozenset[str] = frozenset({
     "capital", "investment", "invest", "cost", "budget", "opex", "capex", "fund",
+})
+# J6.8b — transmission-specific keyword sets
+_INTERCONNECTION_KW: frozenset[str] = frozenset({
+    "interconnection", "queue", "pjm", "miso", "ercot", "caiso", "ferc", "nerc",
+    "utility", "substation", "reliability", "planning", "congestion", "curtailment",
+})
+_TRANSMISSION_KW: frozenset[str] = frozenset({
+    "transmission", "hvdc", "grid", "bottleneck", "congestion", "corridor",
+    "upgrade", "siting", "permitting", "tariff", "access", "delivery",
 })
 
 _FIT_TO_SCORE: dict[str, float] = {"strong": 1.0, "medium": 0.6, "weak": 0.3}
@@ -140,29 +172,33 @@ def _compute_scenario_fit(rec: dict) -> dict[str, str]:
     """Return scenario_fit dict {base_case, upside_case, downside_case} → label."""
     words = _word_bag(rec)
 
-    has_power_grid = bool(words & _POWER_GRID_KW)
-    has_cooling = bool(words & _COOLING_KW)
-    has_capital = bool(words & _CAPITAL_KW)
+    has_power_grid    = bool(words & _POWER_GRID_KW)
+    has_cooling       = bool(words & _COOLING_KW)
+    has_capital       = bool(words & _CAPITAL_KW)
+    has_interconnect  = bool(words & _INTERCONNECTION_KW)  # J6.8b
+    has_transmission  = bool(words & _TRANSMISSION_KW)     # J6.8b
     n_risks = len(rec.get("key_risks", []))
     has_risks = n_risks >= 2
 
     # Base case: generally strong; weak if rec ignores key risks
     base = 0.75
-    if has_power_grid and has_risks:
+    if (has_power_grid or has_transmission) and has_risks:
         base = 1.0
     elif not has_risks:
         base = 0.60
 
-    # Upside case: capital-intensive and cooling recs benefit most
+    # Upside case: capital-intensive, cooling, and fast-grid recs benefit most
     upside = 0.75
-    if has_capital or has_cooling:
+    if has_capital or has_cooling or has_interconnect:
         upside = 1.0
 
-    # Downside case: recs addressing power/grid constraints are more robust;
-    # risk-unaware recs weaken
+    # Downside case: recs addressing power/grid/transmission constraints are more
+    # robust; risk-unaware recs weaken; transmission-aware recs get extra credit
     downside = 0.60
-    if has_power_grid and has_risks:
+    if (has_power_grid or has_transmission) and has_risks:
         downside = 0.75
+    if has_interconnect and has_risks:
+        downside = min(1.0, downside + 0.15)  # interconnection awareness is a risk hedge
     if not has_risks:
         downside -= 0.30
 
@@ -192,6 +228,21 @@ def _scenario_risks_downside(rec: dict) -> list[str]:
     if words & _POWER_GRID_KW:
         risks.append("Grid interconnection delays may extend deployment timelines by 2+ years beyond plan")
         risks.append("Power capacity constraints could force site redesign or relocation after commitment")
+    if words & _INTERCONNECTION_KW:  # J6.8b
+        risks.append(
+            "Interconnection queue backlog may prevent power delivery for 6+ years, "
+            "stranding committed capital at constrained sites"
+        )
+        risks.append(
+            "Utility coordination failures can delay service agreements after interconnection approval"
+        )
+    if words & _TRANSMISSION_KW:  # J6.8b
+        risks.append(
+            "Transmission congestion at target sites may render planned capacity economically undeliverable"
+        )
+        risks.append(
+            "HVDC or corridor upgrade delays may prevent export or import of power to/from AI data center sites"
+        )
     if words & _COOLING_KW:
         risks.append("Cooling supply chain shortages increase equipment lead times and inflate capital cost")
     if words & _CAPITAL_KW:
@@ -204,6 +255,19 @@ def _scenario_risks_downside(rec: dict) -> list[str]:
 
 def _scenario_adjustment_downside(rec: dict) -> str:
     words = _word_bag(rec)
+    if words & _INTERCONNECTION_KW:  # J6.8b — check before generic power/grid
+        return (
+            "Prioritise sites with existing or near-term interconnection rights; "
+            "engage utilities 3–5 years ahead of target in-service date and secure "
+            "transmission service agreements before committing capital. "
+            "Build grid-delay optionality into project financial structures."
+        )
+    if words & _TRANSMISSION_KW:  # J6.8b
+        return (
+            "Conduct transmission adequacy studies before site selection; "
+            "favour locations adjacent to existing high-capacity corridors. "
+            "Negotiate congestion hedges with utilities and plan for curtailment risk in pro forma models."
+        )
     if words & _POWER_GRID_KW:
         return (
             "Prioritise power-secured sites with existing grid interconnection rights over greenfield locations; "
