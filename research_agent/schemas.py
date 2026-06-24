@@ -298,6 +298,11 @@ class ChunkDiagnostic(BaseModel):
     evidence_items_created: int
     extraction_decision: Literal["accepted", "rejected", "not_sent"]
     rejection_reason: str | None = None
+    # JH1 – yield optimisation fields
+    chunk_type: str = "unknown"          # evidence_dense | context | boilerplate | reference | unknown
+    extraction_priority: str = "medium"  # high | medium | low | skip
+    candidate_signals: dict[str, int] = Field(default_factory=dict)
+    classification_reason: str = ""
 
 
 def assign_evidence_ids(items: list[EvidenceItem]) -> list[EvidenceItem]:

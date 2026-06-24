@@ -293,11 +293,18 @@ def test_compute_chunk_diagnostics_rejected_when_sent_but_no_evidence():
 
 
 def test_compute_chunk_diagnostics_not_sent_when_excluded_by_budget():
+    # Use a non-boilerplate chunk (>150 chars, no boilerplate patterns) that
+    # has a non-zero relevance score but is not in selected_chunks.
+    text = (
+        "The Rubin NVL72 system provides high-density GPU compute at 120 kW per rack. "
+        "Each cabinet supports NVLink fabric interconnect at 1800 GB/s bandwidth. "
+        "Deployment requires liquid cooling infrastructure with 35C inlet temperature."
+    )
     chunk = Chunk(
         chunk_id="rubin_C001", document_name="rubin.txt", chunk_number=1,
-        text="Rubin NVL72 power.", start_offset=0, end_offset=18,
+        text=text, start_offset=0, end_offset=len(text),
     )
-    # Not in selected_chunks
+    # Not in selected_chunks — with rel=0.5 the reason should be budget
     diags = compute_chunk_diagnostics(
         [chunk], [], [], {"rubin_C001": (0.5, 1)}
     )
@@ -307,9 +314,14 @@ def test_compute_chunk_diagnostics_not_sent_when_excluded_by_budget():
 
 
 def test_compute_chunk_diagnostics_not_relevant_when_score_zero():
+    text = (
+        "Sprint planning and retrospectives are agile ceremonies that help teams "
+        "align on priorities, review completed work, and improve their processes. "
+        "Daily standups ensure continuous communication and rapid impediment removal."
+    )
     chunk = Chunk(
         chunk_id="agile_C001", document_name="agile.txt", chunk_number=1,
-        text="Sprint planning and retrospectives.", start_offset=0, end_offset=34,
+        text=text, start_offset=0, end_offset=len(text),
     )
     diags = compute_chunk_diagnostics(
         [chunk], [], [], {"agile_C001": (0.0, 0)}

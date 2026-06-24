@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 
+from .chunk_classifier import ChunkClassification, classify_chunk, PRIORITY_BOOST
 from .schemas import Chunk, ChunkDiagnostic, EvidenceItem, SourceDocument
 
 CHUNK_TARGET = 7_000
@@ -29,6 +30,10 @@ def select_relevant_chunks(
 ) -> tuple[list[Chunk], dict[str, tuple[float, int]]]:
     """Select chunks by keyword relevance to the question.
 
+    JH1: chunk classification is applied before selection.  Boilerplate and
+    reference chunks are excluded; evidence-dense chunks receive a priority
+    boost; candidate signals contribute an additional score term.
+
     Returns
     -------
     selected:
@@ -40,21 +45,39 @@ def select_relevant_chunks(
     """
     question_terms = _extract_question_terms(question)
 
+    # ── JH1: classify every chunk upfront ───────────────────────────────────
+    classifications: dict[str, ChunkClassification] = {
+        chunk.chunk_id: classify_chunk(chunk.chunk_id, chunk.text)
+        for chunk in chunks
+    }
+
     scored: list[tuple[Chunk, float, int]] = []
     scores: dict[str, tuple[float, int]] = {}
     for chunk in chunks:
         rel = score_chunk_relevance(chunk, question_terms)
         candidates = count_evidence_candidates(chunk, question_terms)
-        scored.append((chunk, rel, candidates))
         scores[chunk.chunk_id] = (rel, candidates)
 
-    # Sort by relevance descending; break ties by document/chunk order so we
-    # draw evenly from all documents rather than exhausting one first.
+        clf = classifications[chunk.chunk_id]
+        # Skip boilerplate/reference entirely — never select them
+        if clf.extraction_priority == "skip":
+            scored.append((chunk, -1.0, candidates))
+            continue
+
+        # Combine relevance, priority boost, and signal score
+        priority_boost = PRIORITY_BOOST.get(clf.extraction_priority, 0.0)
+        signal_boost = clf.candidate_signals.signal_score * 0.25
+        combined = rel + priority_boost * 0.30 + signal_boost
+        scored.append((chunk, combined, candidates))
+
+    # Sort by combined score descending; tie-break by document/chunk order.
     scored.sort(key=lambda x: (-x[1], x[0].document_name, x[0].chunk_number))
 
     selected: list[Chunk] = []
     total = 0
-    for chunk, _rel, _cand in scored:
+    for chunk, combined_rel, _cand in scored:
+        if combined_rel < 0:
+            continue   # skip boilerplate
         if total + chunk.char_count <= max_total_chars:
             selected.append(chunk)
             total += chunk.char_count
@@ -89,7 +112,7 @@ def compute_chunk_diagnostics(
     evidence: list[EvidenceItem],
     scores: dict[str, tuple[float, int]],
 ) -> list[ChunkDiagnostic]:
-    """Build a per-chunk diagnostic record for the trace."""
+    """Build a per-chunk diagnostic record for the trace (JH1: adds classification fields)."""
     selected_ids = {c.chunk_id for c in selected_chunks}
 
     evidence_per_chunk: dict[str, int] = {}
@@ -99,19 +122,29 @@ def compute_chunk_diagnostics(
                 evidence_per_chunk.get(item.source_chunk_id, 0) + 1
             )
 
+    # JH1: classify all chunks for diagnostic enrichment
+    classifications: dict[str, ChunkClassification] = {
+        chunk.chunk_id: classify_chunk(chunk.chunk_id, chunk.text)
+        for chunk in chunks
+    }
+
     diagnostics: list[ChunkDiagnostic] = []
     for chunk in chunks:
         rel_score, candidate_count = scores.get(chunk.chunk_id, (0.0, 0))
         sent = chunk.chunk_id in selected_ids
         items_created = evidence_per_chunk.get(chunk.chunk_id, 0)
+        clf = classifications.get(chunk.chunk_id)
 
         if not sent:
-            decision = "not_sent"
-            reason: str | None = (
-                "not relevant to question"
-                if rel_score == 0.0
-                else "excluded by character budget"
-            )
+            if clf and clf.extraction_priority == "skip":
+                decision = "not_sent"
+                reason: str | None = f"skipped: {clf.chunk_type} ({clf.classification_reason[:80]})"
+            elif rel_score == 0.0:
+                decision = "not_sent"
+                reason = "not relevant to question"
+            else:
+                decision = "not_sent"
+                reason = "excluded by character budget"
         elif items_created > 0:
             decision = "accepted"
             reason = None
@@ -130,10 +163,69 @@ def compute_chunk_diagnostics(
                 evidence_items_created=items_created,
                 extraction_decision=decision,
                 rejection_reason=reason,
+                # JH1 fields
+                chunk_type=clf.chunk_type if clf else "unknown",
+                extraction_priority=clf.extraction_priority if clf else "medium",
+                candidate_signals=clf.candidate_signals.to_dict() if clf else {},
+                classification_reason=clf.classification_reason if clf else "",
             )
         )
 
     return diagnostics
+
+
+def compute_evidence_yield_metrics(
+    chunks: list[Chunk],
+    selected_chunks: list[Chunk],
+    evidence: list[EvidenceItem],
+    documents_loaded: int = 0,
+) -> dict:
+    """Compute evidence yield metrics for the trace (JH1).
+
+    Returns a dict with keys matching the JH1 spec:
+        documents_loaded, chunks_total, chunks_selected, chunks_with_evidence,
+        evidence_items_created, zero_evidence_chunks, zero_evidence_selected_chunks,
+        skipped_boilerplate_chunks, yield_per_selected_chunk, yield_per_total_chunk.
+    """
+    chunks_total = len(chunks)
+    chunks_selected = len(selected_chunks)
+    evidence_items_created = len(evidence)
+
+    # Chunks that produced at least one evidence item
+    chunks_with_evidence = len({
+        item.source_chunk_id for item in evidence if item.source_chunk_id
+    })
+
+    # Classify all chunks to count boilerplate
+    skipped_boilerplate = sum(
+        1 for chunk in chunks
+        if classify_chunk(chunk.chunk_id, chunk.text).extraction_priority == "skip"
+    )
+
+    zero_evidence_chunks = chunks_total - chunks_with_evidence
+    zero_evidence_selected_chunks = max(0, chunks_selected - chunks_with_evidence)
+
+    yield_per_selected = (
+        round(evidence_items_created / chunks_selected, 3)
+        if chunks_selected > 0 else 0.0
+    )
+    yield_per_total = (
+        round(evidence_items_created / chunks_total, 3)
+        if chunks_total > 0 else 0.0
+    )
+
+    return {
+        "documents_loaded":             documents_loaded,
+        "chunks_total":                 chunks_total,
+        "chunks_selected":              chunks_selected,
+        "chunks_with_evidence":         chunks_with_evidence,
+        "evidence_items_created":       evidence_items_created,
+        "zero_evidence_chunks":         zero_evidence_chunks,
+        "zero_evidence_selected_chunks": zero_evidence_selected_chunks,
+        "skipped_boilerplate_chunks":   skipped_boilerplate,
+        "yield_per_selected_chunk":     yield_per_selected,
+        "yield_per_total_chunk":        yield_per_total,
+    }
 
 
 def _extract_question_terms(question: str) -> set[str]:

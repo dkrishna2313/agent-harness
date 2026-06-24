@@ -6,7 +6,7 @@ import re
 import logging
 from collections.abc import Iterable, Sequence
 
-from .chunker import chunk_documents, compute_chunk_diagnostics
+from .chunker import chunk_documents, compute_chunk_diagnostics, compute_evidence_yield_metrics
 from .claude_client import LLMClient, MockClaudeClient, aggregate_call_traces
 from .contradiction import detect_contradictions, enrich_evidence_items, build_extraction_stats, compute_suppression_metrics
 from .evidence_enricher import enrich_evidence_with_metadata, build_evidence_density_stats
@@ -256,6 +256,10 @@ class DcPowerAgent:
             evidence = enrich_evidence_with_metadata(evidence, self.profile)
             extraction_stats = build_extraction_stats(evidence)
             evidence_density = build_evidence_density_stats(evidence, len(chunks))
+            # JH1 – evidence yield metrics
+            evidence_yield = compute_evidence_yield_metrics(
+                chunks, selected_chunks, evidence, documents_loaded=len(documents)
+            )
             # J3.2 — diversity metrics after perspective enrichment
             _mock_domain = detect_domain(documents[0].path.name if documents else "")
             retrieval_diversity_mock = build_diversity_metrics(evidence, _mock_domain)
@@ -284,6 +288,7 @@ class DcPowerAgent:
                     "contradiction_metrics": contradiction_metrics,
                     "extraction_stats": extraction_stats,
                     "evidence_density": evidence_density,
+                    "evidence_yield": evidence_yield,
                     "retrieval_diversity": retrieval_diversity_mock,
                     "research_gaps": [g.model_dump() for g in research_gaps],
                     "coverage_matrix": [a.model_dump() for a in coverage_matrix],
@@ -431,6 +436,10 @@ class DcPowerAgent:
         evidence = enrich_evidence_with_metadata(evidence, self.profile)
         extraction_stats = build_extraction_stats(evidence)
         evidence_density = build_evidence_density_stats(evidence, len(chunks))
+        # JH1 – evidence yield metrics
+        evidence_yield = compute_evidence_yield_metrics(
+            chunks, selected_chunks, evidence, documents_loaded=len(documents)
+        )
         # J3.2 — diversity metrics computed after perspective enrichment
         _diversity_domain = detect_domain(
             documents[0].path.name if documents else ""
@@ -469,6 +478,7 @@ class DcPowerAgent:
                     "contradiction_metrics": contradiction_metrics,
                     "extraction_stats": extraction_stats,
                     "evidence_density": evidence_density,
+                    "evidence_yield": evidence_yield,
                     "research_gaps": [g.model_dump() for g in research_gaps],
                     "coverage_matrix": [a.model_dump() for a in coverage_matrix],
                     "source_quality_map": sq_map_serialized,
