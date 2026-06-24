@@ -8,6 +8,12 @@ from collections.abc import Iterable, Sequence
 
 from .chunker import chunk_documents, compute_chunk_diagnostics, compute_evidence_yield_metrics
 from .evidence_recovery import attribute_evidence_to_chunks, run_recovery_pass, compute_zero_yield_documents
+from .extraction_diagnostics import (
+    build_failure_diagnostics,
+    build_failure_summary,
+    compute_top_missed_chunks,
+    analyze_document_failures,
+)
 from .claude_client import LLMClient, MockClaudeClient, aggregate_call_traces
 from .contradiction import detect_contradictions, enrich_evidence_items, build_extraction_stats, compute_suppression_metrics
 from .evidence_enricher import enrich_evidence_with_metadata, build_evidence_density_stats
@@ -272,6 +278,19 @@ class DcPowerAgent:
             evidence_yield = compute_evidence_yield_metrics(
                 chunks, selected_chunks, evidence, documents_loaded=len(documents)
             )
+            # JH1b – failure pipeline diagnostics
+            _topic_term_sets = _build_topic_term_sets(self.profile)
+            _failure_diags = build_failure_diagnostics(
+                chunk_diagnostics, chunks, evidence, _topic_term_sets, is_mock=True
+            )
+            _failure_summary = build_failure_summary(_failure_diags)
+            _top_missed = compute_top_missed_chunks(_failure_diags)
+            _giant_doc_analysis = analyze_document_failures(
+                "31523cfd-5bbb-4c65-a4e0-8e699e370f95.pdf",
+                _failure_diags,
+                chunk_diags=chunk_diagnostics,
+                evidence=evidence,
+            )
             # J3.2 — diversity metrics after perspective enrichment
             _mock_domain = detect_domain(documents[0].path.name if documents else "")
             retrieval_diversity_mock = build_diversity_metrics(evidence, _mock_domain)
@@ -307,6 +326,10 @@ class DcPowerAgent:
                     "high_signal_missed_chunks": _recovery.missed_chunk_queue,
                     "category_normalization": _recovery.category_normalization,
                     "zero_yield_documents": zero_yield_docs,
+                    "failure_diagnostics": _failure_diags,
+                    "failure_summary": _failure_summary,
+                    "top_missed_chunks": _top_missed,
+                    "document_failure_analysis": _giant_doc_analysis,
                     "retrieval_diversity": retrieval_diversity_mock,
                     "research_gaps": [g.model_dump() for g in research_gaps],
                     "coverage_matrix": [a.model_dump() for a in coverage_matrix],
@@ -469,6 +492,19 @@ class DcPowerAgent:
         evidence_yield = compute_evidence_yield_metrics(
             chunks, selected_chunks, evidence, documents_loaded=len(documents)
         )
+        # JH1b – failure pipeline diagnostics (real Claude path)
+        _topic_term_sets = _build_topic_term_sets(self.profile)
+        _failure_diags = build_failure_diagnostics(
+            chunk_diagnostics, chunks, evidence, _topic_term_sets, is_mock=False
+        )
+        _failure_summary = build_failure_summary(_failure_diags)
+        _top_missed = compute_top_missed_chunks(_failure_diags)
+        _giant_doc_analysis = analyze_document_failures(
+            "31523cfd-5bbb-4c65-a4e0-8e699e370f95.pdf",
+            _failure_diags,
+            chunk_diags=chunk_diagnostics,
+            evidence=evidence,
+        )
         # J3.2 — diversity metrics computed after perspective enrichment
         _diversity_domain = detect_domain(
             documents[0].path.name if documents else ""
@@ -514,6 +550,10 @@ class DcPowerAgent:
                     "high_signal_missed_chunks": _recovery.missed_chunk_queue,
                     "category_normalization": _recovery.category_normalization,
                     "zero_yield_documents": zero_yield_docs,
+                    "failure_diagnostics": _failure_diags,
+                    "failure_summary": _failure_summary,
+                    "top_missed_chunks": _top_missed,
+                    "document_failure_analysis": _giant_doc_analysis,
                     "research_gaps": [g.model_dump() for g in research_gaps],
                     "coverage_matrix": [a.model_dump() for a in coverage_matrix],
                     "source_quality_map": sq_map_serialized,
