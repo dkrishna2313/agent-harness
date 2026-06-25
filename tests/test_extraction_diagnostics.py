@@ -11,12 +11,14 @@ from research_agent.extraction_diagnostics import (
     ATTRIBUTION_FAILURE,
     BUDGET_EXCLUSION,
     CROSS_CHUNK,
+    DUPLICATE_SUPPRESSION,
     EMPTY_EXTRACTION,
     NO_LLM_OUTPUT,
     PARSER_FAILURE,
     POST_PROCESSING_REJECTION,
     QUALITY_THRESHOLD_REJECTION,
     SCHEMA_VALIDATION_FAILURE,
+    SPEC_FAILURE_STAGES,
     UNKNOWN,
     _chunk_has_topic_match,
     _is_garbled,
@@ -286,11 +288,13 @@ def test_classify_empty_extraction_no_topic_terms():
     assert "topic keyword" in reason.lower()
 
 
-def test_classify_unknown_when_terms_present_but_no_evidence():
+def test_classify_duplicate_suppression_when_terms_present_but_no_evidence():
+    # Topic terms ARE present but no evidence created — classified as dedup/max-cap
     chunk = _chunk("c1", "The construction of the NRC-approved reactor will begin. " * 5)
     diag = _diag("c1", sent=True)
     stage, reason = classify_chunk_failure(chunk, diag, [], _TOPIC_TERMS)
-    assert stage == UNKNOWN
+    assert stage == DUPLICATE_SUPPRESSION
+    assert "dedup" in reason.lower() or "duplicate" in reason.lower() or "max-items" in reason.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -487,9 +491,35 @@ def test_all_failure_stages_contains_spec_stages():
     required = {
         "NO_LLM_OUTPUT", "EMPTY_EXTRACTION", "PARSER_FAILURE",
         "SCHEMA_VALIDATION_FAILURE", "QUALITY_THRESHOLD_REJECTION",
-        "POST_PROCESSING_REJECTION", "UNKNOWN",
+        "DUPLICATE_SUPPRESSION", "POST_PROCESSING_REJECTION", "UNKNOWN",
     }
     assert required.issubset(set(ALL_FAILURE_STAGES))
+
+
+def test_spec_failure_stages_contains_all_required():
+    required = {
+        "NO_LLM_OUTPUT", "EMPTY_EXTRACTION", "PARSER_FAILURE",
+        "SCHEMA_VALIDATION_FAILURE", "QUALITY_THRESHOLD_REJECTION",
+        "DUPLICATE_SUPPRESSION", "POST_PROCESSING_REJECTION", "UNKNOWN",
+    }
+    assert required == set(SPEC_FAILURE_STAGES)
+
+
+def test_failure_summary_contains_all_spec_keys():
+    """failure_summary must always emit every spec-required key."""
+    from research_agent.extraction_diagnostics import build_failure_summary
+    summary = build_failure_summary([])
+    for stage in SPEC_FAILURE_STAGES:
+        assert stage in summary, f"spec stage missing from summary: {stage}"
+
+
+def test_failure_summary_duplicate_suppression_increments():
+    diags = [
+        {"failure_stage": DUPLICATE_SUPPRESSION},
+        {"failure_stage": DUPLICATE_SUPPRESSION},
+    ]
+    summary = build_failure_summary(diags)
+    assert summary[DUPLICATE_SUPPRESSION] == 2
 
 
 def test_all_failure_stages_contains_attribution_stages():

@@ -74,22 +74,28 @@ BUDGET_EXCLUSION              = "BUDGET_EXCLUSION"
 PARSER_FAILURE                = "PARSER_FAILURE"
 SCHEMA_VALIDATION_FAILURE     = "SCHEMA_VALIDATION_FAILURE"
 QUALITY_THRESHOLD_REJECTION   = "QUALITY_THRESHOLD_REJECTION"
+DUPLICATE_SUPPRESSION         = "DUPLICATE_SUPPRESSION"
 POST_PROCESSING_REJECTION     = "POST_PROCESSING_REJECTION"
 NO_LLM_OUTPUT                 = "NO_LLM_OUTPUT"
 UNKNOWN                       = "UNKNOWN"
 
-# Stages that map to the spec-required names (superset)
-ALL_FAILURE_STAGES: tuple[str, ...] = (
+# Spec-required stages — these must appear as keys in failure_summary output
+SPEC_FAILURE_STAGES: tuple[str, ...] = (
     NO_LLM_OUTPUT,
     EMPTY_EXTRACTION,
     PARSER_FAILURE,
     SCHEMA_VALIDATION_FAILURE,
     QUALITY_THRESHOLD_REJECTION,
-    BUDGET_EXCLUSION,
+    DUPLICATE_SUPPRESSION,
     POST_PROCESSING_REJECTION,
+    UNKNOWN,
+)
+
+# Full set including discovery stages added by JH1b analysis
+ALL_FAILURE_STAGES: tuple[str, ...] = SPEC_FAILURE_STAGES + (
     ATTRIBUTION_FAILURE,
     CROSS_CHUNK,
-    UNKNOWN,
+    BUDGET_EXCLUSION,
 )
 
 # Signal threshold for parser failure detection
@@ -204,11 +210,17 @@ def classify_chunk_failure(
             "in this chunk's text",
         )
 
-    # 6. Topic matches exist but extraction still failed — unknown
+    # 6. Topic matches exist but no evidence was created — dedup / max-cap
+    # In the mock path, _append_evidence_item suppresses items via (category, text)
+    # dedup key or the per-document max_items cap.  Neither leaves a trace, so
+    # we classify these as DUPLICATE_SUPPRESSION (the most likely cause when
+    # topic keywords are present but the document already hit its item ceiling).
     return (
-        UNKNOWN,
-        "topic keywords match but no evidence was created; may be dedup rejection "
-        "or max-items cap in a prior chunk of the same document",
+        DUPLICATE_SUPPRESSION,
+        "topic keywords match in this chunk but no evidence was created — "
+        "likely duplicate-key suppression or per-document max-items cap in "
+        "_append_evidence_item(); a prior chunk from this document may have "
+        "already extracted the same sentences",
     )
 
 
@@ -382,8 +394,14 @@ def build_failure_diagnostics(
 # ---------------------------------------------------------------------------
 
 def build_failure_summary(failure_diagnostics: list[dict]) -> dict[str, int]:
-    """Return count of each failure stage across all diagnosed chunks."""
-    # Always include all stages at 0 so the consumer can chart without None checks
+    """Return count of each failure stage across all diagnosed chunks.
+
+    Spec-required stages always appear first (keyed by their exact names).
+    Discovery stages found by JH1b (ATTRIBUTION_FAILURE, CROSS_CHUNK,
+    BUDGET_EXCLUSION) appear after, so spec consumers can slice [:8].
+    All stages initialise to 0 so callers never get KeyError.
+    """
+    # Spec-required keys first, then discovery keys
     summary: dict[str, int] = {stage: 0 for stage in ALL_FAILURE_STAGES}
     for item in failure_diagnostics:
         stage = item.get("failure_stage", UNKNOWN)
