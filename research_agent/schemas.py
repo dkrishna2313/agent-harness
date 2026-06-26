@@ -141,6 +141,8 @@ class EvidenceItem(BaseModel):
     # JH1a – recovery pass fields
     recovered: bool = False
     recovery_reason: str = ""  # numeric_claim | policy_claim | timeline_claim | technical_spec | market_projection | grid_constraint | other
+    # JH2 – atomic claim extraction scoring dimensions
+    quantitative_score: int = Field(default=3, ge=1, le=5)  # numeric/unit richness in claim
 
 
 class ResearchPlan(BaseModel):
@@ -306,6 +308,30 @@ class ChunkDiagnostic(BaseModel):
     extraction_priority: str = "medium"  # high | medium | low | skip
     candidate_signals: dict[str, int] = Field(default_factory=dict)
     classification_reason: str = ""
+
+
+class EvidenceCandidateRecord(BaseModel):
+    """One candidate in the pre-ranking evidence pool (JH2)."""
+
+    claim: str
+    category: str
+    supporting_quote: str      # maps to evidence_snippet
+    source: str                # maps to source_document
+    confidence: str
+    relevance_score: int
+    source_quality_score: int
+    specificity_score: int
+    quantitative_score: int
+    candidate_score: float     # overall_score at time of ranking
+
+
+class EvidenceRankingObservability(BaseModel):
+    """Ranking statistics persisted after each extraction pass (JH2)."""
+
+    candidate_count: int
+    selected_count: int
+    discarded_count: int
+    top_candidates: list[dict[str, Any]] = Field(default_factory=list)
 
 
 def assign_evidence_ids(items: list[EvidenceItem]) -> list[EvidenceItem]:

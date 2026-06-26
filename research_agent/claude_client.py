@@ -1626,12 +1626,15 @@ def _evidence_prompt(question: str, source_texts: Sequence[SourceDocument]) -> s
 Question:
 {question}
 
-Rules:
+Rules — MAXIMIZE RECALL:
 - Use only the source text below.
 - Each evidence_snippet must be copied or tightly paraphrased from one source.
 - Use categories only from: architecture, power, cooling, networking, rack architecture, operations, other.
 - Do not invent evidence IDs; evidence_id is assigned by the harness after extraction.
-- Prefer 3-8 evidence items per source when useful evidence is available.
+- Extract EVERY distinct atomic factual claim present in the source text.
+- One claim = one fact. Decompose compound statements: "X requires Y, enabling Z" → three separate items.
+- Aim for 10-30 items per source for evidence-dense content; fewer only for sparse content. No upper cap.
+- Include numeric claims, specifications, constraints, timelines, and policy statements.
 - Return JSON only.
 
 CRITICAL — claim field rules (violations cause the item to be discarded):
@@ -1736,13 +1739,16 @@ def _evidence_chunk_prompt(question: str, chunks: Sequence[Chunk]) -> str:
 Question:
 {question}
 
-Rules:
+Rules — MAXIMIZE RECALL:
 - Use only the source text below.
 - Each evidence_snippet must be copied or tightly paraphrased from one chunk.
 - Use categories only from: architecture, power, cooling, networking, rack architecture, operations, other.
 - Do not invent evidence IDs; evidence_id is assigned by the harness after extraction.
 - Set source_chunk_id to the Chunk ID shown in the header for the chunk you drew evidence from.
-- Prefer 3-8 evidence items per source when useful evidence is available.
+- Extract EVERY distinct atomic factual claim present in the source text.
+- One claim = one fact. Decompose compound statements: "X requires Y, enabling Z" → three separate items.
+- Aim for 10-30 items per chunk for evidence-dense content; fewer only for sparse content. No upper cap.
+- Include numeric claims, specifications, constraints, timelines, and policy statements.
 - Return JSON only.
 
 CRITICAL — claim field rules (violations cause the item to be discarded):

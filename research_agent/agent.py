@@ -25,7 +25,7 @@ from .evaluator import classify_question_topics, evaluate_memo
 from .profile import DomainProfile, get_default_profile
 from .retrieval import DEFAULT_TOP_CHUNKS, RetrievalScore, select_top_chunks, select_top_chunks_multi
 from .retrieval_planner import RetrievalPlan, RetrievalPlanner
-from .schemas import Chunk, CoverageArea, EvidenceItem, ResearchMemo, ResearchPlan, SourceDocument, SourceQuality, assign_evidence_ids
+from .schemas import Chunk, CoverageArea, EvidenceCandidateRecord, EvidenceItem, EvidenceRankingObservability, ResearchMemo, ResearchPlan, SourceDocument, SourceQuality, assign_evidence_ids
 from .source_quality import build_source_quality_map, classify_source_quality
 from .web_search import WebDocument, web_retrieve
 from .web_cache import WebPageCache
@@ -414,12 +414,16 @@ class DcPowerAgent:
             LOGGER.error("Claude %s", message)
             errors.append(message)
             evidence = extract_evidence(question, documents, source_quality_map=source_quality_map, profile=self.profile)
-        LOGGER.log(PROGRESS, "Starting evidence ranking")
-        evidence = rank_evidence_items(
-            score_evidence_items(question, assign_evidence_ids(list(evidence)), source_quality_map, self.profile)
+        LOGGER.log(PROGRESS, "Starting evidence scoring and ranking")
+        # JH2 – score all candidates before ranking so quantitative_score is populated
+        scored_candidates = score_evidence_items(
+            question, assign_evidence_ids(list(evidence)), source_quality_map, self.profile
         )
+        # JH2 – persist full candidate pool before selection
+        candidate_pool = build_candidate_pool(scored_candidates)
+        evidence = rank_evidence_items(scored_candidates)
         LOGGER.log(PROGRESS,
-            "Evidence: %d items extracted and ranked",
+            "Evidence: %d candidates scored and ranked",
             len(evidence),
         )
         # J3.2 — diversity-aware selection: cap over-represented perspectives so
@@ -434,6 +438,8 @@ class DcPowerAgent:
             top_n=MAX_SYNTHESIS_EVIDENCE,
             max_per_perspective=3,
         )
+        # JH2 – ranking observability: candidate → selected → discarded counts
+        ranking_obs = build_ranking_observability(evidence, synthesis_evidence)
         LOGGER.debug(
             "Evidence pipeline: %d filtered to synthesis (top_evidence=%d, cap=%d, total=%d)",
             len(synthesis_evidence),
@@ -560,6 +566,8 @@ class DcPowerAgent:
                     "domain_profile": _profile_to_metadata(self.profile),
                     "retrieval_plan": retrieval_plan.to_dict(),
                     "retrieval_stats": retrieval_plan_stats,
+                    "evidence_candidate_pool": candidate_pool,
+                    "evidence_ranking": ranking_obs,
                     **({"web_search": web_search_trace} if web_search_trace is not None else {}),
                 },
             }
@@ -681,10 +689,15 @@ def score_evidence_items(
         source_quality_class = sq.source_type
 
         specificity_score = _specificity_score(item, specificity_terms)
+        quantitative_score = _quantitative_score(item)
+        # JH2: weights adjusted to incorporate quantitative dimension.
+        # relevance remains the dominant signal; quantitative rewards
+        # measurement-rich claims over vague assertions.
         overall_score = round(
-            (relevance_score * 0.45)
-            + (source_quality_score * 0.25)
-            + (specificity_score * 0.30),
+            (relevance_score * 0.40)
+            + (source_quality_score * 0.22)
+            + (specificity_score * 0.25)
+            + (quantitative_score * 0.13),
             2,
         )
         scored.append(
@@ -694,6 +707,7 @@ def score_evidence_items(
                     "source_quality_score": source_quality_score,
                     "source_quality_class": source_quality_class,
                     "specificity_score": specificity_score,
+                    "quantitative_score": quantitative_score,
                     "overall_score": overall_score,
                 }
             )
@@ -724,6 +738,58 @@ def select_top_evidence(
     """Select the highest-ranked evidence items for memo synthesis."""
 
     return rank_evidence_items(evidence_items)[: max(1, top_n)]
+
+
+def build_candidate_pool(candidates: Sequence[EvidenceItem]) -> list[dict]:
+    """Serialize pre-ranking candidates to the JH2 candidate pool format."""
+    records = []
+    for item in candidates:
+        records.append(
+            EvidenceCandidateRecord(
+                claim=item.claim,
+                category=item.category,
+                supporting_quote=item.evidence_snippet,
+                source=item.source_document,
+                confidence=item.confidence,
+                relevance_score=item.relevance_score,
+                source_quality_score=item.source_quality_score,
+                specificity_score=item.specificity_score,
+                quantitative_score=item.quantitative_score,
+                candidate_score=item.overall_score,
+            ).model_dump()
+        )
+    return records
+
+
+def build_ranking_observability(
+    candidates: Sequence[EvidenceItem],
+    selected: Sequence[EvidenceItem],
+    *,
+    top_n: int = 10,
+) -> dict:
+    """Build the JH2 ranking observability payload."""
+    candidate_count = len(candidates)
+    selected_ids = {item.evidence_id for item in selected}
+    selected_count = sum(1 for c in candidates if c.evidence_id in selected_ids)
+    obs = EvidenceRankingObservability(
+        candidate_count=candidate_count,
+        selected_count=selected_count,
+        discarded_count=candidate_count - selected_count,
+        top_candidates=[
+            {
+                "evidence_id": c.evidence_id,
+                "claim": c.claim[:120],
+                "source": c.source_document,
+                "overall_score": c.overall_score,
+                "relevance_score": c.relevance_score,
+                "source_quality_score": c.source_quality_score,
+                "specificity_score": c.specificity_score,
+                "quantitative_score": c.quantitative_score,
+            }
+            for c in list(candidates)[:top_n]
+        ],
+    )
+    return obs.model_dump()
 
 
 def build_mock_memo(
@@ -913,6 +979,35 @@ def _specificity_score(
     if technical_hits >= 1 or len(item.evidence_snippet) >= 140:
         return 3
     if len(item.evidence_snippet) >= 60:
+        return 2
+    return 1
+
+
+def _quantitative_score(item: EvidenceItem) -> int:
+    """Score 1-5 for numeric/quantitative richness in the claim (JH2).
+
+    Distinct from specificity_score: rewards claims that carry concrete
+    measurements (with units or percentages) that enable precise comparison.
+    """
+    text = f"{item.claim} {item.evidence_snippet}".lower()
+    # Numbers paired with units — strongest signal
+    with_units = re.findall(
+        r"\b\d+(?:[.,]\d+)?\s*"
+        r"(?:%|kw|mw|gw|tw|w|kv|v|gb|tb|pb|gbps|tbps|hz|ghz|°c|kpa|bar"
+        r"|years?|months?|days?|hours?|mwe?|mwh|gwh|x|×)\b",
+        text,
+    )
+    # Bare multi-digit numbers (statistics, capacities, counts)
+    bare = re.findall(r"\b\d{2,}(?:[.,]\d{3})*\b", text)
+
+    n_units = len(with_units)
+    if n_units >= 3:
+        return 5
+    if n_units >= 2:
+        return 4
+    if n_units >= 1 or len(bare) >= 3:
+        return 3
+    if len(bare) >= 1:
         return 2
     return 1
 
