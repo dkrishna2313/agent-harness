@@ -903,21 +903,24 @@ class ClaudeClient:
         self,
         question: str,
         chunks: Sequence[Chunk],
+        *,
+        prompt_override: str | None = None,
     ) -> list[EvidenceItem]:
         chunk_list = list(chunks)
 
-        # Cache read — skip LLM call on a hit
-        if self._extraction_cache is not None:
+        # Cache read — skip when a custom prompt is supplied (diagnostic / non-production use).
+        if prompt_override is None and self._extraction_cache is not None:
             cached = self._extraction_cache.get(question, chunk_list)
             if cached is not None:
                 from research_agent.log import PROGRESS
                 LOGGER.log(PROGRESS, "[extraction_cache] hit  chunks=%d  items=%d", len(chunk_list), len(cached))
                 return cached
 
+        prompt = prompt_override if prompt_override is not None else _evidence_chunk_prompt(question, chunk_list)
         payload = self._call_json(
             operation="extract_evidence",
             schema_name="evidence_extraction",
-            prompt=_evidence_chunk_prompt(question, chunk_list),
+            prompt=prompt,
             max_tokens=max(self.max_tokens, 16_000),
             response_schema_name="evidence_extraction_raw",
             model_override=self.extraction_model,
@@ -947,8 +950,8 @@ class ClaudeClient:
         result = assign_evidence_ids(clean)
         LOGGER.debug("extract_evidence_from_chunks: final EvidenceItem count=%d", len(result))
 
-        # Cache write
-        if self._extraction_cache is not None:
+        # Cache write — skip when a custom prompt was used.
+        if prompt_override is None and self._extraction_cache is not None:
             self._extraction_cache.put(question, chunk_list, result)
 
         return result
@@ -1030,6 +1033,7 @@ class ClaudeClient:
                 len(str(tool_input)) if tool_input is not None else 0,
             )
             if tool_input is not None:
+                tool_input = _normalize_tool_input(tool_input)
                 payload = _validate_payload(tool_input, _response_schema)
             else:
                 text = _response_text(response)
@@ -1875,6 +1879,27 @@ def re_findall_json_fences(text: str) -> list[str]:
         match.group(1).strip()
         for match in re.finditer(r"```(?:json)?\s*(.*?)```", text, flags=re.DOTALL | re.IGNORECASE)
     ]
+
+
+def _normalize_tool_input(tool_input: Any) -> Any:
+    """Coerce string-encoded list fields to actual lists before schema validation.
+
+    Some models return ``{"evidence_items": "[{...}]"}`` — a JSON-encoded string
+    where a list is expected.  Pydantic v2 does not coerce strings to lists, so
+    we pre-process the dict and decode any string-valued list fields.
+    """
+    if not isinstance(tool_input, dict):
+        return tool_input
+    result = dict(tool_input)
+    for key, value in result.items():
+        if isinstance(value, str) and value.strip().startswith("["):
+            try:
+                decoded = json.loads(value)
+                if isinstance(decoded, list):
+                    result[key] = decoded
+            except (json.JSONDecodeError, ValueError):
+                pass
+    return result
 
 
 def _validate_payload(payload: Any, schema_name: str) -> dict[str, Any]:

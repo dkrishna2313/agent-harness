@@ -224,6 +224,20 @@ def check_prohibited_term(term: str, answer_text: str) -> ProhibitedTermResult:
             reason="sentence_exemption",
         )
 
+    # 2b. Interrogative sentence — term is mentioned as a topic in a question, not asserted.
+    # "Are there half-rack (NVL36) configurations?" asks about NVL36 but does not claim
+    # that the answer being evaluated is about NVL36.  Generalises to any entity mentioned
+    # as the subject of an open question rather than as a direct factual claim.
+    if sentence.rstrip().endswith("?"):
+        return ProhibitedTermResult(
+            term=term,
+            found=True,
+            context_window=sentence[:200],
+            classification="context_allowed",
+            penalty_applied=False,
+            reason="interrogative_sentence",
+        )
+
     # 3. Contrastive connector in sentence
     if _CONTRASTIVE.search(sentence_lower):
         return ProhibitedTermResult(
