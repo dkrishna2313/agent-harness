@@ -36,6 +36,56 @@ LOGGER = logging.getLogger(__name__)
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+def _apply_recommendation_linkage(ctx: AgentContext) -> AgentContext:
+    """J7.2 – link assumptions ↔ recommendations and re-persist both artifacts."""
+    from research_agent.log import PROGRESS
+    from .recommendation_linkage import build_recommendation_linkage, persist_linkage
+
+    assumptions = ctx.assumptions
+    recommendations = ctx.recommendations
+
+    if not assumptions or not recommendations:
+        LOGGER.log(
+            PROGRESS,
+            "[RecommendationLinkage] skipped — assumptions=%d recommendations=%d",
+            len(assumptions), len(recommendations),
+        )
+        return ctx
+
+    linked_assumptions, linked_recommendations = build_recommendation_linkage(
+        assumptions, recommendations
+    )
+
+    # Count links for observability
+    link_count = sum(len(a.get("supported_recommendation_ids", [])) for a in linked_assumptions)
+    LOGGER.log(
+        PROGRESS,
+        "[RecommendationLinkage] %d assumptions × %d recommendations → %d links",
+        len(linked_assumptions), len(linked_recommendations), link_count,
+    )
+
+    # Write back into context
+    ctx.assumptions = linked_assumptions
+    ctx.recommendations = linked_recommendations
+    if ctx.research_object:
+        ctx.research_object["strategic_assumptions"] = linked_assumptions
+        ctx.research_object["recommendations"] = linked_recommendations
+
+    ctx.trace["_recommendation_linkage"] = {
+        "assumption_count": len(linked_assumptions),
+        "recommendation_count": len(linked_recommendations),
+        "link_count": link_count,
+    }
+
+    # Re-persist Decision Model and Research Object
+    dm_id = ctx.research_object.get("decision_model_id") if ctx.research_object else None
+    dm_ok, ro_ok = persist_linkage(dm_id, linked_assumptions, linked_recommendations, ctx.research_object or {})
+    ctx.trace["_recommendation_linkage"]["dm_persisted"] = dm_ok
+    ctx.trace["_recommendation_linkage"]["ro_persisted"] = ro_ok
+
+    return ctx
+
+
 def _step(agent: Any, ctx: AgentContext) -> AgentResult:
     """Run one agent, validate its AgentResult, and append to workflow_path."""
     from .contract import validate_agent_result
@@ -192,6 +242,8 @@ class AgentOrchestrator:
             elif state == WorkflowState.RECOMMENDATION:
                 result = _step(self._recommendation_factory(), ctx)
                 ctx = result.context
+                # J7.2 – link assumptions ↔ recommendations immediately after generation
+                ctx = _apply_recommendation_linkage(ctx)
                 state = (
                     WorkflowState.MULTI_PROFILE
                     if self._multi_profile_factory is not None

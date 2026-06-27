@@ -259,6 +259,12 @@ class RecommendationItem(BaseModel):
     """A single actionable recommendation derived from challenged hypotheses (J6.5)."""
 
     id: str = Field(description="Short identifier, e.g. 'R1'")
+    # J7.2 – stable recommendation_id (REC-001 format) and assumption back-links
+    recommendation_id: str = Field(default="", description="Stable ID e.g. 'REC-001'; auto-derived from id when empty")
+    supported_assumption_ids: list[str] = Field(
+        default_factory=list,
+        description="assumption_ids from the Decision Model that this recommendation depends on",
+    )
     title: str = Field(description="One-line recommendation title")
     summary: str = Field(description="2-4 sentence explanation of what to do and why")
     priority: str = Field(default="medium", description="'high', 'medium', or 'low'")
