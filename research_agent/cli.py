@@ -19,7 +19,7 @@ from .profile import DomainProfile, list_available_profiles, load_profile
 from .schemas import ResearchMemo, SourceDocument
 from .trace import MEMO_SECTIONS, build_trace, write_trace
 from .decision_model import from_question as _dm_from_question, write_decision_model
-from .engagement import from_question as _engagement_from_question, write_engagement
+from .engagement import from_question as _engagement_from_question, link_decision_model as _link_dm, write_engagement
 from .research_object import (
     create_research_object,
     update_research_object,
@@ -158,11 +158,13 @@ def main(
             pass  # persistence failure must never block a research run
 
         # J7.0b – auto-create a minimal Decision Model for every question-driven run.
+        # J7.0b1 – also back-link the engagement so decision_model_id is non-null.
         dm_id: str | None = None
         try:
             dm = _dm_from_question(question, engagement_id=engagement.engagement_id)
             write_decision_model(dm)
             dm_id = dm.decision_model_id
+            _link_dm(engagement, dm_id)  # re-persists engagement with decision_model_id set
         except Exception:
             pass
 
