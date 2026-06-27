@@ -80,6 +80,7 @@ class AgentOrchestrator:
         research_strategy_factory: Any = None,
         hypothesis_factory: Any = None,
         challenge_factory: Any = None,
+        assumption_factory: Any = None,
         recommendation_factory: Any = None,
         multi_profile_factory: Any = None,
         scenario_factory: Any = None,
@@ -92,6 +93,7 @@ class AgentOrchestrator:
         self._research_strategy_factory = research_strategy_factory
         self._hypothesis_factory        = hypothesis_factory
         self._challenge_factory         = challenge_factory
+        self._assumption_factory        = assumption_factory
         self._recommendation_factory    = recommendation_factory
         self._multi_profile_factory     = multi_profile_factory
         self._scenario_factory          = scenario_factory
@@ -165,6 +167,20 @@ class AgentOrchestrator:
             # ---- CHALLENGE (J6.4) -------------------------------------------
             elif state == WorkflowState.CHALLENGE:
                 result = _step(self._challenge_factory(), ctx)
+                ctx = result.context
+                state = (
+                    WorkflowState.ASSUMPTION
+                    if self._assumption_factory is not None
+                    else (
+                        WorkflowState.RECOMMENDATION
+                        if self._recommendation_factory is not None
+                        else WorkflowState.QA
+                    )
+                )
+
+            # ---- ASSUMPTION (J7.1) ------------------------------------------
+            elif state == WorkflowState.ASSUMPTION:
+                result = _step(self._assumption_factory(), ctx)
                 ctx = result.context
                 state = (
                     WorkflowState.RECOMMENDATION
@@ -382,6 +398,7 @@ class Orchestrator:
         from .research_strategy_agent   import ResearchStrategyAgent
         from .hypothesis_agent          import HypothesisAgent
         from .challenge_agent           import ChallengeAgent
+        from .assumption_agent          import AssumptionAgent
         from .recommendation_agent               import RecommendationAgent
         from .scenario_agent                     import ScenarioAgent
         from .recommendation_improvement_agent   import RecommendationImprovementAgent
@@ -414,6 +431,9 @@ class Orchestrator:
 
         def challenge_factory() -> ChallengeAgent:
             return ChallengeAgent(client=self._client, domain_profiles=loaded_profiles)
+
+        def assumption_factory() -> AssumptionAgent:
+            return AssumptionAgent(client=self._client, domain_profiles=loaded_profiles)
 
         def recommendation_factory() -> RecommendationAgent:
             return RecommendationAgent(client=self._client, domain_profiles=loaded_profiles)
@@ -523,6 +543,7 @@ class Orchestrator:
             research_strategy_factory=research_strategy_factory if goal else None,
             hypothesis_factory=hypothesis_factory,
             challenge_factory=challenge_factory,
+            assumption_factory=assumption_factory,
             recommendation_factory=recommendation_factory,
             multi_profile_factory=multi_profile_factory,
             scenario_factory=scenario_factory,

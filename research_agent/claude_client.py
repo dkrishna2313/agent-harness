@@ -314,6 +314,45 @@ class RecommendationPayload(BaseModel):
     )
 
 
+class AssumptionItem(BaseModel):
+    """A single strategic assumption (J7.1)."""
+
+    assumption_id: str = Field(description="Short unique ID e.g. 'A-001'")
+    statement: str = Field(description="What must be true for the recommendation to hold")
+    category: str = Field(
+        description=(
+            "One of: Technology, Market, Economics, Regulation, Policy, Supply Chain, "
+            "Competition, Customer, Execution, Geopolitics, Environment, Infrastructure, Finance, Other"
+        )
+    )
+    importance: str = Field(description="Critical | Important | Supporting")
+    evidence_support: str = Field(description="Strong | Moderate | Weak | None")
+    confidence: str = Field(description="High | Medium | Low")
+    rationale: str = Field(description="Why this assumption matters strategically")
+    evidence_ids: list[str] = Field(
+        default_factory=list,
+        description="IDs of evidence items that support this assumption",
+    )
+    conflicts_with: list[str] = Field(
+        default_factory=list,
+        description="assumption_ids that contradict this assumption",
+    )
+    status: str = Field(default="Active", description="Active | Validated | Invalidated")
+
+
+class AssumptionPayload(BaseModel):
+    """Structured output for AssumptionAgent (J7.1)."""
+
+    assumptions: list[AssumptionItem] = Field(
+        default_factory=list,
+        description="5-10 strategic assumptions that must hold for the recommendations to be valid",
+    )
+    conflict_pairs: list[list[str]] = Field(
+        default_factory=list,
+        description="Pairs of assumption_ids that conflict with each other",
+    )
+
+
 _SCHEMA_ADAPTERS = {
     "research_plan": TypeAdapter(ResearchPlan),
     "research_planning": TypeAdapter(ResearchPlanningPayload),
@@ -322,6 +361,7 @@ _SCHEMA_ADAPTERS = {
     "hypothesis_generation": TypeAdapter(HypothesisPayload),
     "challenge_generation": TypeAdapter(ChallengePayload),
     "recommendation_generation": TypeAdapter(RecommendationPayload),
+    "assumption_generation": TypeAdapter(AssumptionPayload),     # J7.1
     # Used for the tool-definition schema sent to Claude (strict EvidenceItem types).
     "evidence_extraction": TypeAdapter(EvidenceExtractionPayload),
     # Used for response validation (lenient — items validated per-item in extract_evidence).
@@ -684,6 +724,86 @@ class MockClaudeClient:
         )
 
 
+    def generate_assumptions(
+        self,
+        surviving_hypotheses: list[dict],
+        hypothesis_challenges: list[dict],
+        evidence_items: list[dict],
+        decision_model: dict,
+        research_strategy: dict,
+    ) -> "AssumptionPayload":
+        """Return deterministic mock strategic assumptions (J7.1)."""
+        ev_ids = [e.get("evidence_id", "") for e in evidence_items if e.get("evidence_id")]
+        question = decision_model.get("strategic_question", decision_model.get("objective", "the decision"))
+
+        categories = ["Technology", "Market", "Economics", "Regulation", "Supply Chain",
+                      "Execution", "Infrastructure", "Policy", "Competition", "Finance"]
+        importances = ["Critical", "Critical", "Important", "Important", "Supporting",
+                       "Critical", "Important", "Supporting", "Important", "Critical"]
+        supports = ["Strong", "Moderate", "Weak", "Strong", "Moderate",
+                    "Moderate", "Strong", "Weak", "Moderate", "Strong"]
+        confidences = ["High", "Medium", "Low", "High", "Medium",
+                       "Medium", "High", "Low", "Medium", "High"]
+
+        templates = [
+            "The underlying technology is sufficiently mature for commercial deployment at scale",
+            "Market demand will remain at projected levels over the investment horizon",
+            "Capital costs will not materially exceed current estimates",
+            "The regulatory environment will remain stable and permissive",
+            "Supply chain constraints will be resolved within the planning timeframe",
+            "The organisation has sufficient execution capacity to deliver the programme",
+            "Infrastructure dependencies (power, cooling, connectivity) will be available",
+            "Policy support will continue throughout the deployment period",
+            "Competitive dynamics will not materially shift the economic case",
+            "Financing conditions will remain favourable at the required scale",
+        ]
+
+        assumptions = []
+        for i, hyp in enumerate(surviving_hypotheses[:7]):
+            idx = i % len(templates)
+            sup_ev = ev_ids[i*2 : i*2+2] if len(ev_ids) > i*2 else ev_ids[:1]
+            assumptions.append(AssumptionItem(
+                assumption_id=f"A-{i+1:03d}",
+                statement=templates[idx],
+                category=categories[idx],
+                importance=importances[idx],
+                evidence_support=supports[idx],
+                confidence=confidences[idx],
+                rationale=(
+                    f"Derived from hypothesis '{hyp.get('title', hyp.get('id', f'H{i+1}'))}'. "
+                    f"This must hold for the strategic recommendation to remain valid."
+                ),
+                evidence_ids=sup_ev,
+                conflicts_with=[],
+                status="Active",
+            ))
+
+        # Add remaining mock assumptions if fewer hypotheses than templates
+        for j in range(len(assumptions), min(5, len(templates))):
+            sup_ev = ev_ids[j*2 : j*2+2] if len(ev_ids) > j*2 else ev_ids[:1]
+            assumptions.append(AssumptionItem(
+                assumption_id=f"A-{j+1:03d}",
+                statement=templates[j],
+                category=categories[j],
+                importance=importances[j],
+                evidence_support=supports[j],
+                confidence=confidences[j],
+                rationale=f"Strategic assumption relevant to: {question[:80]}",
+                evidence_ids=sup_ev,
+                conflicts_with=[],
+                status="Active",
+            ))
+
+        # Simple mock conflict: assumption 2 (Market demand stable) vs assumption 9 (Competition shifts)
+        conflict_pairs: list[list[str]] = []
+        if len(assumptions) >= 9:
+            assumptions[1].conflicts_with.append(assumptions[8].assumption_id)
+            assumptions[8].conflicts_with.append(assumptions[1].assumption_id)
+            conflict_pairs.append([assumptions[1].assumption_id, assumptions[8].assumption_id])
+
+        return AssumptionPayload(assumptions=assumptions, conflict_pairs=conflict_pairs)
+
+
 class ClaudeClient:
     """Thin Anthropic SDK wrapper for structured research calls."""
 
@@ -824,6 +944,26 @@ class ClaudeClient:
             max_tokens=10000,
         )
         return RecommendationPayload.model_validate(payload)
+
+    def generate_assumptions(
+        self,
+        surviving_hypotheses: list[dict],
+        hypothesis_challenges: list[dict],
+        evidence_items: list[dict],
+        decision_model: dict,
+        research_strategy: dict,
+    ) -> AssumptionPayload:
+        """Identify strategic assumptions that must hold for recommendations to remain valid (J7.1)."""
+        payload = self._call_json(
+            operation="generate_assumptions",
+            schema_name="assumption_generation",
+            prompt=_assumption_prompt(
+                surviving_hypotheses, hypothesis_challenges,
+                evidence_items, decision_model, research_strategy,
+            ),
+            max_tokens=8000,
+        )
+        return AssumptionPayload.model_validate(payload)
 
     def plan_research_question(
         self,
@@ -1551,6 +1691,77 @@ Rules:
 - Write a 1-2 sentence synthesis_note summarising the recommendation set
 
 Return structured JSON only.
+"""
+
+
+def _assumption_prompt(
+    surviving_hypotheses: list[dict],
+    hypothesis_challenges: list[dict],
+    evidence_items: list[dict],
+    decision_model: dict,
+    research_strategy: dict,
+) -> str:
+    """Build the AssumptionAgent prompt (J7.1)."""
+    question = decision_model.get("strategic_question", decision_model.get("objective", ""))
+    decision_areas = decision_model.get("decision_areas", decision_model.get("investigation_areas", []))
+
+    survival_by_id = {s.get("hypothesis_id", ""): s for s in surviving_hypotheses}
+    challenge_by_id = {c.get("hypothesis_id", ""): c for c in hypothesis_challenges}
+
+    hyp_lines = ""
+    for h in surviving_hypotheses:
+        hid = h.get("hypothesis_id", h.get("id", "?"))
+        title = h.get("title", "")
+        status = h.get("survival_status", "")
+        reason = h.get("reason", "")
+        hyp_lines += f"\n  {hid}: {title}  [status={status}]\n  Reason: {reason}\n"
+
+    ev_lines = ""
+    for e in evidence_items[:25]:
+        eid = e.get("evidence_id", "")
+        claim = e.get("claim", "")[:120]
+        src = e.get("source_document", e.get("source", ""))[:40]
+        ev_lines += f"\n  {eid}: {claim}  [source: {src}]"
+
+    return f"""You are a senior strategy consultant producing a Strategic Assumption analysis.
+
+STRATEGIC QUESTION: {question}
+
+DECISION AREAS: {', '.join(str(a) for a in decision_areas[:8])}
+
+SURVIVING HYPOTHESES:
+{hyp_lines or "  (none provided)"}
+
+EVIDENCE AVAILABLE:
+{ev_lines or "  (none provided)"}
+
+TASK:
+Identify 5–10 strategic assumptions that MUST hold for the research findings and emerging
+recommendations to remain valid. These are NOT observations or findings — they are
+conditions that are currently assumed to be true but could prove false.
+
+For each assumption:
+1. State precisely what must be true
+2. Assign the most appropriate category
+3. Rate importance: Critical (recommendation fails if false) | Important | Supporting
+4. Rate evidence support: how well do the evidence items back this assumption?
+5. Rate confidence: your confidence that this assumption currently holds
+6. Write a rationale: why does this assumption matter strategically?
+7. List evidence_ids from the available evidence that support this assumption (use exact IDs)
+8. Identify any conflicts with other assumptions in your list
+
+CONFLICT DETECTION:
+If two assumptions are mutually contradictory or in tension, flag them in conflict_pairs.
+Also set conflicts_with on each assumption involved.
+
+CRITICAL RULES:
+- Avoid trivial or obvious assumptions ("data exists", "team will work hard")
+- Avoid duplicates — each assumption must be distinct
+- Focus on strategic conditions, not operational details
+- Assumptions should be falsifiable — a reasonable analyst could challenge them
+- Use the exact evidence_id strings from the list above (e.g. "EV-001")
+
+Return structured JSON matching the assumption_generation schema.
 """
 
 

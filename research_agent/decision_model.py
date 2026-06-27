@@ -64,6 +64,42 @@ class DecisionObjective(BaseModel):
     rationale: str = ""
 
 
+# ---------------------------------------------------------------------------
+# DecisionAssumption (J7.1)
+# ---------------------------------------------------------------------------
+
+AssumptionCategory = Literal[
+    "Technology", "Market", "Economics", "Regulation", "Policy",
+    "Supply Chain", "Competition", "Customer", "Execution", "Geopolitics",
+    "Environment", "Infrastructure", "Finance", "Other",
+]
+
+AssumptionImportance = Literal["Critical", "Important", "Supporting"]
+AssumptionEvidenceSupport = Literal["Strong", "Moderate", "Weak", "None"]
+AssumptionConfidence = Literal["High", "Medium", "Low"]
+AssumptionStatus = Literal["Active", "Validated", "Invalidated"]
+
+
+class DecisionAssumption(BaseModel):
+    """A first-class strategic assumption in the Decision Model (J7.1).
+
+    Represents something that must be true for a recommendation to remain valid.
+    Populated by AssumptionAgent after Challenge and before Recommendation.
+    """
+
+    assumption_id: str
+    statement: str                              # what must be true
+    category: AssumptionCategory = "Other"
+    importance: AssumptionImportance = "Important"
+    evidence_support: AssumptionEvidenceSupport = "Moderate"
+    confidence: AssumptionConfidence = "Medium"
+    rationale: str = ""                         # why this assumption matters
+    evidence_ids: list[str] = Field(default_factory=list)
+    supported_recommendation_ids: list[str] = Field(default_factory=list)
+    status: AssumptionStatus = "Active"
+    conflicts_with: list[str] = Field(default_factory=list)  # other assumption_ids
+
+
 class DecisionModel(BaseModel):
     """Decision Model v2 — canonical object describing the decision (J7.0b).
 
@@ -93,6 +129,9 @@ class DecisionModel(BaseModel):
 
     # --- Quality bar --------------------------------------------------------
     required_confidence: str = "medium"   # "high" | "medium" | "low"
+
+    # --- Strategic Assumptions (J7.1) — populated by AssumptionAgent --------
+    strategic_assumptions: list[DecisionAssumption] = Field(default_factory=list)
 
     # --- Source traceability ------------------------------------------------
     source: str = "auto"    # "problem_framing_agent" | "question_driven" | "auto"
