@@ -400,6 +400,47 @@ class RiskPayload(BaseModel):
     )
 
 
+class OpportunityItem(BaseModel):
+    """A single strategic opportunity (J7.4)."""
+
+    opportunity_id: str = Field(description="Short unique ID e.g. 'OPP-001'")
+    statement: str = Field(description="What additional value becomes possible when the assumption exceeds expectations")
+    category: str = Field(
+        description=(
+            "One of: Technology, Market, Economics, Regulation, Policy, Supply Chain, "
+            "Competition, Customer, Execution, Geopolitics, Environment, Infrastructure, Finance, Other"
+        )
+    )
+    impact: str = Field(description="High | Medium | Low — magnitude of upside if the opportunity is captured")
+    likelihood: str = Field(description="High | Medium | Low — probability of the favourable condition materialising")
+    evidence_support: str = Field(description="Strong | Moderate | Weak | None")
+    confidence: str = Field(description="High | Medium | Low — confidence in this opportunity assessment")
+    rationale: str = Field(description="Why this opportunity matters strategically and what makes it achievable")
+    related_assumption_ids: list[str] = Field(
+        default_factory=list,
+        description="assumption_ids whose upside scenario this opportunity describes",
+    )
+    enabled_recommendation_ids: list[str] = Field(
+        default_factory=list,
+        description="REC-NNN ids of recommendations that would be amplified if this opportunity is captured",
+    )
+    evidence_ids: list[str] = Field(
+        default_factory=list,
+        description="IDs of evidence items that support or inform this opportunity",
+    )
+    exploitation_notes: str = Field(default="", description="High-level actions to capture this opportunity")
+    status: str = Field(default="Active", description="Active | Realized | Expired")
+
+
+class OpportunityPayload(BaseModel):
+    """Structured output for OpportunityAgent (J7.4)."""
+
+    opportunities: list[OpportunityItem] = Field(
+        default_factory=list,
+        description="5-10 strategic opportunities that become available when assumptions exceed expectations",
+    )
+
+
 _SCHEMA_ADAPTERS = {
     "research_plan": TypeAdapter(ResearchPlan),
     "research_planning": TypeAdapter(ResearchPlanningPayload),
@@ -410,6 +451,7 @@ _SCHEMA_ADAPTERS = {
     "recommendation_generation": TypeAdapter(RecommendationPayload),
     "assumption_generation": TypeAdapter(AssumptionPayload),     # J7.1
     "risk_generation": TypeAdapter(RiskPayload),                 # J7.3
+    "opportunity_generation": TypeAdapter(OpportunityPayload),   # J7.4
     # Used for the tool-definition schema sent to Claude (strict EvidenceItem types).
     "evidence_extraction": TypeAdapter(EvidenceExtractionPayload),
     # Used for response validation (lenient — items validated per-item in extract_evidence).
@@ -897,6 +939,51 @@ class MockClaudeClient:
 
         return RiskPayload(risks=risks)
 
+    def generate_opportunities(
+        self,
+        assumptions: list[dict],
+        recommendations: list[dict],
+        risks: list[dict],
+        evidence_items: list[dict],
+        decision_model: dict,
+    ) -> "OpportunityPayload":
+        """Generate strategic opportunities from assumptions (J7.4) — mock version."""
+        ev_ids = [e.get("evidence_id", "") for e in evidence_items if e.get("evidence_id")]
+        question = decision_model.get("strategic_question", decision_model.get("objective", "the decision"))
+
+        opp_templates = [
+            ("Technology matures faster than expected, enabling earlier deployment and first-mover advantage", "Technology", "High", "Medium"),
+            ("Market demand accelerates above projections, creating a larger addressable opportunity", "Market", "High", "Medium"),
+            ("Capital costs decline faster than modelled, improving project economics materially", "Economics", "High", "Low"),
+            ("Regulatory environment becomes more favourable, reducing compliance burden and opening new markets", "Regulation", "Medium", "Medium"),
+            ("Supply chain innovations reduce lead times, enabling faster scale-up than planned", "Supply Chain", "Medium", "Low"),
+        ]
+
+        opportunities = []
+        for i, (stmt, cat, imp, lik) in enumerate(opp_templates):
+            related_a = [assumptions[i]["assumption_id"]] if i < len(assumptions) else []
+            enabled_r: list[str] = []
+            if related_a and i < len(assumptions):
+                enabled_r = list(assumptions[i].get("supported_recommendation_ids", []))
+            sup_ev = ev_ids[i*2 : i*2+2] if len(ev_ids) > i*2 else ev_ids[:1]
+            opportunities.append(OpportunityItem(
+                opportunity_id=f"OPP-{i+1:03d}",
+                statement=stmt,
+                category=cat,
+                impact=imp,
+                likelihood=lik,
+                evidence_support="Moderate",
+                confidence="Medium",
+                rationale=f"Strategic opportunity relevant to: {question[:80]}",
+                related_assumption_ids=related_a,
+                enabled_recommendation_ids=enabled_r,
+                evidence_ids=sup_ev,
+                exploitation_notes="",
+                status="Active",
+            ))
+
+        return OpportunityPayload(opportunities=opportunities)
+
 
 class ClaudeClient:
     """Thin Anthropic SDK wrapper for structured research calls."""
@@ -1074,6 +1161,23 @@ class ClaudeClient:
             max_tokens=8000,
         )
         return RiskPayload.model_validate(payload)
+
+    def generate_opportunities(
+        self,
+        assumptions: list[dict],
+        recommendations: list[dict],
+        risks: list[dict],
+        evidence_items: list[dict],
+        decision_model: dict,
+    ) -> OpportunityPayload:
+        """Identify strategic opportunities from upside assumption scenarios (J7.4)."""
+        payload = self._call_json(
+            operation="generate_opportunities",
+            schema_name="opportunity_generation",
+            prompt=_opportunity_prompt(assumptions, recommendations, risks, evidence_items, decision_model),
+            max_tokens=8000,
+        )
+        return OpportunityPayload.model_validate(payload)
 
     def plan_research_question(
         self,
@@ -1946,6 +2050,98 @@ CRITICAL RULES:
 - Risks are forward-looking threats, not observations or findings
 
 Return structured JSON matching the risk_generation schema.
+"""
+
+
+def _opportunity_prompt(
+    assumptions: list[dict],
+    recommendations: list[dict],
+    risks: list[dict],
+    evidence_items: list[dict],
+    decision_model: dict,
+) -> str:
+    """Build the OpportunityAgent prompt (J7.4)."""
+    question = decision_model.get("strategic_question", decision_model.get("objective", ""))
+
+    a_lines = ""
+    for a in assumptions:
+        a_id = a.get("assumption_id", "?")
+        stmt = a.get("statement", "")[:120]
+        imp = a.get("importance", "")
+        rec_ids = ", ".join(a.get("supported_recommendation_ids", [])) or "none"
+        a_lines += f"\n  {a_id} [{imp}]: {stmt}\n    → enables recommendations: {rec_ids}\n"
+
+    r_lines = ""
+    for r in recommendations:
+        r_id = r.get("recommendation_id", r.get("id", "?"))
+        title = r.get("title", r.get("recommendation", ""))[:100]
+        r_lines += f"\n  {r_id}: {title}\n"
+
+    risk_lines = ""
+    for rk in risks[:8]:
+        rk_id = rk.get("risk_id", "?")
+        stmt = rk.get("statement", "")[:100]
+        a_ids = ", ".join(rk.get("related_assumption_ids", [])) or "none"
+        risk_lines += f"\n  {rk_id}: {stmt}\n    → threatens assumptions: {a_ids}\n"
+
+    ev_lines = ""
+    for e in evidence_items[:20]:
+        eid = e.get("evidence_id", "")
+        claim = e.get("claim", "")[:100]
+        src = e.get("source_document", e.get("source", ""))[:40]
+        ev_lines += f"\n  {eid}: {claim}  [source: {src}]"
+
+    return f"""You are a senior strategy consultant producing a Strategic Opportunity analysis.
+
+STRATEGIC QUESTION: {question}
+
+STRATEGIC ASSUMPTIONS (what must be true for recommendations to hold):
+{a_lines or "  (none provided)"}
+
+RECOMMENDATIONS (what the research recommends):
+{r_lines or "  (none provided)"}
+
+STRATEGIC RISKS (downside scenarios already identified):
+{risk_lines or "  (none provided)"}
+
+EVIDENCE AVAILABLE:
+{ev_lines or "  (none provided)"}
+
+TASK:
+Identify 5–10 strategic opportunities — upside scenarios that become available when one
+or more assumptions prove MORE FAVOURABLE than expected, not merely satisfied.
+
+This is not about positive risks. It is about what additional value, advantage, or
+acceleration becomes possible when an assumption is exceeded.
+
+Example structure:
+  Assumption: Technology X becomes commercially available within 24 months.
+  Risk (downside): Availability slips to 48 months.
+  Opportunity (upside): Availability accelerates to 12 months, enabling first-mover advantage.
+
+For each opportunity:
+1. State precisely what additional value becomes possible (the upside scenario)
+2. Assign the most appropriate category
+3. Rate impact: High (transformative advantage), Medium, Low
+4. Rate likelihood: High, Medium, Low
+5. Rate evidence support: how strongly do evidence items signal this upside is plausible?
+6. Rate confidence: your confidence in this opportunity assessment
+7. Write a rationale: why does this opportunity matter strategically?
+8. List related_assumption_ids from the assumptions above (use exact IDs)
+9. List enabled_recommendation_ids: which recommendations would be amplified or unlocked?
+   (Traverse from the related assumptions to their supported_recommendation_ids)
+10. List evidence_ids from the available evidence that support this opportunity
+11. Optionally provide brief exploitation_notes: how should this opportunity be captured?
+
+OPPORTUNITY QUALITY CRITERIA:
+- Each opportunity must be grounded in a named assumption — no floating opportunities
+- Prefer opportunities affecting: competitive advantage, capital allocation, market timing,
+  infrastructure strategy, policy advantage, ecosystem positioning
+- Avoid generic opportunities ("things could go better") — be specific about the upside mechanism
+- Opportunities should be distinct from each other and from the risks already identified
+- Use exact assumption IDs (e.g. "A-001") and recommendation IDs (e.g. "REC-001")
+
+Return structured JSON matching the opportunity_generation schema.
 """
 
 

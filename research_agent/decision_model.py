@@ -140,6 +140,46 @@ class StrategicRisk(BaseModel):
     status: RiskStatus = "Active"
 
 
+# ---------------------------------------------------------------------------
+# StrategicOpportunity (J7.4)
+# ---------------------------------------------------------------------------
+
+OpportunityCategory = Literal[
+    "Technology", "Market", "Economics", "Regulation", "Policy",
+    "Supply Chain", "Competition", "Customer", "Execution", "Geopolitics",
+    "Environment", "Infrastructure", "Finance", "Other",
+]
+
+OpportunityImpact = Literal["High", "Medium", "Low"]
+OpportunityLikelihood = Literal["High", "Medium", "Low"]
+OpportunityEvidenceSupport = Literal["Strong", "Moderate", "Weak", "None"]
+OpportunityConfidence = Literal["High", "Medium", "Low"]
+OpportunityStatus = Literal["Active", "Realized", "Expired"]
+
+
+class StrategicOpportunity(BaseModel):
+    """A first-class strategic opportunity in the Decision Model (J7.4).
+
+    Describes additional value that could be created when a strategic assumption
+    proves more favourable than expected — the positive counterpart to StrategicRisk.
+    Populated by OpportunityAgent after RiskAgent.
+    """
+
+    opportunity_id: str                                      # e.g. "OPP-001"
+    statement: str                                           # what upside becomes possible
+    category: OpportunityCategory = "Other"
+    impact: OpportunityImpact = "Medium"
+    likelihood: OpportunityLikelihood = "Medium"
+    evidence_support: OpportunityEvidenceSupport = "Moderate"
+    confidence: OpportunityConfidence = "Medium"
+    rationale: str = ""                                      # why this opportunity matters
+    related_assumption_ids: list[str] = Field(default_factory=list)
+    enabled_recommendation_ids: list[str] = Field(default_factory=list)
+    evidence_ids: list[str] = Field(default_factory=list)
+    exploitation_notes: str = ""
+    status: OpportunityStatus = "Active"
+
+
 class DecisionModel(BaseModel):
     """Decision Model v2 — canonical object describing the decision (J7.0b).
 
@@ -175,6 +215,9 @@ class DecisionModel(BaseModel):
 
     # --- Strategic Risks (J7.3) — populated by RiskAgent --------------------
     strategic_risks: list[StrategicRisk] = Field(default_factory=list)
+
+    # --- Strategic Opportunities (J7.4) — populated by OpportunityAgent -----
+    strategic_opportunities: list[StrategicOpportunity] = Field(default_factory=list)
 
     # --- Source traceability ------------------------------------------------
     source: str = "auto"    # "problem_framing_agent" | "question_driven" | "auto"

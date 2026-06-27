@@ -132,6 +132,7 @@ class AgentOrchestrator:
         challenge_factory: Any = None,
         assumption_factory: Any = None,
         risk_factory: Any = None,
+        opportunity_factory: Any = None,
         recommendation_factory: Any = None,
         multi_profile_factory: Any = None,
         scenario_factory: Any = None,
@@ -146,6 +147,7 @@ class AgentOrchestrator:
         self._challenge_factory         = challenge_factory
         self._assumption_factory        = assumption_factory
         self._risk_factory              = risk_factory
+        self._opportunity_factory       = opportunity_factory
         self._recommendation_factory    = recommendation_factory
         self._multi_profile_factory     = multi_profile_factory
         self._scenario_factory          = scenario_factory
@@ -263,6 +265,24 @@ class AgentOrchestrator:
             # ---- RISK (J7.3) ------------------------------------------------
             elif state == WorkflowState.RISK:
                 result = _step(self._risk_factory(), ctx)
+                ctx = result.context
+                state = (
+                    WorkflowState.OPPORTUNITY
+                    if self._opportunity_factory is not None
+                    else (
+                        WorkflowState.MULTI_PROFILE
+                        if self._multi_profile_factory is not None
+                        else (
+                            WorkflowState.SCENARIO
+                            if self._scenario_factory is not None
+                            else WorkflowState.QA
+                        )
+                    )
+                )
+
+            # ---- OPPORTUNITY (J7.4) -----------------------------------------
+            elif state == WorkflowState.OPPORTUNITY:
+                result = _step(self._opportunity_factory(), ctx)
                 ctx = result.context
                 state = (
                     WorkflowState.MULTI_PROFILE
@@ -472,6 +492,7 @@ class Orchestrator:
         from .challenge_agent           import ChallengeAgent
         from .assumption_agent          import AssumptionAgent
         from .risk_agent                import RiskAgent
+        from .opportunity_agent         import OpportunityAgent
         from .recommendation_agent               import RecommendationAgent
         from .scenario_agent                     import ScenarioAgent
         from .recommendation_improvement_agent   import RecommendationImprovementAgent
@@ -510,6 +531,9 @@ class Orchestrator:
 
         def risk_factory() -> RiskAgent:
             return RiskAgent(client=self._client, domain_profiles=loaded_profiles)
+
+        def opportunity_factory() -> OpportunityAgent:
+            return OpportunityAgent(client=self._client, domain_profiles=loaded_profiles)
 
         def recommendation_factory() -> RecommendationAgent:
             return RecommendationAgent(client=self._client, domain_profiles=loaded_profiles)
@@ -624,6 +648,7 @@ class Orchestrator:
             challenge_factory=challenge_factory,
             assumption_factory=assumption_factory,
             risk_factory=risk_factory,
+            opportunity_factory=opportunity_factory,
             recommendation_factory=recommendation_factory,
             multi_profile_factory=multi_profile_factory,
             scenario_factory=scenario_factory,
