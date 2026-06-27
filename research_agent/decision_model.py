@@ -228,6 +228,67 @@ class StrategicOption(BaseModel):
     rationale: str = ""                                    # why this option is (or is not) preferred
 
 
+# ---------------------------------------------------------------------------
+# DecisionAnalysis (J7.6)
+# ---------------------------------------------------------------------------
+
+ScoreRating = Literal["Very High", "High", "Medium", "Low", "Very Low"]
+AnalysisConfidence = Literal["High", "Medium", "Low"]
+
+
+class DecisionMatrixEntry(BaseModel):
+    """Per-option row in the decision matrix (J7.6)."""
+
+    option_id: str
+    strategic_fit: ScoreRating = "Medium"
+    implementation_risk: ScoreRating = "Medium"
+    execution_complexity: ScoreRating = "Medium"
+    capital_requirement: ScoreRating = "Medium"
+    expected_return: ScoreRating = "Medium"
+    time_to_value: ScoreRating = "Medium"
+    dependency_strength: ScoreRating = "Medium"
+    assumption_strength: ScoreRating = "Medium"
+    risk_exposure: ScoreRating = "Medium"
+    opportunity_capture: ScoreRating = "Medium"
+    overall_score: ScoreRating = "Medium"
+    strengths: list[str] = Field(default_factory=list)
+    weaknesses: list[str] = Field(default_factory=list)
+
+    @field_validator(
+        "strategic_fit", "implementation_risk", "execution_complexity",
+        "capital_requirement", "expected_return", "time_to_value",
+        "dependency_strength", "assumption_strength", "risk_exposure",
+        "opportunity_capture", "overall_score",
+        mode="before",
+    )
+    @classmethod
+    def coerce_score(cls, v: object) -> object:
+        _valid = {"Very High", "High", "Medium", "Low", "Very Low"}
+        return v if v in _valid else "Medium"
+
+
+class DecisionAnalysis(BaseModel):
+    """Explicit comparison of Strategic Options using the full J7 reasoning graph (J7.6).
+
+    DecisionAnalysis is an explanation, not a recommendation generator.
+    It answers 'Why is Option B preferred over Option A?' using the existing graph.
+    Populated by DecisionAnalysisAgent after StrategicOptionAgent.
+    """
+
+    analysis_id: str                                         # e.g. "DA-20260627-120000"
+    recommended_option_id: str                               # must match exactly one StrategicOption
+    executive_summary: str                                   # 2-4 sentence plain-English summary
+    comparison_dimensions: list[str] = Field(default_factory=list)   # dimensions used in the matrix
+    option_rankings: list[str] = Field(default_factory=list)          # option_ids ordered best→worst
+    decision_matrix: list[DecisionMatrixEntry] = Field(default_factory=list)
+    key_tradeoffs: list[str] = Field(default_factory=list)            # explicit tradeoff statements
+    key_uncertainties: list[str] = Field(default_factory=list)        # uncertainties that could shift the choice
+    sensitivity_analysis: str = ""                           # which assumption failures would change the winner
+    confidence_summary: str = ""                             # overall confidence and limiting factors
+    rationale: str = ""                                      # full explanation of why the recommended option wins
+    confidence: AnalysisConfidence = "Medium"
+
+
 class DecisionModel(BaseModel):
     """Decision Model v2 — canonical object describing the decision (J7.0b).
 
@@ -269,6 +330,9 @@ class DecisionModel(BaseModel):
 
     # --- Strategic Options (J7.5) — populated by StrategicOptionAgent -------
     strategic_options: list[StrategicOption] = Field(default_factory=list)
+
+    # --- Decision Analysis (J7.6) — populated by DecisionAnalysisAgent ------
+    decision_analysis: DecisionAnalysis | None = None
 
     # --- Source traceability ------------------------------------------------
     source: str = "auto"    # "problem_framing_agent" | "question_driven" | "auto"

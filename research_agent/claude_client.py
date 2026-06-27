@@ -510,6 +510,71 @@ class StrategicOptionPayload(BaseModel):
     )
 
 
+class DecisionMatrixEntryItem(BaseModel):
+    """Per-option row in the decision matrix (J7.6)."""
+
+    option_id: str
+    strategic_fit: str = Field(description="Very High | High | Medium | Low | Very Low")
+    implementation_risk: str = Field(description="Very High | High | Medium | Low | Very Low")
+    execution_complexity: str = Field(description="Very High | High | Medium | Low | Very Low")
+    capital_requirement: str = Field(description="Very High | High | Medium | Low | Very Low")
+    expected_return: str = Field(description="Very High | High | Medium | Low | Very Low")
+    time_to_value: str = Field(description="Very High | High | Medium | Low | Very Low")
+    dependency_strength: str = Field(description="Very High | High | Medium | Low | Very Low")
+    assumption_strength: str = Field(description="Very High | High | Medium | Low | Very Low")
+    risk_exposure: str = Field(description="Very High | High | Medium | Low | Very Low")
+    opportunity_capture: str = Field(description="Very High | High | Medium | Low | Very Low")
+    overall_score: str = Field(description="Very High | High | Medium | Low | Very Low")
+    strengths: list[str] = Field(default_factory=list, description="2-4 key strengths of this option")
+    weaknesses: list[str] = Field(default_factory=list, description="2-4 key weaknesses of this option")
+
+
+class DecisionAnalysisItem(BaseModel):
+    """Structured output for DecisionAnalysisAgent (J7.6)."""
+
+    analysis_id: str = Field(description="Unique ID e.g. 'DA-001'")
+    recommended_option_id: str = Field(description="option_id of the preferred Strategic Option")
+    executive_summary: str = Field(description="2-4 sentence plain-English explanation of why this option wins")
+    comparison_dimensions: list[str] = Field(
+        default_factory=list,
+        description="List of dimension names used in the decision matrix",
+    )
+    option_rankings: list[str] = Field(
+        default_factory=list,
+        description="option_ids ordered from most to least preferred",
+    )
+    decision_matrix: list[DecisionMatrixEntryItem] = Field(
+        default_factory=list,
+        description="One row per Strategic Option rating each across all comparison dimensions",
+    )
+    key_tradeoffs: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Explicit tradeoff statements. Format: 'Higher X → Lower Y'. "
+            "Derive ONLY from the existing graph — do not invent new tradeoffs."
+        ),
+    )
+    key_uncertainties: list[str] = Field(
+        default_factory=list,
+        description="Uncertainties or assumption failures that could shift the preferred option",
+    )
+    sensitivity_analysis: str = Field(
+        description=(
+            "Explain which specific assumption IDs, if they fail, would change the preferred option. "
+            "Reference assumption_ids by name. Do NOT invent new scenarios."
+        ),
+    )
+    confidence_summary: str = Field(description="Overall confidence level and key limiting factors")
+    rationale: str = Field(description="Full justification for why the recommended option wins over each alternative")
+    confidence: str = Field(default="Medium", description="High | Medium | Low")
+
+
+class DecisionAnalysisPayload(BaseModel):
+    """Structured output wrapper for DecisionAnalysisAgent (J7.6)."""
+
+    analysis: DecisionAnalysisItem
+
+
 _SCHEMA_ADAPTERS = {
     "research_plan": TypeAdapter(ResearchPlan),
     "research_planning": TypeAdapter(ResearchPlanningPayload),
@@ -522,6 +587,7 @@ _SCHEMA_ADAPTERS = {
     "risk_generation": TypeAdapter(RiskPayload),                 # J7.3
     "opportunity_generation": TypeAdapter(OpportunityPayload),   # J7.4
     "strategic_option_generation": TypeAdapter(StrategicOptionPayload),  # J7.5
+    "decision_analysis_generation": TypeAdapter(DecisionAnalysisPayload),  # J7.6
     # Used for the tool-definition schema sent to Claude (strict EvidenceItem types).
     "evidence_extraction": TypeAdapter(EvidenceExtractionPayload),
     # Used for response validation (lenient — items validated per-item in extract_evidence).
@@ -1161,6 +1227,112 @@ class MockClaudeClient:
 
         return StrategicOptionPayload(options=options)
 
+    def generate_decision_analysis(
+        self,
+        strategic_options: list[dict],
+        assumptions: list[dict],
+        risks: list[dict],
+        opportunities: list[dict],
+        recommendations: list[dict],
+        decision_model: dict,
+    ) -> "DecisionAnalysisPayload":
+        """Generate decision analysis comparing strategic options (J7.6) — mock version."""
+        question = decision_model.get("strategic_question", decision_model.get("objective", "the decision"))
+
+        # Find the recommended option
+        rec_opt = next((o for o in strategic_options if o.get("recommended")), None)
+        rec_id = rec_opt["option_id"] if rec_opt else (strategic_options[0]["option_id"] if strategic_options else "OPT-A")
+        opt_ids = [o.get("option_id", f"OPT-{i}") for i, o in enumerate(strategic_options)]
+
+        # Build a matrix row per option
+        _score_map = {"OPT-A": "High", "OPT-B": "Very High", "OPT-C": "Medium"}
+
+        def _row(opt: dict) -> DecisionMatrixEntryItem:
+            oid = opt.get("option_id", "OPT-X")
+            score = _score_map.get(oid, "Medium")
+            low = "Low" if oid == "OPT-A" else ("Very High" if oid == "OPT-C" else "Medium")
+            return DecisionMatrixEntryItem(
+                option_id=oid,
+                strategic_fit=score,
+                implementation_risk="High" if oid == "OPT-A" else ("Low" if oid == "OPT-C" else "Medium"),
+                execution_complexity="High" if oid == "OPT-A" else ("Low" if oid == "OPT-C" else "Medium"),
+                capital_requirement="High" if oid == "OPT-A" else ("Low" if oid == "OPT-C" else "Medium"),
+                expected_return="High" if oid == "OPT-A" else ("Low" if oid == "OPT-C" else "High"),
+                time_to_value="High" if oid == "OPT-A" else ("Low" if oid == "OPT-C" else "Medium"),
+                dependency_strength="High",
+                assumption_strength=score,
+                risk_exposure="High" if oid == "OPT-A" else ("Low" if oid == "OPT-C" else "Medium"),
+                opportunity_capture="High" if oid in ("OPT-A", "OPT-B") else "Medium",
+                overall_score=score,
+                strengths=["Speed to market", "Captures full upside"] if oid == "OPT-A" else (
+                    ["Balanced risk-return", "Preserves optionality"] if oid == "OPT-B" else
+                    ["Lowest capital at risk", "Flexible exit options"]
+                ),
+                weaknesses=["High capital at risk", "Limited optionality"] if oid == "OPT-A" else (
+                    ["Slower to full scale", "May cede first-mover advantage"] if oid == "OPT-B" else
+                    ["Diluted upside", "Partner dependency"]
+                ),
+            )
+
+        matrix = [_row(o) for o in strategic_options]
+        rankings = [rec_id] + [oid for oid in opt_ids if oid != rec_id]
+
+        # Build assumption-sensitivity references
+        a_ids = [a.get("assumption_id", "") for a in assumptions if a.get("assumption_id")]
+        sens_ref = f"If {a_ids[0]} fails" if a_ids else "If the primary assumption fails"
+        sens_ref2 = f"If {a_ids[1]} proves optimistic" if len(a_ids) > 1 else "If market timing shifts"
+
+        analysis = DecisionAnalysisItem(
+            analysis_id="DA-001",
+            recommended_option_id=rec_id,
+            executive_summary=(
+                f"The preferred option for '{question[:60]}' balances risk-adjusted returns with "
+                "capital discipline. It outperforms alternatives on strategic fit and opportunity "
+                "capture while managing the key risks identified in the assumption graph. "
+                "This analysis is derived entirely from the existing reasoning graph."
+            ),
+            comparison_dimensions=[
+                "Strategic Fit", "Implementation Risk", "Execution Complexity",
+                "Capital Requirement", "Expected Return", "Time to Value",
+                "Assumption Strength", "Risk Exposure", "Opportunity Capture",
+            ],
+            option_rankings=rankings,
+            decision_matrix=matrix,
+            key_tradeoffs=[
+                "Higher capital commitment → lower execution risk and faster time-to-value",
+                "Longer implementation horizon → greater strategic flexibility and optionality",
+                "Higher assumption robustness → lower sensitivity to market timing",
+                "Ecosystem partnership approach → reduced upside but diversified downside",
+            ],
+            key_uncertainties=[
+                f"{sens_ref} the risk-return balance shifts materially toward the conservative option",
+                f"{sens_ref2} the aggressive option becomes relatively more attractive",
+                "Regulatory environment changes could invalidate cross-option assumptions",
+            ],
+            sensitivity_analysis=(
+                f"{sens_ref}, the recommended option would no longer dominate — the conservative "
+                f"option would become preferred. {sens_ref2}, the aggressive option's time-to-value "
+                "advantage would amplify, making it competitive with the recommended option. "
+                "The recommended option remains preferred under the majority of plausible scenarios."
+            ),
+            confidence_summary=(
+                "Medium confidence. The analysis relies on the assumption set which has moderate "
+                "evidence support. Key limiting factors: capital cost estimates and regulatory "
+                "timeline assumptions carry the most uncertainty."
+            ),
+            rationale=(
+                f"The recommended option ({rec_id}) wins over alternatives because it achieves the "
+                "highest overall score on the decision matrix, particularly on strategic fit and "
+                "opportunity capture, while maintaining manageable risk exposure. Unlike the aggressive "
+                "option, it does not require all assumptions to hold simultaneously. Unlike the "
+                "conservative option, it commits meaningfully rather than hedging across all vectors, "
+                "which would dilute expected returns below the required threshold."
+            ),
+            confidence="Medium",
+        )
+
+        return DecisionAnalysisPayload(analysis=analysis)
+
 
 class ClaudeClient:
     """Thin Anthropic SDK wrapper for structured research calls."""
@@ -1375,6 +1547,26 @@ class ClaudeClient:
             max_tokens=10000,
         )
         return StrategicOptionPayload.model_validate(payload)
+
+    def generate_decision_analysis(
+        self,
+        strategic_options: list[dict],
+        assumptions: list[dict],
+        risks: list[dict],
+        opportunities: list[dict],
+        recommendations: list[dict],
+        decision_model: dict,
+    ) -> DecisionAnalysisPayload:
+        """Generate decision analysis comparing strategic options (J7.6)."""
+        payload = self._call_json(
+            operation="generate_decision_analysis",
+            schema_name="decision_analysis_generation",
+            prompt=_decision_analysis_prompt(
+                strategic_options, assumptions, risks, opportunities, recommendations, decision_model
+            ),
+            max_tokens=10000,
+        )
+        return DecisionAnalysisPayload.model_validate(payload)
 
     def plan_research_question(
         self,
@@ -2899,3 +3091,85 @@ def _string_value(value: Any) -> str:
 
 def validation_error_message(exc: ValidationError) -> str:
     return "; ".join(error["msg"] for error in exc.errors())
+
+
+def _decision_analysis_prompt(
+    strategic_options: list[dict],
+    assumptions: list[dict],
+    risks: list[dict],
+    opportunities: list[dict],
+    recommendations: list[dict],
+    decision_model: dict,
+) -> str:
+    """Build the DecisionAnalysisAgent prompt (J7.6)."""
+    question = decision_model.get("strategic_question", decision_model.get("objective", ""))
+
+    def _fmt(items: list[dict], id_key: str, label_key: str = "statement") -> str:
+        return "\n".join(
+            f"  [{item.get(id_key, '?')}] {item.get(label_key, item.get('title', ''))}"
+            for item in items
+        ) or "  (none)"
+
+    opts_detail = ""
+    for opt in strategic_options:
+        oid = opt.get("option_id", "?")
+        rec = " [RECOMMENDED]" if opt.get("recommended") else ""
+        opts_detail += (
+            f"\n  {oid}{rec}: {opt.get('title', '')}\n"
+            f"    Description: {opt.get('description', '')}\n"
+            f"    Assumptions: {opt.get('supporting_assumption_ids', [])}\n"
+            f"    Risks:       {opt.get('associated_risk_ids', [])}\n"
+            f"    Opps:        {opt.get('associated_opportunity_ids', [])}\n"
+            f"    Complexity:  {opt.get('implementation_complexity', '')}  "
+            f"Capital: {opt.get('capital_intensity', '')}  "
+            f"Horizon: {opt.get('estimated_time_horizon', '')}\n"
+            f"    Rationale:   {opt.get('rationale', '')}\n"
+        )
+
+    return f"""You are a strategic decision analyst. Your task is to produce an explicit, rigorous comparison of the Strategic Options below, explaining WHY one option is preferred over the others.
+
+DECISION QUESTION
+{question}
+
+STRATEGIC OPTIONS
+{opts_detail}
+ASSUMPTIONS
+{_fmt(assumptions, 'assumption_id')}
+
+RISKS
+{_fmt(risks, 'risk_id')}
+
+OPPORTUNITIES
+{_fmt(opportunities, 'opportunity_id')}
+
+RECOMMENDATIONS
+{_fmt(recommendations, 'recommendation_id', 'title')}
+
+TASK
+Produce a DecisionAnalysis object that:
+
+1. RATES each option across all comparison dimensions in the decision matrix.
+   Dimensions: Strategic Fit, Implementation Risk, Execution Complexity, Capital Requirement,
+   Expected Return, Time to Value, Dependency Strength, Assumption Strength, Risk Exposure,
+   Opportunity Capture. Use: Very High | High | Medium | Low | Very Low.
+
+2. RANKS all options from most to least preferred.
+
+3. IDENTIFIES 3-6 explicit tradeoffs of the form "Higher X → Lower Y".
+   Derive ONLY from the existing graph. Do NOT invent new tradeoffs.
+
+4. EXPLAINS sensitivity: which specific assumption_ids, if they fail, would change the preferred option.
+   Reference assumption_ids by name. Do NOT generate new scenarios.
+
+5. JUSTIFIES the preferred option explicitly against each alternative — not just by restating the recommendation.
+   Answer: "Why does {question[:40]} prefer this option over each alternative?"
+
+CONSTRAINTS
+- Do NOT generate new options, evidence, or scenarios.
+- Everything must derive from the existing graph above.
+- Exactly one recommended_option_id (must match an existing option_id).
+- Be specific: name assumption IDs, risk IDs, opportunity IDs where relevant.
+- Tradeoffs should be concrete, not generic.
+
+Return structured JSON matching the decision_analysis_generation schema.
+"""

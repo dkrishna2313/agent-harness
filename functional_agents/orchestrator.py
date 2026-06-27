@@ -139,6 +139,7 @@ class AgentOrchestrator:
         improvement_factory: Any = None,
         synthesis_factory: Any = None,
         strategic_option_factory: Any = None,
+        decision_analysis_factory: Any = None,
         max_iterations: int = 3,
     ) -> None:
         self._problem_framing_factory   = problem_framing_factory
@@ -154,6 +155,7 @@ class AgentOrchestrator:
         self._improvement_factory       = improvement_factory
         self._synthesis_factory         = synthesis_factory
         self._strategic_option_factory  = strategic_option_factory
+        self._decision_analysis_factory = decision_analysis_factory
         self._planner_factory  = planner_factory
         self._evidence_factory = evidence_factory
         self._qa_factory       = qa_factory
@@ -383,6 +385,24 @@ class AgentOrchestrator:
                 result = _step(self._strategic_option_factory(), ctx)
                 ctx = result.context
                 state = (
+                    WorkflowState.DECISION_ANALYSIS
+                    if self._decision_analysis_factory is not None
+                    else (
+                        WorkflowState.MULTI_PROFILE
+                        if self._multi_profile_factory is not None
+                        else (
+                            WorkflowState.SCENARIO
+                            if self._scenario_factory is not None
+                            else WorkflowState.QA
+                        )
+                    )
+                )
+
+            # ---- DECISION ANALYSIS (J7.6) -----------------------------------
+            elif state == WorkflowState.DECISION_ANALYSIS:
+                result = _step(self._decision_analysis_factory(), ctx)
+                ctx = result.context
+                state = (
                     WorkflowState.MULTI_PROFILE
                     if self._multi_profile_factory is not None
                     else (
@@ -504,6 +524,7 @@ class Orchestrator:
         from .multi_profile_agent                import MultiProfileAgent
         from .recommendation_synthesis_agent    import RecommendationSynthesisAgent
         from .strategic_option_agent            import StrategicOptionAgent
+        from .decision_analysis_agent           import DecisionAnalysisAgent
 
         execution_profile = self._profile_names[0] if self._profile_names else ""
         mock_mode = self._client is not None and getattr(self._client, "is_mock", False)
@@ -557,6 +578,9 @@ class Orchestrator:
 
         def strategic_option_factory() -> StrategicOptionAgent:
             return StrategicOptionAgent(client=self._client, domain_profiles=loaded_profiles)
+
+        def decision_analysis_factory() -> DecisionAnalysisAgent:
+            return DecisionAnalysisAgent(client=self._client, domain_profiles=loaded_profiles)
 
         def planner_factory() -> PlannerAgent:
             return PlannerAgent(client=self._client, domain_profiles=loaded_profiles)
@@ -660,6 +684,7 @@ class Orchestrator:
             improvement_factory=improvement_factory,
             synthesis_factory=synthesis_factory,
             strategic_option_factory=strategic_option_factory,
+            decision_analysis_factory=decision_analysis_factory,
             planner_factory=planner_factory,
             evidence_factory=evidence_factory,
             qa_factory=qa_factory,

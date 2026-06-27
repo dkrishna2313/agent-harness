@@ -28,11 +28,12 @@ from functional_agents.recommendation_improvement_agent import RecommendationImp
 from functional_agents.multi_profile_agent import MultiProfileAgent
 from functional_agents.recommendation_synthesis_agent import RecommendationSynthesisAgent
 from functional_agents.strategic_option_agent import StrategicOptionAgent
+from functional_agents.decision_analysis_agent import DecisionAnalysisAgent
 
 _ALL_AGENT_CLASSES = [
     PlannerAgent, EvidenceAgent, QAAgent, ReportAgent,
     ScenarioAgent, RecommendationImprovementAgent, MultiProfileAgent,
-    RecommendationSynthesisAgent, StrategicOptionAgent,
+    RecommendationSynthesisAgent, StrategicOptionAgent, DecisionAnalysisAgent,
 ]
 
 
@@ -211,7 +212,7 @@ def test_validate_all_classes_returns_all_agents():
         "PlannerAgent", "EvidenceAgent",
         "HypothesisAgent", "ChallengeAgent", "AssumptionAgent", "RiskAgent", "OpportunityAgent", "RecommendationAgent",
         "MultiProfileAgent", "ScenarioAgent", "RecommendationImprovementAgent",
-        "RecommendationSynthesisAgent", "StrategicOptionAgent", "QAAgent", "ReportAgent",
+        "RecommendationSynthesisAgent", "StrategicOptionAgent", "DecisionAnalysisAgent", "QAAgent", "ReportAgent",
     }
 
 

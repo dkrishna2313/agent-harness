@@ -35,6 +35,7 @@ class WorkflowState:
     RECOMMENDATION_IMPROVEMENT   = "RECOMMENDATION_IMPROVEMENT"
     RECOMMENDATION_SYNTHESIS     = "RECOMMENDATION_SYNTHESIS"
     STRATEGIC_OPTIONS            = "STRATEGIC_OPTIONS"
+    DECISION_ANALYSIS            = "DECISION_ANALYSIS"    # J7.6
     QA                           = "QA"
     REPORT      = "REPORT"
     COMPLETE    = "COMPLETE"
@@ -123,6 +124,8 @@ class AgentContext:
     qa_notes: list[dict[str, Any]] = field(default_factory=list)
     qa: dict[str, Any] = field(default_factory=dict)
     report: dict[str, Any] = field(default_factory=dict)
+    # J7.6 — decision analysis
+    decision_analysis: dict[str, Any] = field(default_factory=dict)
 
     # Orchestrator state (J5.5)
     workflow_state: str = ""
