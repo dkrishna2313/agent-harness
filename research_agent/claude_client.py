@@ -359,6 +359,47 @@ class AssumptionPayload(BaseModel):
     )
 
 
+class RiskItem(BaseModel):
+    """A single strategic risk (J7.3)."""
+
+    risk_id: str = Field(description="Short unique ID e.g. 'RSK-001'")
+    statement: str = Field(description="What could go wrong / what could cause an assumption to fail")
+    category: str = Field(
+        description=(
+            "One of: Technology, Market, Economics, Regulation, Policy, Supply Chain, "
+            "Competition, Customer, Execution, Geopolitics, Environment, Infrastructure, Finance, Other"
+        )
+    )
+    severity: str = Field(description="High | Medium | Low — impact if the risk materialises")
+    likelihood: str = Field(description="High | Medium | Low — probability of materialising")
+    evidence_support: str = Field(description="Strong | Moderate | Weak | None")
+    confidence: str = Field(description="High | Medium | Low — confidence in this risk assessment")
+    rationale: str = Field(description="Why this risk matters strategically")
+    related_assumption_ids: list[str] = Field(
+        default_factory=list,
+        description="assumption_ids whose validity this risk threatens",
+    )
+    affected_recommendation_ids: list[str] = Field(
+        default_factory=list,
+        description="REC-NNN ids of recommendations that would be affected if this risk materialises",
+    )
+    evidence_ids: list[str] = Field(
+        default_factory=list,
+        description="IDs of evidence items that support or inform this risk",
+    )
+    mitigation_notes: str = Field(default="", description="High-level mitigation actions or hedges")
+    status: str = Field(default="Active", description="Active | Mitigated | Retired")
+
+
+class RiskPayload(BaseModel):
+    """Structured output for RiskAgent (J7.3)."""
+
+    risks: list[RiskItem] = Field(
+        default_factory=list,
+        description="5-10 strategic risks that could cause assumptions to fail",
+    )
+
+
 _SCHEMA_ADAPTERS = {
     "research_plan": TypeAdapter(ResearchPlan),
     "research_planning": TypeAdapter(ResearchPlanningPayload),
@@ -368,6 +409,7 @@ _SCHEMA_ADAPTERS = {
     "challenge_generation": TypeAdapter(ChallengePayload),
     "recommendation_generation": TypeAdapter(RecommendationPayload),
     "assumption_generation": TypeAdapter(AssumptionPayload),     # J7.1
+    "risk_generation": TypeAdapter(RiskPayload),                 # J7.3
     # Used for the tool-definition schema sent to Claude (strict EvidenceItem types).
     "evidence_extraction": TypeAdapter(EvidenceExtractionPayload),
     # Used for response validation (lenient — items validated per-item in extract_evidence).
@@ -809,6 +851,52 @@ class MockClaudeClient:
 
         return AssumptionPayload(assumptions=assumptions, conflict_pairs=conflict_pairs)
 
+    def generate_risks(
+        self,
+        assumptions: list[dict],
+        recommendations: list[dict],
+        evidence_items: list[dict],
+        decision_model: dict,
+    ) -> "RiskPayload":
+        """Generate strategic risks from assumptions (J7.3) — mock version."""
+        ev_ids = [e.get("evidence_id", "") for e in evidence_items if e.get("evidence_id")]
+        question = decision_model.get("strategic_question", decision_model.get("objective", "the decision"))
+
+        risk_templates = [
+            ("Technology maturity proves insufficient, causing deployment delays or failures", "Technology", "High", "Medium"),
+            ("Market demand shifts materially below projections, undermining the economic case", "Market", "High", "Medium"),
+            ("Capital costs escalate beyond estimates, impairing project viability", "Economics", "High", "Low"),
+            ("Regulatory changes impose unforeseen restrictions or obligations", "Regulation", "Medium", "Medium"),
+            ("Supply chain disruptions delay or prevent timely execution", "Supply Chain", "Medium", "Low"),
+        ]
+
+        risks = []
+        for i, (stmt, cat, sev, lik) in enumerate(risk_templates):
+            # Link to the assumption at the same index (if it exists)
+            related_a = [assumptions[i]["assumption_id"]] if i < len(assumptions) else []
+            # Derive affected recommendations from the linked assumption
+            affected_r: list[str] = []
+            if related_a and i < len(assumptions):
+                affected_r = list(assumptions[i].get("supported_recommendation_ids", []))
+            sup_ev = ev_ids[i*2 : i*2+2] if len(ev_ids) > i*2 else ev_ids[:1]
+            risks.append(RiskItem(
+                risk_id=f"RSK-{i+1:03d}",
+                statement=stmt,
+                category=cat,
+                severity=sev,
+                likelihood=lik,
+                evidence_support="Moderate",
+                confidence="Medium",
+                rationale=f"Strategic risk relevant to: {question[:80]}",
+                related_assumption_ids=related_a,
+                affected_recommendation_ids=affected_r,
+                evidence_ids=sup_ev,
+                mitigation_notes="",
+                status="Active",
+            ))
+
+        return RiskPayload(risks=risks)
+
 
 class ClaudeClient:
     """Thin Anthropic SDK wrapper for structured research calls."""
@@ -970,6 +1058,22 @@ class ClaudeClient:
             max_tokens=8000,
         )
         return AssumptionPayload.model_validate(payload)
+
+    def generate_risks(
+        self,
+        assumptions: list[dict],
+        recommendations: list[dict],
+        evidence_items: list[dict],
+        decision_model: dict,
+    ) -> RiskPayload:
+        """Identify strategic risks that could cause assumptions to fail (J7.3)."""
+        payload = self._call_json(
+            operation="generate_risks",
+            schema_name="risk_generation",
+            prompt=_risk_prompt(assumptions, recommendations, evidence_items, decision_model),
+            max_tokens=8000,
+        )
+        return RiskPayload.model_validate(payload)
 
     def plan_research_question(
         self,
@@ -1768,6 +1872,80 @@ CRITICAL RULES:
 - Use the exact evidence_id strings from the list above (e.g. "EV-001")
 
 Return structured JSON matching the assumption_generation schema.
+"""
+
+
+def _risk_prompt(
+    assumptions: list[dict],
+    recommendations: list[dict],
+    evidence_items: list[dict],
+    decision_model: dict,
+) -> str:
+    """Build the RiskAgent prompt (J7.3)."""
+    question = decision_model.get("strategic_question", decision_model.get("objective", ""))
+
+    a_lines = ""
+    for a in assumptions:
+        a_id = a.get("assumption_id", "?")
+        stmt = a.get("statement", "")[:120]
+        imp = a.get("importance", "")
+        rec_ids = ", ".join(a.get("supported_recommendation_ids", [])) or "none"
+        a_lines += f"\n  {a_id} [{imp}]: {stmt}\n    → supports recommendations: {rec_ids}\n"
+
+    r_lines = ""
+    for r in recommendations:
+        r_id = r.get("recommendation_id", r.get("id", "?"))
+        title = r.get("title", r.get("recommendation", ""))[:100]
+        a_ids = ", ".join(r.get("supported_assumption_ids", [])) or "none"
+        r_lines += f"\n  {r_id}: {title}\n    → rests on assumptions: {a_ids}\n"
+
+    ev_lines = ""
+    for e in evidence_items[:20]:
+        eid = e.get("evidence_id", "")
+        claim = e.get("claim", "")[:100]
+        src = e.get("source_document", e.get("source", ""))[:40]
+        ev_lines += f"\n  {eid}: {claim}  [source: {src}]"
+
+    return f"""You are a senior strategy consultant producing a Strategic Risk analysis.
+
+STRATEGIC QUESTION: {question}
+
+STRATEGIC ASSUMPTIONS (what must be true for recommendations to hold):
+{a_lines or "  (none provided)"}
+
+RECOMMENDATIONS (what the research recommends):
+{r_lines or "  (none provided)"}
+
+EVIDENCE AVAILABLE:
+{ev_lines or "  (none provided)"}
+
+TASK:
+Identify 5–10 strategic risks — conditions or events that could cause one or more assumptions
+above to fail, thereby threatening the validity of one or more recommendations.
+
+For each risk:
+1. State precisely what could go wrong (the risk event or condition)
+2. Assign the most appropriate category
+3. Rate severity: High (recommendation collapses), Medium, Low
+4. Rate likelihood: High, Medium, Low
+5. Rate evidence support: how strongly do the available evidence items signal this risk?
+6. Rate confidence: your confidence in this risk assessment
+7. Write a rationale: why does this risk matter strategically?
+8. List related_assumption_ids from the assumptions above (use exact IDs)
+9. List affected_recommendation_ids: which recommendations would be undermined?
+   (Traverse from the related assumptions to their supported_recommendation_ids)
+10. List evidence_ids from the available evidence that inform this risk
+11. Optionally provide brief mitigation_notes
+
+CRITICAL RULES:
+- Each risk must threaten at least one named assumption — no floating risks
+- Derive affected_recommendation_ids by following the assumption→recommendation links
+- Do not duplicate risks — each must be distinct
+- Avoid trivial risks ("team may not cooperate") — focus on strategic conditions
+- Use exact assumption IDs (e.g. "A-001") and recommendation IDs (e.g. "REC-001")
+- Risks are forward-looking threats, not observations or findings
+
+Return structured JSON matching the risk_generation schema.
 """
 
 

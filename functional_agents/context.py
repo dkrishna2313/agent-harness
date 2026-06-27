@@ -27,6 +27,7 @@ class WorkflowState:
     HYPOTHESIS  = "HYPOTHESIS"
     CHALLENGE       = "CHALLENGE"
     ASSUMPTION      = "ASSUMPTION"          # J7.1
+    RISK            = "RISK"               # J7.3
     RECOMMENDATION              = "RECOMMENDATION"
     MULTI_PROFILE                = "MULTI_PROFILE"
     SCENARIO                     = "SCENARIO"
@@ -97,6 +98,7 @@ class AgentContext:
     hypothesis_challenges: list[dict[str, Any]] = field(default_factory=list)
     surviving_hypotheses: list[dict[str, Any]] = field(default_factory=list)
     assumptions: list[dict[str, Any]] = field(default_factory=list)        # J7.1
+    risks: list[dict[str, Any]] = field(default_factory=list)             # J7.3
     recommendations: list[dict[str, Any]] = field(default_factory=list)
     recommendation_portfolio: dict[str, Any] = field(default_factory=dict)
     multi_profile_analysis: dict[str, Any] = field(default_factory=dict)

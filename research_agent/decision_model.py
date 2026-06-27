@@ -100,6 +100,46 @@ class DecisionAssumption(BaseModel):
     conflicts_with: list[str] = Field(default_factory=list)  # other assumption_ids
 
 
+# ---------------------------------------------------------------------------
+# StrategicRisk (J7.3)
+# ---------------------------------------------------------------------------
+
+RiskCategory = Literal[
+    "Technology", "Market", "Economics", "Regulation", "Policy",
+    "Supply Chain", "Competition", "Customer", "Execution", "Geopolitics",
+    "Environment", "Infrastructure", "Finance", "Other",
+]
+
+RiskSeverity = Literal["High", "Medium", "Low"]
+RiskLikelihood = Literal["High", "Medium", "Low"]
+RiskEvidenceSupport = Literal["Strong", "Moderate", "Weak", "None"]
+RiskConfidence = Literal["High", "Medium", "Low"]
+RiskStatus = Literal["Active", "Mitigated", "Retired"]
+
+
+class StrategicRisk(BaseModel):
+    """A first-class strategic risk in the Decision Model (J7.3).
+
+    Describes what could cause a strategic assumption to fail, and which
+    recommendations would be affected as a consequence.
+    Populated by RiskAgent after Recommendation Linkage.
+    """
+
+    risk_id: str                                      # e.g. "RSK-001"
+    statement: str                                    # what could go wrong
+    category: RiskCategory = "Other"
+    severity: RiskSeverity = "Medium"
+    likelihood: RiskLikelihood = "Medium"
+    evidence_support: RiskEvidenceSupport = "Moderate"
+    confidence: RiskConfidence = "Medium"
+    rationale: str = ""                               # why this risk matters
+    related_assumption_ids: list[str] = Field(default_factory=list)
+    affected_recommendation_ids: list[str] = Field(default_factory=list)
+    evidence_ids: list[str] = Field(default_factory=list)
+    mitigation_notes: str = ""
+    status: RiskStatus = "Active"
+
+
 class DecisionModel(BaseModel):
     """Decision Model v2 — canonical object describing the decision (J7.0b).
 
@@ -132,6 +172,9 @@ class DecisionModel(BaseModel):
 
     # --- Strategic Assumptions (J7.1) — populated by AssumptionAgent --------
     strategic_assumptions: list[DecisionAssumption] = Field(default_factory=list)
+
+    # --- Strategic Risks (J7.3) — populated by RiskAgent --------------------
+    strategic_risks: list[StrategicRisk] = Field(default_factory=list)
 
     # --- Source traceability ------------------------------------------------
     source: str = "auto"    # "problem_framing_agent" | "question_driven" | "auto"
