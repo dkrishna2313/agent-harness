@@ -185,3 +185,15 @@ def link_research_object(
     updated = engagement.model_copy(update={"research_object_ids": ids})
     write_engagement(updated, base=base)
     return updated
+
+
+def link_decision_model(
+    engagement: StrategicEngagement,
+    decision_model_id: str,
+    *,
+    base: Path = Path("outputs"),
+) -> StrategicEngagement:
+    """Set the decision_model_id on the engagement and re-persist (J7.0b)."""
+    updated = engagement.model_copy(update={"decision_model_id": decision_model_id})
+    write_engagement(updated, base=base)
+    return updated

@@ -16,6 +16,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from research_agent.decision_model import from_question as _dm_from_question, write_decision_model
 from research_agent.engagement import from_question as _engagement_from_question, write_engagement
 from research_agent.profile import DomainProfile, load_profile
 from research_agent.research_object import create_research_object
@@ -459,14 +460,22 @@ class Orchestrator:
         ro_question = question or goal
 
         # J7.0a – auto-create a minimal Strategic Engagement for every run.
-        # When a bare question/goal is supplied (the common case) this creates a
-        # "general" engagement with no behavioural change.  Future milestones will
-        # accept a pre-built StrategicEngagement in place of the auto-generated one.
         engagement = _engagement_from_question(ro_question)
         try:
             write_engagement(engagement)
         except Exception:
             pass  # persistence failure must never block a research run
+
+        # J7.0b – auto-create a minimal Decision Model for question-driven runs.
+        # Goal-driven runs have ProblemFramingAgent produce the full DM v2 instead.
+        dm_id: str | None = None
+        if not goal:
+            dm = _dm_from_question(ro_question, engagement_id=engagement.engagement_id)
+            try:
+                write_decision_model(dm)
+                dm_id = dm.decision_model_id
+            except Exception:
+                pass
 
         research_object = create_research_object(
             question=ro_question,
@@ -477,6 +486,7 @@ class Orchestrator:
             web_search=self._web_search,
             mock_mode=mock_mode,
             engagement_id=engagement.engagement_id,
+            decision_model_id=dm_id,
         )
 
         # Build and validate context (J5.0b.1 / J5.0b.7 / J6.1)
@@ -488,6 +498,10 @@ class Orchestrator:
             research_object=research_object,
             run_id=uuid.uuid4().hex[:12],
         )
+        # J7.0b – stash engagement_id in trace so ProblemFramingAgent can link
+        # the DM v2 it produces back to the engagement.
+        ctx.trace["_engagement_id"] = engagement.engagement_id
+
         try:
             ctx.validate()
         except ContextValidationError as exc:

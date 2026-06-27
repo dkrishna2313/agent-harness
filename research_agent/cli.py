@@ -18,6 +18,7 @@ from .markdown import memo_to_markdown, write_markdown
 from .profile import DomainProfile, list_available_profiles, load_profile
 from .schemas import ResearchMemo, SourceDocument
 from .trace import MEMO_SECTIONS, build_trace, write_trace
+from .decision_model import from_question as _dm_from_question, write_decision_model
 from .engagement import from_question as _engagement_from_question, write_engagement
 from .research_object import (
     create_research_object,
@@ -156,6 +157,15 @@ def main(
         except Exception:
             pass  # persistence failure must never block a research run
 
+        # J7.0b – auto-create a minimal Decision Model for every question-driven run.
+        dm_id: str | None = None
+        try:
+            dm = _dm_from_question(question, engagement_id=engagement.engagement_id)
+            write_decision_model(dm)
+            dm_id = dm.decision_model_id
+        except Exception:
+            pass
+
         ro = create_research_object(
             question=question,
             profile_name=profile,  # raw --profile string, None if not passed
@@ -165,6 +175,7 @@ def main(
             mock_mode=mock_mode,
             model_name=model,
             engagement_id=engagement.engagement_id,
+            decision_model_id=dm_id,
         )
 
         memo = DcPowerAgent(

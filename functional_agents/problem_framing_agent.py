@@ -1,10 +1,14 @@
-"""ProblemFramingAgent – transforms a business goal into a Decision Model (J6.1).
+"""ProblemFramingAgent – transforms a business goal into a Decision Model (J6.1 / J7.0b).
 
 Runs before PlannerAgent in goal-driven workflows.  Reads context.goal, calls
 Claude to produce a structured Decision Model, and writes it to:
-  - context.decision_model
+  - context.decision_model        (v2 dict — superset of old v1 fields)
   - context.research_object["decision_model"]
+  - context.research_object["decision_model_id"]
   - context.question  (first research question, used by all downstream agents)
+
+J7.0b: also produces and persists a DecisionModel v2 object, links it to the
+engagement stored in context.trace["_engagement_id"] (when available).
 """
 
 from __future__ import annotations
@@ -52,7 +56,15 @@ class ProblemFramingAgent(FunctionalAgent):
         profiles_context = self._build_profiles_context(context)
         decision_model = self._generate_decision_model(context.goal, profiles_context)
 
-        # Store the full decision model
+        # J7.0b – build and persist Decision Model v2
+        engagement_id: str | None = context.trace.get("_engagement_id")
+        dm_v2 = self._build_decision_model_v2(
+            decision_model,
+            goal=context.goal,
+            engagement_id=engagement_id,
+        )
+
+        # Store the full decision model (v2 dict is a superset of v1 fields)
         dm_dict = decision_model.model_dump()
         context.decision_model = dm_dict
 
@@ -60,9 +72,12 @@ class ProblemFramingAgent(FunctionalAgent):
         if context.research_object:
             context.research_object["decision_model"] = dm_dict
             context.research_object["goal"] = context.goal
+            context.research_object["decision_model_id"] = dm_v2.decision_model_id
 
         # Stash in trace so ReportAgent can emit the problem_framing block
         context.trace["_problem_framing"] = dm_dict
+        # J7.0b – surface decision_model_id for downstream linkage
+        context.trace["_decision_model_id"] = dm_v2.decision_model_id
 
         # Populate question from the first research question (enables downstream agents)
         if decision_model.research_questions and not context.question.strip():
@@ -94,12 +109,30 @@ class ProblemFramingAgent(FunctionalAgent):
             critical_uncertainties_count=len(decision_model.critical_uncertainties),
             research_questions_count=len(decision_model.research_questions),
             evidence_requirements_count=len(decision_model.evidence_requirements),
+            decision_model_id=dm_v2.decision_model_id,
         )
         return context
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def _build_decision_model_v2(self, payload: Any, *, goal: str, engagement_id: str | None):
+        """Produce, persist, and optionally engagement-link a DecisionModel v2."""
+        from research_agent.decision_model import from_framing_payload, write_decision_model
+        dm_v2 = from_framing_payload(payload, strategic_question=goal, engagement_id=engagement_id)
+        try:
+            write_decision_model(dm_v2)
+        except Exception:
+            pass  # persistence failure must never block a research run
+        if engagement_id:
+            try:
+                from research_agent.engagement import load_engagement, link_decision_model
+                eng = load_engagement(engagement_id)
+                link_decision_model(eng, dm_v2.decision_model_id)
+            except Exception:
+                pass
+        return dm_v2
 
     def _build_profiles_context(self, context: AgentContext) -> list[dict]:
         """Build a lightweight profile summary list for the framing prompt."""
