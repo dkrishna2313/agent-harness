@@ -130,7 +130,8 @@ def test_agent_skip_leaves_options_empty():
 def test_agent_writes_strategic_options_list():
     result = StrategicOptionAgent().run(_ctx())
     assert isinstance(result.context.strategic_options, list)
-    assert len(result.context.strategic_options) >= 3
+    n = len(result.context.strategic_options)
+    assert 2 <= n <= 5, f"expected 2-5 options, got {n}"
 
 
 def test_agent_writes_preferred_option():
@@ -151,6 +152,83 @@ def test_recommended_option_matches_preferred_option():
     pref_id = result.context.preferred_option.get("option_id")
     recommended = [o for o in result.context.strategic_options if o.get("recommended")]
     assert recommended[0]["option_id"] == pref_id
+
+
+# ---------------------------------------------------------------------------
+# Cardinality constraints (J7.5a)
+# ---------------------------------------------------------------------------
+
+def _run_with_options(items: list[dict]) -> "AgentContext":
+    """Run StrategicOptionAgent with a pre-cooked payload injected via mock."""
+    from unittest.mock import MagicMock
+    from research_agent.claude_client import StrategicOptionItem, StrategicOptionPayload
+
+    parsed = [StrategicOptionItem(**o) for o in items]
+    payload = StrategicOptionPayload(options=parsed)
+
+    mock_client = MagicMock()
+    mock_client.generate_strategic_options.return_value = payload
+
+    agent = StrategicOptionAgent(client=mock_client)
+    return agent.run(_ctx()).context
+
+
+def _option(opt_id: str, recommended: bool = False) -> dict:
+    return {
+        "option_id": opt_id,
+        "title": f"Option {opt_id}",
+        "description": "A strategic option.",
+        "strategic_objective": "Achieve something.",
+        "expected_outcomes": ["Outcome A"],
+        "supporting_assumption_ids": ["A-001"],
+        "associated_risk_ids": ["RSK-001"],
+        "associated_opportunity_ids": ["OPP-001"],
+        "supporting_recommendation_ids": ["REC-001"],
+        "advantages": ["Fast"],
+        "disadvantages": ["Costly"],
+        "implementation_complexity": "Medium",
+        "estimated_time_horizon": "Medium-term",
+        "capital_intensity": "Medium",
+        "confidence": "Medium",
+        "recommended": recommended,
+        "rationale": "This is preferred because...",
+    }
+
+
+def test_two_options_accepted():
+    ctx = _run_with_options([_option("A", recommended=True), _option("B")])
+    assert len(ctx.strategic_options) == 2
+
+
+def test_five_options_accepted():
+    opts = [_option(c, recommended=(c == "A")) for c in ["A", "B", "C", "D", "E"]]
+    ctx = _run_with_options(opts)
+    assert len(ctx.strategic_options) == 5
+
+
+def test_one_option_padded_to_two():
+    ctx = _run_with_options([_option("A", recommended=True)])
+    assert len(ctx.strategic_options) == 2
+
+
+def test_six_options_truncated_to_five():
+    opts = [_option(c, recommended=(c == "A")) for c in ["A", "B", "C", "D", "E", "F"]]
+    ctx = _run_with_options(opts)
+    assert len(ctx.strategic_options) == 5
+
+
+def test_zero_recommended_fixed_to_one():
+    opts = [_option("A"), _option("B"), _option("C")]  # none recommended
+    ctx = _run_with_options(opts)
+    rec = [o for o in ctx.strategic_options if o.get("recommended")]
+    assert len(rec) == 1
+
+
+def test_multiple_recommended_reduced_to_one():
+    opts = [_option("A", recommended=True), _option("B", recommended=True), _option("C")]
+    ctx = _run_with_options(opts)
+    rec = [o for o in ctx.strategic_options if o.get("recommended")]
+    assert len(rec) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -214,7 +292,7 @@ def test_trace_has_option_count():
     result = StrategicOptionAgent().run(_ctx())
     trace = result.context.trace["_strategic_options"]
     assert "option_count" in trace
-    assert trace["option_count"] >= 3
+    assert 2 <= trace["option_count"] <= 5
 
 
 def test_trace_has_recommended_option():

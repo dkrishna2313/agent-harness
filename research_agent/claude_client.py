@@ -506,7 +506,7 @@ class StrategicOptionPayload(BaseModel):
 
     options: list[StrategicOptionItem] = Field(
         default_factory=list,
-        description="Approximately 3 genuinely different strategic options; exactly one has recommended=True",
+        description="Between 2 and 5 genuinely different strategic options; exactly one has recommended=True",
     )
 
 
@@ -2409,8 +2409,17 @@ EVIDENCE (selected):
 {ev_lines or "  (none provided)"}
 
 TASK:
-Generate approximately 3 genuinely different strategic options. Each option is a coherent,
+Generate between 2 and 5 genuinely different strategic options. Each option is a coherent,
 internally consistent course of action — not a list of tasks, but a strategic posture.
+
+Cardinality guidance:
+- Produce the SMALLEST number of options necessary to capture materially different strategic choices.
+- Do not invent weak or artificial options simply to reach a higher count.
+- Do not merge genuinely distinct strategic paths merely to reduce the count.
+- 2 options: appropriate when the evidence supports only two credible directions.
+- 3-4 options: most common when evidence reveals clearly differentiated postures.
+- 5 options: only when five genuinely distinct and well-supported strategies exist.
+- Prefer quality over quantity.
 
 Options must be meaningfully different from each other in:
   - Risk appetite (aggressive vs phased vs conservative)

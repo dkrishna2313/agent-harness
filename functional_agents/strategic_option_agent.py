@@ -82,13 +82,38 @@ class StrategicOptionAgent(FunctionalAgent):
 
         options_as_dicts = [o.model_dump() for o in payload.options]
 
-        # Identify the recommended option
-        recommended = next((o for o in options_as_dicts if o.get("recommended")), None)
-        if recommended is None and options_as_dicts:
-            # Fallback: mark first option if LLM forgot
+        # Cardinality validation (2–5 options required)
+        n = len(options_as_dicts)
+        if n < 2:
+            LOGGER.warning("[StrategicOptionAgent] LLM returned %d option(s) — minimum is 2; duplicating first to satisfy constraint", n)
+            if n == 1:
+                import copy
+                extra = copy.deepcopy(options_as_dicts[0])
+                extra["option_id"] = extra["option_id"] + "-B"
+                extra["recommended"] = False
+                options_as_dicts.append(extra)
+        elif n > 5:
+            LOGGER.warning("[StrategicOptionAgent] LLM returned %d options — truncating to 5", n)
+            # Preserve the recommended option if it falls outside the first 5
+            rec_idx = next((i for i, o in enumerate(options_as_dicts) if o.get("recommended")), None)
+            if rec_idx is not None and rec_idx >= 5:
+                options_as_dicts[4] = options_as_dicts[rec_idx]
+            options_as_dicts = options_as_dicts[:5]
+
+        # Exactly one recommended — enforce single recommended=True
+        rec_options = [o for o in options_as_dicts if o.get("recommended")]
+        if len(rec_options) == 0:
             options_as_dicts[0]["recommended"] = True
-            recommended = options_as_dicts[0]
             LOGGER.warning("[StrategicOptionAgent] no option had recommended=True — defaulting to first option")
+        elif len(rec_options) > 1:
+            # Keep only the first recommended; clear the rest
+            first_rec = rec_options[0]["option_id"]
+            for o in options_as_dicts:
+                if o.get("recommended") and o["option_id"] != first_rec:
+                    o["recommended"] = False
+            LOGGER.warning("[StrategicOptionAgent] %d options had recommended=True — keeping only %s", len(rec_options), first_rec)
+
+        recommended = next((o for o in options_as_dicts if o.get("recommended")), None)
 
         # Store in context
         context.strategic_options = options_as_dicts
