@@ -540,8 +540,9 @@ def _write_recommendation_observability_trace(rec_eval: dict, report_path: "Path
     import json
     from pathlib import Path
 
-    trace_path = Path(report_path).parent / "j66a_recommendation_observability.trace.json"
-    latest_trace_path = Path(report_path).parent / "latest_recommendation_observability.trace.json"
+    _stem = Path(report_path).stem
+    trace_path = Path(report_path).parent / f"{_stem}.recommendation_observability.trace.json"
+    latest_trace_path = Path(report_path).parent / f"{_stem}.recommendation_observability.latest.json"
 
     scored = rec_eval.get("recommendation_scores", [])
     agg = rec_eval.get("aggregate", {})
