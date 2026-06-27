@@ -165,6 +165,9 @@ def create_research_object(
     mock_mode: bool = False,
     model_name: str | None = None,
     question_id: str | None = None,
+    # J7.0a – strategic engagement linkage (nullable, backward-compatible)
+    engagement_id: str | None = None,
+    decision_model_id: str | None = None,
 ) -> dict[str, Any]:
     """Create a new research object at the start of a run.
 
@@ -233,6 +236,9 @@ def create_research_object(
         "review_status": "unreviewed",
         "parent_research_id": None,
         "child_research_ids": [],
+        # J7.0a – strategic engagement linkage (null when engagement layer not used)
+        "engagement_id": engagement_id,
+        "decision_model_id": decision_model_id,
     }
 
 

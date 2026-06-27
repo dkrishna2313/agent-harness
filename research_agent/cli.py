@@ -18,6 +18,7 @@ from .markdown import memo_to_markdown, write_markdown
 from .profile import DomainProfile, list_available_profiles, load_profile
 from .schemas import ResearchMemo, SourceDocument
 from .trace import MEMO_SECTIONS, build_trace, write_trace
+from .engagement import from_question as _engagement_from_question, write_engagement
 from .research_object import (
     create_research_object,
     update_research_object,
@@ -148,6 +149,13 @@ def main(
         # Use the raw `profile` arg (user-supplied name) as the canonical source.
         # domain_profile always falls back to ai_data_centers, so using its .name
         # would silently record the wrong profile for questions run without --profile.
+        # J7.0a – auto-create a minimal engagement for every CLI run.
+        engagement = _engagement_from_question(question)
+        try:
+            write_engagement(engagement)
+        except Exception:
+            pass  # persistence failure must never block a research run
+
         ro = create_research_object(
             question=question,
             profile_name=profile,  # raw --profile string, None if not passed
@@ -156,6 +164,7 @@ def main(
             web_search=web_search,
             mock_mode=mock_mode,
             model_name=model,
+            engagement_id=engagement.engagement_id,
         )
 
         memo = DcPowerAgent(

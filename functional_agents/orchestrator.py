@@ -16,6 +16,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from research_agent.engagement import from_question as _engagement_from_question, write_engagement
 from research_agent.profile import DomainProfile, load_profile
 from research_agent.research_object import create_research_object
 
@@ -456,6 +457,17 @@ class Orchestrator:
         # For goal-driven runs the question is empty until ProblemFramingAgent runs;
         # use a placeholder so create_research_object gets a non-empty string.
         ro_question = question or goal
+
+        # J7.0a – auto-create a minimal Strategic Engagement for every run.
+        # When a bare question/goal is supplied (the common case) this creates a
+        # "general" engagement with no behavioural change.  Future milestones will
+        # accept a pre-built StrategicEngagement in place of the auto-generated one.
+        engagement = _engagement_from_question(ro_question)
+        try:
+            write_engagement(engagement)
+        except Exception:
+            pass  # persistence failure must never block a research run
+
         research_object = create_research_object(
             question=ro_question,
             profile_name=execution_profile or None,
@@ -464,6 +476,7 @@ class Orchestrator:
             sources_dir=self._sources_dir,
             web_search=self._web_search,
             mock_mode=mock_mode,
+            engagement_id=engagement.engagement_id,
         )
 
         # Build and validate context (J5.0b.1 / J5.0b.7 / J6.1)
