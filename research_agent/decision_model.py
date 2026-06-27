@@ -180,6 +180,44 @@ class StrategicOpportunity(BaseModel):
     status: OpportunityStatus = "Active"
 
 
+# ---------------------------------------------------------------------------
+# StrategicOption (J7.5)
+# ---------------------------------------------------------------------------
+
+ImplementationComplexity = Literal["Low", "Medium", "High"]
+TimeHorizon = Literal["Near-term", "Medium-term", "Long-term"]
+CapitalIntensity = Literal["Low", "Medium", "High"]
+OptionConfidence = Literal["High", "Medium", "Low"]
+
+
+class StrategicOption(BaseModel):
+    """A first-class strategic option synthesising the full J7 reasoning graph (J7.5).
+
+    Represents a coherent, actionable course of action derived from assumptions,
+    risks, opportunities, and recommendations. Exactly one option per run has
+    recommended=True — the preferred course of action.
+    Populated by StrategicOptionAgent after OpportunityAgent.
+    """
+
+    option_id: str                                         # e.g. "OPT-A"
+    title: str                                             # short descriptive name
+    description: str                                       # what this option entails
+    strategic_objective: str                               # what it is trying to achieve
+    expected_outcomes: list[str] = Field(default_factory=list)
+    supporting_assumption_ids: list[str] = Field(default_factory=list)
+    associated_risk_ids: list[str] = Field(default_factory=list)
+    associated_opportunity_ids: list[str] = Field(default_factory=list)
+    supporting_recommendation_ids: list[str] = Field(default_factory=list)
+    advantages: list[str] = Field(default_factory=list)
+    disadvantages: list[str] = Field(default_factory=list)
+    implementation_complexity: ImplementationComplexity = "Medium"
+    estimated_time_horizon: TimeHorizon = "Medium-term"
+    capital_intensity: CapitalIntensity = "Medium"
+    confidence: OptionConfidence = "Medium"
+    recommended: bool = False
+    rationale: str = ""                                    # why this option is (or is not) preferred
+
+
 class DecisionModel(BaseModel):
     """Decision Model v2 — canonical object describing the decision (J7.0b).
 
@@ -218,6 +256,9 @@ class DecisionModel(BaseModel):
 
     # --- Strategic Opportunities (J7.4) — populated by OpportunityAgent -----
     strategic_opportunities: list[StrategicOpportunity] = Field(default_factory=list)
+
+    # --- Strategic Options (J7.5) — populated by StrategicOptionAgent -------
+    strategic_options: list[StrategicOption] = Field(default_factory=list)
 
     # --- Source traceability ------------------------------------------------
     source: str = "auto"    # "problem_framing_agent" | "question_driven" | "auto"

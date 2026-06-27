@@ -441,6 +441,75 @@ class OpportunityPayload(BaseModel):
     )
 
 
+class StrategicOptionItem(BaseModel):
+    """A single strategic option synthesising the full J7 graph (J7.5)."""
+
+    option_id: str = Field(description="Short unique ID e.g. 'OPT-A'")
+    title: str = Field(description="Short descriptive name for this option (5-10 words)")
+    description: str = Field(description="What this option entails — 2-4 sentences")
+    strategic_objective: str = Field(description="The primary objective this option is trying to achieve")
+    expected_outcomes: list[str] = Field(
+        default_factory=list,
+        description="2-5 specific outcomes expected from pursuing this option",
+    )
+    supporting_assumption_ids: list[str] = Field(
+        default_factory=list,
+        description="assumption_ids this option depends on (use exact IDs e.g. 'A-001')",
+    )
+    associated_risk_ids: list[str] = Field(
+        default_factory=list,
+        description="RSK-NNN ids of risks this option must manage or mitigate",
+    )
+    associated_opportunity_ids: list[str] = Field(
+        default_factory=list,
+        description="OPP-NNN ids of opportunities this option is positioned to capture",
+    )
+    supporting_recommendation_ids: list[str] = Field(
+        default_factory=list,
+        description="REC-NNN ids of recommendations this option implements",
+    )
+    advantages: list[str] = Field(
+        default_factory=list,
+        description="2-4 key advantages of this option",
+    )
+    disadvantages: list[str] = Field(
+        default_factory=list,
+        description="2-4 key disadvantages or trade-offs of this option",
+    )
+    implementation_complexity: str = Field(
+        default="Medium",
+        description="Low | Medium | High — overall difficulty of implementation",
+    )
+    estimated_time_horizon: str = Field(
+        default="Medium-term",
+        description="Near-term | Medium-term | Long-term",
+    )
+    capital_intensity: str = Field(
+        default="Medium",
+        description="Low | Medium | High — relative capital requirement",
+    )
+    confidence: str = Field(
+        default="Medium",
+        description="High | Medium | Low — confidence that this option will succeed",
+    )
+    recommended: bool = Field(
+        default=False,
+        description="True for exactly ONE option — the preferred course of action",
+    )
+    rationale: str = Field(
+        description="Why this option is (or is not) the preferred choice — compare against alternatives",
+    )
+
+
+class StrategicOptionPayload(BaseModel):
+    """Structured output for StrategicOptionAgent (J7.5)."""
+
+    options: list[StrategicOptionItem] = Field(
+        default_factory=list,
+        description="Approximately 3 genuinely different strategic options; exactly one has recommended=True",
+    )
+
+
 _SCHEMA_ADAPTERS = {
     "research_plan": TypeAdapter(ResearchPlan),
     "research_planning": TypeAdapter(ResearchPlanningPayload),
@@ -452,6 +521,7 @@ _SCHEMA_ADAPTERS = {
     "assumption_generation": TypeAdapter(AssumptionPayload),     # J7.1
     "risk_generation": TypeAdapter(RiskPayload),                 # J7.3
     "opportunity_generation": TypeAdapter(OpportunityPayload),   # J7.4
+    "strategic_option_generation": TypeAdapter(StrategicOptionPayload),  # J7.5
     # Used for the tool-definition schema sent to Claude (strict EvidenceItem types).
     "evidence_extraction": TypeAdapter(EvidenceExtractionPayload),
     # Used for response validation (lenient — items validated per-item in extract_evidence).
@@ -984,6 +1054,113 @@ class MockClaudeClient:
 
         return OpportunityPayload(opportunities=opportunities)
 
+    def generate_strategic_options(
+        self,
+        assumptions: list[dict],
+        risks: list[dict],
+        opportunities: list[dict],
+        recommendations: list[dict],
+        evidence_items: list[dict],
+        decision_model: dict,
+    ) -> "StrategicOptionPayload":
+        """Generate strategic options synthesising the J7 graph (J7.5) — mock version."""
+        question = decision_model.get("strategic_question", decision_model.get("objective", "the decision"))
+
+        # Collect IDs for linkage
+        a_ids = [a.get("assumption_id", "") for a in assumptions if a.get("assumption_id")]
+        r_ids = [r.get("risk_id", "") for r in risks if r.get("risk_id")]
+        o_ids = [o.get("opportunity_id", "") for o in opportunities if o.get("opportunity_id")]
+        rec_ids = [r.get("recommendation_id", r.get("id", "")) for r in recommendations if r.get("recommendation_id") or r.get("id")]
+
+        def _slice(lst, start, n): return lst[start:start+n] if lst else []
+
+        options = [
+            StrategicOptionItem(
+                option_id="OPT-A",
+                title="Aggressive first-mover investment",
+                description=(
+                    f"Commit maximum capital immediately to capture the earliest advantage on: {question[:60]}. "
+                    "Accept higher execution risk in exchange for market leadership."
+                ),
+                strategic_objective="Establish first-mover advantage and market leadership",
+                expected_outcomes=[
+                    "Early capacity secured before competitor entry",
+                    "Premium positioning in the market",
+                    "Accelerated learning curve",
+                ],
+                supporting_assumption_ids=_slice(a_ids, 0, 2),
+                associated_risk_ids=_slice(r_ids, 0, 2),
+                associated_opportunity_ids=_slice(o_ids, 0, 2),
+                supporting_recommendation_ids=_slice(rec_ids, 0, 1),
+                advantages=["Speed to market", "Captures first-mover upside"],
+                disadvantages=["High capital at risk", "Limited optionality"],
+                implementation_complexity="High",
+                estimated_time_horizon="Near-term",
+                capital_intensity="High",
+                confidence="Medium",
+                recommended=False,
+                rationale="High reward but high execution risk; preferred only if market timing is critical.",
+            ),
+            StrategicOptionItem(
+                option_id="OPT-B",
+                title="Phased deployment preserving optionality",
+                description=(
+                    f"Deploy in staged tranches, validating assumptions at each gate before committing further capital. "
+                    "Balances speed with risk management."
+                ),
+                strategic_objective="Optimise risk-adjusted returns through staged commitment",
+                expected_outcomes=[
+                    "Capital deployed only when assumptions validated",
+                    "Ability to course-correct at each gate",
+                    "Sustainable long-term position",
+                ],
+                supporting_assumption_ids=_slice(a_ids, 1, 3),
+                associated_risk_ids=_slice(r_ids, 1, 3),
+                associated_opportunity_ids=_slice(o_ids, 1, 2),
+                supporting_recommendation_ids=_slice(rec_ids, 0, 2),
+                advantages=["Lower downside risk", "Preserves optionality", "Validates assumptions iteratively"],
+                disadvantages=["Slower to full scale", "May cede first-mover advantage"],
+                implementation_complexity="Medium",
+                estimated_time_horizon="Medium-term",
+                capital_intensity="Medium",
+                confidence="High",
+                recommended=True,
+                rationale=(
+                    "Preferred over OPT-A because it manages the key risks identified while still "
+                    "capturing the primary opportunities. Preferred over OPT-C because it commits "
+                    "meaningfully rather than hedging across all vectors."
+                ),
+            ),
+            StrategicOptionItem(
+                option_id="OPT-C",
+                title="Conservative multi-partner ecosystem strategy",
+                description=(
+                    "Build through partnerships and ecosystem relationships rather than direct ownership, "
+                    "minimising upfront capital while establishing strategic positioning."
+                ),
+                strategic_objective="Minimise capital risk while establishing ecosystem optionality",
+                expected_outcomes=[
+                    "Lower capital commitment",
+                    "Diversified risk across partners",
+                    "Ecosystem relationships established",
+                ],
+                supporting_assumption_ids=_slice(a_ids, 2, 2),
+                associated_risk_ids=_slice(r_ids, 2, 2),
+                associated_opportunity_ids=_slice(o_ids, 2, 2),
+                supporting_recommendation_ids=_slice(rec_ids, 1, 2),
+                advantages=["Lowest capital at risk", "Flexible exit options"],
+                disadvantages=["Diluted upside", "Dependency on partner alignment", "Slower decision-making"],
+                implementation_complexity="Low",
+                estimated_time_horizon="Long-term",
+                capital_intensity="Low",
+                confidence="Medium",
+                recommended=False,
+                rationale="Lower risk but also lower return; appropriate only if capital preservation is the primary constraint.",
+            ),
+        ]
+
+        return StrategicOptionPayload(options=options)
+
 
 class ClaudeClient:
     """Thin Anthropic SDK wrapper for structured research calls."""
@@ -1178,6 +1355,26 @@ class ClaudeClient:
             max_tokens=8000,
         )
         return OpportunityPayload.model_validate(payload)
+
+    def generate_strategic_options(
+        self,
+        assumptions: list[dict],
+        risks: list[dict],
+        opportunities: list[dict],
+        recommendations: list[dict],
+        evidence_items: list[dict],
+        decision_model: dict,
+    ) -> StrategicOptionPayload:
+        """Generate strategic options synthesising the J7 reasoning graph (J7.5)."""
+        payload = self._call_json(
+            operation="generate_strategic_options",
+            schema_name="strategic_option_generation",
+            prompt=_strategic_options_prompt(
+                assumptions, risks, opportunities, recommendations, evidence_items, decision_model
+            ),
+            max_tokens=10000,
+        )
+        return StrategicOptionPayload.model_validate(payload)
 
     def plan_research_question(
         self,
@@ -2142,6 +2339,117 @@ OPPORTUNITY QUALITY CRITERIA:
 - Use exact assumption IDs (e.g. "A-001") and recommendation IDs (e.g. "REC-001")
 
 Return structured JSON matching the opportunity_generation schema.
+"""
+
+
+def _strategic_options_prompt(
+    assumptions: list[dict],
+    risks: list[dict],
+    opportunities: list[dict],
+    recommendations: list[dict],
+    evidence_items: list[dict],
+    decision_model: dict,
+) -> str:
+    """Build the StrategicOptionAgent prompt (J7.5)."""
+    question = decision_model.get("strategic_question", decision_model.get("objective", ""))
+
+    a_lines = ""
+    for a in assumptions:
+        a_id = a.get("assumption_id", "?")
+        stmt = a.get("statement", "")[:100]
+        imp = a.get("importance", "")
+        a_lines += f"\n  {a_id} [{imp}]: {stmt}"
+
+    risk_lines = ""
+    for r in risks:
+        r_id = r.get("risk_id", "?")
+        stmt = r.get("statement", "")[:100]
+        sev = r.get("severity", "")
+        a_ids = ", ".join(r.get("related_assumption_ids", [])) or "none"
+        risk_lines += f"\n  {r_id} [{sev}]: {stmt}  (threatens: {a_ids})"
+
+    opp_lines = ""
+    for o in opportunities:
+        o_id = o.get("opportunity_id", "?")
+        stmt = o.get("statement", "")[:100]
+        imp = o.get("impact", "")
+        a_ids = ", ".join(o.get("related_assumption_ids", [])) or "none"
+        opp_lines += f"\n  {o_id} [{imp}]: {stmt}  (via: {a_ids})"
+
+    rec_lines = ""
+    for r in recommendations:
+        r_id = r.get("recommendation_id", r.get("id", "?"))
+        title = r.get("title", r.get("recommendation", ""))[:100]
+        a_ids = ", ".join(r.get("supported_assumption_ids", [])) or "none"
+        rec_lines += f"\n  {r_id}: {title}  (assumptions: {a_ids})"
+
+    ev_lines = ""
+    for e in evidence_items[:15]:
+        eid = e.get("evidence_id", "")
+        claim = e.get("claim", "")[:80]
+        ev_lines += f"\n  {eid}: {claim}"
+
+    return f"""You are a senior strategy consultant producing a Strategic Options analysis.
+
+STRATEGIC QUESTION: {question}
+
+STRATEGIC ASSUMPTIONS (what must be true):
+{a_lines or "  (none provided)"}
+
+STRATEGIC RISKS (downside scenarios):
+{risk_lines or "  (none provided)"}
+
+STRATEGIC OPPORTUNITIES (upside scenarios):
+{opp_lines or "  (none provided)"}
+
+RECOMMENDATIONS (research-derived actions):
+{rec_lines or "  (none provided)"}
+
+EVIDENCE (selected):
+{ev_lines or "  (none provided)"}
+
+TASK:
+Generate approximately 3 genuinely different strategic options. Each option is a coherent,
+internally consistent course of action — not a list of tasks, but a strategic posture.
+
+Options must be meaningfully different from each other in:
+  - Risk appetite (aggressive vs phased vs conservative)
+  - Capital commitment (high vs medium vs low intensity)
+  - Time horizon (near vs medium vs long-term)
+  - Which opportunities they pursue
+  - Which risks they accept vs mitigate
+
+For each option:
+1. Give it a short descriptive title (5-10 words)
+2. Describe what it entails (2-4 sentences)
+3. State the strategic objective it pursues
+4. List 2-5 expected outcomes
+5. List supporting_assumption_ids it depends on (exact IDs e.g. "A-001")
+6. List associated_risk_ids it must manage (exact IDs e.g. "RSK-001")
+7. List associated_opportunity_ids it is positioned to capture (exact IDs e.g. "OPP-001")
+8. List supporting_recommendation_ids it implements (exact IDs e.g. "REC-001")
+9. List 2-4 advantages
+10. List 2-4 disadvantages
+11. Rate implementation_complexity: Low | Medium | High
+12. Rate estimated_time_horizon: Near-term | Medium-term | Long-term
+13. Rate capital_intensity: Low | Medium | High
+14. Rate confidence: High | Medium | Low
+15. Set recommended: true for EXACTLY ONE option — the preferred course of action
+16. Write a rationale comparing this option against the others — especially for the recommended option
+
+SELECTION RULES:
+- Exactly one option must have recommended=True
+- The recommended option should provide the best risk-adjusted outcome given the evidence
+- The rationale for the recommended option must explicitly compare it against the alternatives
+- Non-recommended options must still be complete and analytically sound
+
+OPTION QUALITY RULES:
+- Options must be derived from the evidence, assumptions, risks, and opportunities above
+- Do not invent options that have no grounding in the strategic context
+- Use exact IDs when referencing assumptions, risks, opportunities, and recommendations
+- Options should represent genuinely different strategic postures, not minor variations
+
+Return structured JSON matching the strategic_option_generation schema.
 """
 
 

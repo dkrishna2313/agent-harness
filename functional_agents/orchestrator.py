@@ -285,12 +285,16 @@ class AgentOrchestrator:
                 result = _step(self._opportunity_factory(), ctx)
                 ctx = result.context
                 state = (
-                    WorkflowState.MULTI_PROFILE
-                    if self._multi_profile_factory is not None
+                    WorkflowState.STRATEGIC_OPTIONS
+                    if self._strategic_option_factory is not None
                     else (
-                        WorkflowState.SCENARIO
-                        if self._scenario_factory is not None
-                        else WorkflowState.QA
+                        WorkflowState.MULTI_PROFILE
+                        if self._multi_profile_factory is not None
+                        else (
+                            WorkflowState.SCENARIO
+                            if self._scenario_factory is not None
+                            else WorkflowState.QA
+                        )
                     )
                 )
 
@@ -355,8 +359,6 @@ class AgentOrchestrator:
                         state = WorkflowState.RECOMMENDATION_IMPROVEMENT
                     elif self._synthesis_factory is not None:
                         state = WorkflowState.RECOMMENDATION_SYNTHESIS
-                    elif self._strategic_option_factory is not None:
-                        state = WorkflowState.STRATEGIC_OPTIONS
                     else:
                         state = WorkflowState.REPORT
 
@@ -364,28 +366,31 @@ class AgentOrchestrator:
             elif state == WorkflowState.RECOMMENDATION_IMPROVEMENT:
                 result = _step(self._improvement_factory(), ctx)
                 ctx = result.context
-                if self._synthesis_factory is not None:
-                    state = WorkflowState.RECOMMENDATION_SYNTHESIS
-                elif self._strategic_option_factory is not None:
-                    state = WorkflowState.STRATEGIC_OPTIONS
-                else:
-                    state = WorkflowState.REPORT
+                state = (
+                    WorkflowState.RECOMMENDATION_SYNTHESIS
+                    if self._synthesis_factory is not None
+                    else WorkflowState.REPORT
+                )
 
             # ---- RECOMMENDATION SYNTHESIS (J6.8c) ---------------------------
             elif state == WorkflowState.RECOMMENDATION_SYNTHESIS:
                 result = _step(self._synthesis_factory(), ctx)
                 ctx = result.context
-                state = (
-                    WorkflowState.STRATEGIC_OPTIONS
-                    if self._strategic_option_factory is not None
-                    else WorkflowState.REPORT
-                )
+                state = WorkflowState.REPORT
 
-            # ---- STRATEGIC OPTIONS (J7.1) -----------------------------------
+            # ---- STRATEGIC OPTIONS (J7.5) -----------------------------------
             elif state == WorkflowState.STRATEGIC_OPTIONS:
                 result = _step(self._strategic_option_factory(), ctx)
                 ctx = result.context
-                state = WorkflowState.REPORT
+                state = (
+                    WorkflowState.MULTI_PROFILE
+                    if self._multi_profile_factory is not None
+                    else (
+                        WorkflowState.SCENARIO
+                        if self._scenario_factory is not None
+                        else WorkflowState.QA
+                    )
+                )
 
             # ---- REPORT -----------------------------------------------------
             elif state == WorkflowState.REPORT:
@@ -551,7 +556,7 @@ class Orchestrator:
             return RecommendationSynthesisAgent()
 
         def strategic_option_factory() -> StrategicOptionAgent:
-            return StrategicOptionAgent()
+            return StrategicOptionAgent(client=self._client, domain_profiles=loaded_profiles)
 
         def planner_factory() -> PlannerAgent:
             return PlannerAgent(client=self._client, domain_profiles=loaded_profiles)
