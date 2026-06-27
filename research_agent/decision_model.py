@@ -32,7 +32,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ---------------------------------------------------------------------------
@@ -178,6 +178,16 @@ class StrategicOpportunity(BaseModel):
     evidence_ids: list[str] = Field(default_factory=list)
     exploitation_notes: str = ""
     status: OpportunityStatus = "Active"
+
+    @field_validator("category", mode="before")
+    @classmethod
+    def coerce_category(cls, v: object) -> object:
+        _valid: set[str] = {
+            "Technology", "Market", "Economics", "Regulation", "Policy",
+            "Supply Chain", "Competition", "Customer", "Execution", "Geopolitics",
+            "Environment", "Infrastructure", "Finance", "Other",
+        }
+        return v if v in _valid else "Other"
 
 
 # ---------------------------------------------------------------------------

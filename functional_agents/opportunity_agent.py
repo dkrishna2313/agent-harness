@@ -118,6 +118,24 @@ class OpportunityAgent(FunctionalAgent):
         context.trace["_strategic_opportunities"]["dm_persisted"] = dm_persisted
         context.trace["_strategic_opportunities"]["ro_persisted"] = ro_persisted
 
+        # Opportunity persistence observability (J7.5c)
+        persisted_opp_ids = _load_persisted_opportunity_ids(dm_id) if dm_persisted else set()
+        context_opp_ids = {o["opportunity_id"] for o in opps_as_dicts}
+        orphan_ids = sorted(context_opp_ids - persisted_opp_ids)
+        linkage_verified = len(orphan_ids) == 0
+        if orphan_ids:
+            LOGGER.warning(
+                "[OpportunityAgent] %d orphan opportunity ID(s) not persisted to DM: %s",
+                len(orphan_ids), orphan_ids,
+            )
+        context.trace["_opportunity_persistence"] = {
+            "opportunity_count": len(opps_as_dicts),
+            "dm_persisted": dm_persisted,
+            "ro_persisted": ro_persisted,
+            "orphan_ids": orphan_ids,
+            "linkage_verified": linkage_verified,
+        }
+
         LOGGER.log(
             PROGRESS,
             "[OpportunityAgent] %d opportunities generated; a_links=%d r_links=%d dm=%s ro=%s",
@@ -193,8 +211,23 @@ def _persist_opportunities_to_dm(decision_model_id: str, opportunities: list[dic
         write_decision_model(updated, write_latest=True)
         return True
     except Exception as exc:
-        LOGGER.warning("[OpportunityAgent] could not persist opportunities to DM %s: %s", decision_model_id, exc)
+        LOGGER.warning(
+            "[OpportunityAgent] could not persist opportunities to DM %s: %s — %s",
+            decision_model_id, type(exc).__name__, exc,
+        )
         return False
+
+
+def _load_persisted_opportunity_ids(decision_model_id: str | None) -> set[str]:
+    """Return the set of opportunity_ids stored in the persisted DM (empty on any error)."""
+    if not decision_model_id:
+        return set()
+    try:
+        from research_agent.decision_model import load_decision_model
+        dm = load_decision_model(decision_model_id)
+        return {o.opportunity_id for o in dm.strategic_opportunities}
+    except Exception:
+        return set()
 
 
 def _persist_opportunities_to_ro(research_object: dict | None, opportunities: list[dict]) -> bool:
