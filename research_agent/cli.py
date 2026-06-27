@@ -159,10 +159,12 @@ def main(
 
         # J7.0b – auto-create a minimal Decision Model for every question-driven run.
         # J7.0b1 – also back-link the engagement so decision_model_id is non-null.
+        # J7.1a – write_latest=False: simple CLI DMs must not overwrite latest_decision_model.json
+        #         which may already contain assumptions from a prior functional-pipeline run.
         dm_id: str | None = None
         try:
             dm = _dm_from_question(question, engagement_id=engagement.engagement_id)
-            write_decision_model(dm)
+            write_decision_model(dm, write_latest=False)
             dm_id = dm.decision_model_id
             _link_dm(engagement, dm_id)  # re-persists engagement with decision_model_id set
         except Exception:

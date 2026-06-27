@@ -489,11 +489,14 @@ class Orchestrator:
         # J7.0b – auto-create a minimal Decision Model for question-driven runs.
         # Goal-driven runs have ProblemFramingAgent produce the full DM v2 instead.
         # J7.0b1 – also back-link the engagement so decision_model_id is non-null.
+        # J7.1a – question-driven auto-DMs use write_latest=False so they don't
+        # overwrite a richer assumption-populated DM from a prior functional run.
+        # The functional pipeline's AssumptionAgent re-writes with write_latest=True.
         dm_id: str | None = None
         if not goal:
             dm = _dm_from_question(ro_question, engagement_id=engagement.engagement_id)
             try:
-                write_decision_model(dm)
+                write_decision_model(dm, write_latest=False)
                 dm_id = dm.decision_model_id
                 engagement = _link_dm(engagement, dm_id)  # persists updated engagement
             except Exception:

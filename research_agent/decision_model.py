@@ -246,16 +246,24 @@ _LATEST_PATH = Path("outputs/latest_decision_model.json")
 def write_decision_model(
     dm: DecisionModel,
     base: Path = Path("outputs"),
+    *,
+    write_latest: bool = True,
 ) -> Path:
-    """Persist the decision model to disk and update latest_decision_model.json."""
+    """Persist the decision model to disk.
+
+    write_latest=True (default): also updates latest_decision_model.json.
+    Pass write_latest=False for minimal auto-created DMs (simple CLI /
+    benchmark path) so they do not overwrite a richer functional-pipeline DM.
+    """
     dm_dir = base / "decision_models"
     dm_dir.mkdir(parents=True, exist_ok=True)
     path = dm_dir / f"{dm.decision_model_id}.json"
     data = dm.to_dict()
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
-    latest = base / "latest_decision_model.json"
-    latest.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    if write_latest:
+        latest = base / "latest_decision_model.json"
+        latest.write_text(json.dumps(data, indent=2), encoding="utf-8")
     return path
 
 

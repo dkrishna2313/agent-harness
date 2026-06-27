@@ -91,14 +91,26 @@ class AssumptionAgent(FunctionalAgent):
             if context.research_object
             else None
         )
+        dm_persisted = False
         if dm_id:
-            _persist_assumptions_to_dm(dm_id, assumptions_as_dicts)
+            LOGGER.log(PROGRESS, "[AssumptionAgent] persisting %d assumptions → DM %s", len(assumptions_as_dicts), dm_id)
+            dm_persisted = _persist_assumptions_to_dm(dm_id, assumptions_as_dicts)
+            if dm_persisted:
+                LOGGER.log(PROGRESS, "[AssumptionAgent] Decision Model written with %d assumptions", len(assumptions_as_dicts))
+            else:
+                LOGGER.warning("[AssumptionAgent] DM persistence failed — assumptions stored in context only")
+        else:
+            LOGGER.warning("[AssumptionAgent] no decision_model_id on RO — skipping DM persistence")
+
+        context.trace["_assumptions"]["dm_persisted"] = dm_persisted
+        context.trace["_assumptions"]["dm_id"] = dm_id
 
         LOGGER.log(
             PROGRESS,
-            "[AssumptionAgent] %d assumptions generated; %d conflict pairs detected",
+            "[AssumptionAgent] %d assumptions generated; %d conflict pairs; dm_persisted=%s",
             len(assumptions_as_dicts),
             len(payload.conflict_pairs),
+            dm_persisted,
         )
 
         self._record(
@@ -106,11 +118,14 @@ class AssumptionAgent(FunctionalAgent):
             status="success",
             summary=(
                 f"{len(assumptions_as_dicts)} strategic assumptions generated; "
-                f"{len(payload.conflict_pairs)} conflict pair(s) detected."
+                f"{len(payload.conflict_pairs)} conflict pair(s) detected; "
+                f"DM persisted={dm_persisted}."
             ),
             assumption_count=len(assumptions_as_dicts),
             conflict_pairs=len(payload.conflict_pairs),
             critical_count=sum(1 for a in assumptions_as_dicts if a.get("importance") == "Critical"),
+            dm_persisted=dm_persisted,
+            dm_id=dm_id,
         )
         return context
 
@@ -170,8 +185,13 @@ def _resolve_conflicts(
 # Decision Model persistence
 # ---------------------------------------------------------------------------
 
-def _persist_assumptions_to_dm(decision_model_id: str, assumptions: list[dict]) -> None:
-    """Load the persisted DecisionModel, inject assumptions, and re-write it."""
+def _persist_assumptions_to_dm(decision_model_id: str, assumptions: list[dict]) -> bool:
+    """Load the persisted DecisionModel, inject assumptions, re-write it.
+
+    Returns True on success, False on any error (so callers can log/trace).
+    Always uses write_latest=True so the functional pipeline's enriched DM
+    becomes the canonical latest_decision_model.json.
+    """
     try:
         from research_agent.decision_model import (
             DecisionAssumption, load_decision_model, write_decision_model,
@@ -179,9 +199,11 @@ def _persist_assumptions_to_dm(decision_model_id: str, assumptions: list[dict]) 
         dm = load_decision_model(decision_model_id)
         parsed = [DecisionAssumption.model_validate(a) for a in assumptions]
         updated = dm.model_copy(update={"strategic_assumptions": parsed})
-        write_decision_model(updated)
+        write_decision_model(updated, write_latest=True)  # owns latest_decision_model.json
+        return True
     except Exception as exc:
-        LOGGER.warning("[AssumptionAgent] could not persist assumptions to DM: %s", exc)
+        LOGGER.warning("[AssumptionAgent] could not persist assumptions to DM %s: %s", decision_model_id, exc)
+        return False
 
 
 # ---------------------------------------------------------------------------
