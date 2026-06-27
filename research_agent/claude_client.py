@@ -351,7 +351,7 @@ class AssumptionPayload(BaseModel):
 
     assumptions: list[AssumptionItem] = Field(
         default_factory=list,
-        description="5-10 strategic assumptions that must hold for the recommendations to be valid",
+        description="3-7 highest-leverage strategic assumptions that must hold for the recommendations to be valid",
     )
     conflict_pairs: list[list[str]] = Field(
         default_factory=list,
@@ -2147,17 +2147,31 @@ EVIDENCE AVAILABLE:
 {ev_lines or "  (none provided)"}
 
 TASK:
-Identify 5–10 strategic assumptions that MUST hold for the research findings and emerging
-recommendations to remain valid. These are NOT observations or findings — they are
-conditions that are currently assumed to be true but could prove false.
+Identify the 3–7 HIGHEST-LEVERAGE strategic assumptions that must hold for the research
+findings and emerging recommendations to remain valid.
 
-For each assumption:
+The objective is NOT completeness. The objective is strategic leverage.
+
+SELECTION CRITERIA — include an assumption only if it passes at least one of:
+- Would this assumption be debated by an executive leadership team?
+- Would the board ask whether this assumption is valid before approving the strategy?
+- If this assumption proved false, would the strategic recommendation materially change?
+- Does this assumption affect capital allocation, strategic direction, timing, risk profile,
+  or expected outcome?
+
+PRIORITISATION — rank candidates and keep only the top 3–7:
+- Prefer assumptions that change WHAT is decided, not HOW it is implemented
+- Prefer independent assumptions — avoid assumptions that are consequences of another
+- Prefer assumptions that are genuinely uncertain, not virtually certain
+- Avoid implementation details, operational assumptions, and administrative prerequisites
+
+For each retained assumption:
 1. State precisely what must be true
 2. Assign the most appropriate category
 3. Rate importance: Critical (recommendation fails if false) | Important | Supporting
 4. Rate evidence support: how well do the evidence items back this assumption?
 5. Rate confidence: your confidence that this assumption currently holds
-6. Write a rationale: why does this assumption matter strategically?
+6. Write a rationale: why is this assumption load-bearing for the strategy?
 7. List evidence_ids from the available evidence that support this assumption (use exact IDs)
 8. Identify any conflicts with other assumptions in your list
 
@@ -2165,10 +2179,11 @@ CONFLICT DETECTION:
 If two assumptions are mutually contradictory or in tension, flag them in conflict_pairs.
 Also set conflicts_with on each assumption involved.
 
-CRITICAL RULES:
-- Avoid trivial or obvious assumptions ("data exists", "team will work hard")
-- Avoid duplicates — each assumption must be distinct
-- Focus on strategic conditions, not operational details
+QUALITY RULES:
+- Produce the smallest set that captures all materially different strategic risks
+- Do not pad the list to reach a higher count
+- Do not merge distinct load-bearing assumptions to reduce the count
+- Avoid duplicates — each assumption must be independently falsifiable
 - Assumptions should be falsifiable — a reasonable analyst could challenge them
 - Use the exact evidence_id strings from the list above (e.g. "EV-001")
 

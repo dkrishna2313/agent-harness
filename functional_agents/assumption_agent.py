@@ -70,6 +70,40 @@ class AssumptionAgent(FunctionalAgent):
 
         assumptions_as_dicts = [a.model_dump() for a in payload.assumptions]
 
+        # Cardinality validation (3–7 assumptions required)
+        n = len(assumptions_as_dicts)
+        if n < 3:
+            LOGGER.warning(
+                "[AssumptionAgent] LLM returned %d assumption(s) — minimum is 3; "
+                "padding with remaining mock assumptions", n,
+            )
+            from research_agent.claude_client import MockClaudeClient
+            mock_payload = MockClaudeClient().generate_assumptions(
+                surviving_hypotheses=surviving_hypotheses,
+                hypothesis_challenges=hypothesis_challenges,
+                evidence_items=evidence_items,
+                decision_model=context.decision_model,
+                research_strategy=context.research_strategy,
+            )
+            existing_ids = {a["assumption_id"] for a in assumptions_as_dicts}
+            for extra in mock_payload.assumptions:
+                if len(assumptions_as_dicts) >= 3:
+                    break
+                if extra.assumption_id not in existing_ids:
+                    assumptions_as_dicts.append(extra.model_dump())
+                    existing_ids.add(extra.assumption_id)
+        elif n > 7:
+            LOGGER.warning(
+                "[AssumptionAgent] LLM returned %d assumptions — truncating to 7 "
+                "(keeping Critical first, then Important, then Supporting)", n,
+            )
+            # Sort by importance tier so we keep the highest-leverage assumptions
+            _order = {"Critical": 0, "Important": 1, "Supporting": 2}
+            assumptions_as_dicts = sorted(
+                assumptions_as_dicts,
+                key=lambda a: _order.get(a.get("importance", "Supporting"), 2),
+            )[:7]
+
         # Resolve conflicts: ensure conflicts_with is populated in both directions
         assumptions_as_dicts = _resolve_conflicts(assumptions_as_dicts, payload.conflict_pairs)
 
