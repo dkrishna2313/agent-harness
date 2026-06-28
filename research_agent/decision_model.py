@@ -289,6 +289,40 @@ class DecisionAnalysis(BaseModel):
     confidence: AnalysisConfidence = "Medium"
 
 
+# ---------------------------------------------------------------------------
+# ExecutiveConfidence (J7.7)
+# ---------------------------------------------------------------------------
+
+OverallConfidence = Literal["High", "Medium", "Low"]
+DecisionReadiness = Literal["Ready for Decision", "Needs Additional Validation", "Not Ready"]
+BoardRecommendation = Literal[
+    "Proceed", "Proceed with Conditions", "Delay Pending Evidence", "Reject"
+]
+
+
+class ExecutiveConfidence(BaseModel):
+    """Synthesis over the completed Decision Graph — answers 'Should we act now?' (J7.7).
+
+    Not a recommendation generator. Evaluates the existing graph to produce an
+    executive-level approval signal and due-diligence checklist.
+    Populated by ExecutiveConfidenceAgent after DecisionAnalysisAgent.
+    """
+
+    confidence_id: str                                      # e.g. "EC-20260628-120000"
+    overall_confidence: OverallConfidence = "Medium"
+    decision_readiness: DecisionReadiness = "Needs Additional Validation"
+    board_recommendation: BoardRecommendation = "Proceed with Conditions"
+    confidence_rationale: str = ""                          # 2-4 sentence plain-English rationale
+    confidence_drivers: list[str] = Field(default_factory=list)      # factors that raise confidence
+    confidence_limiters: list[str] = Field(default_factory=list)     # factors that lower confidence
+    critical_unknowns: list[str] = Field(default_factory=list)       # unknowns that must resolve first
+    validation_priorities: list[str] = Field(default_factory=list)   # due diligence checklist
+    confidence_if_assumptions_hold: str = ""  # confidence level if all Critical assumptions hold
+    confidence_if_assumptions_fail: str = ""  # confidence level if key Critical assumptions fail
+    decision_horizon: str = ""                # when a decision must be made (e.g. "Q3 2026")
+    last_updated: str = ""
+
+
 class DecisionModel(BaseModel):
     """Decision Model v2 — canonical object describing the decision (J7.0b).
 
@@ -333,6 +367,9 @@ class DecisionModel(BaseModel):
 
     # --- Decision Analysis (J7.6) — populated by DecisionAnalysisAgent ------
     decision_analysis: DecisionAnalysis | None = None
+
+    # --- Executive Confidence (J7.7) — populated by ExecutiveConfidenceAgent -
+    executive_confidence: ExecutiveConfidence | None = None  # J7.7
 
     # --- Source traceability ------------------------------------------------
     source: str = "auto"    # "problem_framing_agent" | "question_driven" | "auto"

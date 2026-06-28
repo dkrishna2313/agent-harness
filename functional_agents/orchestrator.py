@@ -140,6 +140,7 @@ class AgentOrchestrator:
         synthesis_factory: Any = None,
         strategic_option_factory: Any = None,
         decision_analysis_factory: Any = None,
+        executive_confidence_factory: Any = None,  # J7.7
         max_iterations: int = 3,
     ) -> None:
         self._problem_framing_factory   = problem_framing_factory
@@ -156,6 +157,7 @@ class AgentOrchestrator:
         self._synthesis_factory         = synthesis_factory
         self._strategic_option_factory  = strategic_option_factory
         self._decision_analysis_factory = decision_analysis_factory
+        self._executive_confidence_factory = executive_confidence_factory  # J7.7
         self._planner_factory  = planner_factory
         self._evidence_factory = evidence_factory
         self._qa_factory       = qa_factory
@@ -403,6 +405,24 @@ class AgentOrchestrator:
                 result = _step(self._decision_analysis_factory(), ctx)
                 ctx = result.context
                 state = (
+                    WorkflowState.EXECUTIVE_CONFIDENCE
+                    if self._executive_confidence_factory is not None
+                    else (
+                        WorkflowState.MULTI_PROFILE
+                        if self._multi_profile_factory is not None
+                        else (
+                            WorkflowState.SCENARIO
+                            if self._scenario_factory is not None
+                            else WorkflowState.QA
+                        )
+                    )
+                )
+
+            # ---- EXECUTIVE CONFIDENCE (J7.7) --------------------------------
+            elif state == WorkflowState.EXECUTIVE_CONFIDENCE:
+                result = _step(self._executive_confidence_factory(), ctx)
+                ctx = result.context
+                state = (
                     WorkflowState.MULTI_PROFILE
                     if self._multi_profile_factory is not None
                     else (
@@ -525,6 +545,7 @@ class Orchestrator:
         from .recommendation_synthesis_agent    import RecommendationSynthesisAgent
         from .strategic_option_agent            import StrategicOptionAgent
         from .decision_analysis_agent           import DecisionAnalysisAgent
+        from .executive_confidence_agent        import ExecutiveConfidenceAgent  # J7.7
 
         execution_profile = self._profile_names[0] if self._profile_names else ""
         mock_mode = self._client is not None and getattr(self._client, "is_mock", False)
@@ -581,6 +602,9 @@ class Orchestrator:
 
         def decision_analysis_factory() -> DecisionAnalysisAgent:
             return DecisionAnalysisAgent(client=self._client, domain_profiles=loaded_profiles)
+
+        def executive_confidence_factory() -> ExecutiveConfidenceAgent:
+            return ExecutiveConfidenceAgent(client=self._client, domain_profiles=loaded_profiles)
 
         def planner_factory() -> PlannerAgent:
             return PlannerAgent(client=self._client, domain_profiles=loaded_profiles)
@@ -685,6 +709,7 @@ class Orchestrator:
             synthesis_factory=synthesis_factory,
             strategic_option_factory=strategic_option_factory,
             decision_analysis_factory=decision_analysis_factory,
+            executive_confidence_factory=executive_confidence_factory,
             planner_factory=planner_factory,
             evidence_factory=evidence_factory,
             qa_factory=qa_factory,

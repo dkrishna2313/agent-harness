@@ -1193,9 +1193,67 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
         lines.append("")
 
     # ------------------------------------------------------------------ #
-    # Section 5 — Strategic Assumptions                                    #
+    # Section 5 — Executive Confidence (J7.7)                              #
     # ------------------------------------------------------------------ #
-    lines += ["## 5. Strategic Assumptions", ""]
+    ec: dict = context.executive_confidence or {}
+    lines += ["## 5. Executive Confidence", ""]
+    if ec:
+        ec_conf = ec.get("overall_confidence", "")
+        ec_ready = ec.get("decision_readiness", "")
+        ec_board = ec.get("board_recommendation", "")
+        lines += [
+            f"**Overall Confidence:** {ec_conf}  |  "
+            f"**Decision Readiness:** {ec_ready}  |  "
+            f"**Board Recommendation:** {ec_board}",
+            "",
+        ]
+        ec_rat = ec.get("confidence_rationale", "")
+        if ec_rat:
+            lines += [ec_rat, ""]
+
+        ec_drivers = ec.get("confidence_drivers", [])
+        if ec_drivers:
+            lines.append("**Confidence Drivers:**")
+            lines.extend(f"- {d}" for d in ec_drivers)
+            lines.append("")
+
+        ec_limiters = ec.get("confidence_limiters", [])
+        if ec_limiters:
+            lines.append("**Confidence Limiters:**")
+            lines.extend(f"- {lim}" for lim in ec_limiters)
+            lines.append("")
+
+        vp = ec.get("validation_priorities", [])
+        if vp:
+            lines.append("**Validation Priorities (Due Diligence Checklist):**")
+            lines.extend(f"{i + 1}. {p}" for i, p in enumerate(vp))
+            lines.append("")
+
+        cu = ec.get("critical_unknowns", [])
+        if cu:
+            lines.append("**Critical Unknowns:**")
+            lines.extend(f"- {u}" for u in cu)
+            lines.append("")
+
+        if_hold = ec.get("confidence_if_assumptions_hold", "")
+        if_fail = ec.get("confidence_if_assumptions_fail", "")
+        if if_hold or if_fail:
+            lines.append("**Conditional Assessment:**")
+            if if_hold:
+                lines += [f"- *If assumptions hold:* {if_hold}", ""]
+            if if_fail:
+                lines += [f"- *If assumptions fail:* {if_fail}", ""]
+
+        horizon = ec.get("decision_horizon", "")
+        if horizon:
+            lines += [f"**Decision Horizon:** {horizon}", ""]
+    else:
+        lines += ["*Executive confidence assessment not available for this run.*", ""]
+
+    # ------------------------------------------------------------------ #
+    # Section 6 — Strategic Assumptions (was §5)                           #
+    # ------------------------------------------------------------------ #
+    lines += ["## 6. Strategic Assumptions", ""]
     if assumptions:
         sorted_assumptions = sorted(
             assumptions,
@@ -1219,7 +1277,7 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     # ------------------------------------------------------------------ #
     # Section 6 — Strategic Risks                                          #
     # ------------------------------------------------------------------ #
-    lines += ["## 6. Strategic Risks", ""]
+    lines += ["## 7. Strategic Risks", ""]
     if risks:
         lines += [
             "| ID | Risk | Severity | Likelihood | Related Assumptions | Affected Recommendations |",
@@ -1246,7 +1304,7 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     # ------------------------------------------------------------------ #
     # Section 7 — Strategic Opportunities                                  #
     # ------------------------------------------------------------------ #
-    lines += ["## 7. Strategic Opportunities", ""]
+    lines += ["## 8. Strategic Opportunities", ""]
     if opps:
         lines += [
             "| ID | Statement | Category | Likelihood | Impact |",
@@ -1266,7 +1324,7 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     # ------------------------------------------------------------------ #
     # Section 8 — Strategic Options                                        #
     # ------------------------------------------------------------------ #
-    lines += ["## 8. Strategic Options", ""]
+    lines += ["## 9. Strategic Options", ""]
     for opt in options:
         oid3 = opt.get("option_id", "")
         t = opt.get("title", "")
@@ -1305,7 +1363,7 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     # Section 9 — Decision Matrix                                          #
     # ------------------------------------------------------------------ #
     matrix: list[dict] = da.get("decision_matrix") or []
-    lines += ["## 9. Decision Matrix", ""]
+    lines += ["## 10. Decision Matrix", ""]
     if matrix:
         _SCORE_COLS = [
             ("strategic_fit", "Strategic Fit"),
@@ -1355,7 +1413,7 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     # Section 10 — Key Tradeoffs                                           #
     # ------------------------------------------------------------------ #
     tradeoffs = da.get("key_tradeoffs") or []
-    lines += ["## 10. Key Tradeoffs", ""]
+    lines += ["## 11. Key Tradeoffs", ""]
     if tradeoffs:
         lines.extend(f"- {t}" for t in tradeoffs)
         lines.append("")
@@ -1366,7 +1424,7 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     # Section 11 — Sensitivity Analysis                                    #
     # ------------------------------------------------------------------ #
     sensitivity = da.get("sensitivity_analysis") or ""
-    lines += ["## 11. Sensitivity Analysis", ""]
+    lines += ["## 12. Sensitivity Analysis", ""]
     if sensitivity:
         lines += [sensitivity, ""]
     else:
@@ -1378,7 +1436,7 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     conf_summary = da.get("confidence_summary") or ""
     conf_level = da.get("confidence") or ""
     uncertainties = da.get("key_uncertainties") or []
-    lines += ["## 12. Confidence Assessment", ""]
+    lines += ["## 13. Confidence Assessment", ""]
     if conf_level:
         lines += [f"**Overall Confidence:** {conf_level}", ""]
     if conf_summary:
@@ -1391,7 +1449,7 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     # ------------------------------------------------------------------ #
     # Section 13 — Immediate Actions                                       #
     # ------------------------------------------------------------------ #
-    lines += ["## 13. Immediate Actions", ""]
+    lines += ["## 14. Immediate Actions", ""]
     if recs:
         grouped: dict[str, list[dict]] = {}
         for rec in recs:
@@ -1437,7 +1495,7 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
         ev_count = len(ro.get("evidence_ids", []))
     profiles = ro.get("profiles") or context.profiles or []
     lines += [
-        "## 14. Supporting Evidence",
+        "## 15. Supporting Evidence",
         "",
         f"**Evidence Items:** {ev_count}  |  **Citations:** {cite_count}  |  "
         f"**Source Profiles:** {', '.join(profiles) if profiles else 'N/A'}",

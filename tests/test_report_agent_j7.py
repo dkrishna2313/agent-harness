@@ -203,20 +203,21 @@ _EXPECTED_SECTIONS = [
     "## 2. Strategic Question",
     "## 3. Recommended Strategic Option",
     "## 4. Why This Option Wins",
-    "## 5. Strategic Assumptions",
-    "## 6. Strategic Risks",
-    "## 7. Strategic Opportunities",
-    "## 8. Strategic Options",
-    "## 9. Decision Matrix",
-    "## 10. Key Tradeoffs",
-    "## 11. Sensitivity Analysis",
-    "## 12. Confidence Assessment",
-    "## 13. Immediate Actions",
-    "## 14. Supporting Evidence",
+    "## 5. Executive Confidence",
+    "## 6. Strategic Assumptions",
+    "## 7. Strategic Risks",
+    "## 8. Strategic Opportunities",
+    "## 9. Strategic Options",
+    "## 10. Decision Matrix",
+    "## 11. Key Tradeoffs",
+    "## 12. Sensitivity Analysis",
+    "## 13. Confidence Assessment",
+    "## 14. Immediate Actions",
+    "## 15. Supporting Evidence",
 ]
 
 
-def test_all_14_sections_present():
+def test_all_15_sections_present():
     ctx = _make_context()
     report = _build_j7_executive_report(ctx)
     for section in _EXPECTED_SECTIONS:
@@ -311,8 +312,8 @@ def test_section9_decision_matrix_rows_per_option():
     ctx = _make_context()
     report = _build_j7_executive_report(ctx)
     # Both options appear in matrix rows
-    section_9_start = report.index("## 9. Decision Matrix")
-    section_10_start = report.index("## 10. Key Tradeoffs")
+    section_9_start = report.index("## 10. Decision Matrix")
+    section_10_start = report.index("## 11. Key Tradeoffs")
     matrix_section = report[section_9_start:section_10_start]
     assert "OPT-A" in matrix_section
     assert "OPT-B" in matrix_section

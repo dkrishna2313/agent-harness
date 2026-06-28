@@ -212,7 +212,8 @@ def test_validate_all_classes_returns_all_agents():
         "PlannerAgent", "EvidenceAgent",
         "HypothesisAgent", "ChallengeAgent", "AssumptionAgent", "RiskAgent", "OpportunityAgent", "RecommendationAgent",
         "MultiProfileAgent", "ScenarioAgent", "RecommendationImprovementAgent",
-        "RecommendationSynthesisAgent", "StrategicOptionAgent", "DecisionAnalysisAgent", "QAAgent", "ReportAgent",
+        "RecommendationSynthesisAgent", "StrategicOptionAgent", "DecisionAnalysisAgent",
+        "ExecutiveConfidenceAgent", "QAAgent", "ReportAgent",
     }
 
 

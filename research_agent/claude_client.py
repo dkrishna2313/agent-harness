@@ -575,6 +575,66 @@ class DecisionAnalysisPayload(BaseModel):
     analysis: DecisionAnalysisItem
 
 
+class ExecutiveConfidenceItem(BaseModel):
+    """Structured output for ExecutiveConfidenceAgent (J7.7)."""
+
+    confidence_id: str = Field(description="Unique ID e.g. 'EC-001'")
+    overall_confidence: str = Field(
+        default="Medium",
+        description="High | Medium | Low — synthesised over the full decision graph",
+    )
+    decision_readiness: str = Field(
+        default="Needs Additional Validation",
+        description="Ready for Decision | Needs Additional Validation | Not Ready",
+    )
+    board_recommendation: str = Field(
+        default="Proceed with Conditions",
+        description="Proceed | Proceed with Conditions | Delay Pending Evidence | Reject",
+    )
+    confidence_rationale: str = Field(
+        description=(
+            "2-4 sentence plain-English rationale for the overall confidence level. "
+            "Must derive from the existing graph — no new reasoning."
+        ),
+    )
+    confidence_drivers: list[str] = Field(
+        default_factory=list,
+        description="Factors from the existing graph that raise confidence (e.g. 'Strong evidence base')",
+    )
+    confidence_limiters: list[str] = Field(
+        default_factory=list,
+        description="Factors from the existing graph that lower confidence (e.g. 'Vendor-only sources')",
+    )
+    critical_unknowns: list[str] = Field(
+        default_factory=list,
+        description="Unknowns that must resolve before the decision can be made confidently",
+    )
+    validation_priorities: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Ordered due-diligence checklist of the most important items to validate before approving. "
+            "Derive from critical_unknowns and assumption gaps. 3-7 items."
+        ),
+    )
+    confidence_if_assumptions_hold: str = Field(
+        description="Confidence level (High/Medium/Low) and rationale if all Critical assumptions hold",
+    )
+    confidence_if_assumptions_fail: str = Field(
+        description="Confidence level and rationale if key Critical assumptions fail",
+    )
+    decision_horizon: str = Field(
+        default="",
+        description="When a decision should be made (e.g. 'Q3 2026', 'Before Series B close')",
+    )
+    last_updated: str = Field(default="", description="ISO timestamp; populated by the system")
+
+
+class ExecutiveConfidencePayload(BaseModel):
+    """Structured output wrapper for ExecutiveConfidenceAgent (J7.7)."""
+
+    confidence: ExecutiveConfidenceItem
+
+
 _SCHEMA_ADAPTERS = {
     "research_plan": TypeAdapter(ResearchPlan),
     "research_planning": TypeAdapter(ResearchPlanningPayload),
@@ -588,6 +648,7 @@ _SCHEMA_ADAPTERS = {
     "opportunity_generation": TypeAdapter(OpportunityPayload),   # J7.4
     "strategic_option_generation": TypeAdapter(StrategicOptionPayload),  # J7.5
     "decision_analysis_generation": TypeAdapter(DecisionAnalysisPayload),  # J7.6
+    "executive_confidence_generation": TypeAdapter(ExecutiveConfidencePayload),  # J7.7
     # Used for the tool-definition schema sent to Claude (strict EvidenceItem types).
     "evidence_extraction": TypeAdapter(EvidenceExtractionPayload),
     # Used for response validation (lenient — items validated per-item in extract_evidence).
@@ -1333,6 +1394,106 @@ class MockClaudeClient:
 
         return DecisionAnalysisPayload(analysis=analysis)
 
+    def generate_executive_confidence(
+        self,
+        decision_analysis: dict,
+        strategic_options: list[dict],
+        assumptions: list[dict],
+        risks: list[dict],
+        opportunities: list[dict],
+        recommendations: list[dict],
+        scenarios: list[dict],
+        decision_model: dict,
+    ) -> "ExecutiveConfidencePayload":
+        """Generate executive confidence assessment over the J7 graph (J7.7) — mock version."""
+        # Derive confidence from assumption importance distribution
+        critical = sum(1 for a in assumptions if a.get("importance") == "Critical")
+        weak_ev = sum(1 for a in assumptions if a.get("evidence_support") == "Weak")
+        high_risks = sum(1 for r in risks if r.get("severity") == "High")
+        da_conf = decision_analysis.get("confidence", "Medium")
+
+        # Map to OverallConfidence
+        if da_conf == "High" and critical <= 2 and weak_ev == 0:
+            overall = "High"
+            readiness = "Ready for Decision"
+            board_rec = "Proceed"
+        elif da_conf == "Low" or high_risks >= 3 or weak_ev >= 2:
+            overall = "Low"
+            readiness = "Not Ready"
+            board_rec = "Delay Pending Evidence"
+        else:
+            overall = "Medium"
+            readiness = "Needs Additional Validation"
+            board_rec = "Proceed with Conditions"
+
+        a_ids = [a.get("assumption_id", "") for a in assumptions if a.get("assumption_id")]
+        crit_a = [a for a in assumptions if a.get("importance") == "Critical"]
+        crit_ids = [a.get("assumption_id", "") for a in crit_a]
+
+        drivers = [
+            f"Decision analysis confidence: {da_conf}",
+            f"{len(strategic_options)} strategic options explicitly compared",
+        ]
+        if len(opportunities) > 0:
+            drivers.append(f"{len(opportunities)} strategic opportunities identified")
+        if high_risks == 0:
+            drivers.append("No High-severity risks in the risk register")
+
+        limiters = []
+        if weak_ev > 0:
+            limiters.append(f"{weak_ev} assumption(s) have Weak evidence support")
+        if high_risks > 0:
+            limiters.append(f"{high_risks} High-severity risk(s) require mitigation")
+        if critical > 0:
+            limiters.append(f"{critical} Critical assumption(s) must hold for the strategy to succeed")
+        if not limiters:
+            limiters.append("Evidence base relies primarily on vendor-sourced material")
+
+        unknowns = [f"Resolution of {aid}" for aid in crit_ids[:3]] if crit_ids else [
+            "Primary assumption validation",
+            "Independent evidence verification",
+        ]
+
+        priorities = []
+        for a in crit_a[:4]:
+            stmt = a.get("statement", "")[:60]
+            priorities.append(f"Validate: {stmt}")
+        if not priorities:
+            priorities = ["Validate critical assumptions with independent evidence"]
+        if high_risks > 0:
+            priorities.append(f"Mitigate {high_risks} High-severity risk(s) before commitment")
+
+        if_hold = (
+            f"High confidence — if all {len(crit_a)} Critical assumption(s) hold, "
+            "the recommended option achieves its strategic objectives with manageable risk."
+        ) if crit_a else "High confidence — core assumptions are well-supported."
+
+        if_fail = (
+            f"Low confidence — if Critical assumption(s) ({', '.join(crit_ids[:2])}) fail, "
+            "the strategy's risk-return profile shifts materially and the preferred option may no longer dominate."
+        ) if crit_ids else "Medium confidence — strategy remains viable under partial assumption failure."
+
+        item = ExecutiveConfidenceItem(
+            confidence_id="EC-001",
+            overall_confidence=overall,
+            decision_readiness=readiness,
+            board_recommendation=board_rec,
+            confidence_rationale=(
+                f"Overall confidence is {overall}. The decision analysis identified {len(strategic_options)} "
+                f"strategic options with {critical} Critical assumptions underpinning the recommended path. "
+                f"{len(risks)} risks have been identified, of which {high_risks} are High-severity. "
+                "This assessment synthesises the full J7 decision graph."
+            ),
+            confidence_drivers=drivers,
+            confidence_limiters=limiters,
+            critical_unknowns=unknowns,
+            validation_priorities=priorities,
+            confidence_if_assumptions_hold=if_hold,
+            confidence_if_assumptions_fail=if_fail,
+            decision_horizon="Q3 2026",
+        )
+        return ExecutiveConfidencePayload(confidence=item)
+
 
 class ClaudeClient:
     """Thin Anthropic SDK wrapper for structured research calls."""
@@ -1567,6 +1728,29 @@ class ClaudeClient:
             max_tokens=10000,
         )
         return DecisionAnalysisPayload.model_validate(payload)
+
+    def generate_executive_confidence(
+        self,
+        decision_analysis: dict,
+        strategic_options: list[dict],
+        assumptions: list[dict],
+        risks: list[dict],
+        opportunities: list[dict],
+        recommendations: list[dict],
+        scenarios: list[dict],
+        decision_model: dict,
+    ) -> ExecutiveConfidencePayload:
+        """Generate executive confidence assessment over the J7 graph (J7.7)."""
+        payload = self._call_json(
+            operation="generate_executive_confidence",
+            schema_name="executive_confidence_generation",
+            prompt=_executive_confidence_prompt(
+                decision_analysis, strategic_options, assumptions,
+                risks, opportunities, recommendations, scenarios, decision_model,
+            ),
+            max_tokens=6000,
+        )
+        return ExecutiveConfidencePayload.model_validate(payload)
 
     def plan_research_question(
         self,
@@ -3172,4 +3356,117 @@ CONSTRAINTS
 - Tradeoffs should be concrete, not generic.
 
 Return structured JSON matching the decision_analysis_generation schema.
+"""
+
+
+def _executive_confidence_prompt(
+    decision_analysis: dict,
+    strategic_options: list[dict],
+    assumptions: list[dict],
+    risks: list[dict],
+    opportunities: list[dict],
+    recommendations: list[dict],
+    scenarios: list[dict],
+    decision_model: dict,
+) -> str:
+    """Build the ExecutiveConfidenceAgent prompt (J7.7)."""
+    question = decision_model.get("strategic_question", decision_model.get("objective", ""))
+    da_conf = decision_analysis.get("confidence", "Medium")
+    da_summary = decision_analysis.get("executive_summary", "")
+    da_rationale = decision_analysis.get("rationale", "")
+    rec_id = decision_analysis.get("recommended_option_id", "")
+
+    def _fmt(items: list[dict], id_key: str, label_key: str = "statement") -> str:
+        return "\n".join(
+            f"  [{item.get(id_key, '?')}] importance={item.get('importance', item.get('severity', ''))} "
+            f"evidence={item.get('evidence_support', '')} conf={item.get('confidence', '')} "
+            f"— {item.get(label_key, item.get('title', ''))[:100]}"
+            for item in items
+        ) or "  (none)"
+
+    sens = decision_analysis.get("sensitivity_analysis", "")
+    tradeoffs = "\n".join(f"  - {t}" for t in decision_analysis.get("key_tradeoffs", [])) or "  (none)"
+    uncertainties = "\n".join(f"  - {u}" for u in decision_analysis.get("key_uncertainties", [])) or "  (none)"
+
+    scenario_summary = ""
+    if scenarios:
+        scenario_summary = "\n".join(
+            f"  [{s.get('scenario_id', '?')}] {s.get('name', '')} — outcome: {s.get('strategic_outcome', '')[:80]}"
+            for s in scenarios[:5]
+        )
+    else:
+        scenario_summary = "  (no scenarios available)"
+
+    return f"""You are an executive decision advisor. Your task is to synthesise the completed J7 decision graph into a single executive confidence assessment that answers: "Should an executive approve this recommendation today?"
+
+DECISION QUESTION
+{question}
+
+DECISION ANALYSIS SUMMARY
+Recommended option: {rec_id}
+Analysis confidence: {da_conf}
+Summary: {da_summary}
+Rationale: {da_rationale[:400]}
+
+KEY TRADEOFFS
+{tradeoffs}
+
+KEY UNCERTAINTIES
+{uncertainties}
+
+SENSITIVITY ANALYSIS
+{sens[:400]}
+
+STRATEGIC ASSUMPTIONS
+{_fmt(assumptions, 'assumption_id')}
+
+STRATEGIC RISKS
+{_fmt(risks, 'risk_id')}
+
+STRATEGIC OPPORTUNITIES
+{_fmt(opportunities, 'opportunity_id')}
+
+SCENARIO ANALYSIS
+{scenario_summary}
+
+TASK
+Produce an ExecutiveConfidence object that:
+
+1. RATES overall_confidence (High/Medium/Low) based on:
+   - Strength and independence of the evidence base
+   - Number of Critical assumptions and their evidence support
+   - Risk concentration (count and severity of High-severity risks)
+   - Sensitivity of the preferred option to assumption failures
+   - Robustness across scenarios
+
+2. DETERMINES decision_readiness:
+   - "Ready for Decision" — strong evidence, assumptions validated, risks mitigated
+   - "Needs Additional Validation" — material unknowns remain but not blocking
+   - "Not Ready" — critical evidence gaps or unmitigated blocking risks
+
+3. ISSUES a board_recommendation:
+   - "Proceed" — approve now with current evidence
+   - "Proceed with Conditions" — approve subject to specific conditions
+   - "Delay Pending Evidence" — do not decide until specific evidence is gathered
+   - "Reject" — evidence or risk profile does not support the strategy
+
+4. IDENTIFIES 3-5 critical_unknowns — specific items that must resolve before
+   the decision can be made with high confidence.
+
+5. PRODUCES validation_priorities — an ordered due-diligence checklist of 3-7
+   specific actions the executive team must take before approving. Be concrete:
+   "Validate retrofit cost assumptions with independent engineering estimates" is
+   better than "validate costs". Reference assumption_ids and risk_ids by name.
+
+6. PROVIDES conditional analysis:
+   - confidence_if_assumptions_hold: what the confidence becomes if Critical assumptions are confirmed
+   - confidence_if_assumptions_fail: what the confidence becomes if Critical assumptions fail
+
+CONSTRAINTS
+- Do NOT generate new strategic reasoning, options, or evidence.
+- Everything must derive from the decision graph provided above.
+- Be specific: reference assumption IDs and risk IDs in your rationale.
+- validation_priorities must be actionable and executive-level.
+
+Return structured JSON matching the executive_confidence_generation schema.
 """
