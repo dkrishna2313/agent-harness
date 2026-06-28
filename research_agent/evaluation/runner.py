@@ -448,6 +448,8 @@ def _write_qa_research_object(
     )
     ro = update_research_object(ro, memo=memo, question_id=question.question_id)
     try:
-        write_research_object(ro, out_dir=out_dir)
+        # J7.6a – write_latest=False: benchmark runs must never overwrite
+        # latest_research_object.json, which belongs to the interactive pipeline.
+        write_research_object(ro, out_dir=out_dir, write_latest=False)
     except Exception as exc:  # pragma: no cover
         LOGGER.warning("Could not write research object for %s: %s", question.question_id, exc)

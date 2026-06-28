@@ -207,7 +207,9 @@ def main(
 
         # J4.5 – update and write research object after run
         ro = update_research_object(ro, memo=memo, output_path=output_path)
-        ro_path = write_research_object(ro, out_dir=out.parent)
+        # J7.6a – write_latest=False: simple CLI runs must not overwrite
+        # latest_research_object.json which belongs to the interactive functional pipeline.
+        ro_path = write_research_object(ro, out_dir=out.parent, write_latest=False)
 
         # Inject research object stub before writing trace
         trace_payload = build_trace(
@@ -222,7 +224,7 @@ def main(
         trace_payload["research_object"] = research_object_trace_stub(ro, ro_path)
         # Now update the research object with the trace path (second write)
         ro = update_research_object(ro, memo=memo, output_path=output_path, trace_path=str(Path(output_path).with_suffix(".trace.json")))
-        write_research_object(ro, out_dir=out.parent)
+        write_research_object(ro, out_dir=out.parent, write_latest=False)
 
         trace_path = write_trace(trace_payload, output_path)
 

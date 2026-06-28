@@ -359,8 +359,15 @@ def write_research_object(
     obj: dict[str, Any],
     *,
     out_dir: str | Path | None = None,
+    write_latest: bool = True,
 ) -> Path:
-    """Write the research object to disk and update latest_research_object.json."""
+    """Write the research object to disk.
+
+    write_latest=True (default): also updates latest_research_object.json.
+    Pass write_latest=False for benchmark / simple-CLI runs so they do not
+    overwrite the canonical latest produced by an interactive functional-pipeline run.
+    Mirrors the write_latest semantics of write_decision_model().
+    """
     base = Path(out_dir) if out_dir else _RO_DIR.parent
     ro_dir = base / "research_objects"
     ro_dir.mkdir(parents=True, exist_ok=True)
@@ -369,8 +376,9 @@ def write_research_object(
     ro_path = ro_dir / f"{research_id}.json"
     ro_path.write_text(json.dumps(obj, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    latest_path = base / "latest_research_object.json"
-    latest_path.write_text(json.dumps(obj, indent=2, ensure_ascii=False), encoding="utf-8")
+    if write_latest:
+        latest_path = base / "latest_research_object.json"
+        latest_path.write_text(json.dumps(obj, indent=2, ensure_ascii=False), encoding="utf-8")
 
     return ro_path
 
