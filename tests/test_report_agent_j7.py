@@ -117,22 +117,61 @@ def _make_context(
         "confidence": "High",
     } if include_da else {}
 
+    # Use canonical DM field names (J7.1 / J7.3 / J7.4 schemas)
     assumptions = [
-        {"assumption_id": "A-001", "statement": "Technology is commercially viable by 2027", "criticality": "Critical", "confidence": "Medium"},
-        {"assumption_id": "A-002", "statement": "Regulatory approval in 18 months", "criticality": "High", "confidence": "Low"},
+        {
+            "assumption_id": "A-001",
+            "statement": "Technology is commercially viable by 2027",
+            "importance": "Critical",   # DM field: importance (not criticality)
+            "confidence": "Medium",
+            "evidence_support": "Moderate",
+        },
+        {
+            "assumption_id": "A-002",
+            "statement": "Regulatory approval in 18 months",
+            "importance": "Important",
+            "confidence": "Low",
+            "evidence_support": "Weak",
+        },
     ] if include_assumptions else []
 
     risks = [
-        {"risk_id": "RSK-001", "title": "Cost overrun", "likelihood": "Medium", "impact": "High", "mitigation": "Fixed-price contracts"},
+        {
+            "risk_id": "RSK-001",
+            "statement": "Cost overrun due to supply chain delays",  # DM field: statement
+            "severity": "High",                                       # DM field: severity
+            "likelihood": "Medium",
+            "mitigation_notes": "Fixed-price contracts and supplier diversification",  # DM field
+            "related_assumption_ids": ["A-001"],
+            "affected_recommendation_ids": ["REC-001"],
+        },
     ] if include_risks else []
 
     opps = [
-        {"opportunity_id": "OPP-001", "title": "First mover advantage", "category": "Market", "probability": "High", "impact": "High"},
+        {
+            "opportunity_id": "OPP-001",
+            "statement": "First mover advantage in emerging market",  # DM field: statement
+            "category": "Market",
+            "likelihood": "High",   # DM field: likelihood (not probability)
+            "impact": "High",
+        },
     ] if include_opps else []
 
     recs = [
-        {"recommendation_id": "REC-001", "title": "Initiate permitting", "rationale": "Critical path item.", "timeframe": "0-3 months", "priority": "High"},
-        {"recommendation_id": "REC-002", "title": "Evaluate partners", "rationale": "Reduce execution risk.", "timeframe": "3-12 months", "priority": "Medium"},
+        {
+            "recommendation_id": "REC-001",
+            "title": "Initiate permitting",
+            "summary": "Critical path item that must begin immediately.",  # DM field: summary
+            "time_horizon": "near_term",   # DM field: time_horizon (not timeframe)
+            "priority": "high",
+        },
+        {
+            "recommendation_id": "REC-002",
+            "title": "Evaluate partners",
+            "summary": "Reduce execution risk through strategic partnerships.",
+            "time_horizon": "medium_term",
+            "priority": "medium",
+        },
     ] if include_recs else []
 
     return AgentContext(
@@ -147,7 +186,8 @@ def _make_context(
         opportunities=opps,
         recommendations=recs,
         research_object={
-            "summary": {"evidence_count": 42, "citation_count": 38},
+            # evidence_summary is set by EvidenceAgent; summary is set by update_research_object
+            "evidence_summary": {"total_evidence_items": 42, "citation_count": 38},
             "profiles": ["smr"],
             "evidence_topics": {"SMR Technology": 15, "Regulation": 8},
         },
@@ -213,6 +253,9 @@ def test_section5_assumption_table_rows():
     assert "A-001" in report
     assert "Technology is commercially viable" in report
     assert "Critical" in report
+    assert "Importance" in report  # column header
+    assert "Evidence Support" in report  # column header
+    assert "Moderate" in report  # evidence_support value
 
 
 def test_section5_critical_assumptions_first():
@@ -220,22 +263,27 @@ def test_section5_critical_assumptions_first():
     report = _build_j7_executive_report(ctx)
     pos_a001 = report.index("A-001")
     pos_a002 = report.index("A-002")
-    assert pos_a001 < pos_a002, "Critical assumption A-001 should appear before High A-002"
+    assert pos_a001 < pos_a002, "Critical assumption A-001 should appear before Important A-002"
 
 
 def test_section6_risk_table():
     ctx = _make_context()
     report = _build_j7_executive_report(ctx)
     assert "RSK-001" in report
-    assert "Cost overrun" in report
-    assert "Fixed-price contracts" in report
+    assert "Cost overrun" in report  # from statement
+    assert "Fixed-price contracts" in report  # from mitigation_notes
+    assert "Severity" in report  # column header
+    assert "A-001" in report  # related_assumption_ids
+    assert "REC-001" in report  # affected_recommendation_ids
 
 
 def test_section7_opportunity_table():
     ctx = _make_context()
     report = _build_j7_executive_report(ctx)
     assert "OPP-001" in report
-    assert "First mover advantage" in report
+    assert "First mover advantage" in report  # from statement field
+    assert "Statement" in report  # column header (not "Opportunity")
+    assert "Likelihood" in report  # column header (not "Probability")
 
 
 def test_section8_all_option_ids_present():
@@ -293,17 +341,33 @@ def test_section12_confidence_level():
 def test_section13_timeframe_grouping():
     ctx = _make_context()
     report = _build_j7_executive_report(ctx)
-    assert "### 0-3 months" in report
-    assert "### 3-12 months" in report
+    # Display names (not raw bucket strings)
+    assert "### Near-term (3–12 months)" in report
+    assert "### Immediate (0–3 months)" in report or "### Near-term" in report
     assert "REC-001" in report
     assert "REC-002" in report
+
+
+def test_section13_uses_time_horizon_field():
+    ctx = _make_context()
+    report = _build_j7_executive_report(ctx)
+    # near_term → Near-term (3–12 months)
+    assert "Near-term (3–12 months)" in report
+    # medium_term → Medium-term (1–3 years)
+    assert "Medium-term (1–3 years)" in report
+
+
+def test_section13_uses_summary_field():
+    ctx = _make_context()
+    report = _build_j7_executive_report(ctx)
+    # summary field value appears (not rationale)
+    assert "Critical path item that must begin immediately" in report
 
 
 def test_section14_evidence_count():
     ctx = _make_context()
     report = _build_j7_executive_report(ctx)
-    assert "42" in report  # evidence_count
-    assert "38" in report  # citation_count
+    assert "42" in report  # total_evidence_items from evidence_summary
 
 
 def test_section14_source_profiles():

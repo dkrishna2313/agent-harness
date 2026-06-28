@@ -111,7 +111,7 @@ _EXEMPT = re.compile(
 # J4.5d.4: multi-month/year ranges — "24–36 months" near "6 months" signals
 #   that "6 months" is being compared or corrected, not asserted as fact.
 _CONTRASTIVE = re.compile(
-    r"\b(unlike|whereas|however|by\s+contrast|in\s+contrast"
+    r"\b(unlike|whereas|while|although|though|however|by\s+contrast|in\s+contrast"
     r"|compared\s+to|versus|vs\.?|rather|contrast"
     # J4.5d.3 – NVL product-family / scaling context: the correct sibling (NVL72)
     # or product-family language signals this is a comparison, not a hallucination.

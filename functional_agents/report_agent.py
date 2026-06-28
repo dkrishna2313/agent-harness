@@ -1087,8 +1087,15 @@ _TIMEFRAME_ALIASES: dict[str, str] = {
     "long_term": "3+ years",
     "long-term": "3+ years",
 }
+_TIMEFRAME_DISPLAY: dict[str, str] = {
+    "0-3 months": "Immediate (0–3 months)",
+    "3-12 months": "Near-term (3–12 months)",
+    "1-3 years": "Medium-term (1–3 years)",
+    "3+ years": "Long-term (>3 years)",
+}
 
-_CRITICALITY_ORDER = {"Critical": 0, "High": 1, "Medium": 2, "Low": 3}
+# Assumption importance tiers (J7.1 schema: "Critical" | "Important" | "Supporting")
+_IMPORTANCE_ORDER = {"Critical": 0, "Important": 1, "Supporting": 2}
 
 
 def _normalise_timeframe(tf: str) -> str:
@@ -1192,18 +1199,19 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     if assumptions:
         sorted_assumptions = sorted(
             assumptions,
-            key=lambda a: _CRITICALITY_ORDER.get(a.get("criticality", "Low"), 99),
+            key=lambda a: _IMPORTANCE_ORDER.get(a.get("importance", "Supporting"), 99),
         )
         lines += [
-            "| ID | Assumption | Criticality | Confidence |",
-            "|---|---|---|---|",
+            "| ID | Assumption | Importance | Confidence | Evidence Support |",
+            "|---|---|---|---|---|",
         ]
         for a in sorted_assumptions:
             aid = a.get("assumption_id", "")
             stmt = a.get("statement", "").replace("|", "\\|")
-            crit = a.get("criticality", "")
+            imp = a.get("importance", "")
             conf = a.get("confidence", "")
-            lines.append(f"| {aid} | {stmt} | {crit} | {conf} |")
+            ev_sup = a.get("evidence_support", "")
+            lines.append(f"| {aid} | {stmt} | {imp} | {conf} | {ev_sup} |")
         lines.append("")
     else:
         lines += ["*No assumptions recorded.*", ""]
@@ -1214,17 +1222,24 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     lines += ["## 6. Strategic Risks", ""]
     if risks:
         lines += [
-            "| ID | Risk | Likelihood | Impact | Mitigation |",
-            "|---|---|---|---|---|",
+            "| ID | Risk | Severity | Likelihood | Related Assumptions | Affected Recommendations |",
+            "|---|---|---|---|---|---|",
         ]
         for r in risks:
             rid = r.get("risk_id", "")
-            title = r.get("title", r.get("description", "")).replace("|", "\\|")
+            stmt = r.get("statement", r.get("title", r.get("description", ""))).replace("|", "\\|")[:120]
+            sev = r.get("severity", "")
             lhood = r.get("likelihood", "")
-            impact = r.get("impact", "")
-            mit = (r.get("mitigation") or "—").replace("|", "\\|")[:80]
-            lines.append(f"| {rid} | {title} | {lhood} | {impact} | {mit} |")
+            rel_assump = ", ".join(r.get("related_assumption_ids", [])) or "—"
+            aff_rec = ", ".join(r.get("affected_recommendation_ids", [])) or "—"
+            lines.append(f"| {rid} | {stmt} | {sev} | {lhood} | {rel_assump} | {aff_rec} |")
         lines.append("")
+        # Mitigation notes as sub-bullets
+        for r in risks:
+            mit = r.get("mitigation_notes") or r.get("mitigation") or ""
+            if mit:
+                rid = r.get("risk_id", "")
+                lines += [f"**{rid} Mitigation:** {mit}", ""]
     else:
         lines += ["*No risks recorded.*", ""]
 
@@ -1234,16 +1249,16 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     lines += ["## 7. Strategic Opportunities", ""]
     if opps:
         lines += [
-            "| ID | Opportunity | Category | Probability | Impact |",
+            "| ID | Statement | Category | Likelihood | Impact |",
             "|---|---|---|---|---|",
         ]
         for o in opps:
             oid2 = o.get("opportunity_id", "")
-            title = o.get("title", o.get("description", "")).replace("|", "\\|")
+            stmt = o.get("statement", o.get("title", o.get("description", ""))).replace("|", "\\|")[:120]
             cat = o.get("category", "")
-            prob = o.get("probability", "")
+            lhood = o.get("likelihood", o.get("probability", ""))
             impact = o.get("impact", "")
-            lines.append(f"| {oid2} | {title} | {cat} | {prob} | {impact} |")
+            lines.append(f"| {oid2} | {stmt} | {cat} | {lhood} | {impact} |")
         lines.append("")
     else:
         lines += ["*No opportunities recorded.*", ""]
@@ -1380,28 +1395,29 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     if recs:
         grouped: dict[str, list[dict]] = {}
         for rec in recs:
-            tf = _normalise_timeframe(rec.get("timeframe", ""))
+            # Recommendations use time_horizon (DM schema) or timeframe (legacy)
+            raw_tf = rec.get("time_horizon") or rec.get("timeframe") or ""
+            tf = _normalise_timeframe(raw_tf)
             grouped.setdefault(tf, []).append(rec)
-        # Emit in canonical order, then any leftovers
-        seen_tfs: set[str] = set()
         ordered_tfs = [tf for tf in _TIMEFRAME_ORDER if tf in grouped]
         for tf in grouped:
             if tf not in ordered_tfs:
                 ordered_tfs.append(tf)
         for tf in ordered_tfs:
-            seen_tfs.add(tf)
             tf_recs = grouped.get(tf, [])
             if not tf_recs:
                 continue
-            lines += [f"### {tf}", ""]
+            display = _TIMEFRAME_DISPLAY.get(tf, tf)
+            lines += [f"### {display}", ""]
             for rec in tf_recs:
                 rid = rec.get("recommendation_id", "")
                 rtitle = rec.get("title", "")
-                rrat = rec.get("rationale") or rec.get("description") or ""
+                # summary is the DM field; fall back to rationale/description for legacy
+                rbody = rec.get("summary") or rec.get("rationale") or rec.get("description") or ""
                 rpri = rec.get("priority", "")
                 lines.append(f"**{rid}: {rtitle}**" + (f" *(Priority: {rpri})*" if rpri else ""))
-                if rrat:
-                    lines += [rrat, ""]
+                if rbody:
+                    lines += [rbody, ""]
                 else:
                     lines.append("")
     else:
@@ -1410,9 +1426,15 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     # ------------------------------------------------------------------ #
     # Section 14 — Supporting Evidence                                     #
     # ------------------------------------------------------------------ #
-    summary = ro.get("summary", {})
-    ev_count = summary.get("evidence_count", 0)
-    cite_count = summary.get("citation_count", 0)
+    # evidence_summary is populated by EvidenceAgent before ReportAgent runs;
+    # summary.evidence_count is only set by update_research_object() which runs
+    # after _build_j7_executive_report(). Use evidence_summary as primary source.
+    ev_summary = ro.get("evidence_summary") or ro.get("summary") or {}
+    ev_count = ev_summary.get("total_evidence_items", ev_summary.get("evidence_count", 0))
+    cite_count = ev_summary.get("citation_count", 0)
+    # Fall back to evidence_ids list length when dedicated counts are missing
+    if not ev_count:
+        ev_count = len(ro.get("evidence_ids", []))
     profiles = ro.get("profiles") or context.profiles or []
     lines += [
         "## 14. Supporting Evidence",

@@ -547,3 +547,36 @@ class TestScorerIntegration:
         assert score.context_allowed_count >= 1
         # Neither term should appear as a violation
         assert score.must_not_include_violations == []
+
+
+class TestContrastiveWhile:
+    """J7.6c – 'while' and 'although' are contrastive connectors (NVIDIA_008 regression fix)."""
+
+    def test_while_exempts_prohibited_term(self):
+        """'while X uses GDDR7' is a comparison, not a hallucinated claim about the query GPU."""
+        from research_agent.evaluation.prohibited_term_checker import check_prohibited_term
+        answer = (
+            "The GB200 Blackwell GPU uses HBM3e memory with 8 TB/s bandwidth. "
+            "The GH100 uses HBM2e with 80 GB capacity, while the GB203 (Blackwell consumer GPU) uses GDDR7 with lower bandwidth."
+        )
+        result = check_prohibited_term("GDDR", answer)
+        assert result.classification == "context_allowed", (
+            f"Expected context_allowed but got {result.classification}. "
+            f"Context: {result.context_window}"
+        )
+        assert result.penalty_applied is False
+
+    def test_although_exempts_prohibited_term(self):
+        from research_agent.evaluation.prohibited_term_checker import check_prohibited_term
+        answer = "HBM3e is used in datacenter GPUs, although consumer cards rely on GDDR7."
+        result = check_prohibited_term("GDDR", answer)
+        assert result.classification == "context_allowed"
+        assert result.penalty_applied is False
+
+    def test_hard_prohibited_without_contrastive(self):
+        """Without a contrastive connector, GDDR in datacenter context is still penalised."""
+        from research_agent.evaluation.prohibited_term_checker import check_prohibited_term
+        answer = "The GB200 GPU uses GDDR7 memory for its high bandwidth requirements."
+        result = check_prohibited_term("GDDR", answer)
+        assert result.classification == "hard_prohibited"
+        assert result.penalty_applied is True
