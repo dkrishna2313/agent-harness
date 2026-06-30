@@ -1849,7 +1849,7 @@ class ClaudeClient:
             operation="extract_evidence",
             schema_name="evidence_extraction",
             prompt=prompt,
-            max_tokens=max(self.max_tokens, 16_000),
+            max_tokens=max(self.max_tokens, 6_500),
             response_schema_name="evidence_extraction_raw",
             model_override=self.extraction_model,
         )
@@ -1893,7 +1893,7 @@ class ClaudeClient:
             operation="synthesize_memo",
             schema_name="memo_synthesis",
             prompt=_memo_prompt(question, evidence_items),
-            max_tokens=max(self.max_tokens, 12_000),
+            max_tokens=max(self.max_tokens, 4_500),
         )
         return ResearchMemo(
             title=f"Research Memo: {question}",
@@ -2942,30 +2942,30 @@ def _slim_evidence(item: EvidenceItem) -> dict[str, Any]:
 
 def _memo_prompt(question: str, evidence_items: Sequence[EvidenceItem]) -> str:
     evidence_json = json.dumps([_slim_evidence(i) for i in evidence_items], indent=2)
-    return f"""Synthesize a Markdown memo payload from the source-grounded evidence.
+    return f"""Synthesize a research memo from the source-grounded evidence below.
 
 Question:
 {question}
 
 Rules:
 - Use only the provided evidence items.
-- Evidence IDs and source document names are assigned by the harness.
-- Every entry in confirmed_facts, power_implications, cooling_implications, networking_implications, and rack_architecture_implications must end with exactly one citation in this format: [Source: filename.pdf, Evidence: E001].
+- Every entry in confirmed_facts, power_implications, cooling_implications, networking_implications, and rack_architecture_implications must end with exactly one citation: [Source: filename.pdf, Evidence: E001].
 - Use only source_document and evidence_id values present in the provided evidence.
 - Do not invent source names or evidence IDs.
-- Distinguish confirmed facts from inferences.
-- Keep entries concise.
-- Return JSON only, not Markdown.
+- Keep each entry concise (1 sentence).
+- Return JSON only.
+
+Output limits: confirmed_facts ≤6, inferences ≤3, each implication section ≤4, open_questions ≤2.
 
 JSON shape:
 {{
   "executive_summary": "...",
-  "confirmed_facts": ["Claim text. [Source: filename.pdf, Evidence: E001]"],
+  "confirmed_facts": ["Claim. [Source: filename.pdf, Evidence: E001]"],
   "inferences": ["..."],
-  "power_implications": ["Claim text. [Source: filename.pdf, Evidence: E001]"],
-  "cooling_implications": ["Claim text. [Source: filename.pdf, Evidence: E001]"],
-  "networking_implications": ["Claim text. [Source: filename.pdf, Evidence: E001]"],
-  "rack_architecture_implications": ["Claim text. [Source: filename.pdf, Evidence: E001]"],
+  "power_implications": ["Claim. [Source: filename.pdf, Evidence: E001]"],
+  "cooling_implications": ["Claim. [Source: filename.pdf, Evidence: E001]"],
+  "networking_implications": ["Claim. [Source: filename.pdf, Evidence: E001]"],
+  "rack_architecture_implications": ["Claim. [Source: filename.pdf, Evidence: E001]"],
   "open_questions": ["..."]
 }}
 
@@ -3006,16 +3006,14 @@ def _evidence_chunk_prompt(question: str, chunks: Sequence[Chunk]) -> str:
 Question:
 {question}
 
-Rules — MAXIMIZE RECALL:
+Rules:
 - Use only the source text below.
 - Each evidence_snippet must be copied or tightly paraphrased from one chunk.
 - Use categories only from: architecture, power, cooling, networking, rack architecture, operations, other.
 - Do not invent evidence IDs; evidence_id is assigned by the harness after extraction.
 - Set source_chunk_id to the Chunk ID shown in the header for the chunk you drew evidence from.
-- Extract EVERY distinct atomic factual claim present in the source text.
-- One claim = one fact. Decompose compound statements: "X requires Y, enabling Z" → three separate items.
-- Aim for 10-30 items per chunk for evidence-dense content; fewer only for sparse content. No upper cap.
-- Include numeric claims, specifications, constraints, timelines, and policy statements.
+- Extract 3-6 items per chunk — prioritise facts that directly address the question.
+- Include numeric claims, specifications, and policy statements relevant to the question.
 - Return JSON only.
 
 CRITICAL — claim field rules (violations cause the item to be discarded):

@@ -389,7 +389,7 @@ def benchmark(
             update={"web_search": WebSearchConfig(enabled=True)}
         )
 
-    agent = DcPowerAgent(client=client, profile=domain_profile)
+    agent = DcPowerAgent(client=client, profile=domain_profile, top_chunks=10)
     runner = EvaluationRunner(
         agent=agent,
         sources_dir=sources,
