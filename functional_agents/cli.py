@@ -19,7 +19,14 @@ def main(
     question: Annotated[str, typer.Argument(help="Research question to answer. Omit if using --goal.")] = "",
     goal: Annotated[
         str | None,
-        typer.Option("--goal", "-g", help="High-level business goal (goal-driven mode). Mutually exclusive with QUESTION."),
+        typer.Option("--goal", "-g", help="High-level business goal (goal-driven mode). Mutually exclusive with QUESTION and --engagement."),
+    ] = None,
+    engagement: Annotated[
+        Path | None,
+        typer.Option(
+            "--engagement",
+            help="Path to a Strategic Engagement file (.yaml/.yml/.json). Strategic Engagement Mode. Mutually exclusive with QUESTION and --goal.",
+        ),
     ] = None,
     sources: Annotated[
         Path,
@@ -89,12 +96,34 @@ def main(
     instead of the legacy document extraction pipeline.
     """
 
-    if goal and question:
-        typer.echo("Error: provide either QUESTION or --goal, not both.", err=True)
+    # J9.1 – three mutually exclusive entry points: QUESTION, --goal, --engagement.
+    provided = [
+        name for name, val in (
+            ("QUESTION", bool(question)),
+            ("--goal", bool(goal)),
+            ("--engagement", engagement is not None),
+        ) if val
+    ]
+    if len(provided) > 1:
+        typer.echo(
+            f"Error: provide exactly one of QUESTION, --goal, or --engagement "
+            f"(got: {', '.join(provided)}).",
+            err=True,
+        )
         raise typer.Exit(code=1)
-    if not goal and not question:
-        typer.echo("Error: provide a QUESTION or --goal.", err=True)
+    if not provided:
+        typer.echo("Error: provide a QUESTION, --goal, or --engagement.", err=True)
         raise typer.Exit(code=1)
+
+    # Load and validate the engagement up front so errors are clear and early.
+    engagement_spec = None
+    if engagement is not None:
+        from .engagement_spec import load_engagement_spec, EngagementError
+        try:
+            engagement_spec = load_engagement_spec(engagement)
+        except EngagementError as exc:
+            typer.echo(f"Error: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
 
     _configure_logging(verbose=False, log_level=log_level or "INFO")
 
@@ -125,12 +154,21 @@ def main(
     )
 
     try:
-        ctx = orchestrator.run_from_goal(goal) if goal else orchestrator.run(question)
+        if engagement_spec is not None:
+            mode = "Strategic Engagement"
+            ctx = orchestrator.run_from_engagement(engagement_spec)
+        elif goal:
+            mode = "Research (goal)"
+            ctx = orchestrator.run_from_goal(goal)
+        else:
+            mode = "Research (question)"
+            ctx = orchestrator.run(question)
     except Exception as exc:
         logging.error("Functional agent pipeline failed: %s", exc)
         raise typer.Exit(code=1) from exc
 
     agents_run = [h["agent"] for h in ctx.agent_history]
+    typer.echo(f"Run mode:   {mode}")
     typer.echo(f"Agents run: {', '.join(agents_run)}")
     typer.echo(f"Profiles:   {', '.join(ctx.profiles)}")
     typer.echo(f"Report:     {ctx.artifacts.get('report_path', ctx.artifacts)}")

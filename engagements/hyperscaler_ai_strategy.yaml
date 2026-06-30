@@ -1,0 +1,57 @@
+engagement:
+  title: AI Data Center Power Infrastructure Strategy
+  client: Hyperscaler Cloud Provider
+  industry: AI Infrastructure / Cloud Computing
+
+  current_situation: >
+    The client operates a fleet of hyperscale data centers and is planning a
+    large GB300 NVL72 GPU deployment over the next 24 months. Rack power density
+    is rising sharply, grid interconnection queues are multi-year, and on-site
+    generation and nuclear options are being evaluated. Cooling, power
+    procurement, and siting decisions must be made before the deployment locks in.
+
+  objectives:
+    - Identify the most viable power procurement strategies for a multi-gigawatt GB300 NVL72 build-out
+    - Determine cooling architecture (air vs liquid vs direct-to-chip) for 130kW+ racks
+    - Assess on-site generation and SMR options against grid interconnection timelines
+    - Quantify the capital and operating cost envelope for each strategy
+
+  constraints:
+    - Deployment must begin within 24 months
+    - Carbon intensity targets aligned with corporate net-zero commitments
+    - Limited grid capacity in preferred metro regions
+    - Capital budget approval required per phase
+
+  stakeholders:
+    - Chief Infrastructure Officer
+    - Data Center Engineering
+    - Energy Procurement
+    - Sustainability Office
+    - Finance / Capital Planning
+
+  assumptions:
+    - GPU power draw per rack continues to rise with each generation
+    - Grid interconnection lead times remain 3-7 years in target regions
+    - Liquid cooling is required above ~50kW per rack
+
+  success_criteria:
+    - A ranked set of power strategies with cost, risk, and timeline trade-offs
+    - Clear recommendation on cooling architecture
+    - Evidence-backed view on whether SMR/on-site generation is viable in the decision window
+
+  decision_horizon: 24 months (deployment start); 5-7 years (full build-out)
+
+  priorities:
+    - Speed to power
+    - Cost predictability
+    - Carbon alignment
+
+  risks:
+    - Grid interconnection delays push deployment past the window
+    - Cooling retrofit costs exceed budget
+    - SMR regulatory timelines slip beyond the decision horizon
+
+  known_unknowns:
+    - Actual realized power draw of GB300 NVL72 at scale
+    - Regional utility tariff evolution
+    - Availability of long-lead electrical equipment (transformers, switchgear)

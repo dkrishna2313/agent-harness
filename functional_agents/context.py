@@ -87,6 +87,10 @@ class AgentContext:
 
     # Goal-driven input (J6.1) — alternative entry point to question-driven
     goal: str = ""
+    # Strategic Engagement input (J9.1) — structured consulting brief that, when
+    # present, drives goal-driven framing from a richer context than a one-liner.
+    # Holds the validated EngagementSpec as a dict; empty for goal/question runs.
+    engagement: dict[str, Any] = field(default_factory=dict)
     decision_model: dict[str, Any] = field(default_factory=dict)
     # Research strategy output of ResearchStrategyAgent (J6.2)
     research_strategy: dict[str, Any] = field(default_factory=dict)

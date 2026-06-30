@@ -1700,6 +1700,14 @@ class ReportAgent(FunctionalAgent):
         )
         trace_payload["functional_agents"] = context.to_functional_trace()
 
+        # J9.1 – record run mode (research vs strategic_engagement) and, when an
+        # engagement drove the run, its structured metadata. Defaults preserve
+        # existing behaviour for goal/question runs.
+        trace_payload["run_mode"] = context.trace.get("_run_mode", "research")
+        _engagement_meta = context.trace.get("_engagement")
+        if _engagement_meta:
+            trace_payload["engagement"] = _engagement_meta
+
         # Multi-profile block (J5.6 / J5.6a)
         trace_payload["profiles_requested"] = context.profiles
         trace_payload["profile_count"] = len(context.profiles)

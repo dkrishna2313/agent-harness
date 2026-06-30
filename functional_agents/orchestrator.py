@@ -17,7 +17,12 @@ from pathlib import Path
 from typing import Any
 
 from research_agent.decision_model import from_question as _dm_from_question, write_decision_model
-from research_agent.engagement import from_question as _engagement_from_question, link_decision_model as _link_dm, write_engagement
+from research_agent.engagement import (
+    from_question as _engagement_from_question,
+    create_engagement as _create_engagement,
+    link_decision_model as _link_dm,
+    write_engagement,
+)
 from research_agent.profile import DomainProfile, load_profile
 from research_agent.research_object import create_research_object
 
@@ -35,6 +40,33 @@ LOGGER = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+def _engagement_from_spec(spec: Any, *, brief: str):
+    """Build a persistence-layer StrategicEngagement from an EngagementSpec (J9.1).
+
+    Maps the structured input contract onto the internal engagement record so
+    Decision Model / Research Object linkage works exactly as in goal-driven runs.
+    """
+    title = getattr(spec, "title", "") or "Strategic engagement"
+    objectives = getattr(spec, "objectives", None) or []
+    strategic_question = objectives[0] if objectives else title
+    client_context_parts = [
+        getattr(spec, "industry", ""),
+        getattr(spec, "current_situation", ""),
+    ]
+    client_context = " — ".join(p for p in client_context_parts if p) or None
+    return _create_engagement(
+        client=getattr(spec, "client", "") or "internal",
+        brief=brief,
+        strategic_question=strategic_question,
+        engagement_type="strategic_planning",
+        decision_deadline=getattr(spec, "decision_horizon", "") or None,
+        client_context=client_context,
+        constraints=list(getattr(spec, "constraints", None) or []),
+        stakeholders=list(getattr(spec, "stakeholders", None) or []),
+        status="active",
+    )
+
 
 def _apply_recommendation_linkage(ctx: AgentContext) -> AgentContext:
     """J7.2 – link assumptions ↔ recommendations and re-persist both artifacts."""
@@ -529,7 +561,22 @@ class Orchestrator:
         """
         return self._run_internal(question="", goal=goal)
 
-    def _run_internal(self, *, question: str, goal: str) -> AgentContext:
+    def run_from_engagement(self, engagement: Any) -> AgentContext:
+        """Run the pipeline from a structured Strategic Engagement (J9.1).
+
+        Renders the engagement into a rich framing brief and runs the existing
+        goal-driven pipeline, so ProblemFramingAgent derives research questions
+        from the full engagement context rather than a one-line goal.  The
+        downstream pipeline is unchanged.
+        """
+        from .engagement_spec import EngagementSpec
+
+        if not isinstance(engagement, EngagementSpec):
+            engagement = EngagementSpec.model_validate(engagement)
+        brief = engagement.to_framing_brief()
+        return self._run_internal(question="", goal=brief, engagement_spec=engagement)
+
+    def _run_internal(self, *, question: str, goal: str, engagement_spec: Any = None) -> AgentContext:
         """Shared implementation for question-driven and goal-driven runs."""
         from .planner_agent             import PlannerAgent
         from .evidence_agent            import EvidenceAgent
@@ -673,8 +720,17 @@ class Orchestrator:
         # use a placeholder so create_research_object gets a non-empty string.
         ro_question = question or goal
 
+        # J9.1 – run mode: research (question/goal) vs strategic_engagement.
+        run_mode = "strategic_engagement" if engagement_spec is not None else "research"
+
         # J7.0a – auto-create a minimal Strategic Engagement for every run.
-        engagement = _engagement_from_question(ro_question)
+        # J9.1 – when a structured EngagementSpec drives the run, build the
+        # persistence record from it (client, brief, constraints, stakeholders)
+        # instead of synthesising one from the bare question.
+        if engagement_spec is not None:
+            engagement = _engagement_from_spec(engagement_spec, brief=goal)
+        else:
+            engagement = _engagement_from_question(ro_question)
         try:
             write_engagement(engagement)
         except Exception:
@@ -712,6 +768,7 @@ class Orchestrator:
         ctx = AgentContext(
             question=question,
             goal=goal,
+            engagement=engagement_spec.model_dump() if engagement_spec is not None else {},
             profiles=self._profile_names,
             execution_profile=execution_profile,
             research_object=research_object,
@@ -720,6 +777,11 @@ class Orchestrator:
         # J7.0b – stash engagement_id in trace so ProblemFramingAgent can link
         # the DM v2 it produces back to the engagement.
         ctx.trace["_engagement_id"] = engagement.engagement_id
+        # J9.1 – record run mode and (when present) structured engagement metadata
+        # so the trace shows whether this was a Research or Strategic Engagement run.
+        ctx.trace["_run_mode"] = run_mode
+        if engagement_spec is not None:
+            ctx.trace["_engagement"] = engagement_spec.to_trace_metadata()
 
         # J8.8a – expose client and performance tracker for per-agent instrumentation
         from .performance import PerformanceTracker
