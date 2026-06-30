@@ -291,6 +291,10 @@ def benchmark(
         str | None,
         typer.Option("--model", help="Anthropic model name."),
     ] = None,
+    extraction_model: Annotated[
+        str | None,
+        typer.Option("--extraction-model", help="Model for benchmark evidence extraction only. Overrides ANTHROPIC_EXTRACTION_MODEL. Synthesis model is unchanged."),
+    ] = None,
     mock: Annotated[
         bool,
         typer.Option("--mock", help="Use mock (no LLM) mode for Q&A runs."),
@@ -373,10 +377,13 @@ def benchmark(
         )
 
     # Build agent
-    client, startup_warnings = _build_client(mock=mock, live_llm=not mock, model=model)
+    client, startup_warnings = _build_client(mock=mock, live_llm=not mock, model=model, extraction_model=extraction_model)
     if startup_warnings:
         for w in startup_warnings:
             typer.echo(f"  Warning: {w}", err=True)
+
+    resolved_extraction_model = getattr(client, "extraction_model", None) or extraction_model or "claude-sonnet-4-6"
+    typer.echo(f"Benchmark extraction model: {resolved_extraction_model}")
 
     if web_search and domain_profile is not None:
         from .profile import WebSearchConfig
@@ -406,6 +413,7 @@ def benchmark(
         "profile": profile,
         "web_search": web_search,
         "mock_mode": mock,
+        "extraction_model": resolved_extraction_model,
     }
 
     # Write reports

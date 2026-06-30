@@ -357,6 +357,9 @@ def build_trace(run: EvaluationRun, *, run_meta: dict | None = None) -> dict:
             "known_limitation_excluded": len(known_limitation),
             "benchmark_errors": len(run.validation_errors),
         },
+        "benchmark_config": {
+            "extraction_model": (run_meta or {}).get("extraction_model"),
+        },
         "agent_evaluation": _agent_evaluation_dict(run),
         "benchmark_performance": build_benchmark_perf_summary(run),
         "qa_results": [_qa_trace_dict(s) for s in run.qa_scores],

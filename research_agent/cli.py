@@ -284,7 +284,7 @@ def _load_profile(
         return get_default_profile(), [warning]
 
 
-def _build_client(*, mock: bool, live_llm: bool, model: str | None):
+def _build_client(*, mock: bool, live_llm: bool, model: str | None, extraction_model: str | None = None):
     if mock:
         return MockClaudeClient(), []
 
@@ -294,7 +294,7 @@ def _build_client(*, mock: bool, live_llm: bool, model: str | None):
         ]
 
     try:
-        return ClaudeClient(model=model), []
+        return ClaudeClient(model=model, extraction_model=extraction_model), []
     except Exception as exc:
         logging.error("Claude client setup failed: %s", exc)
         return MockClaudeClient(), [f"Claude warning: client setup failed: {exc}"]
