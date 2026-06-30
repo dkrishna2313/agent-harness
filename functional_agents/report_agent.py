@@ -1489,7 +1489,15 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     # after _build_j7_executive_report(). Use evidence_summary as primary source.
     ev_summary = ro.get("evidence_summary") or ro.get("summary") or {}
     ev_count = ev_summary.get("total_evidence_items", ev_summary.get("evidence_count", 0))
-    cite_count = ev_summary.get("citation_count", 0)
+    # J8.10 — citation_count is computed by _build_key_findings() and stored in
+    # context.report["report_grounding_score"]; the TRACE reads it from there.
+    # The report previously read it from evidence_summary (which never carries
+    # the key), so it always rendered "Citations: 0" while the trace recorded a
+    # non-zero count. Read from the same source the trace uses to keep them
+    # consistent, falling back to evidence_summary / the RO for legacy objects.
+    report_block = context.report or ro.get("report") or {}
+    grounding = report_block.get("report_grounding_score") or {}
+    cite_count = grounding.get("citation_count", ev_summary.get("citation_count", 0))
     # Fall back to evidence_ids list length when dedicated counts are missing
     if not ev_count:
         ev_count = len(ro.get("evidence_ids", []))
@@ -1501,6 +1509,29 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
         f"**Source Profiles:** {', '.join(profiles) if profiles else 'N/A'}",
         "",
     ]
+
+    # J8.10 — surface the evidence-backed findings so conclusions are traceable.
+    # Each finding carries inline [Source: <doc>, Evidence: <id>] markers plus
+    # its supporting evidence IDs, making the chain from claim → evidence visible
+    # in the report itself (not only in the trace).
+    key_findings = report_block.get("key_findings") or []
+    if key_findings:
+        lines.append("**Evidence-Backed Findings:**")
+        lines.append("")
+        for f in key_findings:
+            finding_text = (f.get("finding") or "").strip()
+            if not finding_text:
+                continue
+            conf = f.get("confidence", "")
+            ids = f.get("supporting_evidence_ids") or []
+            header = f"- {finding_text}"
+            if conf:
+                header += f" *(Confidence: {conf})*"
+            lines.append(header)
+            if ids:
+                lines.append(f"  - Supporting evidence: {', '.join(ids)}")
+        lines.append("")
+
     topics = ro.get("evidence_topics") or {}
     if topics:
         top_topics = sorted(topics.items(), key=lambda x: -x[1])[:8]
