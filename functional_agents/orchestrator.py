@@ -477,6 +477,8 @@ class Orchestrator:
         top_chunks: int = 20,
         max_iterations: int = 3,
         web_search: bool = False,
+        knowledge_store: str | Path | None = None,
+        use_reranker: bool = False,
     ) -> None:
         self._profile_names  = profile_names
         self._sources_dir    = Path(sources_dir)
@@ -486,6 +488,8 @@ class Orchestrator:
         self._top_chunks     = top_chunks
         self._max_iterations = max_iterations
         self._web_search     = web_search
+        self._knowledge_store = Path(knowledge_store) if knowledge_store else None
+        self._use_reranker   = use_reranker
 
         from research_agent.log import PROGRESS
 
@@ -609,6 +613,41 @@ class Orchestrator:
         def planner_factory() -> PlannerAgent:
             return PlannerAgent(client=self._client, domain_profiles=loaded_profiles)
 
+        # Build EvidenceRetriever from Knowledge Layer when a store is configured (J8.6/J8.7)
+        from research_agent.log import PROGRESS
+        _retriever = None
+        if self._knowledge_store and self._knowledge_store.exists():
+            try:
+                from knowledge.store import KnowledgeStore
+                from knowledge.retriever import EvidenceRetriever
+                from knowledge.embeddings import get_provider
+                from knowledge.health import check_store_health
+                _ks = KnowledgeStore(self._knowledge_store)
+
+                # J8.7 — health check before activating retriever
+                _health = check_store_health(_ks)
+                if not _health.runtime_ready:
+                    LOGGER.warning(
+                        "[Orchestrator] Knowledge store health check FAILED — falling back to legacy retrieval. Issues: %s",
+                        "; ".join(_health.issues[:3]) or "no ready domains",
+                    )
+                    for dh in _health.domains:
+                        for issue in dh.issues:
+                            LOGGER.warning("[Orchestrator:health] [%s] %s", dh.domain, issue)
+                else:
+                    _domains = [dh.domain for dh in _health.domains if dh.runtime_ready]
+                    _provider = get_provider()  # cached singleton
+                    _retriever = EvidenceRetriever(_ks, provider=_provider)
+                    LOGGER.log(
+                        PROGRESS,
+                        "[Orchestrator] Knowledge Layer active — store=%s  domains=%s  evidence=%s",
+                        self._knowledge_store,
+                        _domains,
+                        {dh.domain: dh.evidence_count for dh in _health.domains if dh.runtime_ready},
+                    )
+            except Exception as exc:
+                LOGGER.warning("[Orchestrator] Knowledge Layer init failed (%s) — falling back to legacy", exc)
+
         def evidence_factory() -> EvidenceAgent:
             return EvidenceAgent(
                 sources_dir=self._sources_dir,
@@ -617,6 +656,8 @@ class Orchestrator:
                 top_chunks=self._top_chunks,
                 domain_profile=self._domain_profile,
                 domain_profiles=loaded_profiles,
+                retriever=_retriever,
+                use_reranker=self._use_reranker,
             )
 
         def qa_factory() -> QAAgent:
@@ -680,6 +721,12 @@ class Orchestrator:
         # the DM v2 it produces back to the engagement.
         ctx.trace["_engagement_id"] = engagement.engagement_id
 
+        # J8.8a – expose client and performance tracker for per-agent instrumentation
+        from .performance import PerformanceTracker
+        _perf_tracker = PerformanceTracker()
+        ctx.trace["_client"] = self._client
+        ctx.trace["_perf_tracker"] = _perf_tracker
+
         try:
             ctx.validate()
         except ContextValidationError as exc:
@@ -716,4 +763,22 @@ class Orchestrator:
             report_factory=report_factory,
             max_iterations=self._max_iterations,
         )
-        return orchestrator.run(ctx)
+        result_ctx = orchestrator.run(ctx)
+
+        # J8.8a – emit performance summary after pipeline completes
+        from research_agent.log import PROGRESS
+        perf_tracker = result_ctx.trace.get("_perf_tracker")
+        if perf_tracker is not None:
+            perf_summary = perf_tracker.summary()
+            result_ctx.trace["_performance"] = perf_summary
+            perf_tracker.print_summary()
+            LOGGER.log(
+                PROGRESS,
+                "[Orchestrator] Performance: pipeline_wall=%.0fms  llm_total=%.0fms  tokens=%d  calls=%d",
+                perf_summary["totals"]["pipeline_wall_ms"],
+                perf_summary["totals"]["llm_total_ms"],
+                perf_summary["totals"]["total_tokens"],
+                perf_summary["totals"]["llm_call_count"],
+            )
+
+        return result_ctx

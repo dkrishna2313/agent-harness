@@ -32,11 +32,47 @@ class FunctionalAgent(ABC):
     def run(self, context: AgentContext) -> AgentResult:
         """Standardized entry point — returns AgentResult with outputs/metrics/trace."""
         from research_agent.log import PROGRESS
+        from research_agent.schemas import ClaudeCallTrace
+
         LOGGER.log(PROGRESS, "[%s] starting", self.name)
+
+        # Snap call_traces index so we can slice per-agent LLM calls after _execute()
+        client = context.trace.get("_client")
+        traces_start = len(client.call_traces) if client is not None else 0
+
         t0 = time.monotonic()
         context = self._execute(context)
-        duration = round(time.monotonic() - t0, 3)
+        wall_ms = (time.monotonic() - t0) * 1000
+        duration = round(wall_ms / 1000, 3)
+
         LOGGER.log(PROGRESS, "[%s] completed in %.3fs", self.name, duration)
+
+        # Record per-agent performance if tracker is present
+        tracker = context.trace.get("_perf_tracker")
+        if tracker is not None and client is not None:
+            from .performance import AgentPerfRecord, LLMCallRecord
+            agent_traces: list[ClaudeCallTrace] = client.call_traces[traces_start:]
+            llm_calls = [
+                LLMCallRecord(
+                    operation=t.operation,
+                    model=t.model_name,
+                    duration_ms=t.duration_ms,
+                    prompt_tokens=t.token_usage.get("input_tokens", 0),
+                    completion_tokens=t.token_usage.get("output_tokens", 0),
+                    total_tokens=t.token_usage.get("input_tokens", 0) + t.token_usage.get("output_tokens", 0),
+                    success=t.success,
+                    error=t.error,
+                )
+                for t in agent_traces
+            ]
+            sub_phases = tracker.flush_sub_phases()
+            rec = AgentPerfRecord(
+                agent_name=self.name,
+                wall_ms=wall_ms,
+                llm_calls=llm_calls,
+                sub_phases=sub_phases,
+            )
+            tracker.record(rec)
 
         last = context.agent_history[-1] if context.agent_history else {}
         status = last.get("status", "success")

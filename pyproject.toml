@@ -24,6 +24,10 @@ dependencies = [
 dev = [
     "pytest>=8.3.0",
 ]
+knowledge = [
+    "sentence-transformers>=3.0",
+    "numpy>=1.26",
+]
 
 [project.scripts]
 dc-power-agent = "research_agent.cli:app"
@@ -31,7 +35,7 @@ dc-power-agent-eval = "research_agent.eval_runner:app"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["research_agent*"]
+include = ["research_agent*", "knowledge*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

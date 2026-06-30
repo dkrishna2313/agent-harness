@@ -230,16 +230,48 @@ def _attribute_evidence_profiles(
     return coverage
 
 
+_KB_ETYPE_TO_CATEGORY: dict[str, str] = {
+    "STRATEGIC": "other",
+    "TECHNICAL": "other",
+    "ECONOMIC": "economics",
+    "RISK": "other",
+    "REGULATORY": "licensing",
+    "OPERATIONAL": "operations",
+}
+
+_VALID_CATEGORIES: frozenset[str] = frozenset([
+    "architecture", "power", "cooling", "networking", "rack architecture",
+    "operations", "gpu", "facility", "resiliency", "economics", "construction",
+    "licensing", "reactor design", "grid integration", "fuel cycle",
+    "deployment timeline", "safety", "waste management", "bwrx", "nuscale", "other",
+])
+
+
+def _safe_category(raw: str) -> str:
+    """Return a valid EvidenceCategory string, falling back to 'other'."""
+    s = (raw or "").lower().strip()
+    return s if s in _VALID_CATEGORIES else _KB_ETYPE_TO_CATEGORY.get(raw.upper(), "other")
+
+
+def _score_to_5(score: float) -> int:
+    """Map a [0, 1] retrieval score to a 1–5 integer relevance_score."""
+    return max(1, min(5, round(score * 5)))
+
+
 class EvidenceAgent(FunctionalAgent):
     """Runs the research engine and organizes evidence around the research plan (J5.2).
 
     Responsibilities:
-    - Run the extraction pipeline (unchanged from J5.0b)
+    - Retrieve evidence via EvidenceRetriever (J8.6 Knowledge Layer path) or
+      the legacy extraction pipeline (fallback)
     - Map evidence to subquestions from PlannerAgent
     - Map evidence to investigation areas
     - Compute per-subquestion coverage levels
     - Build evidence summary
     - Write all structured evidence data into context and Research Object
+
+    When `retriever` is provided, the Knowledge Layer path is used exclusively.
+    No document loaders, source files, or extraction pipeline are invoked.
     """
 
     def __init__(
@@ -251,19 +283,341 @@ class EvidenceAgent(FunctionalAgent):
         top_chunks: int = 20,
         domain_profile: Any = None,
         domain_profiles: list[Any] | None = None,
+        retriever: Any = None,
+        use_reranker: bool = False,
+        rerank_candidates: int = 40,
     ) -> None:
         self._sources_dir = Path(sources_dir)
         self._client = client
         self._top_evidence = top_evidence
         self._top_chunks = top_chunks
         self._domain_profile = domain_profile
-        # Prefer explicit list; fall back to singleton when provided
         self._domain_profiles: list[Any] = (
             domain_profiles if domain_profiles is not None
             else ([domain_profile] if domain_profile is not None else [])
         )
+        self._retriever = retriever
+        self._use_reranker = use_reranker
+        self._rerank_candidates = rerank_candidates
 
     def _execute(self, context: AgentContext) -> AgentContext:
+        if self._retriever is not None:
+            return self._execute_kb(context)
+        return self._execute_legacy(context)
+
+    # ------------------------------------------------------------------
+    # Knowledge Layer path (J8.6)
+    # ------------------------------------------------------------------
+
+    def _execute_kb(self, context: AgentContext) -> AgentContext:
+        """Retrieve evidence from the Knowledge Layer (no document loading)."""
+        import time as _time
+        import types
+        from research_agent.log import PROGRESS
+        from knowledge.retriever import RETRIEVAL_MODE_HYBRID, RETRIEVAL_MODE_LEXICAL
+
+        _tracker = context.trace.get("_perf_tracker")
+
+        subquestions: list[str] = context.plan.get("subquestions", [])
+        investigation_areas: list[str] = context.plan.get("investigation_areas", [])
+
+        # Determine primary query and mode
+        primary_query = context.question or (subquestions[0] if subquestions else "")
+        has_embeddings = getattr(self._retriever, "provider", None) is not None
+        mode = RETRIEVAL_MODE_HYBRID if has_embeddings else RETRIEVAL_MODE_LEXICAL
+
+        # Retrieve — larger pool when reranking
+        fetch_k = self._rerank_candidates if self._use_reranker else self._top_evidence
+
+        LOGGER.log(
+            PROGRESS,
+            "[EvidenceAgent:kb] query=%r  mode=%s  fetch_k=%d  subquestions=%d",
+            (primary_query or "")[:80], mode, fetch_k, len(subquestions),
+        )
+
+        _t_retrieval = _time.monotonic()
+        result = self._retriever.retrieve(
+            primary_query,
+            mode=mode,
+            top_k=fetch_k,
+        )
+        candidates = result.items
+        _retrieval_ms = (_time.monotonic() - _t_retrieval) * 1000
+
+        LOGGER.log(
+            PROGRESS,
+            "[EvidenceAgent:kb] primary retrieval: total_scanned=%d  matched=%d  returned=%d",
+            result.total_candidates, result.matched_candidates, len(candidates),
+        )
+        if _tracker is not None:
+            _tracker.add_sub_phase(
+                "evidence:retrieval_query",
+                _retrieval_ms,
+                mode=mode,
+                fetch_k=fetch_k,
+                scanned=result.total_candidates,
+                matched=result.matched_candidates,
+                returned=len(candidates),
+            )
+
+        # Also issue per-subquestion retrieval to improve coverage
+        seen_ids: set[str] = {c.evidence.evidence_id for c in candidates}
+        sq_added = 0
+        _t_sq = _time.monotonic()
+        for sq in subquestions:
+            if len(candidates) >= self._top_evidence * 3:
+                break
+            sq_result = self._retriever.retrieve(sq, mode=mode, top_k=10)
+            for item in sq_result.items:
+                eid = item.evidence.evidence_id
+                if eid not in seen_ids:
+                    seen_ids.add(eid)
+                    candidates.append(item)
+                    sq_added += 1
+        _sq_ms = (_time.monotonic() - _t_sq) * 1000
+
+        if sq_added:
+            LOGGER.log(
+                PROGRESS,
+                "[EvidenceAgent:kb] subquestion expansion: +%d items  total=%d",
+                sq_added, len(candidates),
+            )
+        if _tracker is not None:
+            _tracker.add_sub_phase(
+                "evidence:subquestion_expansion",
+                _sq_ms,
+                subquestions=len(subquestions),
+                added=sq_added,
+                total_after=len(candidates),
+            )
+
+        pre_rerank_count = len(candidates)
+
+        # Optional LLM reranking
+        _rerank_ms = 0.0
+        if self._use_reranker and candidates:
+            from knowledge.reranker import LLMReranker
+            reranker = LLMReranker()
+            rerank_result = reranker.rerank(primary_query, candidates, top_k=self._top_evidence)
+            reranked = [r.candidate for r in rerank_result.items]
+            _rerank_ms = rerank_result.latency_ms
+
+            LOGGER.log(
+                PROGRESS,
+                "[EvidenceAgent:kb] reranker: candidates_in=%d  selected=%d  latency=%.0fms",
+                pre_rerank_count, len(reranked), rerank_result.latency_ms,
+            )
+
+            if not reranked and pre_rerank_count > 0:
+                # Reranker returned 0 — use retrieval-order fallback rather than triggering
+                # the 0-evidence legacy fallback. This handles LLM hallucinated-ID failures.
+                LOGGER.warning(
+                    "[EvidenceAgent:kb] Reranker returned 0 items (likely hallucinated evidence_ids). "
+                    "Falling back to retrieval-order selection. pre_rerank_count=%d",
+                    pre_rerank_count,
+                )
+                candidates = candidates[:self._top_evidence]
+            else:
+                candidates = reranked
+        else:
+            candidates = candidates[:self._top_evidence]
+
+        if _tracker is not None:
+            _tracker.add_sub_phase(
+                "evidence:reranking",
+                _rerank_ms,
+                enabled=self._use_reranker,
+                candidates_in=pre_rerank_count,
+                candidates_out=len(candidates),
+            )
+
+        LOGGER.log(
+            PROGRESS,
+            "[EvidenceAgent:kb] retrieved %d items (mode=%s)",
+            len(candidates), mode,
+        )
+
+        if not candidates:
+            LOGGER.warning(
+                "[EvidenceAgent:kb] Knowledge Layer returned 0 evidence items — "
+                "falling back to legacy document retrieval. "
+                "Check that the knowledge store is fully indexed (run: python3 -m knowledge build)."
+            )
+            return self._execute_legacy(context)
+
+        # Convert to legacy dict format
+        items_dicts = [
+            {
+                "evidence_id": c.evidence.evidence_id,
+                "claim": c.statement,
+                "category": _safe_category(c.evidence.category or c.evidence_type),
+                "topics": [],
+                "relevance_score": _score_to_5(c.score),
+                "source_document": (
+                    c.evidence.supporting_source_ids[0]
+                    if c.evidence.supporting_source_ids else "knowledge_store"
+                ),
+            }
+            for c in candidates
+        ]
+
+        # Build SimpleNamespace proxies for the mapping functions (which use getattr)
+        def _proxy(d: dict) -> object:
+            ns = types.SimpleNamespace()
+            ns.claim = d["claim"]
+            ns.evidence_snippet = d["claim"]
+            ns.evidence_id = d["evidence_id"]
+            ns.category = d["category"]
+            ns.topics = d["topics"]
+            return ns
+
+        proxies = [_proxy(d) for d in items_dicts]
+
+        # Map to subquestions and areas
+        _t_mapping = _time.monotonic()
+        evidence_by_subquestion: dict[str, list[str]] = {}
+        evidence_by_area: dict[str, list[str]] = {}
+        if subquestions:
+            evidence_by_subquestion = _map_evidence_to_subquestions(proxies, subquestions)
+        if investigation_areas:
+            evidence_by_area = _map_evidence_to_areas(proxies, investigation_areas)
+
+        # Coverage and summary
+        coverage_by_subquestion = _compute_coverage(evidence_by_subquestion, subquestions)
+        evidence_summary = _build_evidence_summary(
+            proxies, evidence_by_subquestion, evidence_by_area, subquestions
+        )
+
+        covered = evidence_summary["subquestions_with_evidence"]
+        uncovered = evidence_summary["subquestions_without_evidence"]
+        mapped_areas = evidence_summary["investigation_areas_with_evidence"]
+        _mapping_ms = (_time.monotonic() - _t_mapping) * 1000
+
+        LOGGER.log(
+            PROGRESS,
+            "[EvidenceAgent:kb] mapped: subquestions=%d/%d covered, areas=%d/%d covered",
+            covered, len(subquestions), mapped_areas, len(investigation_areas),
+        )
+        if _tracker is not None:
+            _tracker.add_sub_phase(
+                "evidence:mapping_coverage",
+                _mapping_ms,
+                subquestions_covered=covered,
+                subquestions_total=len(subquestions),
+                areas_covered=mapped_areas,
+                areas_total=len(investigation_areas),
+            )
+
+        # Profile attribution
+        _t_assembly = _time.monotonic()
+        profile_coverage_by_profile = _attribute_evidence_profiles(
+            items_dicts,
+            self._domain_profiles,
+            fallback_profile=context.execution_profile,
+        )
+        for item in items_dicts:
+            item["profile"] = item.get("source_profile", context.execution_profile)
+
+        profiles_requested = [p.name for p in self._domain_profiles] if self._domain_profiles else context.profiles
+        profiles_contributing = [p for p, v in profile_coverage_by_profile.items() if v.get("evidence_count", 0) > 0]
+        profiles_missing = [p for p, v in profile_coverage_by_profile.items() if v.get("evidence_count", 0) == 0]
+
+        context.evidence_notes = [
+            {
+                "evidence_items": items_dicts,
+                "evidence_by_subquestion": evidence_by_subquestion,
+                "evidence_by_area": evidence_by_area,
+                "coverage_by_subquestion": coverage_by_subquestion,
+                "evidence_summary": evidence_summary,
+                "profile_coverage_by_profile": profile_coverage_by_profile,
+                "profiles_requested": profiles_requested,
+                "profiles_contributing": profiles_contributing,
+                "profiles_missing": profiles_missing,
+            }
+        ]
+
+        # Build synthetic ResearchMemo for downstream compatibility (ReportAgent)
+        memo = self._build_synthetic_memo(context.question, candidates)
+        context.trace["_memo"] = memo
+        context.trace["_documents"] = []
+        _assembly_ms = (_time.monotonic() - _t_assembly) * 1000
+        if _tracker is not None:
+            _tracker.add_sub_phase(
+                "evidence:evidence_assembly",
+                _assembly_ms,
+                evidence_count=len(candidates),
+                profiles_contributing=len(profiles_contributing),
+            )
+
+        # Research Object update
+        if context.research_object:
+            ro = context.research_object
+            ro["evidence_by_subquestion"] = {
+                sq: ids for sq, ids in evidence_by_subquestion.items() if sq != "_unmapped"
+            }
+            ro["evidence_by_area"] = evidence_by_area
+            ro["coverage_by_subquestion"] = coverage_by_subquestion
+            ro["evidence_summary"] = evidence_summary
+            ro["validated_contradictions"] = []
+            ro["contradiction_metrics"] = {}
+            ro["suppressed_contradictions"] = []
+
+        self._record(
+            context,
+            status="success",
+            summary=(
+                f"Retrieved {len(candidates)} evidence items from Knowledge Layer (mode={mode}). "
+                f"Mapped {covered}/{len(subquestions)} subquestions, "
+                f"{mapped_areas}/{len(investigation_areas)} investigation areas."
+            ),
+            evidence_count=len(candidates),
+            confirmed_facts=0,
+            mapped_subquestions=covered,
+            mapped_areas=mapped_areas,
+            uncovered_subquestions=uncovered,
+        )
+        return context
+
+    def _build_synthetic_memo(self, question: str, candidates: list) -> Any:
+        """Construct a minimal ResearchMemo from Knowledge Layer Evidence for ReportAgent compat."""
+        from research_agent.schemas import EvidenceItem, ResearchMemo
+
+        ev_items = []
+        for c in candidates:
+            ev_items.append(EvidenceItem(
+                evidence_id=c.evidence.evidence_id,
+                claim=c.statement,
+                source_document=(
+                    c.evidence.supporting_source_ids[0]
+                    if c.evidence.supporting_source_ids else "knowledge_store"
+                ),
+                evidence_snippet=c.statement[:300],
+                category=_safe_category(c.evidence.category or c.evidence_type),
+                relevance="relevant",
+                confidence="medium",
+                relevance_score=_score_to_5(c.score),
+            ))
+
+        confirmed_facts = [c.statement for c in candidates[:10]]
+        return ResearchMemo(
+            title=f"Knowledge Layer Evidence: {question[:80]}",
+            question=question,
+            executive_summary=f"Retrieved {len(candidates)} evidence items from the Knowledge Base.",
+            confirmed_facts=confirmed_facts,
+            source_notes=ev_items,
+            metadata={
+                "retrieval_source": "knowledge_layer",
+                "evidence_count": len(candidates),
+                "top_evidence_limit": len(candidates),
+                "evidence_passed_to_synthesis": len(candidates),
+            },
+        )
+
+    # ------------------------------------------------------------------
+    # Legacy extraction path (unchanged)
+    # ------------------------------------------------------------------
+
+    def _execute_legacy(self, context: AgentContext) -> AgentContext:
         from research_agent.log import PROGRESS
         from research_agent.agent import DcPowerAgent
         from research_agent.loaders import load_sources
@@ -284,6 +638,16 @@ class EvidenceAgent(FunctionalAgent):
         evidence_items = memo.source_notes or memo.evidence
 
         LOGGER.log(PROGRESS, "[EvidenceAgent] extracted %d items", len(evidence_items))
+
+        # J8.7 Runtime Guardrail — explicit "insufficient evidence" path
+        if not evidence_items:
+            LOGGER.warning(
+                "[EvidenceAgent] Legacy retrieval also returned 0 evidence items. "
+                "The report will reflect insufficient evidence coverage. "
+                "Ensure source documents are present in %s and the Knowledge Store is built.",
+                self._sources_dir,
+            )
+            context.trace["_insufficient_evidence"] = True
 
         # --- 2. Read planner outputs ---
         subquestions: list[str] = context.plan.get("subquestions", [])

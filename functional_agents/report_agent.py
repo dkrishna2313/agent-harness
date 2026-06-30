@@ -1909,6 +1909,12 @@ class ReportAgent(FunctionalAgent):
             class_checks, runtime_checks
         )
 
+        # Performance instrumentation block (J8.8a)
+        # Snapshot tracker here — all agents except ReportAgent itself have completed
+        perf_tracker = context.trace.get("_perf_tracker")
+        if perf_tracker is not None:
+            trace_payload["performance"] = perf_tracker.summary()
+
         # Report agent block (J5.4.8)
         trace_payload["report_agent"] = {
             "finding_count": len(findings),

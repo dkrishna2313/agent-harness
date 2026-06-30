@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from collections.abc import Sequence
 from datetime import datetime, timezone
 from typing import Any, Protocol
@@ -1590,7 +1591,7 @@ class ClaudeClient:
                 decision_model, research_strategy,
                 evidence_items, profile_coverage, contradictions,
             ),
-            max_tokens=8000,
+            max_tokens=5000,
         )
         return HypothesisPayload.model_validate(payload)
 
@@ -1609,7 +1610,7 @@ class ClaudeClient:
             prompt=_challenge_prompt(
                 hypotheses, evidence_items, contradictions, research_gaps, profile_coverage,
             ),
-            max_tokens=10000,
+            max_tokens=6000,
         )
         return ChallengePayload.model_validate(payload)
 
@@ -1632,7 +1633,7 @@ class ClaudeClient:
                 evidence_items, decision_model, research_strategy,
                 validated_contradictions=validated_contradictions or [],
             ),
-            max_tokens=10000,
+            max_tokens=6000,
         )
         return RecommendationPayload.model_validate(payload)
 
@@ -1652,7 +1653,7 @@ class ClaudeClient:
                 surviving_hypotheses, hypothesis_challenges,
                 evidence_items, decision_model, research_strategy,
             ),
-            max_tokens=8000,
+            max_tokens=5000,
         )
         return AssumptionPayload.model_validate(payload)
 
@@ -1668,7 +1669,7 @@ class ClaudeClient:
             operation="generate_risks",
             schema_name="risk_generation",
             prompt=_risk_prompt(assumptions, recommendations, evidence_items, decision_model),
-            max_tokens=8000,
+            max_tokens=5000,
         )
         return RiskPayload.model_validate(payload)
 
@@ -1685,7 +1686,7 @@ class ClaudeClient:
             operation="generate_opportunities",
             schema_name="opportunity_generation",
             prompt=_opportunity_prompt(assumptions, recommendations, risks, evidence_items, decision_model),
-            max_tokens=8000,
+            max_tokens=5000,
         )
         return OpportunityPayload.model_validate(payload)
 
@@ -1705,7 +1706,7 @@ class ClaudeClient:
             prompt=_strategic_options_prompt(
                 assumptions, risks, opportunities, recommendations, evidence_items, decision_model
             ),
-            max_tokens=10000,
+            max_tokens=6000,
         )
         return StrategicOptionPayload.model_validate(payload)
 
@@ -1725,7 +1726,7 @@ class ClaudeClient:
             prompt=_decision_analysis_prompt(
                 strategic_options, assumptions, risks, opportunities, recommendations, decision_model
             ),
-            max_tokens=10000,
+            max_tokens=6000,
         )
         return DecisionAnalysisPayload.model_validate(payload)
 
@@ -1927,6 +1928,7 @@ class ClaudeClient:
         _response_schema = response_schema_name or schema_name
         _model = model_override or self.model
         request_timestamp = datetime.now(timezone.utc).isoformat()
+        _t0 = time.monotonic()
         try:
             response = self._client.messages.create(
                 model=_model,
@@ -1936,6 +1938,7 @@ class ClaudeClient:
                 tools=[_tool_definition(operation, schema_name)],
                 tool_choice={"type": "tool", "name": operation},
             )
+            _llm_ms = (time.monotonic() - _t0) * 1000
             stop_reason = getattr(response, "stop_reason", None)
             output_tokens = getattr(getattr(response, "usage", None), "output_tokens", None)
             LOGGER.debug(
@@ -1984,10 +1987,12 @@ class ClaudeClient:
                     request_timestamp=request_timestamp,
                     success=True,
                     token_usage=_token_usage(response),
+                    duration_ms=round(_llm_ms, 1),
                 )
             )
             return payload
         except Exception as exc:
+            _llm_ms = (time.monotonic() - _t0) * 1000
             self.call_traces.append(
                 ClaudeCallTrace(
                     operation=operation,
@@ -1995,12 +2000,14 @@ class ClaudeClient:
                     request_timestamp=request_timestamp,
                     success=False,
                     error=str(exc),
+                    duration_ms=round(_llm_ms, 1),
                 )
             )
             raise
 
     def _repair_json_text(self, *, operation: str, prompt: str, max_tokens: int) -> str:
         request_timestamp = datetime.now(timezone.utc).isoformat()
+        _t0 = time.monotonic()
         try:
             response = self._client.messages.create(
                 model=self.model,
@@ -2008,6 +2015,7 @@ class ClaudeClient:
                 system=SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": prompt}],
             )
+            _llm_ms = (time.monotonic() - _t0) * 1000
             self.call_traces.append(
                 ClaudeCallTrace(
                     operation=f"{operation}_repair",
@@ -2015,10 +2023,12 @@ class ClaudeClient:
                     request_timestamp=request_timestamp,
                     success=True,
                     token_usage=_token_usage(response),
+                    duration_ms=round(_llm_ms, 1),
                 )
             )
             return _response_text(response)
         except Exception as exc:
+            _llm_ms = (time.monotonic() - _t0) * 1000
             self.call_traces.append(
                 ClaudeCallTrace(
                     operation=f"{operation}_repair",
@@ -2026,6 +2036,7 @@ class ClaudeClient:
                     request_timestamp=request_timestamp,
                     success=False,
                     error=str(exc),
+                    duration_ms=round(_llm_ms, 1),
                 )
             )
             raise
@@ -2223,11 +2234,11 @@ def _hypothesis_prompt(
     areas = ", ".join(decision_model.get("decision_areas", []))
     uncertainties = "\n".join(f"  - {u}" for u in decision_model.get("critical_uncertainties", []))
 
-    # Summarise evidence (max 20 items for prompt size)
+    # Summarise evidence (max 12 items for prompt size — J8.8b)
     ev_lines = ""
-    for e in evidence_items[:20]:
+    for e in evidence_items[:12]:
         eid = e.get("evidence_id", "?")
-        claim = e.get("claim", e.get("text", ""))[:120]
+        claim = e.get("claim", e.get("text", ""))[:100]
         source = e.get("source_document", "")
         ev_lines += f"\n  [{eid}] {claim} (source: {source})"
 
@@ -2248,7 +2259,7 @@ def _hypothesis_prompt(
         )
     )
 
-    return f"""You are a strategic analysis agent. Generate 3-5 competing hypotheses that explain the evidence gathered for this decision.
+    return f"""You are a strategic analysis agent. Generate 3-4 competing hypotheses that explain the evidence gathered for this decision.
 
 Decision Objective:
 {objective}
@@ -2261,7 +2272,7 @@ Critical Uncertainties:
 Research Questions (priority order):
 {rq_list if rq_list else "  (none)"}
 
-Evidence Collected (up to 20 items):
+Evidence Collected (up to 12 items):
 {ev_lines if ev_lines else "  (no evidence available)"}
 
 Profile Coverage:{coverage_lines if coverage_lines else " (none)"}
@@ -2269,24 +2280,24 @@ Profile Coverage:{coverage_lines if coverage_lines else " (none)"}
 Contradictions Detected:{contra_lines if contra_lines else " (none)"}
 
 Instructions:
-1. Generate 3-5 COMPETING hypotheses. Each should represent a meaningfully different strategic interpretation of the evidence.
+1. Generate 3-4 COMPETING hypotheses. Each should represent a meaningfully different strategic interpretation of the evidence.
 
 2. For each hypothesis, include:
    - id: "H1", "H2", etc.
    - title: one-line hypothesis
-   - summary: 2-4 sentences explaining the hypothesis
+   - summary: 1-2 sentences explaining the hypothesis
    - type: one of constraint_dominant, technology_option, portfolio_strategy, market_timing, risk_concentration, or similar
    - supporting_evidence: list of evidence IDs (from the list above) that support it
    - contradicting_evidence: list of evidence IDs that weaken or contradict it
-   - evidence_gaps: list of evidence types that are absent but needed to test it
+   - evidence_gaps: 2-3 evidence types that are absent but needed to test it
    - confidence: "high", "medium", or "low"
-   - confidence_rationale: 1-2 sentences explaining the confidence level
-   - decision_implications: 2-4 concrete strategic implications
-   - disconfirming_evidence_needed: 2-3 specific evidence items that would invalidate this hypothesis
+   - confidence_rationale: 1 sentence explaining the confidence level
+   - decision_implications: 2-3 concrete strategic implications
+   - disconfirming_evidence_needed: 2 specific evidence items that would invalidate this hypothesis
 
 3. Hypotheses should be mutually distinguishable — avoid restating the same claim.
 
-4. Write a 1-2 sentence synthesis_note summarising the hypothesis landscape.
+4. Write a 1 sentence synthesis_note summarising the hypothesis landscape.
 
 Return structured JSON only.
 """
@@ -2304,24 +2315,22 @@ def _challenge_prompt(
     for h in hypotheses:
         hid = h.get("id", "?")
         title = h.get("title", "")
-        summary = h.get("summary", "")
-        sup = ", ".join(h.get("supporting_evidence", [])[:5]) or "none"
-        con = ", ".join(h.get("contradicting_evidence", [])[:5]) or "none"
-        gaps = "; ".join(h.get("evidence_gaps", [])[:3]) or "none stated"
+        summary = h.get("summary", "")[:150]
+        sup = ", ".join(h.get("supporting_evidence", [])[:4]) or "none"
+        con = ", ".join(h.get("contradicting_evidence", [])[:3]) or "none"
+        gaps = "; ".join(h.get("evidence_gaps", [])[:2]) or "none stated"
         conf = h.get("confidence", "medium")
         hyp_lines += (
             f"\n{hid}: {title}\n"
             f"  Summary: {summary}\n"
-            f"  Supporting evidence: {sup}\n"
-            f"  Contradicting evidence: {con}\n"
-            f"  Evidence gaps: {gaps}\n"
-            f"  Confidence: {conf}\n"
+            f"  Supporting evidence: {sup}  Contradicting: {con}\n"
+            f"  Evidence gaps: {gaps}  Confidence: {conf}\n"
         )
 
     ev_lines = ""
-    for e in evidence_items[:20]:
+    for e in evidence_items[:10]:
         eid = e.get("evidence_id", "")
-        claim = e.get("claim", "")[:120]
+        claim = e.get("claim", "")[:100]
         src = e.get("source_document", "")
         ev_lines += f"  {eid}: {claim} (source: {src})\n"
 
@@ -2333,7 +2342,7 @@ def _challenge_prompt(
         contra_lines += f"  {cid} [{sev}]: {topic}\n"
 
     gap_lines = ""
-    for g in research_gaps[:5]:
+    for g in research_gaps[:3]:
         gap_lines += f"  - {g.get('gap', g) if isinstance(g, dict) else g}\n"
 
     cov_lines = "\n".join(
@@ -2346,7 +2355,7 @@ You are a rigorous intellectual adversary tasked with stress-testing strategic h
 ## Hypotheses to Challenge
 {hyp_lines}
 
-## Evidence Available (up to 20 items)
+## Evidence Available (up to 10 items)
 {ev_lines or "  (none)"}
 
 ## Known Contradictions
@@ -2364,19 +2373,19 @@ You are a rigorous intellectual adversary tasked with stress-testing strategic h
 
 For EACH hypothesis above, produce a ChallengeItem with:
 
-1. challenge_summary — 1-3 sentences on the main weakness
-2. hidden_assumptions — 2-4 implicit assumptions the hypothesis relies on (things it takes for granted without evidence)
-3. weak_evidence — 2-3 specific evidence quality problems (e.g. vendor projections, single-source claims, outdated data)
-4. contradicting_evidence — list evidence IDs (Exxx) from the evidence list above that weaken this hypothesis; explain briefly why each matters
-5. missing_evidence — 2-3 types of evidence that are absent but would be needed to validate the hypothesis
-6. falsification_tests — 2-3 specific, observable conditions that would definitively invalidate the hypothesis
-7. robustness — "high" (withstands most challenges), "medium" (withstands some), or "low" (undermined by major gaps or contradictions)
+1. challenge_summary — 1-2 sentences on the main weakness
+2. hidden_assumptions — 2-3 implicit assumptions the hypothesis takes for granted without evidence
+3. weak_evidence — 2 specific evidence quality problems (e.g. vendor projections, single-source claims)
+4. contradicting_evidence — list evidence IDs (Exxx) from the list above that weaken this hypothesis
+5. missing_evidence — 2 types of evidence absent but needed to validate the hypothesis
+6. falsification_tests — 2 specific, observable conditions that would definitively invalidate the hypothesis
+7. robustness — "high" (withstands most challenges), "medium" (withstands some), or "low" (major gaps)
 
 Then produce a SurvivingHypothesis for each:
 - survival_status: "strong" (core logic intact), "moderate" (survives with caveats), "weak" (significant doubts)
-- reason: 1-2 sentences explaining the survival status
+- reason: 1 sentence explaining the survival status
 
-Finally, write a 1-2 sentence challenge_synthesis summarising which hypotheses survived best and why.
+Finally, write a 1 sentence challenge_synthesis summarising which hypotheses survived best and why.
 
 Be adversarial. Your job is to find problems, not validate. Do not restate the hypothesis — critique it.
 
@@ -2405,26 +2414,24 @@ def _recommendation_prompt(
     for h in hypotheses:
         hid = h.get("id", "?")
         title = h.get("title", "")
-        summary = h.get("summary", "")
-        sup = ", ".join(h.get("supporting_evidence", [])[:4]) or "none"
+        summary = h.get("summary", "")[:150]
+        sup = ", ".join(h.get("supporting_evidence", [])[:3]) or "none"
         sv = survival_by_id.get(hid, {})
         status = sv.get("survival_status", "unknown")
-        reason = sv.get("reason", "")
+        reason = sv.get("reason", "")[:100]
         ch = challenge_by_id.get(hid, {})
         robustness = ch.get("robustness", "unknown")
         key_challenge = ch.get("challenge_summary", "")[:100]
         hyp_lines += (
             f"\n{hid}: {title}  [survival={status}, robustness={robustness}]\n"
             f"  Summary: {summary}\n"
-            f"  Supporting evidence: {sup}\n"
-            f"  Survival reason: {reason}\n"
-            f"  Key challenge: {key_challenge}\n"
+            f"  Evidence: {sup}  Challenge: {key_challenge}\n"
         )
 
     ev_lines = ""
-    for e in evidence_items[:20]:
+    for e in evidence_items[:10]:
         eid = e.get("evidence_id", "")
-        claim = e.get("claim", "")[:120]
+        claim = e.get("claim", "")[:100]
         src = e.get("source_document", "")
         ev_lines += f"  {eid}: {claim} (source: {src})\n"
 
@@ -2432,13 +2439,11 @@ def _recommendation_prompt(
 
     # J6.5a – validated contradictions block
     contra_lines = ""
-    for c in (validated_contradictions or [])[:10]:
+    for c in (validated_contradictions or [])[:5]:
         cid = c.get("contradiction_id", "?")
         topic = c.get("topic", "")
         sev = c.get("severity", "")
-        claim_a = c.get("evidence_a_claim", "")[:80]
-        claim_b = c.get("evidence_b_claim", "")[:80]
-        contra_lines += f"  {cid} [{sev}] {topic}: \"{claim_a}\" vs \"{claim_b}\"\n"
+        contra_lines += f"  {cid} [{sev}] {topic}\n"
 
     return f"""\
 You are a strategic advisor translating challenged hypotheses into actionable recommendations.
@@ -2451,31 +2456,31 @@ Decision Areas:
 ## Hypotheses with Challenge Results
 {hyp_lines}
 
-## Evidence Available (up to 20 items)
+## Evidence Available (up to 10 items)
 {ev_lines or "  (none)"}
 
-## Validated Contradictions (post-suppression, use to flag risks)
+## Validated Contradictions
 {contra_lines or "  (none detected)"}
 
 ---
 
 ## Your Task
 
-Generate 3-5 strategic recommendations. Each recommendation must:
+Generate 3-4 strategic recommendations. Each recommendation must:
 
 1. Be DERIVED from one or more surviving hypotheses — do not invent new strategic logic
 2. Be grounded in specific evidence IDs from the evidence list above
-3. Include key risks that could undermine it
-4. Include trigger conditions — future events that change or activate the recommendation
+3. Include 1-2 key risks that could undermine it
+4. Include 1-2 trigger conditions — future events that change or activate the recommendation
 5. Be classified by time horizon: "near_term" (2026-2030), "medium_term" (2030-2035), or "long_term" (2035+)
-6. Have a confidence level ("high"/"medium"/"low") that reflects the underlying hypothesis robustness and challenge findings
+6. Have a confidence level ("high"/"medium"/"low") reflecting hypothesis robustness and challenge findings
+7. Include a 1-2 sentence summary (not a restatement of the hypothesis — translate to specific action)
 
 Rules:
 - Recommendations from "weak" survival hypotheses should have LOW priority and LOW confidence
 - Recommendations from "strong" or "moderate" survival hypotheses may have MEDIUM or HIGH priority
-- Do not repeat hypothesis summaries as recommendations — translate them into specific actions
-- Include a recommendation_portfolio that groups recommendation IDs by time horizon
-- Write a 1-2 sentence synthesis_note summarising the recommendation set
+- Include a recommendation_portfolio grouping IDs by time horizon
+- Write a 1 sentence synthesis_note summarising the recommendation set
 
 Return structured JSON only.
 """
@@ -2504,10 +2509,10 @@ def _assumption_prompt(
         hyp_lines += f"\n  {hid}: {title}  [status={status}]\n  Reason: {reason}\n"
 
     ev_lines = ""
-    for e in evidence_items[:25]:
+    for e in evidence_items[:12]:
         eid = e.get("evidence_id", "")
-        claim = e.get("claim", "")[:120]
-        src = e.get("source_document", e.get("source", ""))[:40]
+        claim = e.get("claim", "")[:100]
+        src = e.get("source_document", e.get("source", ""))[:35]
         ev_lines += f"\n  {eid}: {claim}  [source: {src}]"
 
     return f"""You are a senior strategy consultant producing a Strategic Assumption analysis.
@@ -2523,22 +2528,19 @@ EVIDENCE AVAILABLE:
 {ev_lines or "  (none provided)"}
 
 TASK:
-Identify the 3–7 HIGHEST-LEVERAGE strategic assumptions that must hold for the research
+Identify the 3–5 HIGHEST-LEVERAGE strategic assumptions that must hold for the research
 findings and emerging recommendations to remain valid.
 
 The objective is NOT completeness. The objective is strategic leverage.
 
 SELECTION CRITERIA — include an assumption only if it passes at least one of:
-- Would this assumption be debated by an executive leadership team?
 - Would the board ask whether this assumption is valid before approving the strategy?
 - If this assumption proved false, would the strategic recommendation materially change?
-- Does this assumption affect capital allocation, strategic direction, timing, risk profile,
-  or expected outcome?
+- Does this assumption affect capital allocation, strategic direction, timing, or risk profile?
 
-PRIORITISATION — rank candidates and keep only the top 3–7:
+PRIORITISATION — keep only the top 3–5:
 - Prefer assumptions that change WHAT is decided, not HOW it is implemented
-- Prefer independent assumptions — avoid assumptions that are consequences of another
-- Prefer assumptions that are genuinely uncertain, not virtually certain
+- Prefer independent, genuinely uncertain assumptions
 - Avoid implementation details, operational assumptions, and administrative prerequisites
 
 For each retained assumption:
@@ -2547,20 +2549,16 @@ For each retained assumption:
 3. Rate importance: Critical (recommendation fails if false) | Important | Supporting
 4. Rate evidence support: how well do the evidence items back this assumption?
 5. Rate confidence: your confidence that this assumption currently holds
-6. Write a rationale: why is this assumption load-bearing for the strategy?
+6. Write a 1-2 sentence rationale: why is this assumption load-bearing for the strategy?
 7. List evidence_ids from the available evidence that support this assumption (use exact IDs)
 8. Identify any conflicts with other assumptions in your list
 
 CONFLICT DETECTION:
-If two assumptions are mutually contradictory or in tension, flag them in conflict_pairs.
-Also set conflicts_with on each assumption involved.
+If two assumptions are mutually contradictory, flag them in conflict_pairs and set conflicts_with.
 
 QUALITY RULES:
 - Produce the smallest set that captures all materially different strategic risks
-- Do not pad the list to reach a higher count
-- Do not merge distinct load-bearing assumptions to reduce the count
 - Avoid duplicates — each assumption must be independently falsifiable
-- Assumptions should be falsifiable — a reasonable analyst could challenge them
 - Use the exact evidence_id strings from the list above (e.g. "EV-001")
 
 Return structured JSON matching the assumption_generation schema.
@@ -2592,10 +2590,10 @@ def _risk_prompt(
         r_lines += f"\n  {r_id}: {title}\n    → rests on assumptions: {a_ids}\n"
 
     ev_lines = ""
-    for e in evidence_items[:20]:
+    for e in evidence_items[:8]:
         eid = e.get("evidence_id", "")
-        claim = e.get("claim", "")[:100]
-        src = e.get("source_document", e.get("source", ""))[:40]
+        claim = e.get("claim", "")[:80]
+        src = e.get("source_document", e.get("source", ""))[:35]
         ev_lines += f"\n  {eid}: {claim}  [source: {src}]"
 
     return f"""You are a senior strategy consultant producing a Strategic Risk analysis.
@@ -2612,7 +2610,7 @@ EVIDENCE AVAILABLE:
 {ev_lines or "  (none provided)"}
 
 TASK:
-Identify 5–10 strategic risks — conditions or events that could cause one or more assumptions
+Identify 4–7 strategic risks — conditions or events that could cause one or more assumptions
 above to fail, thereby threatening the validity of one or more recommendations.
 
 For each risk:
@@ -2622,20 +2620,17 @@ For each risk:
 4. Rate likelihood: High, Medium, Low
 5. Rate evidence support: how strongly do the available evidence items signal this risk?
 6. Rate confidence: your confidence in this risk assessment
-7. Write a rationale: why does this risk matter strategically?
+7. Write a 1-2 sentence rationale: why does this risk matter strategically?
 8. List related_assumption_ids from the assumptions above (use exact IDs)
-9. List affected_recommendation_ids: which recommendations would be undermined?
-   (Traverse from the related assumptions to their supported_recommendation_ids)
+9. List affected_recommendation_ids derived from the assumption→recommendation links
 10. List evidence_ids from the available evidence that inform this risk
-11. Optionally provide brief mitigation_notes
+11. Optionally provide brief mitigation_notes (1 sentence max)
 
 CRITICAL RULES:
 - Each risk must threaten at least one named assumption — no floating risks
-- Derive affected_recommendation_ids by following the assumption→recommendation links
 - Do not duplicate risks — each must be distinct
-- Avoid trivial risks ("team may not cooperate") — focus on strategic conditions
+- Avoid trivial risks — focus on strategic conditions
 - Use exact assumption IDs (e.g. "A-001") and recommendation IDs (e.g. "REC-001")
-- Risks are forward-looking threats, not observations or findings
 
 Return structured JSON matching the risk_generation schema.
 """
@@ -2673,10 +2668,10 @@ def _opportunity_prompt(
         risk_lines += f"\n  {rk_id}: {stmt}\n    → threatens assumptions: {a_ids}\n"
 
     ev_lines = ""
-    for e in evidence_items[:20]:
+    for e in evidence_items[:8]:
         eid = e.get("evidence_id", "")
-        claim = e.get("claim", "")[:100]
-        src = e.get("source_document", e.get("source", ""))[:40]
+        claim = e.get("claim", "")[:80]
+        src = e.get("source_document", e.get("source", ""))[:35]
         ev_lines += f"\n  {eid}: {claim}  [source: {src}]"
 
     return f"""You are a senior strategy consultant producing a Strategic Opportunity analysis.
@@ -2696,16 +2691,11 @@ EVIDENCE AVAILABLE:
 {ev_lines or "  (none provided)"}
 
 TASK:
-Identify 5–10 strategic opportunities — upside scenarios that become available when one
+Identify 4–7 strategic opportunities — upside scenarios that become available when one
 or more assumptions prove MORE FAVOURABLE than expected, not merely satisfied.
 
 This is not about positive risks. It is about what additional value, advantage, or
 acceleration becomes possible when an assumption is exceeded.
-
-Example structure:
-  Assumption: Technology X becomes commercially available within 24 months.
-  Risk (downside): Availability slips to 48 months.
-  Opportunity (upside): Availability accelerates to 12 months, enabling first-mover advantage.
 
 For each opportunity:
 1. State precisely what additional value becomes possible (the upside scenario)
@@ -2714,18 +2704,15 @@ For each opportunity:
 4. Rate likelihood: High, Medium, Low
 5. Rate evidence support: how strongly do evidence items signal this upside is plausible?
 6. Rate confidence: your confidence in this opportunity assessment
-7. Write a rationale: why does this opportunity matter strategically?
+7. Write a 1-2 sentence rationale: why does this opportunity matter strategically?
 8. List related_assumption_ids from the assumptions above (use exact IDs)
-9. List enabled_recommendation_ids: which recommendations would be amplified or unlocked?
-   (Traverse from the related assumptions to their supported_recommendation_ids)
+9. List enabled_recommendation_ids derived from the assumption→recommendation links
 10. List evidence_ids from the available evidence that support this opportunity
-11. Optionally provide brief exploitation_notes: how should this opportunity be captured?
+11. Optionally provide brief exploitation_notes (1 sentence max)
 
 OPPORTUNITY QUALITY CRITERIA:
 - Each opportunity must be grounded in a named assumption — no floating opportunities
-- Prefer opportunities affecting: competitive advantage, capital allocation, market timing,
-  infrastructure strategy, policy advantage, ecosystem positioning
-- Avoid generic opportunities ("things could go better") — be specific about the upside mechanism
+- Be specific about the upside mechanism — avoid generic "things could go better"
 - Opportunities should be distinct from each other and from the risks already identified
 - Use exact assumption IDs (e.g. "A-001") and recommendation IDs (e.g. "REC-001")
 
@@ -2775,7 +2762,7 @@ def _strategic_options_prompt(
         rec_lines += f"\n  {r_id}: {title}  (assumptions: {a_ids})"
 
     ev_lines = ""
-    for e in evidence_items[:15]:
+    for e in evidence_items[:6]:
         eid = e.get("evidence_id", "")
         claim = e.get("claim", "")[:80]
         ev_lines += f"\n  {eid}: {claim}"
@@ -2800,54 +2787,35 @@ EVIDENCE (selected):
 {ev_lines or "  (none provided)"}
 
 TASK:
-Generate between 2 and 5 genuinely different strategic options. Each option is a coherent,
-internally consistent course of action — not a list of tasks, but a strategic posture.
+Generate 2-4 genuinely different strategic options. Each option is a coherent, internally
+consistent course of action — a strategic posture, not a list of tasks.
 
-Cardinality guidance:
-- Produce the SMALLEST number of options necessary to capture materially different strategic choices.
-- Do not invent weak or artificial options simply to reach a higher count.
-- Do not merge genuinely distinct strategic paths merely to reduce the count.
-- 2 options: appropriate when the evidence supports only two credible directions.
-- 3-4 options: most common when evidence reveals clearly differentiated postures.
-- 5 options: only when five genuinely distinct and well-supported strategies exist.
-- Prefer quality over quantity.
-
-Options must be meaningfully different from each other in:
-  - Risk appetite (aggressive vs phased vs conservative)
-  - Capital commitment (high vs medium vs low intensity)
-  - Time horizon (near vs medium vs long-term)
-  - Which opportunities they pursue
-  - Which risks they accept vs mitigate
+Options must be meaningfully different in: risk appetite, capital commitment, time horizon,
+which opportunities they pursue, and which risks they accept vs mitigate.
 
 For each option:
 1. Give it a short descriptive title (5-10 words)
-2. Describe what it entails (2-4 sentences)
-3. State the strategic objective it pursues
-4. List 2-5 expected outcomes
+2. Describe what it entails (1-3 sentences)
+3. State the strategic objective it pursues (1 sentence)
+4. List 2-3 expected outcomes
 5. List supporting_assumption_ids it depends on (exact IDs e.g. "A-001")
 6. List associated_risk_ids it must manage (exact IDs e.g. "RSK-001")
-7. List associated_opportunity_ids it is positioned to capture (exact IDs e.g. "OPP-001")
+7. List associated_opportunity_ids it captures (exact IDs e.g. "OPP-001")
 8. List supporting_recommendation_ids it implements (exact IDs e.g. "REC-001")
-9. List 2-4 advantages
-10. List 2-4 disadvantages
+9. List 2-3 advantages
+10. List 2-3 disadvantages
 11. Rate implementation_complexity: Low | Medium | High
 12. Rate estimated_time_horizon: Near-term | Medium-term | Long-term
 13. Rate capital_intensity: Low | Medium | High
 14. Rate confidence: High | Medium | Low
-15. Set recommended: true for EXACTLY ONE option — the preferred course of action
-16. Write a rationale comparing this option against the others — especially for the recommended option
+15. Set recommended: true for EXACTLY ONE option
+16. Write a rationale (2-3 sentences) comparing this option against the others
 
 SELECTION RULES:
 - Exactly one option must have recommended=True
-- The recommended option should provide the best risk-adjusted outcome given the evidence
-- The rationale for the recommended option must explicitly compare it against the alternatives
+- The recommended option rationale must explicitly compare it against the alternatives
 - Non-recommended options must still be complete and analytically sound
-
-OPTION QUALITY RULES:
-- Options must be derived from the evidence, assumptions, risks, and opportunities above
-- Do not invent options that have no grounding in the strategic context
 - Use exact IDs when referencing assumptions, risks, opportunities, and recommendations
-- Options should represent genuinely different strategic postures, not minor variations
 
 Return structured JSON matching the strategic_option_generation schema.
 """
@@ -3300,17 +3268,17 @@ def _decision_analysis_prompt(
         rec = " [RECOMMENDED]" if opt.get("recommended") else ""
         opts_detail += (
             f"\n  {oid}{rec}: {opt.get('title', '')}\n"
-            f"    Description: {opt.get('description', '')}\n"
-            f"    Assumptions: {opt.get('supporting_assumption_ids', [])}\n"
-            f"    Risks:       {opt.get('associated_risk_ids', [])}\n"
-            f"    Opps:        {opt.get('associated_opportunity_ids', [])}\n"
-            f"    Complexity:  {opt.get('implementation_complexity', '')}  "
+            f"    Description: {opt.get('description', '')[:200]}\n"
+            f"    Assumptions: {opt.get('supporting_assumption_ids', [])}  "
+            f"Risks: {opt.get('associated_risk_ids', [])}  "
+            f"Opps: {opt.get('associated_opportunity_ids', [])}\n"
+            f"    Complexity: {opt.get('implementation_complexity', '')}  "
             f"Capital: {opt.get('capital_intensity', '')}  "
             f"Horizon: {opt.get('estimated_time_horizon', '')}\n"
-            f"    Rationale:   {opt.get('rationale', '')}\n"
+            f"    Rationale: {opt.get('rationale', '')[:200]}\n"
         )
 
-    return f"""You are a strategic decision analyst. Your task is to produce an explicit, rigorous comparison of the Strategic Options below, explaining WHY one option is preferred over the others.
+    return f"""You are a strategic decision analyst. Produce an explicit, rigorous comparison of the Strategic Options below, explaining WHY one option is preferred.
 
 DECISION QUESTION
 {question}
@@ -3339,21 +3307,19 @@ Produce a DecisionAnalysis object that:
 
 2. RANKS all options from most to least preferred.
 
-3. IDENTIFIES 3-6 explicit tradeoffs of the form "Higher X → Lower Y".
+3. IDENTIFIES 3-4 explicit tradeoffs of the form "Higher X → Lower Y".
    Derive ONLY from the existing graph. Do NOT invent new tradeoffs.
 
 4. EXPLAINS sensitivity: which specific assumption_ids, if they fail, would change the preferred option.
    Reference assumption_ids by name. Do NOT generate new scenarios.
 
-5. JUSTIFIES the preferred option explicitly against each alternative — not just by restating the recommendation.
-   Answer: "Why does {question[:40]} prefer this option over each alternative?"
+5. JUSTIFIES the preferred option against each alternative in 2-3 sentences total.
 
 CONSTRAINTS
 - Do NOT generate new options, evidence, or scenarios.
 - Everything must derive from the existing graph above.
 - Exactly one recommended_option_id (must match an existing option_id).
 - Be specific: name assumption IDs, risk IDs, opportunity IDs where relevant.
-- Tradeoffs should be concrete, not generic.
 
 Return structured JSON matching the decision_analysis_generation schema.
 """
@@ -3391,13 +3357,13 @@ def _executive_confidence_prompt(
     scenario_summary = ""
     if scenarios:
         scenario_summary = "\n".join(
-            f"  [{s.get('scenario_id', '?')}] {s.get('name', '')} — outcome: {s.get('strategic_outcome', '')[:80]}"
-            for s in scenarios[:5]
+            f"  [{s.get('scenario_id', '?')}] {s.get('name', '')} — outcome: {s.get('strategic_outcome', '')[:60]}"
+            for s in scenarios[:4]
         )
     else:
         scenario_summary = "  (no scenarios available)"
 
-    return f"""You are an executive decision advisor. Your task is to synthesise the completed J7 decision graph into a single executive confidence assessment that answers: "Should an executive approve this recommendation today?"
+    return f"""You are an executive decision advisor. Synthesise the completed J7 decision graph into a single executive confidence assessment: "Should an executive approve this recommendation today?"
 
 DECISION QUESTION
 {question}
@@ -3405,8 +3371,8 @@ DECISION QUESTION
 DECISION ANALYSIS SUMMARY
 Recommended option: {rec_id}
 Analysis confidence: {da_conf}
-Summary: {da_summary}
-Rationale: {da_rationale[:400]}
+Summary: {da_summary[:250]}
+Rationale: {da_rationale[:250]}
 
 KEY TRADEOFFS
 {tradeoffs}
@@ -3415,7 +3381,7 @@ KEY UNCERTAINTIES
 {uncertainties}
 
 SENSITIVITY ANALYSIS
-{sens[:400]}
+{sens[:300] if isinstance(sens, str) else str(sens)[:300]}
 
 STRATEGIC ASSUMPTIONS
 {_fmt(assumptions, 'assumption_id')}
@@ -3432,41 +3398,29 @@ SCENARIO ANALYSIS
 TASK
 Produce an ExecutiveConfidence object that:
 
-1. RATES overall_confidence (High/Medium/Low) based on:
-   - Strength and independence of the evidence base
-   - Number of Critical assumptions and their evidence support
-   - Risk concentration (count and severity of High-severity risks)
-   - Sensitivity of the preferred option to assumption failures
-   - Robustness across scenarios
+1. RATES overall_confidence (High/Medium/Low) based on: evidence strength, Critical assumption count,
+   High-severity risk concentration, and option sensitivity to assumption failures.
 
 2. DETERMINES decision_readiness:
    - "Ready for Decision" — strong evidence, assumptions validated, risks mitigated
    - "Needs Additional Validation" — material unknowns remain but not blocking
    - "Not Ready" — critical evidence gaps or unmitigated blocking risks
 
-3. ISSUES a board_recommendation:
-   - "Proceed" — approve now with current evidence
-   - "Proceed with Conditions" — approve subject to specific conditions
-   - "Delay Pending Evidence" — do not decide until specific evidence is gathered
-   - "Reject" — evidence or risk profile does not support the strategy
+3. ISSUES a board_recommendation: "Proceed" | "Proceed with Conditions" | "Delay Pending Evidence" | "Reject"
 
-4. IDENTIFIES 3-5 critical_unknowns — specific items that must resolve before
-   the decision can be made with high confidence.
+4. IDENTIFIES 3-4 critical_unknowns — specific items that must resolve before deciding.
 
-5. PRODUCES validation_priorities — an ordered due-diligence checklist of 3-7
-   specific actions the executive team must take before approving. Be concrete:
-   "Validate retrofit cost assumptions with independent engineering estimates" is
-   better than "validate costs". Reference assumption_ids and risk_ids by name.
+5. PRODUCES validation_priorities — 3-5 concrete due-diligence actions. Reference assumption_ids
+   and risk_ids by name. Be specific (e.g. "Validate A-001 cost assumption via independent estimate").
 
 6. PROVIDES conditional analysis:
-   - confidence_if_assumptions_hold: what the confidence becomes if Critical assumptions are confirmed
-   - confidence_if_assumptions_fail: what the confidence becomes if Critical assumptions fail
+   - confidence_if_assumptions_hold: confidence if Critical assumptions are confirmed
+   - confidence_if_assumptions_fail: confidence if Critical assumptions fail
 
 CONSTRAINTS
 - Do NOT generate new strategic reasoning, options, or evidence.
 - Everything must derive from the decision graph provided above.
-- Be specific: reference assumption IDs and risk IDs in your rationale.
-- validation_priorities must be actionable and executive-level.
+- Reference assumption IDs and risk IDs specifically.
 
 Return structured JSON matching the executive_confidence_generation schema.
 """

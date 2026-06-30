@@ -277,11 +277,15 @@ def benchmark(
     ] = Path("sources"),
     out_dir: Annotated[
         Path,
-        typer.Option("--out-dir", "-o", help="Directory for report outputs."),
+        typer.Option("--out-dir", "--out", "-o", help="Directory for report outputs."),
     ] = Path("outputs"),
     profile: Annotated[
         str | None,
         typer.Option("--profile", "-p", help="Domain profile name or path (e.g. smr, ai_data_centers)."),
+    ] = None,
+    knowledge_store: Annotated[
+        Path | None,
+        typer.Option("--knowledge-store", help="Knowledge Store directory for Knowledge Layer evidence retrieval."),
     ] = None,
     model: Annotated[
         str | None,
@@ -530,8 +534,12 @@ def regress(
     ] = Path("baseline/evaluation_report.json"),
     out_dir: Annotated[
         Path,
-        typer.Option("--out-dir", "-o", help="Directory for regression report outputs."),
+        typer.Option("--out-dir", "--out", "-o", help="Directory for regression report outputs."),
     ] = Path("outputs"),
+    knowledge_store: Annotated[
+        Path | None,
+        typer.Option("--knowledge-store", help="Knowledge Store directory (accepted for forward compat; not used by regression comparison)."),
+    ] = None,
     fail_threshold: Annotated[
         float,
         typer.Option(

@@ -162,6 +162,7 @@ class ClaudeCallTrace(BaseModel):
     success: bool
     token_usage: dict[str, int] = Field(default_factory=dict)
     error: str | None = None
+    duration_ms: float = 0.0
 
 
 class Contradiction(BaseModel):

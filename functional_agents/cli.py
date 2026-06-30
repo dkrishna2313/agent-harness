@@ -58,6 +58,21 @@ def main(
         int,
         typer.Option("--top-chunks", help="Maximum chunks sent to evidence extraction."),
     ] = 20,
+    knowledge_store: Annotated[
+        Path | None,
+        typer.Option(
+            "--knowledge-store",
+            help=(
+                "Path to the Knowledge Store directory. Enables Knowledge Layer evidence retrieval "
+                "(hybrid semantic + lexical + LLM reranking) instead of legacy document extraction. "
+                "Defaults to 'knowledge_store/' if that directory exists."
+            ),
+        ),
+    ] = None,
+    rerank: Annotated[
+        bool,
+        typer.Option("--rerank/--no-rerank", help="Apply LLM reranking to retrieved evidence (requires ANTHROPIC_API_KEY)."),
+    ] = False,
     log_level: Annotated[
         str | None,
         typer.Option("--log-level", help="Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL."),
@@ -68,6 +83,10 @@ def main(
     Either pass a QUESTION as a positional argument (question-driven mode) or
     use --goal for goal-driven mode where ProblemFramingAgent derives the
     research questions automatically.
+
+    When a knowledge store is available (default: knowledge_store/), evidence is
+    retrieved via the Knowledge Layer (hybrid retrieval + optional LLM reranking)
+    instead of the legacy document extraction pipeline.
     """
 
     if goal and question:
@@ -80,6 +99,13 @@ def main(
     _configure_logging(verbose=False, log_level=log_level or "INFO")
 
     profile_names = [p.strip() for p in profiles.split(",") if p.strip()]
+
+    # Auto-detect knowledge store when not explicitly provided
+    resolved_ks: Path | None = knowledge_store
+    if resolved_ks is None:
+        default_ks = Path("knowledge_store")
+        if default_ks.exists():
+            resolved_ks = default_ks
 
     # Build client
     client = _build_client(mock=mock, model=model, use_extraction_cache=use_extraction_cache)
@@ -94,6 +120,8 @@ def main(
         top_evidence=top_evidence,
         top_chunks=top_chunks,
         web_search=web_search,
+        knowledge_store=resolved_ks,
+        use_reranker=rerank,
     )
 
     try:
