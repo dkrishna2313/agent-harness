@@ -370,6 +370,12 @@ class DcPowerAgent:
         selected_chunks, retrieval_scores, retrieval_plan_stats = select_top_chunks_multi(
             chunks, retrieval_plan.queries, top_n=self.top_chunks, source_quality_map=source_quality_map
         )
+        # select_top_chunks_multi returns the UNION of top-n chunks per query, which
+        # grows to N_queries × top_n for EXPLORATORY_RESEARCH questions (5-8 queries).
+        # Cap to top_chunks by retrieval score to keep the extraction prompt bounded.
+        if len(selected_chunks) > self.top_chunks:
+            cap_ids = {rs.chunk_id for rs in retrieval_scores[:self.top_chunks]}
+            selected_chunks = [c for c in selected_chunks if c.chunk_id in cap_ids]
         LOGGER.debug(
             "Evidence pipeline: %d chunks from %d documents; %d selected by retrieval (%d queries)",
             len(chunks),
@@ -413,7 +419,14 @@ class DcPowerAgent:
             message = f"evidence extraction failed: {exc}"
             LOGGER.error("Claude %s", message)
             errors.append(message)
-            evidence = extract_evidence(question, documents, source_quality_map=source_quality_map, profile=self.profile)
+            # Bounded fallback: cap at synthesis budget so recovery never produces
+            # more evidence than a successful extraction path would deliver to synthesis.
+            _fallback = extract_evidence(question, documents, source_quality_map=source_quality_map, profile=self.profile)
+            evidence = _fallback[:MAX_SYNTHESIS_EVIDENCE]
+            LOGGER.debug(
+                "Evidence fallback (bounded): %d items from %d candidates",
+                len(evidence), len(_fallback),
+            )
         LOGGER.log(PROGRESS, "Starting evidence scoring and ranking")
         # JH2 – score all candidates before ranking so quantitative_score is populated
         scored_candidates = score_evidence_items(
