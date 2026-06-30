@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -27,6 +28,24 @@ from .validator import validate_benchmark
 LOGGER = logging.getLogger(__name__)
 
 DEFAULT_WORKERS = 1
+
+
+@dataclass
+class BenchmarkPerfRecord:
+    """Per-question timing and token data collected during a benchmark run."""
+
+    question_id: str
+    total_ms: float
+    analysis_ms: float
+    retrieval_ms: float
+    reranking_ms: float
+    llm_ms: float
+    scoring_ms: float
+    report_ms: float
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    llm_calls: int
 
 
 @dataclass
@@ -55,6 +74,9 @@ class EvaluationRun:
 
     # J5.7 — per-question agent evaluation scores
     agent_scores: list[AgentScores] = field(default_factory=list)
+
+    # J8.9a — per-question benchmark performance records
+    perf_records: list[BenchmarkPerfRecord] = field(default_factory=list)
 
     # J5.7 / J6.6 / J6.6a — aggregate agent scores (computed in _compute_aggregates)
     planner_score: float = 0.0
@@ -154,7 +176,7 @@ class EvaluationRunner:
         total = len(qa_questions)
         if self._workers > 1:
             LOGGER.info("Running %d Q&A questions with %d workers", total, self._workers)
-        result.qa_scores, result.agent_scores = self._run_qa_parallel(
+        result.qa_scores, result.agent_scores, result.perf_records = self._run_qa_parallel(
             list(qa_questions), documents, total
         )
 
@@ -214,17 +236,43 @@ class EvaluationRunner:
         total: int,
         question: QAQuestion,
         documents: list,
-    ) -> tuple[int, QAScore]:
-        """Run a single Q&A question. Returns (original_index, score) for ordering."""
+    ) -> tuple[int, QAScore, AgentScores, BenchmarkPerfRecord]:
+        """Run a single Q&A question. Returns (original_index, score, agent_score, perf)."""
         LOGGER.info(
             "[%d/%d] Running %s: %s",
             idx + 1, total, question.question_id, question.question[:60],
         )
+        t_question_start = time.monotonic()
+        perf: BenchmarkPerfRecord | None = None
         try:
             agent = self._make_agent()
+            client = agent.client
+            traces_start = len(client.call_traces)
+
+            # --- Analysis phase (retrieval + LLM) ---
+            t_analysis = time.monotonic()
             memo = agent.analyze(question.question, documents)
+            analysis_ms = (time.monotonic() - t_analysis) * 1000
+
+            # Derive LLM stats from call_traces accumulated during analyze()
+            agent_traces = client.call_traces[traces_start:]
+            llm_ms = sum(t.duration_ms for t in agent_traces)
+            prompt_tokens = sum(t.token_usage.get("input_tokens", 0) for t in agent_traces)
+            completion_tokens = sum(t.token_usage.get("output_tokens", 0) for t in agent_traces)
+            total_tokens = prompt_tokens + completion_tokens
+            llm_call_count = len(agent_traces)
+            # Retrieval ≈ everything in analyze() that isn't LLM time
+            retrieval_ms = max(0.0, analysis_ms - llm_ms)
+            reranking_ms = 0.0  # not applicable in legacy DcPowerAgent path
+
+            # --- Scoring / evaluation phase ---
+            t_scoring = time.monotonic()
             qa_score = score_qa_response(question, memo)
             agent_score = score_agents(question.question_id, question.domain, memo, qa_score)
+            scoring_ms = (time.monotonic() - t_scoring) * 1000
+
+            # --- Report generation phase ---
+            t_report = time.monotonic()
             if self._ro_out_dir is not None:
                 _write_qa_research_object(
                     question=question,
@@ -232,26 +280,60 @@ class EvaluationRunner:
                     profile=self._profile,
                     out_dir=self._ro_out_dir,
                 )
+            report_ms = (time.monotonic() - t_report) * 1000
+
+            total_ms = (time.monotonic() - t_question_start) * 1000
+            perf = BenchmarkPerfRecord(
+                question_id=question.question_id,
+                total_ms=total_ms,
+                analysis_ms=analysis_ms,
+                retrieval_ms=retrieval_ms,
+                reranking_ms=reranking_ms,
+                llm_ms=llm_ms,
+                scoring_ms=scoring_ms,
+                report_ms=report_ms,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+                llm_calls=llm_call_count,
+            )
         except Exception as exc:
             LOGGER.error("Error running %s: %s", question.question_id, exc)
             qa_score = _failed_qa_score(question, str(exc))
             agent_score = AgentScores(question_id=question.question_id, domain=question.domain)
-        return idx, qa_score, agent_score
+            total_ms = (time.monotonic() - t_question_start) * 1000
+            perf = BenchmarkPerfRecord(
+                question_id=question.question_id,
+                total_ms=total_ms,
+                analysis_ms=0.0,
+                retrieval_ms=0.0,
+                reranking_ms=0.0,
+                llm_ms=0.0,
+                scoring_ms=0.0,
+                report_ms=0.0,
+                prompt_tokens=0,
+                completion_tokens=0,
+                total_tokens=0,
+                llm_calls=0,
+            )
+        return idx, qa_score, agent_score, perf
 
     def _run_qa_parallel(
         self,
         questions: list[QAQuestion],
         documents: list,
         total: int,
-    ) -> tuple[list[QAScore], list[AgentScores]]:
+    ) -> tuple[list[QAScore], list[AgentScores], list[BenchmarkPerfRecord]]:
         """Run Q&A questions in parallel, preserving original ordering."""
         qa_slots: list[QAScore | None] = [None] * len(questions)
         agent_slots: list[AgentScores | None] = [None] * len(questions)
+        perf_slots: list[BenchmarkPerfRecord | None] = [None] * len(questions)
         if self._workers == 1:
             for idx, question in enumerate(questions):
-                _, qa_score, agent_score = self._run_one_qa(idx, total, question, documents)
+                _, qa_score, agent_score, perf = self._run_one_qa(idx, total, question, documents)
                 qa_slots[idx] = qa_score
                 agent_slots[idx] = agent_score
+                perf_slots[idx] = perf
         else:
             with ThreadPoolExecutor(max_workers=self._workers) as pool:
                 futures = {
@@ -259,12 +341,14 @@ class EvaluationRunner:
                     for idx, q in enumerate(questions)
                 }
                 for future in as_completed(futures):
-                    idx, qa_score, agent_score = future.result()
+                    idx, qa_score, agent_score, perf = future.result()
                     qa_slots[idx] = qa_score
                     agent_slots[idx] = agent_score
+                    perf_slots[idx] = perf
         return (
             [s for s in qa_slots if s is not None],
             [s for s in agent_slots if s is not None],
+            [p for p in perf_slots if p is not None],
         )
 
     def _run_one_contradiction(

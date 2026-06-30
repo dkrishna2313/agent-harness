@@ -412,10 +412,13 @@ def benchmark(
     json_path = write_json_report(run, out_dir / "evaluation_report.json", run_meta=run_meta)
     md_path = write_md_report(run, out_dir / "evaluation_report.md", run_meta=run_meta)
 
-    from .evaluation.report import write_trace
+    from .evaluation.report import write_trace, print_benchmark_perf_summary
     trace_path = write_trace(run, out_dir / "evaluation.trace.json", run_meta=run_meta)
 
-    # Print summary
+    # J8.9a — print benchmark performance summary
+    print_benchmark_perf_summary(run)
+
+    # Print evaluation summary
     typer.echo("")
     typer.echo("=== Evaluation Complete ===")
     typer.echo(f"  Overall score:            {run.overall_score:.1%}")

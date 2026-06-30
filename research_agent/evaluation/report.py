@@ -258,6 +258,80 @@ def write_md_report(run: EvaluationRun, path: str | Path, *, run_meta: dict | No
     return out
 
 
+def build_benchmark_perf_summary(run: EvaluationRun) -> dict:
+    """Build benchmark_performance block for the trace (J8.9a)."""
+    records = run.perf_records
+    if not records:
+        return {}
+    total_runtime_ms = sum(r.total_ms for r in records)
+    avg_ms = total_runtime_ms / len(records)
+    slowest = max(records, key=lambda r: r.total_ms)
+    fastest = min(records, key=lambda r: r.total_ms)
+    return {
+        "total_runtime_ms": round(total_runtime_ms, 1),
+        "average_runtime_ms": round(avg_ms, 1),
+        "slowest_question": slowest.question_id,
+        "fastest_question": fastest.question_id,
+        "total_llm_calls": sum(r.llm_calls for r in records),
+        "prompt_tokens": sum(r.prompt_tokens for r in records),
+        "completion_tokens": sum(r.completion_tokens for r in records),
+        "total_tokens": sum(r.total_tokens for r in records),
+        "questions": [
+            {
+                "id": r.question_id,
+                "retrieval_ms": round(r.retrieval_ms, 1),
+                "reranking_ms": round(r.reranking_ms, 1),
+                "llm_ms": round(r.llm_ms, 1),
+                "evaluation_ms": round(r.scoring_ms, 1),
+                "report_ms": round(r.report_ms, 1),
+                "total_ms": round(r.total_ms, 1),
+                "prompt_tokens": r.prompt_tokens,
+                "completion_tokens": r.completion_tokens,
+                "total_tokens": r.total_tokens,
+                "llm_calls": r.llm_calls,
+            }
+            for r in records
+        ],
+    }
+
+
+def print_benchmark_perf_summary(run: EvaluationRun) -> None:
+    """Print benchmark performance summary to stdout (J8.9a)."""
+    records = run.perf_records
+    if not records:
+        return
+    summary = build_benchmark_perf_summary(run)
+    SEP = "=" * 60
+
+    print(f"\n{SEP}")
+    print("  Benchmark Performance Summary")
+    print(SEP)
+    print(f"  Questions run:            {len(records)}")
+    print(f"  Total runtime:            {summary['total_runtime_ms'] / 1000:.1f}s")
+    print(f"  Average runtime/question: {summary['average_runtime_ms'] / 1000:.1f}s")
+    print(f"  Slowest question:         {summary['slowest_question']}")
+    print(f"  Fastest question:         {summary['fastest_question']}")
+    print(f"  Total LLM calls:          {summary['total_llm_calls']}")
+    print(f"  Prompt tokens:            {summary['prompt_tokens']:,}")
+    print(f"  Completion tokens:        {summary['completion_tokens']:,}")
+    print(f"  Total tokens:             {summary['total_tokens']:,}")
+    print(SEP)
+    print()
+
+    for q in summary["questions"]:
+        print(f"  {q['id']}")
+        print(f"    Retrieval:        {q['retrieval_ms'] / 1000:.1f}s")
+        if q["reranking_ms"] > 0:
+            print(f"    Reranking:        {q['reranking_ms'] / 1000:.1f}s")
+        print(f"    LLM:              {q['llm_ms'] / 1000:.1f}s")
+        print(f"    Evaluation:       {q['evaluation_ms'] / 1000:.1f}s")
+        print(f"    Report gen:       {q['report_ms'] / 1000:.1f}s")
+        print(f"    Total:            {q['total_ms'] / 1000:.1f}s")
+        print(f"    Prompt tokens:    {q['prompt_tokens']:,}")
+        print(f"    Completion tokens:{q['completion_tokens']:,}")
+        print()
+
+
 def build_trace(run: EvaluationRun, *, run_meta: dict | None = None) -> dict:
     """Build a detailed evaluation trace for debugging (J2.2a.4)."""
 
@@ -284,6 +358,7 @@ def build_trace(run: EvaluationRun, *, run_meta: dict | None = None) -> dict:
             "benchmark_errors": len(run.validation_errors),
         },
         "agent_evaluation": _agent_evaluation_dict(run),
+        "benchmark_performance": build_benchmark_perf_summary(run),
         "qa_results": [_qa_trace_dict(s) for s in run.qa_scores],
         "contradiction_results": [_contra_trace_dict(s) for s in run.contradiction_scores],
         "failed_tests": {
