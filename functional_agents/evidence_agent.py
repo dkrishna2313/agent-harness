@@ -301,9 +301,99 @@ class EvidenceAgent(FunctionalAgent):
         self._rerank_candidates = rerank_candidates
 
     def _execute(self, context: AgentContext) -> AgentContext:
+        """J10.5 — collect evidence per Decision Domain; primary flows downstream.
+
+        The PRIMARY domain (domain_plans[0], whose plan == context.plan) runs on
+        the real context, leaving context.evidence_notes and all downstream state
+        byte-identical to J10.4. Secondary domains run on isolated scratch
+        contexts so the real context is untouched; their evidence/mapping/coverage
+        is captured into context.domain_evidence. Goal/question mode has a single
+        plan → single collection, unchanged.
+        """
+        plans = list(context.domain_plans) if context.domain_plans else []
+
+        # Primary run on the real context (byte-identical to prior behaviour).
+        self._execute_single(context)
+        primary_plan = plans[0] if plans else context.plan
+        domain_evidence = [self._capture_domain_evidence(context, primary_plan)]
+
+        # Secondary domains on isolated scratch contexts (organizational only).
+        for plan in plans[1:]:
+            scratch = self._scratch_context(context, plan)
+            try:
+                self._execute_single(scratch)
+                domain_evidence.append(self._capture_domain_evidence(scratch, plan))
+            except Exception as exc:  # a secondary domain must never fail the run
+                LOGGER.warning(
+                    "[EvidenceAgent] secondary domain evidence failed (%s: %s) — skipping.",
+                    type(exc).__name__, exc,
+                )
+
+        context.domain_evidence = domain_evidence
+
+        primary_domain = (
+            primary_plan.get("decision_domain_title")
+            or primary_plan.get("question", "")
+            if isinstance(primary_plan, dict) else ""
+        )
+        context.trace["_evidence_reasoning"] = {
+            "plans_received": len(plans),
+            "evidence_sets_generated": len(domain_evidence),
+            "evidence_sets_executed": 1 if domain_evidence else 0,
+            "primary_domain": primary_domain,
+        }
+        return context
+
+    def _execute_single(self, context: AgentContext) -> AgentContext:
         if self._retriever is not None:
             return self._execute_kb(context)
         return self._execute_legacy(context)
+
+    # ------------------------------------------------------------------
+    # J10.5 — multi-domain helpers
+    # ------------------------------------------------------------------
+
+    _PLAN_KEYS = ("question", "research_type", "subquestions",
+                  "investigation_areas", "profiles_used", "reasoning")
+
+    def _scratch_context(self, context: AgentContext, plan: dict) -> AgentContext:
+        """Build an isolated context for a secondary domain's evidence pass.
+
+        Shares read-only collaborators (client/retriever live on the agent or in
+        the trace) but isolates everything _execute_single mutates: plan,
+        question, research_object, trace, evidence_notes, agent_history.
+        """
+        import copy
+
+        scratch = copy.copy(context)
+        scratch.plan = {k: plan.get(k) for k in self._PLAN_KEYS}
+        scratch.question = plan.get("question", context.question)
+        scratch.research_object = copy.deepcopy(context.research_object) if context.research_object else {}
+        # Fresh trace: keep the client for the legacy path, drop the perf tracker
+        # so secondary passes don't pollute primary performance accounting.
+        scratch.trace = {"_client": context.trace.get("_client")}
+        scratch.evidence_notes = []
+        scratch.agent_history = []
+        return scratch
+
+    @staticmethod
+    def _capture_domain_evidence(context: AgentContext, plan: dict) -> dict:
+        """Extract one Decision Domain's evidence collection + stats (J10.5)."""
+        note = context.evidence_notes[0] if context.evidence_notes else {}
+        plan = plan if isinstance(plan, dict) else {}
+        return {
+            "decision_domain_id": plan.get("decision_domain_id"),
+            "decision_domain_title": plan.get("decision_domain_title"),
+            "evidence": note.get("evidence_items", []),
+            "mapping": {
+                "evidence_by_subquestion": note.get("evidence_by_subquestion", {}),
+                "evidence_by_area": note.get("evidence_by_area", {}),
+            },
+            "coverage": {
+                "coverage_by_subquestion": note.get("coverage_by_subquestion", {}),
+                "evidence_summary": note.get("evidence_summary", {}),
+            },
+        }
 
     # ------------------------------------------------------------------
     # Knowledge Layer path (J8.6)

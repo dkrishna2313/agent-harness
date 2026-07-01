@@ -111,6 +111,12 @@ class AgentContext:
     # only and does not change execution. Single entry in goal/question mode.
     domain_plans: list[dict[str, Any]] = field(default_factory=list)
     evidence_notes: list[dict[str, Any]] = field(default_factory=list)
+    # J10.5 — one evidence collection per Decision Domain (engagement mode).
+    # evidence_notes (above) remains the PRIMARY collection that flows to
+    # HypothesisAgent; domain_evidence is organizational only. Single entry in
+    # goal/question mode. Each entry: {decision_domain_id, decision_domain_title,
+    # evidence, mapping, coverage}.
+    domain_evidence: list[dict[str, Any]] = field(default_factory=list)
     hypotheses: list[dict[str, Any]] = field(default_factory=list)
     hypothesis_challenges: list[dict[str, Any]] = field(default_factory=list)
     surviving_hypotheses: list[dict[str, Any]] = field(default_factory=list)

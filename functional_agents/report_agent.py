@@ -1746,6 +1746,10 @@ class ReportAgent(FunctionalAgent):
         _planner_reasoning = context.trace.get("_planner_reasoning")
         if _planner_reasoning:
             trace_payload["planner_reasoning"] = _planner_reasoning
+        # J10.5 – evidence reasoning (per-domain) diagnostics (additive).
+        _evidence_reasoning = context.trace.get("_evidence_reasoning")
+        if _evidence_reasoning:
+            trace_payload["evidence_reasoning"] = _evidence_reasoning
         # PH1 – LLM output normalization diagnostics (additive).
         _llm_norm = context.trace.get("_llm_normalization")
         if _llm_norm:
