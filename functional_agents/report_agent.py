@@ -1738,6 +1738,10 @@ class ReportAgent(FunctionalAgent):
         trace_payload["reasoning_targets"] = reasoning_targets_diagnostics(
             context.get_reasoning_targets(), source="context.question"
         )
+        # J10.2 – planner reasoning-target diagnostics (additive).
+        _planner_reasoning = context.trace.get("_planner_reasoning")
+        if _planner_reasoning:
+            trace_payload["planner_reasoning"] = _planner_reasoning
 
         # Multi-profile block (J5.6 / J5.6a)
         trace_payload["profiles_requested"] = context.profiles

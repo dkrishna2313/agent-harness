@@ -34,20 +34,36 @@ class PlannerAgent(FunctionalAgent):
 
         profiles_context = self._build_profiles_context(context)
 
+        # J10.2 — consume Reasoning Targets instead of reading context.question
+        # directly. Today the accessor returns exactly one target derived from
+        # context.question, so planning output is unchanged. Future milestones
+        # increase the target count; the Planner selects the primary target here
+        # and does not assume only one exists.
+        targets = context.get_reasoning_targets()
+        primary_target = targets[0] if targets else None
+        planning_question = primary_target.question if primary_target else context.question
+
         plan = self._generate_plan(
-            context.question,
+            planning_question,
             profiles_context,
             decision_model=context.decision_model or None,
             research_strategy=context.research_strategy or None,
         )
 
         context.plan = {
-            "question": context.question,
+            "question": planning_question,
             "research_type": plan.research_type,
             "subquestions": plan.subquestions,
             "investigation_areas": plan.investigation_areas,
             "profiles_used": plan.profiles_used,
             "reasoning": plan.reasoning,
+        }
+
+        # J10.2 — additive planner diagnostics (seam visibility, not behavior).
+        context.trace["_planner_reasoning"] = {
+            "targets_received": len(targets),
+            "targets_planned": 1 if primary_target is not None else 0,
+            "primary_target_kind": primary_target.kind if primary_target else None,
         }
 
         # Write plan fields into the Research Object (J5.1.6)
