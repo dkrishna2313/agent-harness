@@ -1733,6 +1733,11 @@ class ReportAgent(FunctionalAgent):
         _arch_meta = context.trace.get("_decision_architecture_meta")
         if _arch_meta:
             trace_payload["decision_architecture_meta"] = _arch_meta
+        # J10.1 – reasoning-target seam diagnostics (legacy: single question).
+        from .reasoning_target import reasoning_targets_diagnostics
+        trace_payload["reasoning_targets"] = reasoning_targets_diagnostics(
+            context.get_reasoning_targets(), source="context.question"
+        )
 
         # Multi-profile block (J5.6 / J5.6a)
         trace_payload["profiles_requested"] = context.profiles

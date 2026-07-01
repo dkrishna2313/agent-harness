@@ -8,7 +8,10 @@ sequence, and written to the Research Object and trace at the end.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .reasoning_target import ReasoningTarget
 
 
 class ContextValidationError(ValueError):
@@ -191,6 +194,42 @@ class AgentContext:
             "profiles": self.profiles,
             "execution_profile": self.execution_profile,
         }
+
+    # ------------------------------------------------------------------
+    # Reasoning targets (J10.1) — compatibility seam for Decision Domains
+    # ------------------------------------------------------------------
+
+    def get_reasoning_targets(self) -> list["ReasoningTarget"]:
+        """Return the reasoning target(s) downstream agents should reason over.
+
+        J10.1 — legacy behaviour: derive exactly ONE target from
+        ``context.question`` so nothing downstream changes. Later milestones will
+        return one target per Decision Domain / decision stream; consumers that
+        read through this accessor will move to Decision Domains without further
+        edits. Returns an empty list only when no question is set yet (e.g. a
+        goal-driven run before ProblemFramingAgent populates it).
+        """
+        from .reasoning_target import ReasoningTarget, KIND_RESEARCH_QUESTION
+
+        question = (self.question or "").strip()
+        if not question:
+            return []
+        return [
+            ReasoningTarget(
+                id="primary",
+                title=question,
+                kind=KIND_RESEARCH_QUESTION,
+                question=question,
+                decision_domain_id=None,
+                decision_domain_title=None,
+                evidence_requirements=[],
+            )
+        ]
+
+    @property
+    def reasoning_targets(self) -> list["ReasoningTarget"]:
+        """Convenience property mirroring :meth:`get_reasoning_targets` (J10.1)."""
+        return self.get_reasoning_targets()
 
 
 # ---------------------------------------------------------------------------
