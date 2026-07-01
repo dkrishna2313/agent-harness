@@ -1734,10 +1734,14 @@ class ReportAgent(FunctionalAgent):
         if _arch_meta:
             trace_payload["decision_architecture_meta"] = _arch_meta
         # J10.1 – reasoning-target seam diagnostics (legacy: single question).
-        from .reasoning_target import reasoning_targets_diagnostics
-        trace_payload["reasoning_targets"] = reasoning_targets_diagnostics(
-            context.get_reasoning_targets(), source="context.question"
+        from .reasoning_target import reasoning_targets_diagnostics, KIND_DECISION_DOMAIN
+        _rt = context.get_reasoning_targets()
+        _rt_source = (
+            "decision_architecture"
+            if (_rt and _rt[0].kind == KIND_DECISION_DOMAIN)
+            else "context.question"
         )
+        trace_payload["reasoning_targets"] = reasoning_targets_diagnostics(_rt, source=_rt_source)
         # J10.2 – planner reasoning-target diagnostics (additive).
         _planner_reasoning = context.trace.get("_planner_reasoning")
         if _planner_reasoning:

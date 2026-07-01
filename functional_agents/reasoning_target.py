@@ -56,9 +56,17 @@ class ReasoningTarget:
 def reasoning_targets_diagnostics(
     targets: list[ReasoningTarget], *, source: str
 ) -> dict[str, Any]:
-    """Lightweight trace summary for the reasoning targets (J10.1)."""
+    """Lightweight trace summary for the reasoning targets (J10.1 / J10.3).
+
+    J10.3 adds a ``kinds`` histogram so multi-target (Decision Domain) runs are
+    visible. Existing fields (count, primary_kind, source) are unchanged.
+    """
+    kinds: dict[str, int] = {}
+    for t in targets:
+        kinds[t.kind] = kinds.get(t.kind, 0) + 1
     return {
         "count": len(targets),
         "primary_kind": targets[0].kind if targets else None,
         "source": source,
+        "kinds": kinds,
     }

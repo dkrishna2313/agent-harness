@@ -85,6 +85,7 @@ def test_diagnostics_shape():
         "count": 1,
         "primary_kind": "research_question",
         "source": "context.question",
+        "kinds": {"research_question": 1},
     }
 
 
@@ -92,6 +93,7 @@ def test_diagnostics_empty():
     diag = reasoning_targets_diagnostics([], source="context.question")
     assert diag["count"] == 0
     assert diag["primary_kind"] is None
+    assert diag["kinds"] == {}
 
 
 def test_target_to_dict_has_future_fields():

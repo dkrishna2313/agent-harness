@@ -202,16 +202,60 @@ class AgentContext:
     def get_reasoning_targets(self) -> list["ReasoningTarget"]:
         """Return the reasoning target(s) downstream agents should reason over.
 
-        J10.1 — legacy behaviour: derive exactly ONE target from
-        ``context.question`` so nothing downstream changes. Later milestones will
-        return one target per Decision Domain / decision stream; consumers that
-        read through this accessor will move to Decision Domains without further
-        edits. Returns an empty list only when no question is set yet (e.g. a
-        goal-driven run before ProblemFramingAgent populates it).
+        J10.3 — the producer now depends on run mode:
+
+        * **Strategic Engagement mode** (``self.engagement`` populated and a
+          Decision Architecture with decision streams present): return ONE target
+          per Decision Domain (decision stream), ``kind='decision_domain'``.
+        * **Research/goal/question mode**: return exactly ONE
+          ``kind='research_question'`` target derived from ``context.question``
+          (unchanged from J10.1).
+
+        This changes the *representation*, not the reasoning: the Planner plans
+        only the primary target (``[0]``), and the primary target's ``question``
+        is pinned to ``context.question`` so planning output is byte-identical to
+        prior behaviour. Returns an empty list only when no question is set yet
+        (e.g. a goal-driven run before ProblemFramingAgent populates it).
         """
-        from .reasoning_target import ReasoningTarget, KIND_RESEARCH_QUESTION
+        from .reasoning_target import (
+            ReasoningTarget,
+            KIND_RESEARCH_QUESTION,
+            KIND_DECISION_DOMAIN,
+        )
 
         question = (self.question or "").strip()
+        streams = (self.decision_architecture or {}).get("decision_streams") or []
+
+        # Strategic Engagement mode → one target per Decision Domain.
+        if self.engagement and streams:
+            targets: list[ReasoningTarget] = []
+            for i, s in enumerate(streams):
+                title = (s.get("title") or "").strip() or f"Decision Domain {i + 1}"
+                rqs = [str(q).strip() for q in (s.get("research_questions") or []) if str(q).strip()]
+                # Primary domain is pinned to context.question so the Planner (which
+                # plans the primary target) produces identical output to J10.2. Other
+                # domains use their own primary analytical question from the stream.
+                if i == 0 and question:
+                    dq = question
+                elif rqs:
+                    dq = rqs[0]
+                else:
+                    dq = (s.get("executive_objective") or title).strip()
+                domain_id = f"domain-{i + 1}"
+                targets.append(
+                    ReasoningTarget(
+                        id=domain_id,
+                        title=title,
+                        kind=KIND_DECISION_DOMAIN,
+                        question=dq,
+                        decision_domain_id=domain_id,
+                        decision_domain_title=title,
+                        evidence_requirements=[],
+                    )
+                )
+            return targets
+
+        # Research / goal / question mode → single research-question target.
         if not question:
             return []
         return [
