@@ -30,6 +30,7 @@ importable everywhere without a cycle.
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
@@ -108,6 +109,70 @@ def normalize_llm_items(
         "component": component,
         "items_received": received,
         "items_valid": len(valid),
+        "items_dropped": dropped,
+        "fallback_used": False,
+    }
+
+
+def normalize_llm_object(
+    raw: Any,
+    *,
+    required_fields: tuple[str, ...] = (),
+    component: str = "",
+) -> tuple[dict | None, dict]:
+    """Normalize a raw LLM value expected to be a SINGLE object (dict).
+
+    Sibling of :func:`normalize_llm_items` for boundaries whose payload is one
+    object rather than a list (e.g. DecisionAnalysis's ``analysis``). Handles the
+    common LLM variances:
+
+      * already a dict → validated against ``required_fields``;
+      * a **stringified JSON object** → deserialized, then validated (the
+        observed DecisionAnalysis failure mode);
+      * a plain / non-JSON string, or JSON that isn't an object → dropped
+        (returns ``None``) so the caller's fallback path engages.
+
+    Never raises. Returns ``(obj_or_None, diagnostics)`` with the same diagnostic
+    shape as :func:`normalize_llm_items` (``items_received``/``items_valid`` are
+    0 or 1).
+    """
+    received = 0 if raw is None else 1
+    obj: dict | None = None
+
+    if isinstance(raw, dict):
+        obj = raw
+    elif isinstance(raw, str):
+        text = raw.strip()
+        if text:
+            try:
+                parsed = json.loads(text)
+                if isinstance(parsed, dict):
+                    obj = parsed
+                    LOGGER.warning(
+                        "llm_normalize[%s]: coerced stringified-JSON object into a dict.",
+                        component,
+                    )
+            except (ValueError, TypeError):
+                obj = None  # plain string — not usable
+
+    # Required-field validation.
+    if obj is not None and required_fields and not all(
+        (f in obj and obj[f] is not None) for f in required_fields
+    ):
+        obj = None
+
+    valid = 1 if obj is not None else 0
+    dropped = received - valid
+    if dropped:
+        LOGGER.warning(
+            "llm_normalize[%s]: dropped malformed object payload (type=%s, required=%s).",
+            component, type(raw).__name__, list(required_fields),
+        )
+
+    return obj, {
+        "component": component,
+        "items_received": received,
+        "items_valid": valid,
         "items_dropped": dropped,
         "fallback_used": False,
     }

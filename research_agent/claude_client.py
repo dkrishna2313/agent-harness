@@ -630,6 +630,8 @@ class DecisionAnalysisPayload(BaseModel):
     """Structured output wrapper for DecisionAnalysisAgent (J7.6)."""
 
     analysis: DecisionAnalysisItem
+    # PH1a — LLM output normalization diagnostics (None when not applicable).
+    normalization: dict | None = None
 
 
 class ExecutiveConfidenceItem(BaseModel):
@@ -1813,7 +1815,26 @@ class ClaudeClient:
             ),
             max_tokens=6000,
         )
-        return DecisionAnalysisPayload.model_validate(payload)
+        # PH1a — normalize the 'analysis' object at the boundary BEFORE typed
+        # validation. The model intermittently returns 'analysis' as a stringified
+        # JSON object (or a plain string); normalization deserializes the former
+        # and drops the latter so a malformed payload degrades to the caller's
+        # deterministic fallback instead of raising a raw pydantic error.
+        from .llm_normalize import normalize_llm_object
+        raw_analysis = payload.get("analysis") if isinstance(payload, dict) else payload
+        norm_obj, diag = normalize_llm_object(
+            raw_analysis,
+            required_fields=("recommended_option_id",),
+            component="decision_analysis",
+        )
+        # When normalization fails, pass the original through so model_validate
+        # raises (the agent catches it and falls back); flag the fallback.
+        analysis_value = norm_obj if norm_obj is not None else raw_analysis
+        if norm_obj is None:
+            diag["fallback_used"] = True
+        result = DecisionAnalysisPayload.model_validate({"analysis": analysis_value})
+        result.normalization = diag
+        return result
 
     def generate_executive_confidence(
         self,

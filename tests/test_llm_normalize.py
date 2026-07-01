@@ -79,3 +79,59 @@ def test_no_required_fields_keeps_all_dicts():
     raw = [{"a": 1}, {"b": 2}, "x"]
     items, diag = normalize_llm_items(raw, component="c")
     assert len(items) == 2  # the string is dropped (no coercion)
+
+
+# ---------------------------------------------------------------------------
+# PH1a — single-object normalization (normalize_llm_object)
+# ---------------------------------------------------------------------------
+
+from research_agent.llm_normalize import normalize_llm_object  # noqa: E402
+
+
+def test_object_valid_dict():
+    obj, diag = normalize_llm_object({"recommended_option_id": "O1"},
+                                     required_fields=("recommended_option_id",), component="decision_analysis")
+    assert obj == {"recommended_option_id": "O1"}
+    assert diag["items_received"] == 1 and diag["items_valid"] == 1
+
+
+def test_object_stringified_json_deserialized():
+    import json
+    raw = json.dumps({"recommended_option_id": "O1", "rationale": "x"})
+    obj, diag = normalize_llm_object(raw, required_fields=("recommended_option_id",), component="decision_analysis")
+    assert obj == {"recommended_option_id": "O1", "rationale": "x"}
+    assert diag["items_valid"] == 1
+
+
+def test_object_plain_string_dropped():
+    obj, diag = normalize_llm_object("just a sentence, not JSON",
+                                     required_fields=("recommended_option_id",), component="decision_analysis")
+    assert obj is None
+    assert diag["items_valid"] == 0 and diag["items_dropped"] == 1
+
+
+def test_object_stringified_json_but_not_object():
+    obj, diag = normalize_llm_object("[1, 2, 3]", component="c")  # JSON array, not object
+    assert obj is None
+    assert diag["items_dropped"] == 1
+
+
+def test_object_missing_required_field():
+    obj, diag = normalize_llm_object({"analysis_id": "DA-1"},
+                                     required_fields=("recommended_option_id",), component="c")
+    assert obj is None
+    assert diag["items_dropped"] == 1
+
+
+def test_object_none_input():
+    obj, diag = normalize_llm_object(None, component="c")
+    assert obj is None
+    assert diag["items_received"] == 0
+    assert diag["items_dropped"] == 0
+
+
+def test_object_never_raises():
+    for bad in (123, [1], {"x": 1}, "", "  ", "{bad json"):
+        obj, diag = normalize_llm_object(bad, required_fields=("k",), component="c")
+        assert obj is None or isinstance(obj, dict)
+        assert isinstance(diag, dict)

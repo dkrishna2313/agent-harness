@@ -86,6 +86,11 @@ class DecisionAnalysisAgent(FunctionalAgent):
         analysis = payload.analysis
         analysis_dict = analysis.model_dump()
 
+        # PH1a — surface LLM-output normalization diagnostics into the trace.
+        _norm = getattr(payload, "normalization", None)
+        if _norm:
+            context.trace.setdefault("_llm_normalization", []).append(_norm)
+
         # Store in context
         context.decision_analysis = analysis_dict
 
@@ -174,14 +179,36 @@ class DecisionAnalysisAgent(FunctionalAgent):
             return _mock_analysis(strategic_options, assumptions, risks, opportunities, recommendations, decision_model)
 
         if hasattr(self._client, "generate_decision_analysis"):
-            return self._client.generate_decision_analysis(
-                strategic_options=strategic_options,
-                assumptions=assumptions,
-                risks=risks,
-                opportunities=opportunities,
-                recommendations=recommendations,
-                decision_model=decision_model,
-            )
+            # PH1a — the boundary is hardened in generate_decision_analysis
+            # (stringified-JSON coercion). A still-unusable payload raises; catch
+            # it here and degrade to the deterministic mock rather than failing the
+            # run, mirroring the reranker's retrieval-order fallback.
+            try:
+                return self._client.generate_decision_analysis(
+                    strategic_options=strategic_options,
+                    assumptions=assumptions,
+                    risks=risks,
+                    opportunities=opportunities,
+                    recommendations=recommendations,
+                    decision_model=decision_model,
+                )
+            except Exception as exc:
+                LOGGER.warning(
+                    "[DecisionAnalysisAgent] live analysis failed (%s: %s) — "
+                    "degrading to deterministic mock analysis.",
+                    type(exc).__name__, exc,
+                )
+                mock = _mock_analysis(
+                    strategic_options, assumptions, risks, opportunities, recommendations, decision_model
+                )
+                mock.normalization = {
+                    "component": "decision_analysis",
+                    "items_received": 1,
+                    "items_valid": 0,
+                    "items_dropped": 1,
+                    "fallback_used": True,
+                }
+                return mock
 
         LOGGER.warning("[DecisionAnalysisAgent] client lacks generate_decision_analysis — using mock")
         return _mock_analysis(strategic_options, assumptions, risks, opportunities, recommendations, decision_model)
