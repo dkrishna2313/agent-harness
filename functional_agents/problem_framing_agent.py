@@ -91,15 +91,26 @@ class ProblemFramingAgent(FunctionalAgent):
         # critical_uncertainties, evidence_requirements) are left untouched.
         decision_model = self._condense_framing(decision_model)
 
+        # J9.2 – Decision Architecture: reframe the engagement as an executive
+        # decision (statement, scope, streams, board decisions, …). Research
+        # questions become children of decision streams. Derived deterministically
+        # from the framing payload + the structured engagement (when present).
+        from .decision_architecture import build_decision_architecture, architecture_trace_metadata
+        architecture = build_decision_architecture(decision_model, context.engagement or None)
+        arch_dict = architecture.to_dict()
+        context.decision_architecture = arch_dict
+
         # J7.0b – build and persist Decision Model v2.
         # J9.1a – link the DM to the CONDENSED objective, not the raw brief, so the
         # persisted strategic_question stays compact.
+        # J9.2 – carry the Decision Architecture on the persisted Decision Model.
         engagement_id: str | None = context.trace.get("_engagement_id")
         strategic_question = decision_model.objective or context.goal
         dm_v2 = self._build_decision_model_v2(
             decision_model,
             goal=strategic_question,
             engagement_id=engagement_id,
+            decision_architecture=arch_dict,
         )
 
         # Store the full decision model (v2 dict is a superset of v1 fields)
@@ -111,6 +122,8 @@ class ProblemFramingAgent(FunctionalAgent):
             context.research_object["decision_model"] = dm_dict
             context.research_object["goal"] = context.goal
             context.research_object["decision_model_id"] = dm_v2.decision_model_id
+            # J9.2 – persist the Decision Architecture on the Research Object.
+            context.research_object["decision_architecture"] = arch_dict
 
         # Stash in trace so ReportAgent can emit the problem_framing block
         context.trace["_problem_framing"] = dm_dict
@@ -125,6 +138,9 @@ class ProblemFramingAgent(FunctionalAgent):
             "research_questions": len(dm_dict.get("research_questions", [])),
             "raw_goal_chars": len(context.goal or ""),
         }
+        # J9.2 – stash the Decision Architecture and its metadata for the trace.
+        context.trace["_decision_architecture"] = arch_dict
+        context.trace["_decision_architecture_meta"] = architecture_trace_metadata(architecture)
 
         # Populate question from the first research question (enables downstream agents)
         if decision_model.research_questions and not context.question.strip():
@@ -198,10 +214,16 @@ class ProblemFramingAgent(FunctionalAgent):
                 pass
             return decision_model
 
-    def _build_decision_model_v2(self, payload: Any, *, goal: str, engagement_id: str | None):
+    def _build_decision_model_v2(
+        self, payload: Any, *, goal: str, engagement_id: str | None,
+        decision_architecture: dict | None = None,
+    ):
         """Produce, persist, and optionally engagement-link a DecisionModel v2."""
         from research_agent.decision_model import from_framing_payload, write_decision_model
-        dm_v2 = from_framing_payload(payload, strategic_question=goal, engagement_id=engagement_id)
+        dm_v2 = from_framing_payload(
+            payload, strategic_question=goal, engagement_id=engagement_id,
+            decision_architecture=decision_architecture or {},
+        )
         try:
             write_decision_model(dm_v2)
         except Exception:

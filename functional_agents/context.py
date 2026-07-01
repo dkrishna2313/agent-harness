@@ -92,6 +92,9 @@ class AgentContext:
     # Holds the validated EngagementSpec as a dict; empty for goal/question runs.
     engagement: dict[str, Any] = field(default_factory=dict)
     decision_model: dict[str, Any] = field(default_factory=dict)
+    # Decision Architecture (J9.2) — executive decision framing derived by
+    # ProblemFramingAgent, sitting between the engagement and the research program.
+    decision_architecture: dict[str, Any] = field(default_factory=dict)
     # Research strategy output of ResearchStrategyAgent (J6.2)
     research_strategy: dict[str, Any] = field(default_factory=dict)
 

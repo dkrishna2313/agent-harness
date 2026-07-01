@@ -350,6 +350,11 @@ class DecisionModel(BaseModel):
     constraints: list[str] = Field(default_factory=list)
     out_of_scope: list[str] = Field(default_factory=list)
 
+    # --- Decision Architecture (J9.2) — executive decision framing derived by
+    #     ProblemFramingAgent (statement, scope, streams, board decisions, …).
+    #     Stored as a dict to stay decoupled from the functional_agents layer.
+    decision_architecture: dict = Field(default_factory=dict)
+
     # --- Quality bar --------------------------------------------------------
     required_confidence: str = "medium"   # "high" | "medium" | "low"
 
@@ -402,6 +407,7 @@ def create_decision_model(
     alternatives: list[str] | None = None,
     constraints: list[str] | None = None,
     out_of_scope: list[str] | None = None,
+    decision_architecture: dict | None = None,
     required_confidence: str = "medium",
     source: str = "auto",
 ) -> DecisionModel:
@@ -418,6 +424,7 @@ def create_decision_model(
         alternatives=alternatives or [],
         constraints=constraints or [],
         out_of_scope=out_of_scope or [],
+        decision_architecture=decision_architecture or {},
         required_confidence=required_confidence,
         source=source,
     )
@@ -446,10 +453,12 @@ def from_framing_payload(
     *,
     strategic_question: str,
     engagement_id: str | None = None,
+    decision_architecture: dict | None = None,
 ) -> DecisionModel:
     """Build a DecisionModel v2 from a DecisionModelPayload (ProblemFramingAgent output).
 
     Maps the existing v1 fields into the v2 schema without any information loss.
+    J9.2: optionally carries the derived Decision Architecture dict.
     """
     # payload is a DecisionModelPayload Pydantic model
     objectives = [
@@ -468,6 +477,7 @@ def from_framing_payload(
         objectives=[o.model_dump() for o in objectives],
         decision_criteria=[c.model_dump() for c in criteria],
         investigation_areas=investigation_areas,
+        decision_architecture=decision_architecture or {},
         required_confidence="medium",
         source="problem_framing_agent",
     )

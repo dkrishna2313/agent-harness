@@ -1717,6 +1717,13 @@ class ReportAgent(FunctionalAgent):
         _rs_diag = context.trace.get("_research_strategy_diagnostics")
         if _rs_diag:
             trace_payload["research_strategy_diagnostics"] = _rs_diag
+        # J9.2 – Decision Architecture: full structure + compact metadata counts.
+        _arch = context.trace.get("_decision_architecture")
+        if _arch:
+            trace_payload["decision_architecture"] = _arch
+        _arch_meta = context.trace.get("_decision_architecture_meta")
+        if _arch_meta:
+            trace_payload["decision_architecture_meta"] = _arch_meta
 
         # Multi-profile block (J5.6 / J5.6a)
         trace_payload["profiles_requested"] = context.profiles
