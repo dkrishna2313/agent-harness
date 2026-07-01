@@ -118,6 +118,11 @@ class AgentContext:
     # evidence, mapping, coverage}.
     domain_evidence: list[dict[str, Any]] = field(default_factory=list)
     hypotheses: list[dict[str, Any]] = field(default_factory=list)
+    # J10.6 — one hypothesis set per Decision Domain (engagement mode). hypotheses
+    # (above) remains the PRIMARY set that flows to ChallengeAgent; domain_hypotheses
+    # is organizational only. Each entry: {decision_domain_id, decision_domain_title,
+    # hypotheses, synthesis_note, diagnostics}.
+    domain_hypotheses: list[dict[str, Any]] = field(default_factory=list)
     hypothesis_challenges: list[dict[str, Any]] = field(default_factory=list)
     surviving_hypotheses: list[dict[str, Any]] = field(default_factory=list)
     assumptions: list[dict[str, Any]] = field(default_factory=list)        # J7.1

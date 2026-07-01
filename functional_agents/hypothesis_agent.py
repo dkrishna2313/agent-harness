@@ -46,6 +46,48 @@ class HypothesisAgent(FunctionalAgent):
         self._domain_profiles = domain_profiles or []
 
     def _execute(self, context: AgentContext) -> AgentContext:
+        """J10.6 — generate hypotheses per Decision Domain; primary flows downstream.
+
+        The PRIMARY domain (domain_evidence[0], whose evidence == the primary
+        evidence in context.evidence_notes) runs on the real context, leaving
+        context.hypotheses byte-identical to J10.5. Secondary domains run on
+        isolated scratch contexts; their hypotheses are captured into
+        context.domain_hypotheses. Goal/question mode has a single evidence set →
+        single hypothesis set, unchanged.
+        """
+        domain_evidence = list(context.domain_evidence) if context.domain_evidence else []
+
+        # Primary run on the real context (byte-identical to prior behaviour).
+        self._execute_single(context)
+        primary_meta = domain_evidence[0] if domain_evidence else {}
+        domain_hypotheses = [self._capture_domain_hypotheses(context, primary_meta)]
+
+        # Secondary domains on isolated scratch contexts (organizational only).
+        for entry in domain_evidence[1:]:
+            scratch = self._scratch_context(context, entry)
+            try:
+                self._execute_single(scratch)
+                domain_hypotheses.append(self._capture_domain_hypotheses(scratch, entry))
+            except Exception as exc:  # a secondary domain must never fail the run
+                LOGGER.warning(
+                    "[HypothesisAgent] secondary domain hypotheses failed (%s: %s) — skipping.",
+                    type(exc).__name__, exc,
+                )
+
+        context.domain_hypotheses = domain_hypotheses
+
+        primary_domain = (
+            primary_meta.get("decision_domain_title") or context.question
+        ) if isinstance(primary_meta, dict) else context.question
+        context.trace["_hypothesis_reasoning"] = {
+            "evidence_sets_received": len(domain_evidence),
+            "hypothesis_sets_generated": len(domain_hypotheses),
+            "hypothesis_sets_executed": 1 if domain_hypotheses else 0,
+            "primary_domain": primary_domain,
+        }
+        return context
+
+    def _execute_single(self, context: AgentContext) -> AgentContext:
         from research_agent.log import PROGRESS
 
         evidence_note = context.evidence_notes[0] if context.evidence_notes else {}
@@ -102,6 +144,43 @@ class HypothesisAgent(FunctionalAgent):
             low_confidence=sum(1 for h in hypothesis_payload.hypotheses if h.confidence == "low"),
         )
         return context
+
+    # ------------------------------------------------------------------
+    # J10.6 — multi-domain helpers
+    # ------------------------------------------------------------------
+
+    def _scratch_context(self, context: AgentContext, entry: dict) -> AgentContext:
+        """Build an isolated context for a secondary domain's hypothesis pass.
+
+        Reconstructs a minimal evidence_note (only evidence_items +
+        profile_coverage are read by _execute_single) and isolates everything
+        _execute_single mutates: hypotheses, research_object, trace, history.
+        """
+        import copy
+
+        scratch = copy.copy(context)
+        scratch.evidence_notes = [{
+            "evidence_items": entry.get("evidence", []),
+            "profile_coverage_by_profile": {},
+        }]
+        scratch.research_object = copy.deepcopy(context.research_object) if context.research_object else {}
+        scratch.trace = {"_client": context.trace.get("_client")}
+        scratch.hypotheses = []
+        scratch.agent_history = []
+        return scratch
+
+    @staticmethod
+    def _capture_domain_hypotheses(context: AgentContext, meta: dict) -> dict:
+        """Extract one Decision Domain's hypothesis set + diagnostics (J10.6)."""
+        meta = meta if isinstance(meta, dict) else {}
+        synthesis_note = context.trace.get("_hypotheses", {}).get("synthesis_note", "")
+        return {
+            "decision_domain_id": meta.get("decision_domain_id"),
+            "decision_domain_title": meta.get("decision_domain_title"),
+            "hypotheses": context.hypotheses,
+            "synthesis_note": synthesis_note,
+            "diagnostics": {"hypothesis_count": len(context.hypotheses)},
+        }
 
     # ------------------------------------------------------------------
     # Internal helpers
