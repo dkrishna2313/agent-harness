@@ -363,3 +363,63 @@ def test_orchestrator_class_has_run_from_goal():
     finally:
         if existing is None:
             sys.modules.pop("yaml", None)
+
+
+# ---------------------------------------------------------------------------
+# J9.1a – Strategic Framing Summary: bound derived framing so the raw brief
+# does not propagate downstream and inflate prompts.
+# ---------------------------------------------------------------------------
+
+def _long_brief(n_chars: int = 2000) -> str:
+    base = (
+        "AI Data Center Power Infrastructure Strategy for Hyperscaler. "
+        "Current situation: planning a large GB300 NVL72 deployment with rising "
+        "rack density, multi-year grid interconnection queues, and SMR options. "
+    )
+    return (base * ((n_chars // len(base)) + 1))[:n_chars]
+
+
+def test_objective_condensed_when_brief_is_long():
+    agent = ProblemFramingAgent()  # no client → mock echoes goal into objective
+    ctx = _goal_context(goal=_long_brief())
+    result = agent.run(ctx)
+    dm = result.context.decision_model
+    # Raw brief is ~2000 chars; the propagated objective must be bounded.
+    assert len(ctx.goal) > 1500
+    assert len(dm["objective"]) <= 401, len(dm["objective"])
+
+
+def test_research_questions_bounded():
+    agent = ProblemFramingAgent()
+    ctx = _goal_context(goal=_long_brief())
+    result = agent.run(ctx)
+    dm = result.context.decision_model
+    for q in dm["research_questions"]:
+        assert len(q) <= 401, len(q)
+
+
+def test_propagated_question_is_bounded():
+    """context.question feeds PlannerAgent/EvidenceAgent — it must not be the brief."""
+    agent = ProblemFramingAgent()
+    ctx = _goal_context(goal=_long_brief())
+    result = agent.run(ctx)
+    assert 0 < len(result.context.question) <= 401
+
+
+def test_strategic_framing_summary_recorded():
+    agent = ProblemFramingAgent()
+    ctx = _goal_context(goal=_long_brief())
+    result = agent.run(ctx)
+    summary = result.context.trace.get("_strategic_framing_summary")
+    assert summary is not None
+    assert summary["raw_goal_chars"] > summary["objective_chars"]
+    assert summary["decision_areas"] >= 1
+
+
+def test_short_goal_objective_preserved():
+    """Condensation must not truncate an already-short objective."""
+    agent = ProblemFramingAgent()
+    ctx = _goal_context(goal="Analyze AI data center power strategies.")
+    result = agent.run(ctx)
+    dm = result.context.decision_model
+    assert dm["objective"].endswith("…") is False

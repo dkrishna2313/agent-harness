@@ -14,12 +14,41 @@ engagement stored in context.trace["_engagement_id"] (when available).
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from .base import FunctionalAgent
 from .context import AgentContext
 
 LOGGER = logging.getLogger(__name__)
+
+# J9.1a — Strategic Framing Summary bounds.
+# ProblemFramingAgent receives the full (rich) engagement brief via context.goal,
+# but only DERIVED framing may propagate downstream. Without these bounds the raw
+# brief leaks through decision_model.objective / research_questions into every
+# downstream prompt (ResearchStrategyAgent, etc.), inflating token counts and
+# causing max_tokens truncation. These caps condense the framing to a summary
+# without touching the reasoning-bearing lists (decision_areas, uncertainties).
+_OBJECTIVE_MAX_CHARS = 400
+_RESEARCH_QUESTION_MAX_CHARS = 400
+
+
+def _condense_text(text: str, *, max_chars: int, max_sentences: int = 2) -> str:
+    """Condense free text to at most ``max_sentences`` sentences / ``max_chars``.
+
+    Used to turn a possibly-verbose objective (or an echoed brief) into a compact
+    strategic statement. Sentence-aware so we cut on boundaries when possible.
+    """
+    text = (text or "").strip()
+    if not text:
+        return ""
+    if len(text) <= max_chars:
+        return text
+    sentences = re.split(r"(?<=[.!?])\s+", text)
+    condensed = " ".join(sentences[:max_sentences]).strip()
+    if len(condensed) > max_chars:
+        condensed = condensed[:max_chars].rsplit(" ", 1)[0].rstrip() + "…"
+    return condensed
 
 
 class ProblemFramingAgent(FunctionalAgent):
@@ -56,11 +85,20 @@ class ProblemFramingAgent(FunctionalAgent):
         profiles_context = self._build_profiles_context(context)
         decision_model = self._generate_decision_model(context.goal, profiles_context)
 
-        # J7.0b – build and persist Decision Model v2
+        # J9.1a – Strategic Framing Summary: bound the derived framing so the raw
+        # engagement brief (fed in via context.goal) does not propagate verbatim
+        # into downstream prompts. The reasoning-bearing lists (decision_areas,
+        # critical_uncertainties, evidence_requirements) are left untouched.
+        decision_model = self._condense_framing(decision_model)
+
+        # J7.0b – build and persist Decision Model v2.
+        # J9.1a – link the DM to the CONDENSED objective, not the raw brief, so the
+        # persisted strategic_question stays compact.
         engagement_id: str | None = context.trace.get("_engagement_id")
+        strategic_question = decision_model.objective or context.goal
         dm_v2 = self._build_decision_model_v2(
             decision_model,
-            goal=context.goal,
+            goal=strategic_question,
             engagement_id=engagement_id,
         )
 
@@ -78,6 +116,15 @@ class ProblemFramingAgent(FunctionalAgent):
         context.trace["_problem_framing"] = dm_dict
         # J7.0b – surface decision_model_id for downstream linkage
         context.trace["_decision_model_id"] = dm_v2.decision_model_id
+        # J9.1a – record the condensed Strategic Framing Summary for observability:
+        # this is the bounded context that propagates downstream (not the raw brief).
+        context.trace["_strategic_framing_summary"] = {
+            "objective": dm_dict.get("objective", ""),
+            "objective_chars": len(dm_dict.get("objective", "")),
+            "decision_areas": len(dm_dict.get("decision_areas", [])),
+            "research_questions": len(dm_dict.get("research_questions", [])),
+            "raw_goal_chars": len(context.goal or ""),
+        }
 
         # Populate question from the first research question (enables downstream agents)
         if decision_model.research_questions and not context.question.strip():
@@ -116,6 +163,40 @@ class ProblemFramingAgent(FunctionalAgent):
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def _condense_framing(self, decision_model: Any) -> Any:
+        """Bound the derived framing so the raw brief does not propagate (J9.1a).
+
+        Condenses the objective to a compact statement and defensively caps any
+        pathologically long research question (which can happen when a framing
+        source echoes the input brief). Leaves decision_areas, critical
+        uncertainties, and evidence_requirements untouched — they carry the
+        reasoning signal and are already short.
+        """
+        objective = _condense_text(
+            getattr(decision_model, "objective", "") or "",
+            max_chars=_OBJECTIVE_MAX_CHARS,
+        )
+        questions = []
+        for q in (getattr(decision_model, "research_questions", None) or []):
+            q = (q or "").strip()
+            if len(q) > _RESEARCH_QUESTION_MAX_CHARS:
+                q = _condense_text(q, max_chars=_RESEARCH_QUESTION_MAX_CHARS, max_sentences=1)
+            if q:
+                questions.append(q)
+
+        try:
+            return decision_model.model_copy(
+                update={"objective": objective, "research_questions": questions}
+            )
+        except Exception:
+            # Non-pydantic fallback: mutate in place.
+            try:
+                decision_model.objective = objective
+                decision_model.research_questions = questions
+            except Exception:
+                pass
+            return decision_model
 
     def _build_decision_model_v2(self, payload: Any, *, goal: str, engagement_id: str | None):
         """Produce, persist, and optionally engagement-link a DecisionModel v2."""

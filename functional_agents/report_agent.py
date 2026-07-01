@@ -1707,6 +1707,11 @@ class ReportAgent(FunctionalAgent):
         _engagement_meta = context.trace.get("_engagement")
         if _engagement_meta:
             trace_payload["engagement"] = _engagement_meta
+        # J9.1a – condensed Strategic Framing Summary: shows the bounded framing
+        # that propagates downstream vs the raw brief size, for prompt-growth audits.
+        _framing_summary = context.trace.get("_strategic_framing_summary")
+        if _framing_summary:
+            trace_payload["strategic_framing_summary"] = _framing_summary
 
         # Multi-profile block (J5.6 / J5.6a)
         trace_payload["profiles_requested"] = context.profiles
