@@ -34,63 +34,97 @@ class PlannerAgent(FunctionalAgent):
 
         profiles_context = self._build_profiles_context(context)
 
-        # J10.2 — consume Reasoning Targets instead of reading context.question
-        # directly. Today the accessor returns exactly one target derived from
-        # context.question, so planning output is unchanged. Future milestones
-        # increase the target count; the Planner selects the primary target here
-        # and does not assume only one exists.
+        # J10.4 — multi-domain planning. Generate one plan per Reasoning Target
+        # (one per Decision Domain in engagement mode; a single target in goal/
+        # question mode). Only the PRIMARY plan (targets[0]) executes downstream —
+        # context.plan is pinned to it and is byte-identical to J10.3, so no
+        # downstream agent sees any change. domain_plans is organizational only.
         targets = context.get_reasoning_targets()
         primary_target = targets[0] if targets else None
-        planning_question = primary_target.question if primary_target else context.question
 
-        plan = self._generate_plan(
-            planning_question,
-            profiles_context,
-            decision_model=context.decision_model or None,
-            research_strategy=context.research_strategy or None,
-        )
+        # Fall back to context.question when no targets exist yet (e.g. a run
+        # before ProblemFramingAgent populates the question).
+        planning_targets = targets if targets else ([None] if context.question else [])
 
+        domain_plans: list[dict] = []
+        for i, target in enumerate(planning_targets):
+            planning_question = target.question if target is not None else context.question
+            plan = self._generate_plan(
+                planning_question,
+                profiles_context,
+                decision_model=context.decision_model or None,
+                research_strategy=context.research_strategy or None,
+            )
+            # Existing planning schema (unchanged) …
+            plan_obj = {
+                "question": planning_question,
+                "research_type": plan.research_type,
+                "subquestions": plan.subquestions,
+                "investigation_areas": plan.investigation_areas,
+                "profiles_used": plan.profiles_used,
+                "reasoning": plan.reasoning,
+            }
+            # … wrapped with organizational metadata for domain_plans only.
+            domain_plans.append({
+                **plan_obj,
+                "decision_domain_id": target.decision_domain_id if target else None,
+                "decision_domain_title": target.decision_domain_title if target else None,
+                "target_kind": target.kind if target else None,
+                "is_primary": i == 0,
+            })
+
+        context.domain_plans = domain_plans
+
+        # Primary plan drives the pipeline. Keep context.plan to the EXISTING
+        # 6-key schema (strip the organizational metadata) so it is identical to
+        # prior milestones and no downstream consumer changes.
+        _primary = domain_plans[0] if domain_plans else {}
         context.plan = {
-            "question": planning_question,
-            "research_type": plan.research_type,
-            "subquestions": plan.subquestions,
-            "investigation_areas": plan.investigation_areas,
-            "profiles_used": plan.profiles_used,
-            "reasoning": plan.reasoning,
+            "question": _primary.get("question", context.question),
+            "research_type": _primary.get("research_type", ""),
+            "subquestions": _primary.get("subquestions", []),
+            "investigation_areas": _primary.get("investigation_areas", []),
+            "profiles_used": _primary.get("profiles_used", []),
+            "reasoning": _primary.get("reasoning", ""),
         }
-
-        # J10.2 — additive planner diagnostics (seam visibility, not behavior).
+        # J10.2/J10.4 — planner diagnostics (existing fields retained; additive).
         context.trace["_planner_reasoning"] = {
             "targets_received": len(targets),
-            "targets_planned": 1 if primary_target is not None else 0,
+            "targets_planned": 1 if domain_plans else 0,   # retained (J10.2)
+            "plans_generated": len(domain_plans),           # J10.4
+            "plans_executed": 1 if domain_plans else 0,     # J10.4
             "primary_target_kind": primary_target.kind if primary_target else None,
         }
 
-        # Write plan fields into the Research Object (J5.1.6)
+        # Write PRIMARY plan fields into the Research Object (J5.1.6) — unchanged.
+        _p = context.plan
         if context.research_object:
-            context.research_object["research_type"] = plan.research_type
-            context.research_object["subquestions"] = plan.subquestions
-            context.research_object["investigation_areas"] = plan.investigation_areas
+            context.research_object["research_type"] = _p["research_type"]
+            context.research_object["subquestions"] = _p["subquestions"]
+            context.research_object["investigation_areas"] = _p["investigation_areas"]
 
         LOGGER.log(
             PROGRESS,
-            "[PlannerAgent] type=%s  subquestions=%d  areas=%d",
-            plan.research_type,
-            len(plan.subquestions),
-            len(plan.investigation_areas),
+            "[PlannerAgent] type=%s  subquestions=%d  areas=%d  domain_plans=%d",
+            _p["research_type"],
+            len(_p["subquestions"]),
+            len(_p["investigation_areas"]),
+            len(domain_plans),
         )
 
         self._record(
             context,
             status="success",
             summary=(
-                f"Classified as {plan.research_type}; "
-                f"generated {len(plan.subquestions)} subquestions and "
-                f"{len(plan.investigation_areas)} investigation areas."
+                f"Classified as {_p['research_type']}; "
+                f"generated {len(_p['subquestions'])} subquestions and "
+                f"{len(_p['investigation_areas'])} investigation areas "
+                f"({len(domain_plans)} domain plan(s), 1 executed)."
             ),
-            research_type=plan.research_type,
-            subquestions_generated=len(plan.subquestions),
-            investigation_areas_generated=len(plan.investigation_areas),
+            research_type=_p["research_type"],
+            subquestions_generated=len(_p["subquestions"]),
+            investigation_areas_generated=len(_p["investigation_areas"]),
+            domain_plans_generated=len(domain_plans),
         )
         return context
 

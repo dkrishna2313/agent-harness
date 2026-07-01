@@ -106,6 +106,10 @@ class AgentContext:
 
     # Per-agent detailed notes
     plan: dict[str, Any] = field(default_factory=dict)
+    # J10.4 — one plan per Decision Domain (engagement mode). plan (above) remains
+    # the PRIMARY plan that executes downstream; domain_plans is organizational
+    # only and does not change execution. Single entry in goal/question mode.
+    domain_plans: list[dict[str, Any]] = field(default_factory=list)
     evidence_notes: list[dict[str, Any]] = field(default_factory=list)
     hypotheses: list[dict[str, Any]] = field(default_factory=list)
     hypothesis_challenges: list[dict[str, Any]] = field(default_factory=list)
