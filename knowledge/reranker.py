@@ -23,6 +23,7 @@ import logging
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from typing import Any
 
 from .retriever import EvidenceType, RetrievedEvidence
 
@@ -75,6 +76,8 @@ class RerankResult:
     candidates_evaluated: int
     reranker: str
     latency_ms: float
+    # PH1 — LLM output normalization diagnostics (None for non-LLM rerankers).
+    normalization: dict | None = None
 
     def print_summary(self, *, show_rationale: bool = False) -> None:
         print(
@@ -265,15 +268,30 @@ class LLMReranker(EvidenceReranker):
 
         raw = self._call_llm(user_msg, effective_k)
 
+        # PH1 — normalize raw LLM output at the boundary BEFORE typed access.
+        # The model intermittently emits `rankings` as bare strings or malformed
+        # items; normalization coerces bare id-strings to objects and drops the
+        # rest so the `.get()` below can never raise. Malformed output degrades to
+        # the existing retrieval-order fallback (valid == 0).
+        from research_agent.llm_normalize import normalize_llm_items
+        normalized, norm_diag = normalize_llm_items(
+            raw,
+            required_fields=("evidence_id",),
+            coerce_str_key="evidence_id",
+            component="reranker",
+        )
+
         # Validate: drop hallucinated IDs
-        valid = [r for r in raw if r.get("evidence_id") in by_id]
-        n_dropped = len(raw) - len(valid)
+        valid = [r for r in normalized if r.get("evidence_id") in by_id]
+        n_dropped = len(normalized) - len(valid)
         if n_dropped:
             LOGGER.warning(
-                "reranker: dropped %d/%d hallucinated evidence_ids (raw=%d  valid=%d) — "
+                "reranker: dropped %d/%d hallucinated evidence_ids (normalized=%d  valid=%d) — "
                 "retrieval-order fallback will apply if valid=0",
-                n_dropped, len(raw), len(raw), len(valid),
+                n_dropped, len(normalized), len(normalized), len(valid),
             )
+        # Zero valid items → EvidenceAgent's retrieval-order fallback engages.
+        norm_diag["fallback_used"] = len(valid) == 0
 
         # Deduplicate preserving first-occurrence order
         seen: set[str] = set()
@@ -284,11 +302,18 @@ class LLMReranker(EvidenceReranker):
                 seen.add(eid)
                 deduped.append(r)
 
+        def _safe_score(v: Any) -> float:
+            # PH1 — a non-numeric relevance_score must not crash the boundary.
+            try:
+                return max(0.0, min(1.0, float(v)))
+            except (TypeError, ValueError):
+                return 0.0
+
         items = [
             RankedEvidence(
                 candidate=by_id[r["evidence_id"]],
                 rank=i + 1,
-                relevance_score=max(0.0, min(1.0, float(r.get("relevance_score", 0.0)))),
+                relevance_score=_safe_score(r.get("relevance_score", 0.0)),
                 rationale=str(r.get("rationale", "")),
             )
             for i, r in enumerate(deduped[:top_k])
@@ -306,6 +331,7 @@ class LLMReranker(EvidenceReranker):
             candidates_evaluated=len(candidates),
             reranker=f"{RERANKER_LLM_PREFIX}-{self._model}",
             latency_ms=latency_ms,
+            normalization=norm_diag,
         )
 
     @staticmethod

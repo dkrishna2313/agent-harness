@@ -1746,6 +1746,10 @@ class ReportAgent(FunctionalAgent):
         _planner_reasoning = context.trace.get("_planner_reasoning")
         if _planner_reasoning:
             trace_payload["planner_reasoning"] = _planner_reasoning
+        # PH1 – LLM output normalization diagnostics (additive).
+        _llm_norm = context.trace.get("_llm_normalization")
+        if _llm_norm:
+            trace_payload["llm_normalization"] = _llm_norm
 
         # Multi-profile block (J5.6 / J5.6a)
         trace_payload["profiles_requested"] = context.profiles

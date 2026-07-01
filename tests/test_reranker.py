@@ -421,3 +421,81 @@ def test_llm_reranker_handles_error_gracefully():
     result = LLMReranker(client=MockClientThatFails()).rerank("q", candidates, top_k=3)
     assert result.items == []
     assert result.candidates_evaluated == 3
+
+
+# ---------------------------------------------------------------------------
+# PH1 — LLM output boundary normalization (reranker must never crash on
+# malformed tool payloads; must degrade to retrieval-order fallback).
+# ---------------------------------------------------------------------------
+
+class _ShapeClient:
+    """Mock Anthropic client returning an arbitrary `rankings` payload shape."""
+
+    def __init__(self, rankings):
+        self._rankings = rankings
+
+    @property
+    def messages(self):
+        return self
+
+    def create(self, **kwargs):
+        return _MockResponse(content=[_ToolUseBlock(input={"rankings": self._rankings})])
+
+
+def test_ph1_bare_string_rankings_do_not_crash():
+    """The exact J10 defect: rankings is a list of bare id strings."""
+    candidates = _candidates(3)
+    ids = [c.evidence.evidence_id for c in candidates]
+    client = _ShapeClient(list(reversed(ids)))  # list[str], not list[dict]
+
+    result = LLMReranker(client=client).rerank("q", candidates, top_k=3)
+    # Coerced to objects → valid selection, no exception.
+    assert len(result.items) == 3
+    assert result.normalization["items_valid"] == 3
+    assert result.normalization["fallback_used"] is False
+
+
+def test_ph1_mixed_shapes_drop_invalid_keep_valid():
+    candidates = _candidates(3)
+    ids = [c.evidence.evidence_id for c in candidates]
+    client = _ShapeClient([
+        ids[0],                                   # bare string → coerced
+        {"evidence_id": ids[1], "relevance_score": 0.8, "rationale": "ok"},  # valid
+        {"relevance_score": 0.5},                 # missing evidence_id → dropped
+        99,                                       # non-dict/str → dropped
+    ])
+    result = LLMReranker(client=client).rerank("q", candidates, top_k=5)
+    returned = {i.evidence.evidence_id for i in result.items}
+    assert returned == {ids[0], ids[1]}
+    assert result.normalization["items_received"] == 4
+    assert result.normalization["items_dropped"] == 2
+
+
+def test_ph1_all_malformed_triggers_fallback_flag():
+    candidates = _candidates(3)
+    client = _ShapeClient([{"no_id": 1}, 42, None])  # nothing usable
+    result = LLMReranker(client=client).rerank("q", candidates, top_k=3)
+    assert result.items == []                       # empty → EvidenceAgent falls back
+    assert result.normalization["fallback_used"] is True
+
+
+def test_ph1_non_numeric_score_does_not_crash():
+    candidates = _candidates(2)
+    ids = [c.evidence.evidence_id for c in candidates]
+    client = _ShapeClient([
+        {"evidence_id": ids[0], "relevance_score": "high", "rationale": "x"},  # bad score
+    ])
+    result = LLMReranker(client=client).rerank("q", candidates, top_k=2)
+    assert len(result.items) == 1
+    assert result.items[0].relevance_score == 0.0   # safe-coerced
+
+
+def test_ph1_normalization_diagnostics_present_on_valid_run():
+    candidates = _candidates(3)
+    ids = [c.evidence.evidence_id for c in candidates]
+    result = LLMReranker(client=MockAnthropicClient(ids)).rerank("q", candidates, top_k=3)
+    norm = result.normalization
+    assert norm["component"] == "reranker"
+    assert norm["items_received"] == 3
+    assert norm["items_valid"] == 3
+    assert norm["items_dropped"] == 0

@@ -401,6 +401,9 @@ class EvidenceAgent(FunctionalAgent):
             rerank_result = reranker.rerank(primary_query, candidates, top_k=self._top_evidence)
             reranked = [r.candidate for r in rerank_result.items]
             _rerank_ms = rerank_result.latency_ms
+            # PH1 — surface LLM-output normalization diagnostics into the trace.
+            if getattr(rerank_result, "normalization", None):
+                context.trace["_llm_normalization"] = rerank_result.normalization
 
             LOGGER.log(
                 PROGRESS,
