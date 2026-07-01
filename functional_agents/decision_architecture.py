@@ -58,9 +58,15 @@ class DecisionScope(BaseModel):
 
 
 class DecisionArchitecture(BaseModel):
-    """Executive decision framing derived from engagement + problem framing (J9.2)."""
+    """Executive decision framing derived from engagement + problem framing (J9.2).
+
+    J9.3: normally produced by reasoning (Executive Framing) rather than
+    deterministic mapping; the deterministic builder below remains the fallback.
+    """
 
     decision_statement: str = ""
+    # J9.3 — narrative executive context (the "so what" a consultant would open with).
+    executive_context: str = ""
     decision_scope: DecisionScope = Field(default_factory=DecisionScope)
     success_definition: list[str] = Field(default_factory=list)
     strategic_themes: list[str] = Field(default_factory=list)
@@ -68,6 +74,8 @@ class DecisionArchitecture(BaseModel):
     executive_unknowns: list[str] = Field(default_factory=list)
     board_decisions_required: list[str] = Field(default_factory=list)
     out_of_scope_items: list[str] = Field(default_factory=list)
+    # J9.3 — provenance: "reasoning" (LLM Executive Framing) or "deterministic".
+    framing_method: str = "deterministic"
 
     def to_dict(self) -> dict[str, Any]:
         return self.model_dump()
@@ -232,9 +240,37 @@ def build_decision_architecture(
     )
 
 
+def bound_architecture(arch: DecisionArchitecture) -> DecisionArchitecture:
+    """Enforce the J9.2/J9.3 caps on an architecture (e.g. LLM output).
+
+    Defence-in-depth mirroring J9.1b: keeps the executive framing compact even if
+    the reasoning step over-produces, so it never bloats the persisted objects.
+    """
+    streams = []
+    for s in arch.decision_streams[:_MAX_STREAMS]:
+        streams.append(
+            DecisionStream(
+                title=s.title,
+                executive_objective=s.executive_objective,
+                related_strategic_themes=list(s.related_strategic_themes)[:_MAX_THEMES],
+                research_questions=list(s.research_questions)[:3],
+                expected_outputs=list(s.expected_outputs)[:3],
+            )
+        )
+    return arch.model_copy(update={
+        "strategic_themes": _dedupe_keep_order(arch.strategic_themes)[:_MAX_THEMES],
+        "decision_streams": streams,
+        "executive_unknowns": _dedupe_keep_order(arch.executive_unknowns)[:_MAX_EXEC_UNKNOWNS],
+        "board_decisions_required": _dedupe_keep_order(arch.board_decisions_required)[:_MAX_BOARD_DECISIONS],
+        "success_definition": _dedupe_keep_order(arch.success_definition)[:_MAX_SUCCESS],
+        "out_of_scope_items": _dedupe_keep_order(arch.out_of_scope_items)[:_MAX_BOARD_DECISIONS],
+    })
+
+
 def architecture_trace_metadata(arch: DecisionArchitecture) -> dict[str, Any]:
-    """Compact counts for the execution trace (J9.2)."""
+    """Compact counts for the execution trace (J9.2 / J9.3)."""
     return {
+        "framing_method": arch.framing_method,
         "decision_stream_count": len(arch.decision_streams),
         "strategic_theme_count": len(arch.strategic_themes),
         "board_decision_count": len(arch.board_decisions_required),

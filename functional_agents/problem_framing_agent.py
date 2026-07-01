@@ -91,12 +91,14 @@ class ProblemFramingAgent(FunctionalAgent):
         # critical_uncertainties, evidence_requirements) are left untouched.
         decision_model = self._condense_framing(decision_model)
 
-        # J9.2 – Decision Architecture: reframe the engagement as an executive
-        # decision (statement, scope, streams, board decisions, …). Research
-        # questions become children of decision streams. Derived deterministically
-        # from the framing payload + the structured engagement (when present).
-        from .decision_architecture import build_decision_architecture, architecture_trace_metadata
-        architecture = build_decision_architecture(decision_model, context.engagement or None)
+        # J9.2/J9.3 – Decision Architecture: reframe the engagement as an executive
+        # decision (statement, context, scope, streams, board decisions, …).
+        # J9.3 makes this a REASONING step (Executive Framing) when an LLM client
+        # is available; the J9.2 deterministic derivation is the fallback.
+        from .decision_architecture import architecture_trace_metadata
+        architecture = self._build_executive_architecture(
+            decision_model, context.engagement or None, profiles_context
+        )
         arch_dict = architecture.to_dict()
         context.decision_architecture = arch_dict
 
@@ -213,6 +215,87 @@ class ProblemFramingAgent(FunctionalAgent):
             except Exception:
                 pass
             return decision_model
+
+    def _build_executive_architecture(self, decision_model: Any, engagement: dict | None, profiles_context: list[dict]):
+        """Produce the Decision Architecture via Executive Framing (J9.3).
+
+        Uses LLM reasoning when the client supports it; falls back to the J9.2
+        deterministic derivation on no-client, missing method, truncation, or any
+        error. The deterministic result guarantees research questions are parented.
+        """
+        from .decision_architecture import (
+            build_decision_architecture,
+            bound_architecture,
+        )
+
+        deterministic = lambda: build_decision_architecture(decision_model, engagement)
+
+        if self._client is None or not hasattr(self._client, "frame_executive_decision"):
+            return deterministic()
+
+        try:
+            dm_dict = decision_model.model_dump() if hasattr(decision_model, "model_dump") else dict(decision_model)
+            payload = self._client.frame_executive_decision(engagement, dm_dict, profiles_context)
+            arch = self._architecture_from_payload(payload, decision_model, engagement)
+            arch = bound_architecture(arch)
+            # Guarantee research questions are subordinate to streams: if the
+            # reasoning step produced streams but parented no questions, distribute
+            # the decision model's questions deterministically so none are lost.
+            if arch.decision_streams and not any(s.research_questions for s in arch.decision_streams):
+                arch = self._parent_questions(arch, list(getattr(decision_model, "research_questions", []) or []))
+            if not arch.decision_streams:
+                return deterministic()
+            return arch
+        except RuntimeError as exc:
+            if "max_tokens" in str(exc):
+                LOGGER.warning("[ProblemFramingAgent] Executive Framing truncated — deterministic fallback.")
+                return deterministic()
+            raise
+        except Exception as exc:  # malformed payload etc. — never block the run
+            LOGGER.warning("[ProblemFramingAgent] Executive Framing failed (%s) — deterministic fallback.", exc)
+            return deterministic()
+
+    def _architecture_from_payload(self, payload: Any, decision_model: Any, engagement: dict | None):
+        """Map a DecisionArchitecturePayload (LLM) onto the DecisionArchitecture contract."""
+        from .decision_architecture import DecisionArchitecture, DecisionScope, DecisionStream
+
+        streams = [
+            DecisionStream(
+                title=(s.title or "").strip() or "Decision Workstream",
+                executive_objective=(s.executive_objective or "").strip(),
+                related_strategic_themes=list(s.related_strategic_themes or []),
+                research_questions=list(s.research_questions or []),
+                expected_outputs=list(s.expected_outputs or []),
+            )
+            for s in (payload.decision_streams or [])
+        ]
+        statement = (payload.executive_decision_statement or "").strip() or (
+            getattr(decision_model, "objective", "") or ""
+        )
+        return DecisionArchitecture(
+            decision_statement=statement,
+            executive_context=(payload.executive_context or "").strip(),
+            decision_scope=DecisionScope(
+                in_scope=list(payload.in_scope or []),
+                out_of_scope=list(payload.out_of_scope_items or []),
+            ),
+            success_definition=list(payload.success_definition or []),
+            strategic_themes=list(payload.strategic_themes or []),
+            decision_streams=streams,
+            executive_unknowns=list(payload.executive_unknowns or []),
+            board_decisions_required=list(payload.board_decisions_required or []),
+            out_of_scope_items=list(payload.out_of_scope_items or []),
+            framing_method="reasoning",
+        )
+
+    def _parent_questions(self, arch: Any, questions: list[str]):
+        """Distribute research questions across existing streams (round-robin)."""
+        if not questions or not arch.decision_streams:
+            return arch
+        streams = [s.model_copy(deep=True) for s in arch.decision_streams]
+        for i, q in enumerate(questions):
+            streams[i % len(streams)].research_questions.append(q)
+        return arch.model_copy(update={"decision_streams": streams})
 
     def _build_decision_model_v2(
         self, payload: Any, *, goal: str, engagement_id: str | None,

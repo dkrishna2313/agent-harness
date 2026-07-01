@@ -202,3 +202,148 @@ def test_framing_agent_backwards_compatible_outputs_intact():
     for key in ("objective", "decision_areas", "critical_uncertainties",
                 "research_questions", "evidence_requirements"):
         assert key in dm
+
+
+# ---------------------------------------------------------------------------
+# J9.3 – Executive Framing (reasoning) with deterministic fallback
+# ---------------------------------------------------------------------------
+
+from research_agent.claude_client import (  # noqa: E402
+    DecisionArchitecturePayload,
+    ExecutiveDecisionStreamPayload,
+    DecisionModelPayload,
+)
+
+
+class _ExecFramingClient:
+    """Live-like client that supports Executive Framing."""
+    is_mock = False
+
+    def frame_problem(self, goal, profiles_context):
+        return DecisionModelPayload(
+            objective="Decide the power strategy.",
+            decision_areas=["Power", "Cooling"],
+            critical_uncertainties=["Realized draw"],
+            research_questions=["Q1?", "Q2?", "Q3?"],
+            evidence_requirements=["forecasts"],
+        )
+
+    def frame_executive_decision(self, engagement, decision_model, profiles_context):
+        return DecisionArchitecturePayload(
+            executive_decision_statement="Determine the optimal power strategy.",
+            executive_context="Grid constraints force a near-term decision.",
+            strategic_themes=["Power Procurement", "Cooling Architecture"],
+            decision_streams=[
+                ExecutiveDecisionStreamPayload(
+                    title="Power Procurement",
+                    executive_objective="Choose procurement model",
+                    research_questions=["What PPA options exist?"],
+                    expected_outputs=["Ranked options"],
+                ),
+                ExecutiveDecisionStreamPayload(
+                    title="Cooling Architecture",
+                    executive_objective="Choose cooling",
+                    research_questions=["Liquid vs air?"],
+                    expected_outputs=["Recommendation"],
+                ),
+            ],
+            executive_unknowns=["Realized power draw"],
+            board_decisions_required=["Approve capital allocation"],
+            success_definition=["Deploy within 24 months"],
+            in_scope=["Power", "Cooling"],
+            out_of_scope_items=["Chip design"],
+        )
+
+
+class _TruncatingExecClient(_ExecFramingClient):
+    def frame_executive_decision(self, engagement, decision_model, profiles_context):
+        raise RuntimeError("executive_framing: response truncated (stop_reason=max_tokens, limit=4000).")
+
+
+class _BrokenExecClient(_ExecFramingClient):
+    def frame_executive_decision(self, engagement, decision_model, profiles_context):
+        raise ValueError("malformed payload")
+
+
+def _exec_ctx(client):
+    return AgentContext(
+        goal="Analyze AI data center power strategies.",
+        engagement=_ENGAGEMENT,
+        profiles=["ai_data_centers"],
+        execution_profile="ai_data_centers",
+        research_object={"id": "R-EXEC"},
+        run_id="exec01",
+    ), client
+
+
+def test_executive_framing_used_when_available():
+    ctx, client = _exec_ctx(_ExecFramingClient())
+    agent = ProblemFramingAgent(client=client)
+    result = agent.run(ctx)
+    arch = result.context.decision_architecture
+    assert arch["framing_method"] == "reasoning"
+    assert arch["decision_statement"] == "Determine the optimal power strategy."
+    assert arch["executive_context"]
+    assert [s["title"] for s in arch["decision_streams"]] == ["Power Procurement", "Cooling Architecture"]
+
+
+def test_executive_framing_questions_subordinate_to_streams():
+    ctx, client = _exec_ctx(_ExecFramingClient())
+    agent = ProblemFramingAgent(client=client)
+    result = agent.run(ctx)
+    arch = result.context.decision_architecture
+    parented = [q for s in arch["decision_streams"] for q in s["research_questions"]]
+    assert parented  # research questions live beneath streams
+
+
+def test_truncation_falls_back_to_deterministic():
+    ctx, client = _exec_ctx(_TruncatingExecClient())
+    agent = ProblemFramingAgent(client=client)
+    result = agent.run(ctx)
+    arch = result.context.decision_architecture
+    assert arch["framing_method"] == "deterministic"
+    assert arch["decision_streams"]
+
+
+def test_malformed_payload_falls_back_to_deterministic():
+    ctx, client = _exec_ctx(_BrokenExecClient())
+    agent = ProblemFramingAgent(client=client)
+    result = agent.run(ctx)
+    assert result.context.decision_architecture["framing_method"] == "deterministic"
+
+
+def test_mock_client_uses_deterministic():
+    """MockClaudeClient lacks frame_executive_decision → deterministic path."""
+    from research_agent.claude_client import MockClaudeClient
+    ctx, _ = _exec_ctx(None)
+    agent = ProblemFramingAgent(client=MockClaudeClient())
+    result = agent.run(ctx)
+    assert result.context.decision_architecture["framing_method"] == "deterministic"
+
+
+def test_reasoning_output_is_bounded():
+    """Over-produced reasoning output is capped."""
+    class _VerboseExec(_ExecFramingClient):
+        def frame_executive_decision(self, engagement, decision_model, profiles_context):
+            return DecisionArchitecturePayload(
+                executive_decision_statement="X",
+                strategic_themes=[f"t{i}" for i in range(30)],
+                decision_streams=[
+                    ExecutiveDecisionStreamPayload(
+                        title=f"s{i}", research_questions=[f"q{j}" for j in range(10)]
+                    ) for i in range(20)
+                ],
+                board_decisions_required=[f"b{i}" for i in range(20)],
+            )
+    from functional_agents.decision_architecture import (
+        _MAX_STREAMS, _MAX_THEMES, _MAX_BOARD_DECISIONS,
+    )
+    ctx, client = _exec_ctx(_VerboseExec())
+    agent = ProblemFramingAgent(client=client)
+    result = agent.run(ctx)
+    arch = result.context.decision_architecture
+    assert len(arch["decision_streams"]) <= _MAX_STREAMS
+    assert len(arch["strategic_themes"]) <= _MAX_THEMES
+    assert len(arch["board_decisions_required"]) <= _MAX_BOARD_DECISIONS
+    for s in arch["decision_streams"]:
+        assert len(s["research_questions"]) <= 3

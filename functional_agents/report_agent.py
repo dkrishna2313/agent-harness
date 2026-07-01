@@ -1129,14 +1129,23 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     # Section 1 — Executive Summary                                        #
     # ------------------------------------------------------------------ #
     exec_summary = da.get("executive_summary") or preferred.get("rationale") or ""
+    # J9.3 — lead with the Executive Decision Statement (from the Decision
+    # Architecture) rather than the technical research question when available.
+    _arch = ro.get("decision_architecture") or {}
+    decision_statement = _arch.get("decision_statement", "")
+    executive_context = _arch.get("executive_context", "")
     lines += [
         "# Executive Strategic Report",
         "",
         "## 1. Executive Summary",
         "",
     ]
+    if decision_statement:
+        lines += [f"**Decision:** {decision_statement}", ""]
     if preferred_title:
         lines += [f"**Recommended Option:** {preferred_title}", ""]
+    if executive_context:
+        lines += [executive_context, ""]
     if exec_summary:
         lines += [exec_summary, ""]
 

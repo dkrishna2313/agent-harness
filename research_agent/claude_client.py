@@ -145,6 +145,62 @@ class ResearchStrategyPayload(BaseModel):
     )
 
 
+class ExecutiveDecisionStreamPayload(BaseModel):
+    """One executive workstream in the Decision Architecture (J9.3)."""
+
+    title: str = Field(description="Short workstream title, e.g. 'Power Procurement'.")
+    executive_objective: str = Field(
+        default="", description="What this stream must decide, ≤25 words."
+    )
+    related_strategic_themes: list[str] = Field(
+        default_factory=list, description="At most 3 strategic themes this stream advances."
+    )
+    research_questions: list[str] = Field(
+        default_factory=list,
+        description="At most 3 supporting research questions (children of this stream), each ≤20 words.",
+    )
+    expected_outputs: list[str] = Field(
+        default_factory=list, description="At most 2 concrete deliverables, each ≤12 words."
+    )
+
+
+class DecisionArchitecturePayload(BaseModel):
+    """Structured output for Executive Framing (J9.3).
+
+    Reframes the engagement as an executive decision. Bounded to stay compact
+    (mirrors the J9.1b anti-truncation discipline).
+    """
+
+    executive_decision_statement: str = Field(
+        default="", description="The decision being made, ≤2 sentences, executive voice."
+    )
+    executive_context: str = Field(
+        default="", description="Why this decision matters now, ≤3 sentences."
+    )
+    strategic_themes: list[str] = Field(
+        default_factory=list, description="At most 8 high-level consulting workstream themes."
+    )
+    decision_streams: list[ExecutiveDecisionStreamPayload] = Field(
+        default_factory=list, description="4-6 executive decision streams. Research questions live under these."
+    )
+    executive_unknowns: list[str] = Field(
+        default_factory=list,
+        description="At most 6 unknowns most likely to change the recommendation (not ordinary research gaps).",
+    )
+    board_decisions_required: list[str] = Field(
+        default_factory=list, description="At most 6 executive approvals required before implementation."
+    )
+    success_definition: list[str] = Field(
+        default_factory=list, description="At most 6 measurable decision outcomes."
+    )
+    in_scope: list[str] = Field(
+        default_factory=list, description="At most 8 areas explicitly in scope."
+    )
+    out_of_scope_items: list[str] = Field(
+        default_factory=list, description="At most 6 areas explicitly excluded (only if clearly implied)."
+    )
+
+
 class HypothesisItem(BaseModel):
     """A single competing hypothesis (J6.3)."""
 
@@ -640,6 +696,7 @@ _SCHEMA_ADAPTERS = {
     "research_plan": TypeAdapter(ResearchPlan),
     "research_planning": TypeAdapter(ResearchPlanningPayload),
     "problem_framing": TypeAdapter(DecisionModelPayload),
+    "executive_framing": TypeAdapter(DecisionArchitecturePayload),  # J9.3
     "research_strategy": TypeAdapter(ResearchStrategyPayload),
     "hypothesis_generation": TypeAdapter(HypothesisPayload),
     "challenge_generation": TypeAdapter(ChallengePayload),
@@ -1561,6 +1618,30 @@ class ClaudeClient:
         )
         return DecisionModelPayload.model_validate(payload)
 
+    def frame_executive_decision(
+        self,
+        engagement: dict | None,
+        decision_model: dict,
+        profiles_context: list[dict],
+    ) -> DecisionArchitecturePayload:
+        """Executive Framing (J9.3): produce a Decision Architecture by reasoning.
+
+        Reframes the engagement as an executive decision — statement, context,
+        strategic themes, decision streams (with research questions as children),
+        executive unknowns, board decisions, success criteria, and scope.
+        """
+        # J9.3 — 4000 covers the bounded architecture (~1500 tokens) with headroom
+        # for tool-call JSON of nested streams. Schema + prompt cap counts so this
+        # is not driven higher; the agent falls back to deterministic derivation if
+        # the response still truncates.
+        payload = self._call_json(
+            operation="executive_framing",
+            schema_name="executive_framing",
+            prompt=_executive_framing_prompt(engagement, decision_model, profiles_context),
+            max_tokens=4000,
+        )
+        return DecisionArchitecturePayload.model_validate(payload)
+
     def generate_research_strategy(
         self,
         decision_model: dict,
@@ -2223,6 +2304,67 @@ Instructions:
 5. List 2-5 evidence requirements — the types of evidence needed to answer the research questions (e.g. "Benchmark performance data", "Vendor cost sheets", "Industry analyst reports").
 
 Return structured JSON only.
+"""
+
+
+def _executive_framing_prompt(
+    engagement: dict | None,
+    decision_model: dict,
+    profiles_context: list[dict],
+) -> str:
+    """Build the Executive Framing prompt (J9.3).
+
+    Feeds the structured engagement plus the problem-framing outputs so the model
+    reasons about how a strategy consultant would structure the engagement as an
+    executive decision. Kept tightly bounded to avoid output truncation.
+    """
+    eng = engagement or {}
+
+    def _lines(label: str, items: list) -> str:
+        items = [str(i).strip() for i in (items or []) if str(i).strip()]
+        return f"\n{label}:\n" + "\n".join(f"  - {i}" for i in items) if items else ""
+
+    profiles = ", ".join(p.get("name", "") for p in profiles_context if p.get("name")) or "(none)"
+
+    engagement_block = ""
+    if eng:
+        engagement_block = "Engagement:\n"
+        for key in ("title", "client", "industry", "current_situation", "decision_horizon"):
+            val = (eng.get(key) or "").strip() if isinstance(eng.get(key), str) else eng.get(key)
+            if val:
+                engagement_block += f"  {key}: {val}\n"
+        engagement_block += _lines("  Objectives", eng.get("objectives"))
+        engagement_block += _lines("  Priorities", eng.get("priorities"))
+        engagement_block += _lines("  Constraints", eng.get("constraints"))
+        engagement_block += _lines("  Success criteria", eng.get("success_criteria"))
+        engagement_block += _lines("  Known unknowns", eng.get("known_unknowns"))
+
+    dm_block = (
+        f"Objective: {decision_model.get('objective', '')}"
+        + _lines("Decision areas", decision_model.get("decision_areas"))
+        + _lines("Research questions", decision_model.get("research_questions"))
+        + _lines("Critical uncertainties", decision_model.get("critical_uncertainties"))
+    )
+
+    return f"""You are a senior strategy consultant framing an executive engagement. Reframe the material below as an EXECUTIVE DECISION — not a research plan. Research is a supporting workstream, not the primary product.
+
+{engagement_block}
+Problem framing so far:
+{dm_block}
+
+Available domain profiles: {profiles}
+
+Produce a Decision Architecture the way an experienced consultant would structure it for a board:
+1. executive_decision_statement: the decision being made, ≤2 sentences, executive voice (not a research question).
+2. executive_context: why this decision matters now, ≤3 sentences.
+3. strategic_themes: at most 8 consulting workstream themes.
+4. decision_streams: 4-6 streams. Each has a title, an executive_objective (≤25 words), related_strategic_themes (≤3), research_questions (AT MOST 3, ≤20 words each — these are the supporting analyses that live UNDER the stream), and expected_outputs (≤2). Every research question must sit under a stream.
+5. executive_unknowns: at most 6 unknowns most likely to CHANGE the recommendation (not ordinary research gaps).
+6. board_decisions_required: at most 6 concrete executive approvals needed before implementation (e.g. "Approve capital allocation").
+7. success_definition: at most 6 measurable decision outcomes.
+8. in_scope / out_of_scope_items: what is explicitly in and out of scope (only list exclusions that are clearly implied; do not invent).
+
+Keep every field tight. Return structured JSON only — no prose outside the JSON fields.
 """
 
 
