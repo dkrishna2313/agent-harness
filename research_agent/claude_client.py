@@ -125,23 +125,23 @@ class ResearchStrategyPayload(BaseModel):
     )
     research_question_priorities: list[dict] = Field(
         default_factory=list,
-        description='Ordered list of {question: str, priority: int} dicts ranked by decision impact.',
+        description='At most 6 {question: str, priority: int} dicts ranked by decision impact. "question" is a SHORT label (≤12 words), not the full restated question.',
     )
     required_evidence: list[str] = Field(
         default_factory=list,
-        description="Specific evidence items needed (e.g. 'AI power demand forecasts', 'SMR deployment schedules')",
+        description="At most 6 concrete evidence items, each ≤12 words (e.g. 'AI power demand forecasts 2024-2030').",
     )
     source_priorities: list[str] = Field(
         default_factory=list,
-        description="Source types in priority order (e.g. 'regulatory filings', 'grid operator reports')",
+        description="At most 5 source types, each ≤6 words (e.g. 'grid operator reports').",
     )
     coverage_targets: dict[str, str] = Field(
         default_factory=dict,
-        description="Topic/area → required coverage level: 'strong', 'moderate', or 'light'",
+        description="At most 8 entries: topic/area → coverage level, exactly 'strong', 'moderate', or 'light'.",
     )
     strategy_rationale: str = Field(
         default="",
-        description="2-3 sentence explanation of the strategy choices",
+        description="At most 2 sentences explaining the strategy choices.",
     )
 
 
@@ -1567,6 +1567,10 @@ class ClaudeClient:
         profiles_context: list[dict],
     ) -> ResearchStrategyPayload:
         """Transform a Decision Model into an executable research strategy (J6.2)."""
+        # J9.1b — 2000 is ample for the bounded strategy object (~600-800 tokens
+        # incl. tool-call JSON). The prompt and ResearchStrategyPayload schema now
+        # cap counts and forbid restating the brief, so this is not raised; the
+        # agent falls back to a deterministic bounded strategy if truncation recurs.
         payload = self._call_json(
             operation="generate_research_strategy",
             schema_name="research_strategy",
@@ -2837,7 +2841,7 @@ def _strategy_prompt(decision_model: dict, profiles_context: list[dict]) -> str:
     dm_uncertainties = "\n".join(f"  - {u}" for u in decision_model.get("critical_uncertainties", []))
     dm_evidence = "\n".join(f"  - {e}" for e in decision_model.get("evidence_requirements", []))
 
-    return f"""You are a research strategy agent. Given a Decision Model and available domain profiles, produce an executable research strategy.
+    return f"""You are a research strategy agent. Given a Decision Model and available domain profiles, produce a CONCISE, executable research strategy.
 
 Decision Model:
   Objective: {decision_model.get("objective", "")}
@@ -2852,20 +2856,20 @@ Decision Model:
 
 Domain Profiles:{profile_lines if profile_lines else " (none)"}
 
-Instructions:
-1. Rank each profile by its relevance to this decision model (1 = most relevant). Include all available profiles.
+Instructions — keep the output tight; this is a routing plan, not a report:
+1. Rank each profile by relevance (1 = most relevant). Include all available profiles.
 
-2. Order the research questions by decision impact — most important first. Return a list of {{question, priority}} objects.
+2. Order the research questions by decision impact. Return {{question, priority}} objects. For "question", write a SHORT label of ≤12 words — do NOT restate the full question text and do NOT repeat the objective or engagement brief. Maximum 6 questions.
 
-3. List the specific evidence items needed to satisfy the decision model's evidence requirements. Be concrete (e.g. "AI power demand forecasts 2024–2030" not just "forecasts").
+3. required_evidence: at most 6 concrete evidence items, each ≤12 words (e.g. "AI power demand forecasts 2024-2030").
 
-4. List source types in priority order (e.g. "grid operator reports", "peer-reviewed studies", "vendor datasheets").
+4. source_priorities: at most 5 source types, each ≤6 words.
 
-5. For each decision area and critical uncertainty, assign a coverage target: "strong", "moderate", or "light".
+5. coverage_targets: one entry per decision area / critical uncertainty (at most 8 total), value is exactly "strong", "moderate", or "light".
 
-6. Write 2-3 sentences explaining the strategic choices.
+6. strategy_rationale: at most 2 sentences.
 
-Return structured JSON only.
+Hard limits: no field may exceed the counts above. Return structured JSON only — no prose, preamble, or explanation outside the JSON fields.
 """
 
 

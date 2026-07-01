@@ -378,3 +378,94 @@ def test_report_agent_emits_research_strategy_trace_key():
     rs_block = trace["research_strategy"]
     assert rs_block["profile_priorities"] == {"smr": 1}
     assert rs_block["coverage_targets"] == {"Technology Readiness": "strong"}
+
+
+# ---------------------------------------------------------------------------
+# J9.1b – live truncation fix: bounded object, graceful fallback, diagnostics
+# ---------------------------------------------------------------------------
+
+class _TruncatingClient:
+    """Simulates a live client whose strategy call truncates at max_tokens."""
+    is_mock = False
+
+    def generate_research_strategy(self, decision_model, profiles_context):
+        raise RuntimeError(
+            "generate_research_strategy: response truncated "
+            "(stop_reason=max_tokens, limit=2000)."
+        )
+
+
+class _VerboseClient:
+    """Simulates a live client that over-produces beyond the caps."""
+    is_mock = False
+
+    def generate_research_strategy(self, decision_model, profiles_context):
+        return ResearchStrategyPayload(
+            profile_priorities={"smr": 1},
+            research_question_priorities=[{"question": f"q{i}", "priority": i} for i in range(20)],
+            required_evidence=[f"evidence {i}" for i in range(20)],
+            source_priorities=[f"source {i}" for i in range(20)],
+            coverage_targets={f"area{i}": "strong" for i in range(20)},
+            strategy_rationale="Too much.",
+        )
+
+
+def test_truncation_falls_back_not_crash():
+    agent = ResearchStrategyAgent(client=_TruncatingClient())
+    ctx = _context_with_decision_model()
+    result = agent.run(ctx)
+    assert result.status == "success"
+    # Deterministic fallback populated the strategy.
+    assert ctx.research_strategy["research_question_priorities"]
+
+
+def test_truncation_recorded_in_diagnostics():
+    agent = ResearchStrategyAgent(client=_TruncatingClient())
+    ctx = _context_with_decision_model()
+    agent.run(ctx)
+    diag = ctx.trace["_research_strategy_diagnostics"]
+    assert diag["truncated"] is True
+    assert diag["stop_reason"] == "max_tokens"
+    assert diag["used_fallback"] is True
+    assert diag["max_tokens"] == 2000
+    assert diag["prompt_token_estimate"] >= 0
+
+
+def test_verbose_output_is_bounded():
+    from functional_agents.research_strategy_agent import (
+        MAX_RESEARCH_QUESTIONS, MAX_REQUIRED_EVIDENCE,
+        MAX_SOURCE_PRIORITIES, MAX_COVERAGE_TARGETS,
+    )
+    agent = ResearchStrategyAgent(client=_VerboseClient())
+    ctx = _context_with_decision_model()
+    agent.run(ctx)
+    rs = ctx.research_strategy
+    assert len(rs["research_question_priorities"]) <= MAX_RESEARCH_QUESTIONS
+    assert len(rs["required_evidence"]) <= MAX_REQUIRED_EVIDENCE
+    assert len(rs["source_priorities"]) <= MAX_SOURCE_PRIORITIES
+    assert len(rs["coverage_targets"]) <= MAX_COVERAGE_TARGETS
+
+
+def test_diagnostics_output_shape_present():
+    agent = ResearchStrategyAgent()  # no client → deterministic
+    ctx = _context_with_decision_model()
+    agent.run(ctx)
+    diag = ctx.trace["_research_strategy_diagnostics"]
+    assert "output_shape" in diag
+    assert diag["truncated"] is False
+    assert set(diag["output_shape"]) == {
+        "research_questions", "required_evidence",
+        "source_priorities", "coverage_targets", "rationale_chars",
+    }
+
+
+def test_non_truncation_runtimeerror_propagates():
+    """Only max_tokens truncation is swallowed; other errors must surface."""
+    class _BoomClient:
+        is_mock = False
+        def generate_research_strategy(self, decision_model, profiles_context):
+            raise RuntimeError("some other failure")
+    agent = ResearchStrategyAgent(client=_BoomClient())
+    ctx = _context_with_decision_model()
+    with pytest.raises(RuntimeError, match="some other failure"):
+        agent.run(ctx)

@@ -1712,6 +1712,11 @@ class ReportAgent(FunctionalAgent):
         _framing_summary = context.trace.get("_strategic_framing_summary")
         if _framing_summary:
             trace_payload["strategic_framing_summary"] = _framing_summary
+        # J9.1b – ResearchStrategy generation diagnostics (prompt estimate,
+        # max_tokens, stop_reason, truncation flag, output shape).
+        _rs_diag = context.trace.get("_research_strategy_diagnostics")
+        if _rs_diag:
+            trace_payload["research_strategy_diagnostics"] = _rs_diag
 
         # Multi-profile block (J5.6 / J5.6a)
         trace_payload["profiles_requested"] = context.profiles
