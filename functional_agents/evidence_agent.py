@@ -349,6 +349,22 @@ class EvidenceAgent(FunctionalAgent):
             return self._execute_kb(context)
         return self._execute_legacy(context)
 
+    def _set_evidence_note(self, context: AgentContext, note: dict) -> None:
+        """PH2.2 — pass the assembled note through the Evidence LLM boundary
+        (normalize → validate → typed EvidenceOutput) before it becomes
+        context.evidence_notes. Business logic downstream consumes only the
+        validated typed output. For a well-formed note this is a no-op, so
+        evidence content and citations are preserved byte-for-byte.
+        """
+        from .evidence_boundary import finalize_evidence, EvidenceBoundaryError
+        try:
+            output, boundary = finalize_evidence(note, plan=context.plan or None)
+        except EvidenceBoundaryError as exc:
+            context.trace["_evidence_boundary"] = exc.diagnostics
+            raise
+        context.evidence_notes = [output.as_note()]
+        context.trace["_evidence_boundary"] = boundary
+
     # ------------------------------------------------------------------
     # J10.5 — multi-domain helpers
     # ------------------------------------------------------------------
@@ -616,19 +632,17 @@ class EvidenceAgent(FunctionalAgent):
         profiles_contributing = [p for p, v in profile_coverage_by_profile.items() if v.get("evidence_count", 0) > 0]
         profiles_missing = [p for p, v in profile_coverage_by_profile.items() if v.get("evidence_count", 0) == 0]
 
-        context.evidence_notes = [
-            {
-                "evidence_items": items_dicts,
-                "evidence_by_subquestion": evidence_by_subquestion,
-                "evidence_by_area": evidence_by_area,
-                "coverage_by_subquestion": coverage_by_subquestion,
-                "evidence_summary": evidence_summary,
-                "profile_coverage_by_profile": profile_coverage_by_profile,
-                "profiles_requested": profiles_requested,
-                "profiles_contributing": profiles_contributing,
-                "profiles_missing": profiles_missing,
-            }
-        ]
+        self._set_evidence_note(context, {
+            "evidence_items": items_dicts,
+            "evidence_by_subquestion": evidence_by_subquestion,
+            "evidence_by_area": evidence_by_area,
+            "coverage_by_subquestion": coverage_by_subquestion,
+            "evidence_summary": evidence_summary,
+            "profile_coverage_by_profile": profile_coverage_by_profile,
+            "profiles_requested": profiles_requested,
+            "profiles_contributing": profiles_contributing,
+            "profiles_missing": profiles_missing,
+        })
 
         # Build synthetic ResearchMemo for downstream compatibility (ReportAgent)
         memo = self._build_synthetic_memo(context.question, candidates)
@@ -817,19 +831,17 @@ class EvidenceAgent(FunctionalAgent):
                 profiles_missing,
             )
 
-        context.evidence_notes = [
-            {
-                "evidence_items": items_dicts,
-                "evidence_by_subquestion": evidence_by_subquestion,
-                "evidence_by_area": evidence_by_area,
-                "coverage_by_subquestion": coverage_by_subquestion,
-                "evidence_summary": evidence_summary,
-                "profile_coverage_by_profile": profile_coverage_by_profile,
-                "profiles_requested": profiles_requested,
-                "profiles_contributing": profiles_contributing,
-                "profiles_missing": profiles_missing,
-            }
-        ]
+        self._set_evidence_note(context, {
+            "evidence_items": items_dicts,
+            "evidence_by_subquestion": evidence_by_subquestion,
+            "evidence_by_area": evidence_by_area,
+            "coverage_by_subquestion": coverage_by_subquestion,
+            "evidence_summary": evidence_summary,
+            "profile_coverage_by_profile": profile_coverage_by_profile,
+            "profiles_requested": profiles_requested,
+            "profiles_contributing": profiles_contributing,
+            "profiles_missing": profiles_missing,
+        })
 
         # --- 5b. Contradiction hardening metadata (J6.5a) ---
         memo_meta = getattr(memo, "metadata", {}) or {}
