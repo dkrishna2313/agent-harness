@@ -72,6 +72,10 @@ class RecommendationAgent(FunctionalAgent):
             if context.research_object else context.validated_contradictions
         )
 
+        # J10.8 — Strategic Synthesis (J10.7) shapes recommendation reasoning and
+        # prioritisation when present; absent → legacy hypothesis-driven behaviour.
+        strategic_synthesis: dict = context.strategic_synthesis or {}
+
         rec_payload = self._generate_recommendations(
             hypotheses=hypotheses,
             surviving_hypotheses=context.surviving_hypotheses,
@@ -80,6 +84,7 @@ class RecommendationAgent(FunctionalAgent):
             decision_model=context.decision_model,
             research_strategy=context.research_strategy,
             validated_contradictions=validated_contradictions,
+            strategic_synthesis=strategic_synthesis,
         )
 
         recs_as_dicts = [r.model_dump() for r in rec_payload.recommendations]
@@ -96,6 +101,24 @@ class RecommendationAgent(FunctionalAgent):
             "recommendations": recs_as_dicts,
             "recommendation_portfolio": portfolio_as_dict,
             "synthesis_note": rec_payload.synthesis_note,
+        }
+
+        # J10.8 — additive diagnostics: how much Strategic Synthesis context was
+        # available and used (capped identically to the prompt). Trace-only; the
+        # recommendation schema is unchanged.
+        _cap = 5
+        def _used(key: str) -> int:
+            return min(len(strategic_synthesis.get(key) or []), _cap)
+        synthesis_available = bool(strategic_synthesis)
+        context.trace["_recommendation_strategy_context"] = {
+            "strategic_synthesis_available": synthesis_available,
+            "strategic_synthesis_used": synthesis_available,
+            "cross_domain_findings_used": _used("cross_domain_findings"),
+            "dependencies_used": _used("cross_domain_dependencies"),
+            "conflicts_used": _used("cross_domain_conflicts"),
+            "strategic_levers_used": _used("strategic_levers"),
+            "dominant_constraints_used": _used("dominant_constraints"),
+            "emerging_themes_used": _used("emerging_themes"),
         }
 
         high_count = sum(1 for r in recs_as_dicts if r.get("priority") == "high")
@@ -139,8 +162,9 @@ class RecommendationAgent(FunctionalAgent):
         decision_model: dict,
         research_strategy: dict,
         validated_contradictions: list[dict] | None = None,
+        strategic_synthesis: dict | None = None,
     ):
-        """Call the LLM client to generate recommendations."""
+        """Call the LLM client to generate recommendations (J10.8: + synthesis)."""
         if self._client is None:
             LOGGER.warning("[RecommendationAgent] no client — using mock recommendations")
             return self._mock_recommendations(hypotheses, surviving_hypotheses, hypothesis_challenges, evidence_items, decision_model)
@@ -150,6 +174,7 @@ class RecommendationAgent(FunctionalAgent):
                 hypotheses, surviving_hypotheses, hypothesis_challenges,
                 evidence_items, decision_model, research_strategy,
                 validated_contradictions=validated_contradictions or [],
+                strategic_synthesis=strategic_synthesis or {},
             )
 
         LOGGER.warning("[RecommendationAgent] client does not support generate_recommendations — using mock")

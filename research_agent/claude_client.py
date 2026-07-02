@@ -1043,8 +1043,13 @@ class MockClaudeClient:
         decision_model: dict,
         research_strategy: dict,
         validated_contradictions: list[dict] | None = None,
+        strategic_synthesis: dict | None = None,
     ) -> "RecommendationPayload":
-        """Return deterministic recommendations derived from surviving hypotheses."""
+        """Return deterministic recommendations derived from surviving hypotheses.
+
+        J10.8 — accepts strategic_synthesis for signature parity; the deterministic
+        mock derives recommendations from hypotheses/evidence and does not vary on it.
+        """
         ev_ids = [e.get("evidence_id", "") for e in evidence_items if e.get("evidence_id")]
         horizon_cycle = ["near_term", "medium_term", "near_term", "long_term"]
         priority_cycle = ["high", "medium", "high", "low"]
@@ -1780,8 +1785,13 @@ class ClaudeClient:
         decision_model: dict,
         research_strategy: dict,
         validated_contradictions: list[dict] | None = None,
+        strategic_synthesis: dict | None = None,
     ) -> RecommendationPayload:
-        """Generate actionable recommendations from challenged hypotheses (J6.5)."""
+        """Generate actionable recommendations from challenged hypotheses (J6.5).
+
+        J10.8 — an optional Strategic Synthesis block shapes reasoning and
+        prioritisation (evidence citations still come from evidence items).
+        """
         payload = self._call_json(
             operation="generate_recommendations",
             schema_name="recommendation_generation",
@@ -1789,6 +1799,7 @@ class ClaudeClient:
                 hypotheses, surviving_hypotheses, hypothesis_challenges,
                 evidence_items, decision_model, research_strategy,
                 validated_contradictions=validated_contradictions or [],
+                strategic_synthesis=strategic_synthesis,
             ),
             max_tokens=6000,
         )
@@ -2648,6 +2659,42 @@ Return structured JSON only.
 """
 
 
+# J10.8 — bounded caps for the Strategic Synthesis section of the recommendation
+# prompt (mirrors J9.1b discipline). Kept in sync with recommendation_agent's
+# diagnostics counters.
+_SYNTH_SUMMARY_MAX_CHARS = 600
+_SYNTH_LIST_CAP = 5
+
+
+def _strategic_synthesis_section(strategic_synthesis: dict | None) -> str:
+    """Render a BOUNDED Strategic Synthesis block for the recommendation prompt (J10.8)."""
+    if not strategic_synthesis:
+        return ""
+
+    def _lst(key: str) -> str:
+        items = [str(x).strip() for x in (strategic_synthesis.get(key) or []) if str(x).strip()]
+        items = items[:_SYNTH_LIST_CAP]
+        return "\n".join(f"  - {x}" for x in items) if items else "  (none)"
+
+    summary = (strategic_synthesis.get("executive_summary") or "").strip()[:_SYNTH_SUMMARY_MAX_CHARS]
+    return f"""
+## Strategic Synthesis (executive cross-domain perspective — shape reasoning & prioritisation, not evidence citations)
+Executive summary: {summary or "(none)"}
+Cross-domain findings:
+{_lst("cross_domain_findings")}
+Cross-domain dependencies:
+{_lst("cross_domain_dependencies")}
+Cross-domain conflicts:
+{_lst("cross_domain_conflicts")}
+Strategic levers:
+{_lst("strategic_levers")}
+Dominant constraints:
+{_lst("dominant_constraints")}
+Emerging themes:
+{_lst("emerging_themes")}
+"""
+
+
 def _recommendation_prompt(
     hypotheses: list[dict],
     surviving_hypotheses: list[dict],
@@ -2656,8 +2703,9 @@ def _recommendation_prompt(
     decision_model: dict,
     research_strategy: dict,
     validated_contradictions: list[dict] | None = None,
+    strategic_synthesis: dict | None = None,
 ) -> str:
-    """Build the RecommendationAgent prompt (J6.5)."""
+    """Build the RecommendationAgent prompt (J6.5; J10.8 adds synthesis context)."""
     objective = decision_model.get("objective", "")
     decision_areas = decision_model.get("decision_areas", [])
 
@@ -2707,7 +2755,7 @@ You are a strategic advisor translating challenged hypotheses into actionable re
 Objective: {objective}
 Decision Areas:
 {areas_text}
-
+{_strategic_synthesis_section(strategic_synthesis)}
 ## Hypotheses with Challenge Results
 {hyp_lines}
 

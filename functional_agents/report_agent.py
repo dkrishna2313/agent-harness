@@ -1876,6 +1876,11 @@ class ReportAgent(FunctionalAgent):
                 "synthesis_note": rec_data.get("synthesis_note", ""),
             }
 
+        # J10.8 – recommendation strategy context (synthesis usage) diagnostics.
+        _rec_strategy = context.trace.get("_recommendation_strategy_context")
+        if _rec_strategy:
+            trace_payload["recommendation_strategy_context"] = _rec_strategy
+
         # Challenge generation block (J6.4)
         chal_data = context.trace.get("_challenges")
         if chal_data:
