@@ -871,6 +871,20 @@ class MockClaudeClient:
         )
 
 
+    def generate_hypotheses_raw(
+        self,
+        decision_model: dict,
+        research_strategy: dict,
+        evidence_items: list[dict],
+        profile_coverage: dict,
+        contradictions: list[dict],
+    ) -> dict:
+        """Raw hypothesis payload for the PH2.3 boundary (deterministic mock)."""
+        return self.generate_hypotheses(
+            decision_model, research_strategy, evidence_items,
+            profile_coverage, contradictions,
+        ).model_dump()
+
     def generate_hypotheses(
         self,
         decision_model: dict,
@@ -1750,6 +1764,29 @@ class ClaudeClient:
         )
         return ResearchStrategyPayload.model_validate(payload)
 
+    def generate_hypotheses_raw(
+        self,
+        decision_model: dict,
+        research_strategy: dict,
+        evidence_items: list[dict],
+        profile_coverage: dict,
+        contradictions: list[dict],
+    ) -> dict:
+        """Return the RAW hypothesis payload (no validation) for the PH2.3 boundary.
+
+        The functional HypothesisAgent normalizes + validates this via
+        hypothesis_boundary, so business logic never consumes unvalidated output.
+        """
+        return self._call_json(
+            operation="generate_hypotheses",
+            schema_name="hypothesis_generation",
+            prompt=_hypothesis_prompt(
+                decision_model, research_strategy,
+                evidence_items, profile_coverage, contradictions,
+            ),
+            max_tokens=5000,
+        )
+
     def generate_hypotheses(
         self,
         decision_model: dict,
@@ -1759,16 +1796,12 @@ class ClaudeClient:
         contradictions: list[dict],
     ) -> HypothesisPayload:
         """Generate competing hypotheses from evidence and context (J6.3)."""
-        payload = self._call_json(
-            operation="generate_hypotheses",
-            schema_name="hypothesis_generation",
-            prompt=_hypothesis_prompt(
+        return HypothesisPayload.model_validate(
+            self.generate_hypotheses_raw(
                 decision_model, research_strategy,
                 evidence_items, profile_coverage, contradictions,
-            ),
-            max_tokens=5000,
+            )
         )
-        return HypothesisPayload.model_validate(payload)
 
     def generate_challenges(
         self,

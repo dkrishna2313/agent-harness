@@ -104,15 +104,29 @@ class HypothesisAgent(FunctionalAgent):
 
         contradictions: list[dict] = context.research_object.get("contradictions", [])
 
-        hypothesis_payload = self._generate_hypotheses(
-            context.decision_model,
-            context.research_strategy,
-            evidence_items,
-            profile_coverage,
-            contradictions,
-        )
+        # PH2.3 — raw LLM payload → normalize → validate → typed HypothesisOutput
+        # before any business logic. A boundary failure is deterministic and its
+        # stage is recorded in context.trace["_hypothesis_boundary"].
+        from .hypothesis_boundary import HypothesisBoundaryError
+        try:
+            output, boundary = self._generate_hypotheses(
+                context.decision_model,
+                context.research_strategy,
+                evidence_items,
+                profile_coverage,
+                contradictions,
+            )
+        except HypothesisBoundaryError as exc:
+            context.trace["_hypothesis_boundary"] = exc.diagnostics
+            self._record(
+                context, status="error",
+                summary=(f"Hypothesis boundary failed at stage "
+                         f"'{exc.diagnostics.get('failed_stage', 'boundary')}': {exc}"),
+                boundary_failed_stage=exc.diagnostics.get("failed_stage", "boundary"),
+            )
+            raise
 
-        hypotheses_as_dicts = [h.model_dump() for h in hypothesis_payload.hypotheses]
+        hypotheses_as_dicts = output.as_dicts()
 
         context.hypotheses = hypotheses_as_dicts
 
@@ -121,27 +135,28 @@ class HypothesisAgent(FunctionalAgent):
 
         context.trace["_hypotheses"] = {
             "hypotheses": hypotheses_as_dicts,
-            "synthesis_note": hypothesis_payload.synthesis_note,
+            "synthesis_note": output.synthesis_note,
         }
+        context.trace["_hypothesis_boundary"] = boundary
 
         LOGGER.log(
             PROGRESS,
             "[HypothesisAgent] generated=%d  synthesis=%r",
-            len(hypothesis_payload.hypotheses),
-            hypothesis_payload.synthesis_note[:80],
+            len(output.hypotheses),
+            output.synthesis_note[:80],
         )
 
         self._record(
             context,
             status="success",
             summary=(
-                f"{len(hypothesis_payload.hypotheses)} competing hypotheses generated. "
-                + hypothesis_payload.synthesis_note[:100]
+                f"{len(output.hypotheses)} competing hypotheses generated. "
+                + output.synthesis_note[:100]
             ),
-            hypothesis_count=len(hypothesis_payload.hypotheses),
-            high_confidence=sum(1 for h in hypothesis_payload.hypotheses if h.confidence == "high"),
-            medium_confidence=sum(1 for h in hypothesis_payload.hypotheses if h.confidence == "medium"),
-            low_confidence=sum(1 for h in hypothesis_payload.hypotheses if h.confidence == "low"),
+            hypothesis_count=len(output.hypotheses),
+            high_confidence=sum(1 for h in output.hypotheses if h.confidence == "high"),
+            medium_confidence=sum(1 for h in output.hypotheses if h.confidence == "medium"),
+            low_confidence=sum(1 for h in output.hypotheses if h.confidence == "low"),
         )
         return context
 
@@ -194,29 +209,60 @@ class HypothesisAgent(FunctionalAgent):
         profile_coverage: dict,
         contradictions: list[dict],
     ):
-        """Call the LLM client to generate competing hypotheses."""
-        from research_agent.claude_client import HypothesisPayload, HypothesisItem
+        """PH2.3 boundary: raw payload → normalize → validate → HypothesisOutput.
+
+        Returns (HypothesisOutput, boundary_diagnostics). Raises a distinct
+        HypothesisBoundaryError subclass on generation / normalization /
+        validation failure so business logic never consumes unvalidated output.
+        """
+        from .hypothesis_boundary import finalize_hypotheses
+
+        raw = self._raw_hypothesis_payload(
+            decision_model, research_strategy, evidence_items, profile_coverage, contradictions
+        )
+        return finalize_hypotheses(raw)
+
+    def _raw_hypothesis_payload(
+        self,
+        decision_model: dict,
+        research_strategy: dict,
+        evidence_items: list[dict],
+        profile_coverage: dict,
+        contradictions: list[dict],
+    ) -> dict:
+        """Obtain the RAW (unvalidated) hypothesis payload dict (generation stage)."""
+        from .hypothesis_boundary import HypothesisGenerationError
 
         if self._client is None:
             LOGGER.warning("[HypothesisAgent] no client provided — using mock hypotheses")
-            return self._mock_hypotheses(decision_model, evidence_items)
+            return self._mock_hypothesis_payload(decision_model, evidence_items)
 
-        if hasattr(self._client, "generate_hypotheses"):
-            return self._client.generate_hypotheses(
-                decision_model, research_strategy,
-                evidence_items, profile_coverage, contradictions,
-            )
+        try:
+            if hasattr(self._client, "generate_hypotheses_raw"):
+                return self._client.generate_hypotheses_raw(
+                    decision_model, research_strategy, evidence_items, profile_coverage, contradictions,
+                )
+            if hasattr(self._client, "generate_hypotheses"):
+                payload = self._client.generate_hypotheses(
+                    decision_model, research_strategy, evidence_items, profile_coverage, contradictions,
+                )
+                return payload.model_dump() if hasattr(payload, "model_dump") else dict(payload)
+        except Exception as exc:
+            raise HypothesisGenerationError(
+                f"hypothesis LLM generation failed: {exc}",
+                {"failed_stage": "generation"},
+            ) from exc
 
-        LOGGER.warning("[HypothesisAgent] client does not support generate_hypotheses — using mock")
-        return self._mock_hypotheses(decision_model, evidence_items)
+        LOGGER.warning("[HypothesisAgent] client lacks generate_hypotheses — using mock payload")
+        return self._mock_hypothesis_payload(decision_model, evidence_items)
 
-    def _mock_hypotheses(self, decision_model: dict, evidence_items: list[dict]):
-        """Deterministic fallback hypotheses."""
-        from research_agent.claude_client import HypothesisPayload, HypothesisItem, MockClaudeClient
+    def _mock_hypothesis_payload(self, decision_model: dict, evidence_items: list[dict]) -> dict:
+        """Deterministic fallback hypothesis payload (dict)."""
+        from research_agent.claude_client import MockClaudeClient
         return MockClaudeClient().generate_hypotheses(
             decision_model=decision_model,
             research_strategy={},
             evidence_items=evidence_items,
             profile_coverage={},
             contradictions=[],
-        )
+        ).model_dump()
