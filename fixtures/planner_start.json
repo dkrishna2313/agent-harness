@@ -1,0 +1,17 @@
+{
+  "question": "What are the power and cooling constraints for a GB300 NVL72 deployment?",
+  "profiles": ["ai_data_centers"],
+  "execution_profile": "ai_data_centers",
+  "run_id": "harness-planner",
+  "decision_model": {
+    "objective": "Determine power and cooling strategy for GB300 NVL72.",
+    "decision_areas": ["Power Procurement", "Cooling Architecture"],
+    "research_questions": [
+      "What power procurement options fit a multi-GW build-out?",
+      "Which cooling architecture suits 130kW+ racks?"
+    ],
+    "critical_uncertainties": ["Realized GB300 power draw"],
+    "evidence_requirements": ["Power demand forecasts", "Cooling benchmarks"]
+  },
+  "research_object": {"research_id": "R-HARNESS-PLANNER"}
+}

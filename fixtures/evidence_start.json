@@ -1,0 +1,18 @@
+{
+  "question": "What power procurement options fit a multi-GW GB300 NVL72 build-out?",
+  "profiles": ["ai_data_centers"],
+  "execution_profile": "ai_data_centers",
+  "run_id": "harness-evidence",
+  "plan": {
+    "question": "What power procurement options fit a multi-GW GB300 NVL72 build-out?",
+    "research_type": "RESEARCH",
+    "subquestions": [
+      "What grid interconnection timelines apply?",
+      "What on-site generation options exist?"
+    ],
+    "investigation_areas": ["Power Procurement", "Grid Interconnection"],
+    "profiles_used": ["ai_data_centers"],
+    "reasoning": "Seeded from decision model."
+  },
+  "research_object": {"research_id": "R-HARNESS-EVIDENCE"}
+}

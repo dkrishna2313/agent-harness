@@ -1,0 +1,35 @@
+{
+  "question": "What power procurement options fit a multi-GW GB300 NVL72 build-out?",
+  "profiles": ["ai_data_centers"],
+  "execution_profile": "ai_data_centers",
+  "run_id": "harness-report",
+  "plan": {
+    "question": "What power procurement options fit a multi-GW GB300 NVL72 build-out?",
+    "research_type": "RESEARCH",
+    "subquestions": ["What grid interconnection timelines apply?"],
+    "investigation_areas": ["Power Procurement"],
+    "profiles_used": ["ai_data_centers"],
+    "reasoning": "Seeded."
+  },
+  "evidence_notes": [
+    {
+      "evidence_items": [
+        {"evidence_id": "E001", "claim": "GB300 NVL72 racks draw over 100 kW each.",
+         "source_document": "sample.md", "category": "power"},
+        {"evidence_id": "E002", "claim": "Grid interconnection queues can exceed 3-7 years.",
+         "source_document": "sample.md", "category": "power"}
+      ],
+      "evidence_by_subquestion": {"What grid interconnection timelines apply?": ["E002"]},
+      "coverage_by_subquestion": {"What grid interconnection timelines apply?": {"coverage": "STRONG"}},
+      "evidence_summary": {"total_evidence_items": 2, "citation_count": 0},
+      "profile_coverage_by_profile": {"ai_data_centers": {"coverage_level": "STRONG", "evidence_count": 2}}
+    }
+  ],
+  "recommendations": [
+    {"id": "REC-1", "title": "Prioritise power procurement", "summary": "Secure PPAs early.",
+     "priority": "high", "time_horizon": "near_term", "supporting_evidence": ["E002"],
+     "confidence": "medium"}
+  ],
+  "qa": {"qa_summary": {"issues_found": 0}, "confidence_assessment": {"overall_confidence": "medium"}},
+  "research_object": {"research_id": "R-HARNESS-REPORT"}
+}

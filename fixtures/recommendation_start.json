@@ -1,0 +1,36 @@
+{
+  "question": "What power procurement options fit a multi-GW GB300 NVL72 build-out?",
+  "profiles": ["ai_data_centers"],
+  "execution_profile": "ai_data_centers",
+  "run_id": "harness-recommendation",
+  "decision_model": {
+    "objective": "Determine power and cooling strategy for GB300 NVL72.",
+    "decision_areas": ["Power Procurement", "Cooling Architecture"]
+  },
+  "evidence_notes": [
+    {
+      "evidence_items": [
+        {"evidence_id": "E001", "claim": "GB300 NVL72 racks draw over 100 kW each.",
+         "source_document": "sample.md", "category": "power"},
+        {"evidence_id": "E002", "claim": "Grid interconnection queues can exceed 3-7 years.",
+         "source_document": "sample.md", "category": "power"}
+      ],
+      "profile_coverage_by_profile": {"ai_data_centers": {"coverage_level": "STRONG", "evidence_count": 2}}
+    }
+  ],
+  "hypotheses": [
+    {"id": "H1", "title": "Grid constraints dominate siting",
+     "summary": "Multi-year interconnection queues force on-site generation or PPAs.",
+     "supporting_evidence": ["E002"], "contradicting_evidence": [],
+     "evidence_gaps": ["Tariff data"], "confidence": "medium",
+     "confidence_rationale": "Strong queue evidence.", "decision_implications": ["Prioritise power procurement"],
+     "disconfirming_evidence_needed": ["Faster interconnect precedent"]}
+  ],
+  "surviving_hypotheses": [
+    {"hypothesis_id": "H1", "survival_status": "strong", "reason": "Core logic intact."}
+  ],
+  "hypothesis_challenges": [
+    {"hypothesis_id": "H1", "challenge_summary": "Assumes queues stay long.", "robustness": "high"}
+  ],
+  "research_object": {"research_id": "R-HARNESS-REC", "contradictions": [], "validated_contradictions": []}
+}

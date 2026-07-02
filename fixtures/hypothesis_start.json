@@ -1,0 +1,34 @@
+{
+  "question": "What power procurement options fit a multi-GW GB300 NVL72 build-out?",
+  "profiles": ["ai_data_centers"],
+  "execution_profile": "ai_data_centers",
+  "run_id": "harness-hypothesis",
+  "decision_model": {
+    "objective": "Determine power and cooling strategy for GB300 NVL72.",
+    "decision_areas": ["Power Procurement", "Cooling Architecture"]
+  },
+  "evidence_notes": [
+    {
+      "evidence_items": [
+        {"evidence_id": "E001", "claim": "GB300 NVL72 racks draw over 100 kW each.",
+         "source_document": "sample.md", "category": "power", "topics": ["power", "rack"],
+         "relevance_score": 5, "source_document_id": "sample.md"},
+        {"evidence_id": "E002", "claim": "Grid interconnection queues can exceed 3-7 years.",
+         "source_document": "sample.md", "category": "power", "topics": ["grid", "power"],
+         "relevance_score": 4},
+        {"evidence_id": "E003", "claim": "Liquid cooling is required above ~50 kW per rack.",
+         "source_document": "sample.md", "category": "cooling", "topics": ["cooling"],
+         "relevance_score": 5}
+      ],
+      "evidence_by_subquestion": {"What grid interconnection timelines apply?": ["E002"]},
+      "evidence_by_area": {"Power Procurement": ["E001", "E002"]},
+      "coverage_by_subquestion": {"What grid interconnection timelines apply?": {"coverage": "STRONG"}},
+      "evidence_summary": {"total_evidence_items": 3},
+      "profile_coverage_by_profile": {"ai_data_centers": {"coverage_level": "STRONG", "evidence_count": 3}},
+      "profiles_requested": ["ai_data_centers"],
+      "profiles_contributing": ["ai_data_centers"],
+      "profiles_missing": []
+    }
+  ],
+  "research_object": {"research_id": "R-HARNESS-HYP", "contradictions": []}
+}
