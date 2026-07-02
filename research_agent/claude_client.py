@@ -694,6 +694,38 @@ class ExecutiveConfidencePayload(BaseModel):
     confidence: ExecutiveConfidenceItem
 
 
+class StrategicSynthesisPayload(BaseModel):
+    """Cross-domain strategic synthesis (J10.7).
+
+    Integrates independent per-Decision-Domain reasoning into one executive
+    perspective. Executive reasoning ONLY — no recommendations or implementation
+    plans. Bounded to stay compact (J9.1b discipline).
+    """
+
+    executive_summary: str = Field(
+        default="", description="Cross-domain executive perspective, <=4 sentences."
+    )
+    cross_domain_findings: list[str] = Field(
+        default_factory=list, description="At most 8 findings spanning multiple Decision Domains."
+    )
+    cross_domain_dependencies: list[str] = Field(
+        default_factory=list,
+        description="At most 8 dependencies, form 'A requires/depends-on B' across domains.",
+    )
+    cross_domain_conflicts: list[str] = Field(
+        default_factory=list, description="At most 6 tensions/conflicts between domains."
+    )
+    strategic_levers: list[str] = Field(
+        default_factory=list, description="At most 6 leverage points that move multiple domains."
+    )
+    dominant_constraints: list[str] = Field(
+        default_factory=list, description="At most 6 constraints that bind the overall decision."
+    )
+    emerging_themes: list[str] = Field(
+        default_factory=list, description="At most 8 themes emerging across domains."
+    )
+
+
 _SCHEMA_ADAPTERS = {
     "research_plan": TypeAdapter(ResearchPlan),
     "research_planning": TypeAdapter(ResearchPlanningPayload),
@@ -708,6 +740,7 @@ _SCHEMA_ADAPTERS = {
     "opportunity_generation": TypeAdapter(OpportunityPayload),   # J7.4
     "strategic_option_generation": TypeAdapter(StrategicOptionPayload),  # J7.5
     "decision_analysis_generation": TypeAdapter(DecisionAnalysisPayload),  # J7.6
+    "strategic_synthesis": TypeAdapter(StrategicSynthesisPayload),  # J10.7
     "executive_confidence_generation": TypeAdapter(ExecutiveConfidencePayload),  # J7.7
     # Used for the tool-definition schema sent to Claude (strict EvidenceItem types).
     "evidence_extraction": TypeAdapter(EvidenceExtractionPayload),
@@ -1454,6 +1487,43 @@ class MockClaudeClient:
 
         return DecisionAnalysisPayload(analysis=analysis)
 
+    def generate_strategic_synthesis(
+        self,
+        domain_plans: list[dict],
+        domain_evidence: list[dict],
+        domain_hypotheses: list[dict],
+        decision_architecture: dict,
+    ) -> "StrategicSynthesisPayload":
+        """Cross-domain strategic synthesis (J10.7) — deterministic mock version."""
+        titles = [
+            (d.get("decision_domain_title") or d.get("title") or f"Domain {i + 1}")
+            for i, d in enumerate(domain_hypotheses or domain_plans or [])
+        ]
+        themes = list(decision_architecture.get("strategic_themes", [])) or titles
+        statement = decision_architecture.get("decision_statement", "the decision")
+
+        findings = [
+            f"{t}: {len((domain_hypotheses[i] or {}).get('hypotheses', []))} hypotheses generated"
+            for i, t in enumerate(titles)
+        ][:8]
+        dependencies = [
+            f"{titles[i]} depends on {titles[i + 1]}" for i in range(len(titles) - 1)
+        ][:8]
+        conflicts = (
+            [f"Tension between {titles[0]} and {titles[-1]}"] if len(titles) >= 2 else []
+        )
+        return StrategicSynthesisPayload(
+            executive_summary=(
+                f"Cross-domain synthesis for {statement}: {len(titles)} decision domains integrated."
+            ),
+            cross_domain_findings=findings,
+            cross_domain_dependencies=dependencies,
+            cross_domain_conflicts=conflicts,
+            strategic_levers=themes[:6],
+            dominant_constraints=list(decision_architecture.get("executive_unknowns", []))[:6],
+            emerging_themes=themes[:8],
+        )
+
     def generate_executive_confidence(
         self,
         decision_analysis: dict,
@@ -1835,6 +1905,24 @@ class ClaudeClient:
         result = DecisionAnalysisPayload.model_validate({"analysis": analysis_value})
         result.normalization = diag
         return result
+
+    def generate_strategic_synthesis(
+        self,
+        domain_plans: list[dict],
+        domain_evidence: list[dict],
+        domain_hypotheses: list[dict],
+        decision_architecture: dict,
+    ) -> StrategicSynthesisPayload:
+        """Cross-domain strategic synthesis (J10.7) — one integration call."""
+        payload = self._call_json(
+            operation="generate_strategic_synthesis",
+            schema_name="strategic_synthesis",
+            prompt=_strategic_synthesis_prompt(
+                domain_plans, domain_evidence, domain_hypotheses, decision_architecture,
+            ),
+            max_tokens=4000,
+        )
+        return StrategicSynthesisPayload.model_validate(payload)
 
     def generate_executive_confidence(
         self,
@@ -3487,6 +3575,46 @@ CONSTRAINTS
 - Be specific: name assumption IDs, risk IDs, opportunity IDs where relevant.
 
 Return structured JSON matching the decision_analysis_generation schema.
+"""
+
+
+def _strategic_synthesis_prompt(
+    domain_plans: list[dict],
+    domain_evidence: list[dict],
+    domain_hypotheses: list[dict],
+    decision_architecture: dict,
+) -> str:
+    """Build the cross-domain Strategic Synthesis prompt (J10.7)."""
+
+    def _domain_block(i: int) -> str:
+        hyps = (domain_hypotheses[i] if i < len(domain_hypotheses) else {}) or {}
+        title = hyps.get("decision_domain_title") or f"Domain {i + 1}"
+        h_titles = [h.get("title", "") for h in (hyps.get("hypotheses") or [])][:3]
+        return f"- {title}: " + ("; ".join(t for t in h_titles if t) or "(no hypotheses)")
+
+    n = max(len(domain_hypotheses), len(domain_plans))
+    domains = "\n".join(_domain_block(i) for i in range(n)) or "(no domains)"
+    themes = ", ".join(decision_architecture.get("strategic_themes", [])) or "(none)"
+    statement = decision_architecture.get("decision_statement", "")
+
+    return f"""You are a senior strategy consultant integrating independent Decision Domain analyses into ONE executive perspective. This is executive reasoning — NOT recommendations and NOT implementation plans.
+
+Decision: {statement}
+Strategic themes: {themes}
+
+Decision Domains (title: top hypotheses):
+{domains}
+
+Make the IMPLICIT relationships across domains EXPLICIT. Produce:
+1. executive_summary: the integrated cross-domain perspective, <=4 sentences.
+2. cross_domain_findings: <=8 findings that span multiple domains.
+3. cross_domain_dependencies: <=8, each of the form "A requires/depends-on B" across domains.
+4. cross_domain_conflicts: <=6 tensions between domains.
+5. strategic_levers: <=6 leverage points that move multiple domains at once.
+6. dominant_constraints: <=6 constraints that bind the whole decision.
+7. emerging_themes: <=8 themes emerging across domains.
+
+Do NOT produce recommendations or actions. Return structured JSON only.
 """
 
 

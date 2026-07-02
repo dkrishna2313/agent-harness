@@ -28,6 +28,7 @@ class WorkflowState:
     PLANNING    = "PLANNING"
     EVIDENCE    = "EVIDENCE"
     HYPOTHESIS  = "HYPOTHESIS"
+    STRATEGIC_SYNTHESIS = "STRATEGIC_SYNTHESIS"   # J10.7
     CHALLENGE       = "CHALLENGE"
     ASSUMPTION      = "ASSUMPTION"          # J7.1
     RISK            = "RISK"               # J7.3
@@ -123,6 +124,10 @@ class AgentContext:
     # is organizational only. Each entry: {decision_domain_id, decision_domain_title,
     # hypotheses, synthesis_note, diagnostics}.
     domain_hypotheses: list[dict[str, Any]] = field(default_factory=list)
+    # J10.7 — cross-domain strategic synthesis (executive reasoning; NO
+    # recommendations). Integrates the per-domain reasoning streams into one
+    # executive perspective. Additive; does not change the primary path.
+    strategic_synthesis: dict[str, Any] = field(default_factory=dict)
     hypothesis_challenges: list[dict[str, Any]] = field(default_factory=list)
     surviving_hypotheses: list[dict[str, Any]] = field(default_factory=list)
     assumptions: list[dict[str, Any]] = field(default_factory=list)        # J7.1

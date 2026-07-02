@@ -1754,6 +1754,11 @@ class ReportAgent(FunctionalAgent):
         _hypothesis_reasoning = context.trace.get("_hypothesis_reasoning")
         if _hypothesis_reasoning:
             trace_payload["hypothesis_reasoning"] = _hypothesis_reasoning
+        # J10.7 – cross-domain strategic synthesis diagnostics (additive). Only the
+        # compact diagnostics block is surfaced; the report itself is unchanged.
+        _strategic_synthesis = context.trace.get("_strategic_synthesis")
+        if _strategic_synthesis and _strategic_synthesis.get("diagnostics"):
+            trace_payload["strategic_synthesis"] = _strategic_synthesis["diagnostics"]
         # PH1 – LLM output normalization diagnostics (additive).
         _llm_norm = context.trace.get("_llm_normalization")
         if _llm_norm:

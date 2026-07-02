@@ -161,6 +161,7 @@ class AgentOrchestrator:
         problem_framing_factory: Any = None,
         research_strategy_factory: Any = None,
         hypothesis_factory: Any = None,
+        strategic_synthesis_factory: Any = None,  # J10.7
         challenge_factory: Any = None,
         assumption_factory: Any = None,
         risk_factory: Any = None,
@@ -178,6 +179,7 @@ class AgentOrchestrator:
         self._problem_framing_factory   = problem_framing_factory
         self._research_strategy_factory = research_strategy_factory
         self._hypothesis_factory        = hypothesis_factory
+        self._strategic_synthesis_factory = strategic_synthesis_factory  # J10.7
         self._challenge_factory         = challenge_factory
         self._assumption_factory        = assumption_factory
         self._risk_factory              = risk_factory
@@ -247,6 +249,20 @@ class AgentOrchestrator:
             # ---- HYPOTHESIS (J6.3) ------------------------------------------
             elif state == WorkflowState.HYPOTHESIS:
                 result = _step(self._hypothesis_factory(), ctx)
+                ctx = result.context
+                state = (
+                    WorkflowState.STRATEGIC_SYNTHESIS
+                    if self._strategic_synthesis_factory is not None
+                    else (
+                        WorkflowState.CHALLENGE
+                        if self._challenge_factory is not None
+                        else WorkflowState.QA
+                    )
+                )
+
+            # ---- STRATEGIC SYNTHESIS (J10.7) --------------------------------
+            elif state == WorkflowState.STRATEGIC_SYNTHESIS:
+                result = _step(self._strategic_synthesis_factory(), ctx)
                 ctx = result.context
                 state = (
                     WorkflowState.CHALLENGE
@@ -585,6 +601,7 @@ class Orchestrator:
         from .problem_framing_agent     import ProblemFramingAgent
         from .research_strategy_agent   import ResearchStrategyAgent
         from .hypothesis_agent          import HypothesisAgent
+        from .strategic_synthesis_agent import StrategicSynthesisAgent
         from .challenge_agent           import ChallengeAgent
         from .assumption_agent          import AssumptionAgent
         from .risk_agent                import RiskAgent
@@ -620,6 +637,9 @@ class Orchestrator:
 
         def hypothesis_factory() -> HypothesisAgent:
             return HypothesisAgent(client=self._client, domain_profiles=loaded_profiles)
+
+        def strategic_synthesis_factory() -> StrategicSynthesisAgent:
+            return StrategicSynthesisAgent(client=self._client, domain_profiles=loaded_profiles)
 
         def challenge_factory() -> ChallengeAgent:
             return ChallengeAgent(client=self._client, domain_profiles=loaded_profiles)
@@ -807,6 +827,7 @@ class Orchestrator:
             problem_framing_factory=problem_framing_factory if goal else None,
             research_strategy_factory=research_strategy_factory if goal else None,
             hypothesis_factory=hypothesis_factory,
+            strategic_synthesis_factory=strategic_synthesis_factory,
             challenge_factory=challenge_factory,
             assumption_factory=assumption_factory,
             risk_factory=risk_factory,

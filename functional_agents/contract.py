@@ -47,10 +47,11 @@ def _agent_classes() -> list[type]:
     from .strategic_option_agent            import StrategicOptionAgent
     from .decision_analysis_agent           import DecisionAnalysisAgent
     from .executive_confidence_agent        import ExecutiveConfidenceAgent  # J7.7
+    from .strategic_synthesis_agent         import StrategicSynthesisAgent  # J10.7
     return [
         ProblemFramingAgent, ResearchStrategyAgent,
         PlannerAgent, EvidenceAgent,
-        HypothesisAgent, ChallengeAgent, AssumptionAgent, RiskAgent, OpportunityAgent, RecommendationAgent,
+        HypothesisAgent, StrategicSynthesisAgent, ChallengeAgent, AssumptionAgent, RiskAgent, OpportunityAgent, RecommendationAgent,
         MultiProfileAgent, ScenarioAgent, RecommendationImprovementAgent,
         RecommendationSynthesisAgent, StrategicOptionAgent, DecisionAnalysisAgent,
         ExecutiveConfidenceAgent, QAAgent, ReportAgent,
