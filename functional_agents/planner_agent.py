@@ -46,33 +46,58 @@ class PlannerAgent(FunctionalAgent):
         # before ProblemFramingAgent populates the question).
         planning_targets = targets if targets else ([None] if context.question else [])
 
-        domain_plans: list[dict] = []
-        for i, target in enumerate(planning_targets):
-            planning_question = target.question if target is not None else context.question
-            plan = self._generate_plan(
-                planning_question,
-                profiles_context,
-                decision_model=context.decision_model or None,
-                research_strategy=context.research_strategy or None,
-            )
-            # Existing planning schema (unchanged) …
-            plan_obj = {
-                "question": planning_question,
-                "research_type": plan.research_type,
-                "subquestions": plan.subquestions,
-                "investigation_areas": plan.investigation_areas,
-                "profiles_used": plan.profiles_used,
-                "reasoning": plan.reasoning,
-            }
-            # … wrapped with organizational metadata for domain_plans only.
-            domain_plans.append({
-                **plan_obj,
-                "decision_domain_id": target.decision_domain_id if target else None,
-                "decision_domain_title": target.decision_domain_title if target else None,
-                "target_kind": target.kind if target else None,
-                "is_primary": i == 0,
-            })
+        # PH2.1 — every plan passes the explicit LLM boundary
+        # (raw → normalize → validate → typed PlannerOutput) before it becomes
+        # business logic. A boundary failure is deterministic and its stage is
+        # recorded in context.trace["_planner_boundary"].
+        from .planner_boundary import PlannerBoundaryError
 
+        domain_plans: list[dict] = []
+        primary_boundary: dict | None = None
+        try:
+            for i, target in enumerate(planning_targets):
+                planning_question = target.question if target is not None else context.question
+                plan, boundary = self._generate_plan(
+                    planning_question,
+                    profiles_context,
+                    decision_model=context.decision_model or None,
+                    research_strategy=context.research_strategy or None,
+                )
+                if i == 0:
+                    primary_boundary = boundary
+                # Existing planning schema (unchanged), now sourced from the typed
+                # PlannerOutput the boundary produced …
+                plan_obj = {
+                    "question": planning_question,
+                    "research_type": plan.research_type,
+                    "subquestions": plan.subquestions,
+                    "investigation_areas": plan.investigation_areas,
+                    "profiles_used": plan.profiles_used,
+                    "reasoning": plan.reasoning,
+                }
+                # … wrapped with organizational metadata for domain_plans only.
+                domain_plans.append({
+                    **plan_obj,
+                    "decision_domain_id": target.decision_domain_id if target else None,
+                    "decision_domain_title": target.decision_domain_title if target else None,
+                    "target_kind": target.kind if target else None,
+                    "is_primary": i == 0,
+                })
+        except PlannerBoundaryError as exc:
+            # Deterministic failure: record the failing stage; do not run business
+            # logic on unvalidated output.
+            context.trace["_planner_boundary"] = exc.diagnostics
+            self._record(
+                context, status="error",
+                summary=(f"Planner boundary failed at stage "
+                         f"'{exc.diagnostics.get('failed_stage', 'boundary')}': {exc}"),
+                boundary_failed_stage=exc.diagnostics.get("failed_stage", "boundary"),
+            )
+            raise
+
+        context.trace["_planner_boundary"] = primary_boundary or {
+            "stages": {}, "failed_stage": None
+        }
         context.domain_plans = domain_plans
 
         # Primary plan drives the pipeline. Keep context.plan to the EXISTING
@@ -158,48 +183,77 @@ class PlannerAgent(FunctionalAgent):
         decision_model: dict | None = None,
         research_strategy: dict | None = None,
     ):
-        """Call the LLM client to generate the research plan.
+        """PH2.1 boundary: raw LLM payload → normalize → validate → PlannerOutput.
 
-        When a Decision Model is provided (goal-driven runs), it is passed to
-        the planning prompt so the plan is grounded in the pre-derived research
-        questions and decision areas rather than re-deriving them from scratch.
+        Returns (PlannerOutput, boundary_diagnostics). Raises a distinct
+        PlannerBoundaryError subclass on generation / normalization / validation
+        failure so business logic never consumes unvalidated output.
         """
-        from research_agent.claude_client import ResearchPlanningPayload
+        from .planner_boundary import plan_from_raw
+
+        raw = self._raw_planner_payload(
+            question, profiles_context, decision_model, research_strategy
+        )
+        return plan_from_raw(raw)
+
+    def _raw_planner_payload(
+        self,
+        question: str,
+        profiles_context: list[dict],
+        decision_model: dict | None,
+        research_strategy: dict | None,
+    ) -> dict:
+        """Obtain the RAW (unvalidated) planner payload dict (LLM-generation stage)."""
+        from .planner_boundary import PlannerGenerationError
 
         if self._client is None:
-            LOGGER.warning("[PlannerAgent] no client provided — using mock plan")
-            # In goal-driven mode, seed the plan from the decision model
-            subquestions = (
-                list(decision_model.get("research_questions", []))
-                if decision_model else []
-            ) or [
-                f"What are the key facts about: {question}?",
-                "What evidence exists in the available sources?",
-                "What are the main constraints or limitations?",
-                "What are the practical implications?",
-                "What gaps remain in the available evidence?",
-            ]
-            investigation_areas = (
-                list(decision_model.get("decision_areas", []))
-                if decision_model else []
-            ) or ["Overview", "Key Facts", "Evidence Quality", "Implications", "Open Questions"]
-            return ResearchPlanningPayload(
-                research_type="RESEARCH",
-                subquestions=subquestions,
-                investigation_areas=investigation_areas,
-                profiles_used=[p.get("name", "") for p in profiles_context],
-                reasoning="No client available; plan seeded from decision model." if decision_model
-                    else "No client available; using default plan structure.",
-            )
+            LOGGER.warning("[PlannerAgent] no client provided — using deterministic default plan")
+            return self._default_plan_dict(question, profiles_context, decision_model)
 
-        if hasattr(self._client, "plan_research_question"):
-            return self._client.plan_research_question(
-                question, profiles_context,
-                decision_model=decision_model,
-                research_strategy=research_strategy,
-            )
+        try:
+            if hasattr(self._client, "plan_research_question_raw"):
+                return self._client.plan_research_question_raw(
+                    question, profiles_context,
+                    decision_model=decision_model, research_strategy=research_strategy,
+                )
+            if hasattr(self._client, "plan_research_question"):
+                payload = self._client.plan_research_question(
+                    question, profiles_context,
+                    decision_model=decision_model, research_strategy=research_strategy,
+                )
+                return payload.model_dump() if hasattr(payload, "model_dump") else dict(payload)
+        except Exception as exc:
+            raise PlannerGenerationError(
+                f"planner LLM generation failed: {exc}",
+                {"failed_stage": "llm_generation"},
+            ) from exc
 
-        # Fallback for clients that predate this method
-        LOGGER.warning("[PlannerAgent] client does not support plan_research_question — using mock plan")
+        # Client predates the planner method — deterministic mock payload.
+        LOGGER.warning("[PlannerAgent] client lacks plan_research_question — using mock payload")
         from research_agent.claude_client import MockClaudeClient
-        return MockClaudeClient().plan_research_question(question, profiles_context)
+        return MockClaudeClient().plan_research_question(question, profiles_context).model_dump()
+
+    def _default_plan_dict(
+        self, question: str, profiles_context: list[dict], decision_model: dict | None
+    ) -> dict:
+        """Deterministic default planner payload (no client), seeded from the DM."""
+        subquestions = (
+            list(decision_model.get("research_questions", [])) if decision_model else []
+        ) or [
+            f"What are the key facts about: {question}?",
+            "What evidence exists in the available sources?",
+            "What are the main constraints or limitations?",
+            "What are the practical implications?",
+            "What gaps remain in the available evidence?",
+        ]
+        investigation_areas = (
+            list(decision_model.get("decision_areas", [])) if decision_model else []
+        ) or ["Overview", "Key Facts", "Evidence Quality", "Implications", "Open Questions"]
+        return {
+            "research_type": "RESEARCH",
+            "subquestions": subquestions,
+            "investigation_areas": investigation_areas,
+            "profiles_used": [p.get("name", "") for p in profiles_context],
+            "reasoning": ("No client available; plan seeded from decision model."
+                          if decision_model else "No client available; using default plan structure."),
+        }

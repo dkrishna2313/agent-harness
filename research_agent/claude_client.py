@@ -767,6 +767,19 @@ class MockClaudeClient:
     def __init__(self) -> None:
         self.call_traces: list[ClaudeCallTrace] = []
 
+    def plan_research_question_raw(
+        self,
+        question: str,
+        profiles_context: list[dict],
+        decision_model: dict | None = None,
+        research_strategy: dict | None = None,
+    ) -> dict:
+        """Raw planner payload for the PH2.1 boundary (deterministic mock)."""
+        return self.plan_research_question(
+            question, profiles_context,
+            decision_model=decision_model, research_strategy=research_strategy,
+        ).model_dump()
+
     def plan_research_question(
         self,
         question: str,
@@ -1958,15 +1971,19 @@ class ClaudeClient:
         )
         return ExecutiveConfidencePayload.model_validate(payload)
 
-    def plan_research_question(
+    def plan_research_question_raw(
         self,
         question: str,
         profiles_context: list[dict],
         decision_model: dict | None = None,
         research_strategy: dict | None = None,
-    ) -> ResearchPlanningPayload:
-        """Classify the question and generate a structured research plan (J5.1 / J6.1a)."""
-        payload = self._call_json(
+    ) -> dict:
+        """Return the RAW planner payload (no validation) for the PH2.1 boundary.
+
+        The functional Planner normalizes + validates this via planner_boundary,
+        so business logic never consumes unvalidated model output.
+        """
+        return self._call_json(
             operation="plan_research_question",
             schema_name="research_planning",
             prompt=_planning_prompt(
@@ -1975,6 +1992,20 @@ class ClaudeClient:
                 research_strategy=research_strategy,
             ),
             max_tokens=2000,
+        )
+
+    def plan_research_question(
+        self,
+        question: str,
+        profiles_context: list[dict],
+        decision_model: dict | None = None,
+        research_strategy: dict | None = None,
+    ) -> ResearchPlanningPayload:
+        """Classify the question and generate a structured research plan (J5.1 / J6.1a)."""
+        payload = self.plan_research_question_raw(
+            question, profiles_context,
+            decision_model=decision_model,
+            research_strategy=research_strategy,
         )
         return ResearchPlanningPayload.model_validate(payload)
 

@@ -241,23 +241,37 @@ def run_agent(
     if spec.get("prepare"):
         spec["prepare"](ctx)
 
-    # Preconditions.
+    # Preconditions (pre-run harness usage failures raise HarnessError).
     pre_checked = _check_conditions(spec["pre"], ctx, "Precondition")
 
-    # Execute.
+    # Execute. Execution-time failures (e.g. LLM boundary rejection) are captured
+    # into the mini trace as a distinct error rather than crashing the harness,
+    # so boundary stages/failures are always reported.
+    status = "error"
+    post_checked: list[str] = []
+    exec_error: str | None = None
     t0 = time.monotonic()
-    result = agent.run(ctx)
+    try:
+        result = agent.run(ctx)
+        ctx = result.context
+        status = result.status
+        post_checked = _check_conditions(spec["post"], ctx, "Postcondition")
+    except HarnessError as exc:      # postcondition failure
+        exec_error = str(exc)
+    except Exception as exc:          # agent / boundary execution failure
+        exec_error = f"{type(exc).__name__}: {exc}"
     elapsed_ms = round((time.monotonic() - t0) * 1000, 1)
-    ctx = result.context
-
-    # Postconditions.
-    post_checked = _check_conditions(spec["post"], ctx, "Postcondition")
 
     after = context_to_jsonable(ctx)
     diff = context_diff(before, after)
 
     llm_calls = len(getattr(client, "call_traces", [])) - llm_before
     norm = ctx.trace.get("_llm_normalization")
+    # PH2.1 — surface any LLM-boundary diagnostics (keys ending in _boundary).
+    boundary = {
+        k: v for k, v in ctx.trace.items()
+        if isinstance(k, str) and k.endswith("_boundary")
+    }
     warnings = [
         h.get("summary", "") for h in ctx.agent_history
         if h.get("status") in ("warning", "error")
@@ -266,11 +280,13 @@ def run_agent(
     mini_trace = {
         "agent": agent_name,
         "agent_class": cls_name,
-        "status": result.status,
+        "status": status,
+        "error": exec_error,
         "execution_time_ms": elapsed_ms,
         "llm_call_count": llm_calls,
         "llm_mode": "mock" if use_mock else "live",
         "normalization": norm,
+        "boundary": boundary,
         "validation": {
             "preconditions_passed": pre_checked,
             "postconditions_passed": post_checked,
@@ -291,10 +307,16 @@ def _print_summary(res: dict[str, Any]) -> None:
     d = res["diff"]
     print(f"\n=== Agent Harness — {mt['agent']} ({mt['agent_class']}) ===")
     print(f"  status         : {mt['status']}")
+    if mt.get("error"):
+        print(f"  error          : {mt['error']}")
     print(f"  time           : {mt['execution_time_ms']} ms")
     print(f"  llm calls      : {mt['llm_call_count']} ({mt['llm_mode']})")
     print(f"  preconditions  : {'; '.join(mt['validation']['preconditions_passed']) or '(none)'}")
     print(f"  postconditions : {'; '.join(mt['validation']['postconditions_passed']) or '(none)'}")
+    for name, bd in (mt.get("boundary") or {}).items():
+        stages = bd.get("stages") if isinstance(bd, dict) else None
+        failed = bd.get("failed_stage") if isinstance(bd, dict) else None
+        print(f"  {name:<15}: stages={stages} failed_stage={failed}")
     print("\n  Context diff:")
     print(f"    added    ({len(d['added'])}): {', '.join(d['added']) or '-'}")
     print(f"    modified ({len(d['modified'])}): {', '.join(d['modified']) or '-'}")
@@ -345,7 +367,8 @@ def main(argv: list[str] | None = None) -> int:
         Path(args.trace).write_text(json.dumps(res["mini_trace"], indent=2, ensure_ascii=False), encoding="utf-8")
         print(f"Mini trace → {args.trace}")
 
-    return 0
+    # Non-zero exit on an execution/boundary failure (deterministic).
+    return 0 if res["mini_trace"]["status"] != "error" else 1
 
 
 if __name__ == "__main__":
