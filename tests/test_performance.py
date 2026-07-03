@@ -228,13 +228,42 @@ def _sample_summary():
     return tracker.summary()
 
 
-def test_extract_performance_from_serialized_key():
+def _canonical_trace_with_performance(perf):
+    from functional_agents.pipeline_trace import SCHEMA_VERSION
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "pipeline": {}, "agents": {}, "boundaries": {},
+        "performance": perf, "prompt_slices": {}, "contracts": {}, "summary": {},
+    }
+
+
+def test_extract_performance_requires_canonical_trace():
+    """PH3.4: extract_performance no longer guesses between legacy trace shapes."""
+    from functional_agents.pipeline_trace import CanonicalTraceError
+
     perf = _sample_summary()
-    assert pr.extract_performance({"performance": perf}) is perf
-    assert pr.extract_performance({"_performance": perf}) is perf
-    assert pr.extract_performance({"trace": {"performance": perf}}) is perf
-    assert pr.extract_performance(perf) is perf  # raw summary
-    assert pr.extract_performance({"nothing": 1}) is None
+    canonical = _canonical_trace_with_performance(perf)
+    assert pr.extract_performance(canonical) is perf
+
+    # Legacy/non-canonical shapes all now raise, with a clear message.
+    for bad in (
+        {"performance": perf},
+        {"_performance": perf},
+        {"trace": {"performance": perf}},
+        perf,  # a bare summary dict
+        {"nothing": 1},
+        "not a mapping",
+    ):
+        with pytest.raises(CanonicalTraceError):
+            pr.extract_performance(bad)
+
+
+def test_extract_performance_errors_when_canonical_but_no_performance():
+    from functional_agents.pipeline_trace import CanonicalTraceError
+
+    canonical = _canonical_trace_with_performance(None)
+    with pytest.raises(CanonicalTraceError, match="no performance data"):
+        pr.extract_performance(canonical)
 
 
 def test_build_report_shape():

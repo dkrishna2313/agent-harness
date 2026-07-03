@@ -1,16 +1,27 @@
-"""PH3.1 — Performance report generator.
+"""PH3.1 / PH3.4 — Performance report generator.
 
-Reads a pipeline trace (or a raw ``PerformanceTracker.summary()`` dict) and
-produces a structured engineering performance report: per-agent timing, stage
-breakdown, LLM vs non-LLM share, total pipeline timing, and ranked bottlenecks.
+Reads the canonical pipeline trace (PH3.4, ``functional_agents.pipeline_trace``)
+and produces a structured engineering performance report: per-agent timing,
+stage breakdown, LLM vs non-LLM share, total pipeline timing, ranked
+bottlenecks, measured prompt-efficiency (PH3.2), and applied prompt-slice
+savings (PH3.3).
 
 This is a *reporting* tool — it consumes measurement data already captured by
 ``functional_agents.performance``.  It changes no platform behaviour.
 
+PH3.4 note: this module used to guess between several trace shapes (a raw
+``_performance``/``performance`` key, a nested ``trace`` wrapper, a bare
+summary dict). It no longer guesses — the CLI now requires a canonical
+pipeline trace (``functional_agents.pipeline_trace.build_canonical_trace``)
+and raises a clear ``CanonicalTraceError`` otherwise. ``build_report()``
+itself still operates on a plain ``PerformanceTracker.summary()``-shaped
+dict (the canonical trace's ``"performance"`` section *is* exactly that
+shape), so it composes cleanly with both the CLI and direct unit tests.
+
 CLI::
 
-    python3 -m functional_agents.performance_report --trace outputs/run.trace.json
-    python3 -m functional_agents.performance_report --trace run.trace.json --md perf.md --json perf.json
+    python3 -m functional_agents.performance_report --trace outputs/pipeline.trace.json
+    python3 -m functional_agents.performance_report --trace pipeline.trace.json --md perf.md --json perf.json
 """
 
 from __future__ import annotations
@@ -22,31 +33,30 @@ from pathlib import Path
 from typing import Any
 
 from .performance import STAGE_CATEGORIES
+from .pipeline_trace import CanonicalTraceError, require_canonical_trace
 
 
 # ---------------------------------------------------------------------------
 # Extraction
 # ---------------------------------------------------------------------------
 
-def extract_performance(trace: dict) -> dict | None:
-    """Locate the performance summary within a trace dict.
+def extract_performance(data: Any, *, source: str = "<trace>") -> dict:
+    """Extract the performance section from a canonical pipeline trace (PH3.4).
 
-    Handles the in-memory key (``_performance``), the serialized key
-    (``performance``), and a nested ``trace`` wrapper.  Returns None if absent.
+    Requires ``data`` to be a canonical pipeline trace (schema_version
+    ``pipeline_trace.SCHEMA_VERSION``, produced by a full pipeline run).
+    Raises ``CanonicalTraceError`` — with an actionable message — for any
+    other shape (a ``run_agent.py`` mini-trace, a legacy ReportAgent trace,
+    a bare performance summary, etc.). This function no longer guesses.
     """
-    if not isinstance(trace, dict):
-        return None
-    for key in ("_performance", "performance"):
-        val = trace.get(key)
-        if isinstance(val, dict) and "agents" in val:
-            return val
-    nested = trace.get("trace")
-    if isinstance(nested, dict):
-        return extract_performance(nested)
-    # A raw summary passed directly
-    if "agents" in trace and "totals" in trace:
-        return trace
-    return None
+    canonical = require_canonical_trace(data, source=source)
+    perf = canonical.get("performance")
+    if not isinstance(perf, dict) or "agents" not in perf:
+        raise CanonicalTraceError(
+            f"{source}: canonical pipeline trace has no performance data "
+            "(no PerformanceTracker was attached to this pipeline run)."
+        )
+    return perf
 
 
 # ---------------------------------------------------------------------------
@@ -175,7 +185,7 @@ def _ms(v: float) -> str:
 def render_markdown(report: dict, *, source: str | None = None) -> str:
     t = report["totals"]
     wall = t.get("pipeline_wall_ms", 0.0)
-    lines: list[str] = ["# Platform Performance Report (PH3.1 / PH3.2 / PH3.3)", ""]
+    lines: list[str] = ["# Platform Performance Report (PH3.1 / PH3.2 / PH3.3 / PH3.4)", ""]
     if source:
         lines += [f"**Source:** `{source}`", ""]
 
@@ -281,7 +291,7 @@ def render_markdown(report: dict, *, source: str | None = None) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python3 -m functional_agents.performance_report",
-        description="Generate a PH3.1 performance report from a pipeline trace.",
+        description="Generate a performance report from a canonical pipeline trace (PH3.4).",
     )
     parser.add_argument("--trace", required=True, type=Path, help="Path to a pipeline trace JSON.")
     parser.add_argument("--md", type=Path, default=None, help="Write markdown report to this path.")
@@ -295,11 +305,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: could not read trace {args.trace}: {exc}", file=sys.stderr)
         return 2
 
-    perf = extract_performance(trace)
-    if perf is None:
-        print(f"error: no performance data found in {args.trace} "
-              "(expected a '_performance'/'performance' key with an 'agents' list).",
-              file=sys.stderr)
+    try:
+        perf = extract_performance(trace, source=str(args.trace))
+    except CanonicalTraceError as exc:
+        print(f"error: {exc}", file=sys.stderr)
         return 1
 
     report = build_report(perf)

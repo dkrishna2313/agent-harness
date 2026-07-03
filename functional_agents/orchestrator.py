@@ -864,4 +864,15 @@ class Orchestrator:
                 perf_summary["totals"]["llm_call_count"],
             )
 
+        # PH3.4 – write the one authoritative canonical pipeline trace,
+        # consolidating boundaries/performance/prompt-slices already computed
+        # above. Best-effort: a write failure must never fail the pipeline
+        # run itself (this is diagnostic tooling, not pipeline output).
+        try:
+            from .pipeline_trace import write_canonical_trace
+            trace_path = write_canonical_trace(result_ctx, Path(self._out_path).parent)
+            print(f"Pipeline trace → {trace_path}")
+        except Exception as exc:
+            LOGGER.warning("[Orchestrator] canonical pipeline trace write failed: %s", exc)
+
         return result_ctx
