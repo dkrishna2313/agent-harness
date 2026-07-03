@@ -1894,6 +1894,10 @@ class ReportAgent(FunctionalAgent):
         _rec_strategy = context.trace.get("_recommendation_strategy_context")
         if _rec_strategy:
             trace_payload["recommendation_strategy_context"] = _rec_strategy
+        # PH2.4 – recommendation LLM boundary diagnostics (additive).
+        _rec_boundary = context.trace.get("_recommendation_boundary")
+        if _rec_boundary:
+            trace_payload["recommendation_boundary"] = _rec_boundary
 
         # Challenge generation block (J6.4)
         chal_data = context.trace.get("_challenges")

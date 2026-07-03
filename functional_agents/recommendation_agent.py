@@ -76,19 +76,33 @@ class RecommendationAgent(FunctionalAgent):
         # prioritisation when present; absent → legacy hypothesis-driven behaviour.
         strategic_synthesis: dict = context.strategic_synthesis or {}
 
-        rec_payload = self._generate_recommendations(
-            hypotheses=hypotheses,
-            surviving_hypotheses=context.surviving_hypotheses,
-            hypothesis_challenges=context.hypothesis_challenges,
-            evidence_items=evidence_items,
-            decision_model=context.decision_model,
-            research_strategy=context.research_strategy,
-            validated_contradictions=validated_contradictions,
-            strategic_synthesis=strategic_synthesis,
-        )
+        # PH2.4 — raw payload → normalize → validate → typed RecommendationOutput
+        # before any business logic. A boundary failure is deterministic and its
+        # stage is recorded in context.trace["_recommendation_boundary"].
+        from .recommendation_boundary import RecommendationBoundaryError
+        try:
+            rec_output, rec_boundary = self._generate_recommendations(
+                hypotheses=hypotheses,
+                surviving_hypotheses=context.surviving_hypotheses,
+                hypothesis_challenges=context.hypothesis_challenges,
+                evidence_items=evidence_items,
+                decision_model=context.decision_model,
+                research_strategy=context.research_strategy,
+                validated_contradictions=validated_contradictions,
+                strategic_synthesis=strategic_synthesis,
+            )
+        except RecommendationBoundaryError as exc:
+            context.trace["_recommendation_boundary"] = exc.diagnostics
+            self._record(
+                context, status="error",
+                summary=(f"Recommendation boundary failed at stage "
+                         f"'{exc.diagnostics.get('failed_stage', 'boundary')}': {exc}"),
+                boundary_failed_stage=exc.diagnostics.get("failed_stage", "boundary"),
+            )
+            raise
 
-        recs_as_dicts = [r.model_dump() for r in rec_payload.recommendations]
-        portfolio_as_dict = rec_payload.recommendation_portfolio.model_dump()
+        recs_as_dicts = rec_output.as_dicts()
+        portfolio_as_dict = rec_output.portfolio_dict()
 
         context.recommendations = recs_as_dicts
         context.recommendation_portfolio = portfolio_as_dict
@@ -100,8 +114,9 @@ class RecommendationAgent(FunctionalAgent):
         context.trace["_recommendations"] = {
             "recommendations": recs_as_dicts,
             "recommendation_portfolio": portfolio_as_dict,
-            "synthesis_note": rec_payload.synthesis_note,
+            "synthesis_note": rec_output.synthesis_note,
         }
+        context.trace["_recommendation_boundary"] = rec_boundary
 
         # J10.8 — additive diagnostics: how much Strategic Synthesis context was
         # available and used (capped identically to the prompt). Trace-only; the
@@ -139,7 +154,7 @@ class RecommendationAgent(FunctionalAgent):
             summary=(
                 f"{len(recs_as_dicts)} recommendations generated. "
                 f"high_priority={high_count}. "
-                + rec_payload.synthesis_note[:100]
+                + rec_output.synthesis_note[:100]
             ),
             recommendation_count=len(recs_as_dicts),
             high_priority=high_count,
@@ -164,30 +179,76 @@ class RecommendationAgent(FunctionalAgent):
         validated_contradictions: list[dict] | None = None,
         strategic_synthesis: dict | None = None,
     ):
-        """Call the LLM client to generate recommendations (J10.8: + synthesis)."""
-        if self._client is None:
-            LOGGER.warning("[RecommendationAgent] no client — using mock recommendations")
-            return self._mock_recommendations(hypotheses, surviving_hypotheses, hypothesis_challenges, evidence_items, decision_model)
+        """PH2.4 boundary: raw payload → normalize → validate → RecommendationOutput.
 
-        if hasattr(self._client, "generate_recommendations"):
-            return self._client.generate_recommendations(
-                hypotheses, surviving_hypotheses, hypothesis_challenges,
-                evidence_items, decision_model, research_strategy,
-                validated_contradictions=validated_contradictions or [],
-                strategic_synthesis=strategic_synthesis or {},
-            )
+        Returns (RecommendationOutput, boundary_diagnostics). Raises a distinct
+        RecommendationBoundaryError subclass on generation / normalization /
+        validation failure so business logic never consumes unvalidated output.
+        """
+        from .recommendation_boundary import finalize_recommendations
 
-        LOGGER.warning("[RecommendationAgent] client does not support generate_recommendations — using mock")
-        return self._mock_recommendations(hypotheses, surviving_hypotheses, hypothesis_challenges, evidence_items, decision_model)
+        raw = self._raw_recommendation_payload(
+            hypotheses, surviving_hypotheses, hypothesis_challenges,
+            evidence_items, decision_model, research_strategy,
+            validated_contradictions, strategic_synthesis,
+        )
+        return finalize_recommendations(raw)
 
-    def _mock_recommendations(
+    def _raw_recommendation_payload(
         self,
         hypotheses: list[dict],
         surviving_hypotheses: list[dict],
         hypothesis_challenges: list[dict],
         evidence_items: list[dict],
         decision_model: dict,
-    ):
+        research_strategy: dict,
+        validated_contradictions: list[dict] | None,
+        strategic_synthesis: dict | None,
+    ) -> dict:
+        """Obtain the RAW (unvalidated) recommendation payload dict (generation stage)."""
+        from .recommendation_boundary import RecommendationGenerationError
+
+        if self._client is None:
+            LOGGER.warning("[RecommendationAgent] no client — using mock recommendations")
+            return self._mock_recommendation_payload(
+                hypotheses, surviving_hypotheses, hypothesis_challenges, evidence_items, decision_model
+            )
+
+        try:
+            if hasattr(self._client, "generate_recommendations_raw"):
+                return self._client.generate_recommendations_raw(
+                    hypotheses, surviving_hypotheses, hypothesis_challenges,
+                    evidence_items, decision_model, research_strategy,
+                    validated_contradictions=validated_contradictions or [],
+                    strategic_synthesis=strategic_synthesis or {},
+                )
+            if hasattr(self._client, "generate_recommendations"):
+                payload = self._client.generate_recommendations(
+                    hypotheses, surviving_hypotheses, hypothesis_challenges,
+                    evidence_items, decision_model, research_strategy,
+                    validated_contradictions=validated_contradictions or [],
+                    strategic_synthesis=strategic_synthesis or {},
+                )
+                return payload.model_dump() if hasattr(payload, "model_dump") else dict(payload)
+        except Exception as exc:
+            raise RecommendationGenerationError(
+                f"recommendation LLM generation failed: {exc}",
+                {"failed_stage": "generation"},
+            ) from exc
+
+        LOGGER.warning("[RecommendationAgent] client lacks generate_recommendations — using mock payload")
+        return self._mock_recommendation_payload(
+            hypotheses, surviving_hypotheses, hypothesis_challenges, evidence_items, decision_model
+        )
+
+    def _mock_recommendation_payload(
+        self,
+        hypotheses: list[dict],
+        surviving_hypotheses: list[dict],
+        hypothesis_challenges: list[dict],
+        evidence_items: list[dict],
+        decision_model: dict,
+    ) -> dict:
         from research_agent.claude_client import MockClaudeClient
         return MockClaudeClient().generate_recommendations(
             hypotheses=hypotheses,
@@ -196,4 +257,4 @@ class RecommendationAgent(FunctionalAgent):
             evidence_items=evidence_items,
             decision_model=decision_model,
             research_strategy={},
-        )
+        ).model_dump()

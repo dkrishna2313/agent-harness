@@ -1061,6 +1061,25 @@ class MockClaudeClient:
             ),
         )
 
+    def generate_recommendations_raw(
+        self,
+        hypotheses: list[dict],
+        surviving_hypotheses: list[dict],
+        hypothesis_challenges: list[dict],
+        evidence_items: list[dict],
+        decision_model: dict,
+        research_strategy: dict,
+        validated_contradictions: list[dict] | None = None,
+        strategic_synthesis: dict | None = None,
+    ) -> dict:
+        """Raw recommendation payload for the PH2.4 boundary (deterministic mock)."""
+        return self.generate_recommendations(
+            hypotheses, surviving_hypotheses, hypothesis_challenges,
+            evidence_items, decision_model, research_strategy,
+            validated_contradictions=validated_contradictions,
+            strategic_synthesis=strategic_synthesis,
+        ).model_dump()
+
     def generate_recommendations(
         self,
         hypotheses: list[dict],
@@ -1822,6 +1841,30 @@ class ClaudeClient:
         )
         return ChallengePayload.model_validate(payload)
 
+    def generate_recommendations_raw(
+        self,
+        hypotheses: list[dict],
+        surviving_hypotheses: list[dict],
+        hypothesis_challenges: list[dict],
+        evidence_items: list[dict],
+        decision_model: dict,
+        research_strategy: dict,
+        validated_contradictions: list[dict] | None = None,
+        strategic_synthesis: dict | None = None,
+    ) -> dict:
+        """Return the RAW recommendation payload (no validation) for the PH2.4 boundary."""
+        return self._call_json(
+            operation="generate_recommendations",
+            schema_name="recommendation_generation",
+            prompt=_recommendation_prompt(
+                hypotheses, surviving_hypotheses, hypothesis_challenges,
+                evidence_items, decision_model, research_strategy,
+                validated_contradictions=validated_contradictions or [],
+                strategic_synthesis=strategic_synthesis,
+            ),
+            max_tokens=6000,
+        )
+
     def generate_recommendations(
         self,
         hypotheses: list[dict],
@@ -1838,18 +1881,14 @@ class ClaudeClient:
         J10.8 — an optional Strategic Synthesis block shapes reasoning and
         prioritisation (evidence citations still come from evidence items).
         """
-        payload = self._call_json(
-            operation="generate_recommendations",
-            schema_name="recommendation_generation",
-            prompt=_recommendation_prompt(
+        return RecommendationPayload.model_validate(
+            self.generate_recommendations_raw(
                 hypotheses, surviving_hypotheses, hypothesis_challenges,
                 evidence_items, decision_model, research_strategy,
-                validated_contradictions=validated_contradictions or [],
+                validated_contradictions=validated_contradictions,
                 strategic_synthesis=strategic_synthesis,
-            ),
-            max_tokens=6000,
+            )
         )
-        return RecommendationPayload.model_validate(payload)
 
     def generate_assumptions(
         self,
