@@ -43,6 +43,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from .trace_paths import CANONICAL_PIPELINE_TRACE_FILENAME, default_pipeline_trace
+
 SCHEMA_VERSION = "ph3.4-canonical-v1"
 
 _REQUIRED_TOP_LEVEL_KEYS = (
@@ -50,7 +52,9 @@ _REQUIRED_TOP_LEVEL_KEYS = (
     "performance", "prompt_slices", "contracts", "summary",
 )
 
-DEFAULT_TRACE_FILENAME = "pipeline.trace.json"
+# PH3.4a — sourced from trace_paths.py (single source of truth for the
+# literal filename); value is unchanged from PH3.4.
+DEFAULT_TRACE_FILENAME = CANONICAL_PIPELINE_TRACE_FILENAME
 
 
 class CanonicalTraceError(Exception):
@@ -164,27 +168,68 @@ def is_canonical_trace(data: Any) -> bool:
     )
 
 
+def _diagnose_trace_shape(data: dict[str, Any]) -> str:
+    """Best-effort, human-readable description of a non-canonical trace's shape.
+
+    Used only to make the PH3.4a error message specific; never affects
+    validation logic (``is_canonical_trace`` is the only source of truth for
+    whether a trace is accepted).
+    """
+    if {"agent_class", "execution_time_ms", "llm_mode"} <= set(data):
+        return (
+            "a run_agent.py MINI TRACE — a record of one isolated agent's "
+            "pre/postconditions and boundary result. run_agent.py never "
+            "attaches a PerformanceTracker or assembles pipeline-wide "
+            "diagnostics, so it can never produce a canonical pipeline trace."
+        )
+    if "question_topics_detected" in data or {"timestamp", "documents_loaded"} <= set(data):
+        return (
+            "a legacy ReportAgent / research-memo trace — per-question "
+            "extraction and synthesis diagnostics from the legacy research_agent "
+            "path, not a functional-pipeline run."
+        )
+    if {"totals", "agents"} <= set(data) and "schema_version" not in data:
+        return (
+            "a bare PerformanceTracker.summary() dict — this is the "
+            "canonical trace's \"performance\" section on its own, not the "
+            "full canonical trace envelope around it."
+        )
+    return "an unrecognized trace format"
+
+
 def require_canonical_trace(data: Any, *, source: str = "<trace>") -> dict[str, Any]:
     """Return ``data`` if it is a canonical pipeline trace; otherwise raise.
 
     Used by ``performance_report.py`` so it stops guessing between the
-    several legacy trace shapes and gives a clear, actionable error instead.
+    several legacy trace shapes. The error names the source file, describes
+    what kind of trace it actually looks like, reports the schema-version
+    mismatch (if any), and points at the command that produces a canonical
+    trace.
     """
     if is_canonical_trace(data):
         return data
     if not isinstance(data, dict):
-        raise CanonicalTraceError(f"{source}: not a JSON object.")
+        raise CanonicalTraceError(
+            f"{source}: not a JSON object (got {type(data).__name__}).\n"
+            "Generate a canonical pipeline trace with:\n"
+            "    python3 -m functional_agents.cli run ..."
+        )
+
     got_version = data.get("schema_version")
+    shape = _diagnose_trace_shape(data)
     missing = [k for k in _REQUIRED_TOP_LEVEL_KEYS if k not in data]
-    raise CanonicalTraceError(
-        f"{source}: not a canonical pipeline trace (schema_version={got_version!r}, "
-        f"expected {SCHEMA_VERSION!r}"
-        + (f"; missing keys: {missing}" if missing else "")
-        + "). Generate one with a full pipeline run "
-        "(functional_agents.cli run ...) — this file looks like a "
-        "run_agent.py mini-trace, a legacy ReportAgent trace, or another "
-        "non-canonical format."
-    )
+
+    lines = [f"{source}: not a canonical pipeline trace."]
+    lines.append(f"  This file looks like {shape}")
+    if "schema_version" in data:
+        lines.append(f"  schema_version found:    {got_version!r}")
+        lines.append(f"  schema_version expected: {SCHEMA_VERSION!r}")
+    if missing:
+        lines.append(f"  missing keys: {missing}")
+    lines.append("")
+    lines.append("Generate a canonical pipeline trace with:")
+    lines.append("    python3 -m functional_agents.cli run ...")
+    raise CanonicalTraceError("\n".join(lines))
 
 
 def write_canonical_trace(context: Any, out_dir: str | Path) -> Path:
@@ -196,7 +241,7 @@ def write_canonical_trace(context: Any, out_dir: str | Path) -> Path:
     fallback behaviour.
     """
     trace = build_canonical_trace(context)
-    out_path = Path(out_dir) / DEFAULT_TRACE_FILENAME
+    out_path = default_pipeline_trace(out_dir)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(trace, indent=2, default=str))
     return out_path

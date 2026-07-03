@@ -153,3 +153,67 @@ def test_registry_covers_required_agents():
     for a in ("planner", "evidence", "hypothesis", "recommendation", "report"):
         assert a in AGENT_REGISTRY
         assert "pre" in AGENT_REGISTRY[a] and "post" in AGENT_REGISTRY[a]
+
+
+# ---------------------------------------------------------------------------
+# PH3.4a — CLI guard: refuse reserved canonical-trace filenames before execution
+# ---------------------------------------------------------------------------
+
+from functional_agents.run_agent import main as run_agent_main
+
+
+def test_cli_refuses_exact_reserved_trace_filename(tmp_path, capsys):
+    trace_path = tmp_path / "pipeline.trace.json"
+    exit_code = run_agent_main([
+        "--agent", "planner",
+        "--fixture", f"{_FIXTURES}/planner_start.json",
+        "--trace", str(trace_path),
+    ])
+    assert exit_code == 2
+    err = capsys.readouterr().err
+    assert "CanonicalTraceReservedError" in err
+    assert not trace_path.exists()  # never written — failed before execution
+
+
+def test_cli_refuses_suffix_reserved_trace_filename(tmp_path, capsys):
+    trace_path = tmp_path / "ph34_pipeline.trace.json"
+    exit_code = run_agent_main([
+        "--agent", "planner",
+        "--fixture", f"{_FIXTURES}/planner_start.json",
+        "--trace", str(trace_path),
+    ])
+    assert exit_code == 2
+    assert "CanonicalTraceReservedError" in capsys.readouterr().err
+    assert not trace_path.exists()
+
+
+def test_cli_never_overwrites_existing_canonical_trace(tmp_path, capsys):
+    canonical = tmp_path / "pipeline.trace.json"
+    canonical.write_text('{"schema_version": "ph3.4-canonical-v1", "sentinel": true}')
+    run_agent_main([
+        "--agent", "planner",
+        "--fixture", f"{_FIXTURES}/planner_start.json",
+        "--trace", str(canonical),
+    ])
+    # Untouched — still exactly the sentinel content, not a mini-trace.
+    assert json.loads(canonical.read_text())["sentinel"] is True
+
+
+def test_cli_allows_normal_trace_filename(tmp_path, capsys):
+    trace_path = tmp_path / "planner.trace.json"
+    exit_code = run_agent_main([
+        "--agent", "planner",
+        "--fixture", f"{_FIXTURES}/planner_start.json",
+        "--trace", str(trace_path),
+    ])
+    assert exit_code == 0
+    assert trace_path.exists()
+    assert "status         : success" in capsys.readouterr().out
+
+
+def test_cli_allows_no_trace_flag_at_all(capsys):
+    exit_code = run_agent_main([
+        "--agent", "planner",
+        "--fixture", f"{_FIXTURES}/planner_start.json",
+    ])
+    assert exit_code == 0

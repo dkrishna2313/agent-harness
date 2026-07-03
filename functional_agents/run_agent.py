@@ -357,6 +357,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--log-level", default="WARNING")
     args = parser.parse_args(argv)
 
+    # PH3.4a — fail before any execution if --trace targets a filename
+    # reserved for the canonical pipeline trace (only a full pipeline run via
+    # `functional_agents.cli run` can ever produce one). Never silently
+    # overwrite a canonical trace with a single-agent mini-trace.
+    if args.trace:
+        from .trace_paths import CanonicalTraceReservedError, require_not_reserved
+        try:
+            require_not_reserved(args.trace, tool_name="run_agent")
+        except CanonicalTraceReservedError as exc:
+            print(f"CanonicalTraceReservedError\n\n{exc}", file=sys.stderr)
+            return 2
+
     logging.basicConfig(level=getattr(logging, args.log_level.upper(), logging.WARNING),
                         format="%(levelname)s %(name)s: %(message)s")
 

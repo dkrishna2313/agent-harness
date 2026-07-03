@@ -263,6 +263,58 @@ def test_require_canonical_trace_reports_missing_keys():
 
 
 # ---------------------------------------------------------------------------
+# PH3.4a — improved diagnostic messages
+# ---------------------------------------------------------------------------
+
+def test_require_canonical_trace_identifies_mini_trace():
+    mini_trace = {
+        "agent": "planner", "agent_class": "PlannerAgent", "status": "success",
+        "execution_time_ms": 5.0, "llm_call_count": 0, "llm_mode": "mock",
+        "boundary": {}, "prompt_slice": {}, "validation": {}, "objects_produced": [],
+    }
+    with pytest.raises(CanonicalTraceError) as ei:
+        require_canonical_trace(mini_trace, source="planner.trace.json")
+    msg = str(ei.value)
+    assert "planner.trace.json" in msg
+    assert "run_agent.py MINI TRACE" in msg
+    assert "python3 -m functional_agents.cli run" in msg
+
+
+def test_require_canonical_trace_identifies_legacy_report_trace():
+    legacy = {"timestamp": "2026-01-01", "question": "q", "documents_loaded": 3,
+              "question_topics_detected": ["power"]}
+    with pytest.raises(CanonicalTraceError) as ei:
+        require_canonical_trace(legacy, source="harness_report.trace.json")
+    assert "legacy ReportAgent" in str(ei.value)
+
+
+def test_require_canonical_trace_identifies_bare_performance_summary():
+    bare = {"totals": {"pipeline_wall_ms": 100.0}, "agents": []}
+    with pytest.raises(CanonicalTraceError) as ei:
+        require_canonical_trace(bare, source="perf.json")
+    assert "PerformanceTracker.summary()" in str(ei.value)
+
+
+def test_require_canonical_trace_reports_wrong_schema_version():
+    wrong = {
+        "schema_version": "some-old-version",
+        "pipeline": {}, "agents": {}, "boundaries": {},
+        "performance": None, "prompt_slices": {}, "contracts": {}, "summary": {},
+    }
+    with pytest.raises(CanonicalTraceError) as ei:
+        require_canonical_trace(wrong, source="x.json")
+    msg = str(ei.value)
+    assert "some-old-version" in msg
+    assert SCHEMA_VERSION in msg
+
+
+def test_require_canonical_trace_generic_unrecognized_shape():
+    with pytest.raises(CanonicalTraceError) as ei:
+        require_canonical_trace({"totally": "unrelated", "shape": 1}, source="x.json")
+    assert "unrecognized trace format" in str(ei.value)
+
+
+# ---------------------------------------------------------------------------
 # write_canonical_trace
 # ---------------------------------------------------------------------------
 

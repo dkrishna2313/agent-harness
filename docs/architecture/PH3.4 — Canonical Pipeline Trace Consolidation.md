@@ -86,6 +86,48 @@ performance report consume only that shape.
   PH3.4 (ReportAgent runs and writes its file *before* the orchestrator's new
   canonical-trace block executes).
 
+## Trace Types
+
+*(Added in PH3.4a — Trace Safety & CLI UX Hardening.)*
+
+The platform now produces exactly two trace types, deliberately distinct in
+purpose, filename, and consumer.
+
+### Mini Trace
+
+- **Produced by:** `functional_agents.run_agent` (`python3 -m functional_agents.run_agent --agent <name> --fixture <path> --trace <path>`)
+- **Purpose:** validate ONE Functional Agent in isolation against a
+  serialized `AgentContext` fixture — preconditions, postconditions, boundary
+  result, context diff. It never attaches a `PerformanceTracker` and never
+  assembles pipeline-wide diagnostics, so it can never be a canonical
+  pipeline trace.
+- **Expected filename:** anything **except** a name reserved for the
+  canonical pipeline trace (see below) — e.g. `planner.trace.json`,
+  `outputs/hypothesis.trace.json`. As of PH3.4a, `run_agent.py` refuses to
+  write to a reserved filename and fails before executing anything
+  (`CanonicalTraceReservedError`, exit code 2) rather than silently
+  overwriting what looks like a pipeline trace.
+
+### Canonical Pipeline Trace
+
+- **Produced by:** `functional_agents.cli run` (via `Orchestrator._run_internal()`
+  → `functional_agents.pipeline_trace.write_canonical_trace()`)
+- **Purpose:** the one authoritative record of a *complete* pipeline run —
+  pipeline metadata, every agent's execution summary, every boundary's
+  diagnostics, every prompt-slice diagnostic, the full performance summary,
+  and a rollup `summary` — assembled read-only from data every prior
+  milestone (PH2.x, PH3.1, PH3.3) already computed.
+- **Expected filename:** `pipeline.trace.json`, colocated with wherever
+  `--out` pointed (e.g. `outputs/pipeline.trace.json`). This filename (and
+  the pattern `*_pipeline.trace.json`) is reserved — centralized in
+  `functional_agents/trace_paths.py` — so no other tool can write to it.
+- **Consumed by:** `functional_agents.performance_report` exclusively.
+  `require_canonical_trace()` rejects anything else with a message that
+  names the file, describes what kind of trace it actually looks like (mini
+  trace / legacy ReportAgent trace / bare performance summary / unrecognized),
+  reports the schema-version mismatch if present, and points at
+  `python3 -m functional_agents.cli run ...` as the fix.
+
 ## 4. Verification
 
 - **Full pipeline (mock) run** produces a valid canonical trace with all
