@@ -286,5 +286,15 @@
       }
     ],
     "stages": []
+  },
+  "prompt_efficiency": {
+    "totals": {
+      "original_tokens": 0,
+      "compacted_tokens": 0,
+      "tokens_saved": 0,
+      "reduction_pct": 0.0,
+      "agents_measured": 0
+    },
+    "agents": []
   }
 }

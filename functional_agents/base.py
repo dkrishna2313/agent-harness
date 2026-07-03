@@ -40,6 +40,12 @@ class FunctionalAgent(ABC):
         client = context.trace.get("_client")
         traces_start = len(client.call_traces) if client is not None else 0
 
+        # PH3.2 — measure (never apply) this agent's context-compaction opportunity
+        # against the context it is about to receive. Read-only; no-op for agents
+        # without a documented profile or without an attached PerformanceTracker.
+        from .context_compactor import measure_and_record
+        measure_and_record(context, self.name)
+
         t0 = time.monotonic()
         context = self._execute(context)
         wall_ms = (time.monotonic() - t0) * 1000
@@ -66,11 +72,13 @@ class FunctionalAgent(ABC):
                 for t in agent_traces
             ]
             sub_phases = tracker.flush_sub_phases()
+            context_compaction = tracker.flush_context_compaction()
             rec = AgentPerfRecord(
                 agent_name=self.name,
                 wall_ms=wall_ms,
                 llm_calls=llm_calls,
                 sub_phases=sub_phases,
+                context_compaction=context_compaction,
             )
             tracker.record(rec)
 

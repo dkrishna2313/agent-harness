@@ -82,6 +82,7 @@ class AgentPerfRecord:
     wall_ms: float                            # monotonic elapsed for _execute()
     llm_calls: list[LLMCallRecord] = field(default_factory=list)
     sub_phases: list[SubPhaseRecord] = field(default_factory=list)
+    context_compaction: dict[str, Any] | None = None   # PH3.2 — CompactionResult.to_dict()
 
     @property
     def llm_total_ms(self) -> float:
@@ -153,6 +154,7 @@ class AgentPerfRecord:
             "non_llm_ms": round(self.wall_ms - self.llm_total_ms, 1),
             "stage_breakdown": {k: round(v, 1) for k, v in self.stage_breakdown().items()},
             "unattributed_ms": round(self.unattributed_ms, 1),
+            "context_compaction": self.context_compaction,
             "sub_phases": [
                 {
                     "name": sp.name,
@@ -179,6 +181,7 @@ class PerformanceTracker:
     def __init__(self) -> None:
         self._records: list[AgentPerfRecord] = []
         self._pending_sub_phases: list[SubPhaseRecord] = []  # written by EvidenceAgent
+        self._pending_compaction: dict[str, Any] | None = None  # PH3.2
 
     def record(self, rec: AgentPerfRecord) -> None:
         self._records.append(rec)
@@ -216,6 +219,20 @@ class PerformanceTracker:
         self._pending_sub_phases.clear()
         return phases
 
+    def record_context_compaction(self, result_dict: dict[str, Any]) -> None:
+        """Register the current agent's measured context-compaction stats (PH3.2).
+
+        Called by ``context_compactor.measure_and_record`` before an agent's
+        ``_execute`` runs; flushed onto that agent's perf record in ``run()``.
+        """
+        self._pending_compaction = result_dict
+
+    def flush_context_compaction(self) -> dict[str, Any] | None:
+        """Drain the pending context-compaction record (called by base class)."""
+        result = self._pending_compaction
+        self._pending_compaction = None
+        return result
+
     def summary(self) -> dict[str, Any]:
         """Return a structured performance summary suitable for trace JSON."""
         agents = [r.to_dict() for r in self._records]
@@ -248,6 +265,19 @@ class PerformanceTracker:
             for cat, ms in sorted(stage_totals.items(), key=lambda kv: kv[1], reverse=True)
         ]
 
+        # PH3.2 — prompt/context efficiency, aggregated over agents that were measured
+        prompt_efficiency: list[dict[str, Any]] = []
+        for r in self._records:
+            if r.context_compaction:
+                prompt_efficiency.append({"agent": r.agent_name, **r.context_compaction})
+        total_original_tokens = sum(p["original_tokens"] for p in prompt_efficiency)
+        total_compacted_tokens = sum(p["compacted_tokens"] for p in prompt_efficiency)
+        total_tokens_saved = sum(p["tokens_saved"] for p in prompt_efficiency)
+        overall_reduction_pct = (
+            round(100.0 * total_tokens_saved / total_original_tokens, 1)
+            if total_original_tokens else 0.0
+        )
+
         return {
             "totals": {
                 "pipeline_wall_ms": round(total_wall_ms, 1),
@@ -266,6 +296,16 @@ class PerformanceTracker:
             "bottlenecks": {
                 "agents": agent_bottlenecks[:5],
                 "stages": stage_bottlenecks,
+            },
+            "prompt_efficiency": {
+                "totals": {
+                    "original_tokens": total_original_tokens,
+                    "compacted_tokens": total_compacted_tokens,
+                    "tokens_saved": total_tokens_saved,
+                    "reduction_pct": overall_reduction_pct,
+                    "agents_measured": len(prompt_efficiency),
+                },
+                "agents": prompt_efficiency,
             },
             "agents": agents,
         }
@@ -298,6 +338,19 @@ class PerformanceTracker:
             if a.get("sub_phases"):
                 for sp in a["sub_phases"]:
                     print(f"    {'└─ ' + sp['name']:<33} {sp['duration_ms']:>7.0f}")
+            cc = a.get("context_compaction")
+            if cc:
+                print(
+                    f"    {'└─ context: ' + str(cc['original_tokens']) + '→' + str(cc['compacted_tokens']) + ' tok':<33}"
+                    f" {cc['reduction_pct']:>6.1f}%"
+                )
+        pe = s.get("prompt_efficiency", {}).get("totals", {})
+        if pe.get("agents_measured"):
+            print(
+                f"\n  PROMPT EFFICIENCY (measured, not yet applied): "
+                f"{pe['original_tokens']:,} -> {pe['compacted_tokens']:,} tokens "
+                f"({pe['reduction_pct']:.1f}% reduction across {pe['agents_measured']} agents)"
+            )
         print()
 
 

@@ -111,6 +111,27 @@ def build_report(perf: dict) -> dict[str, Any]:
         ],
     }
 
+    # PH3.2 — Prompt Efficiency: prefer the tracker's own aggregate; otherwise
+    # derive it from each agent's context_compaction field (e.g. a summary
+    # built directly from records rather than via PerformanceTracker.summary()).
+    prompt_efficiency = perf.get("prompt_efficiency")
+    if not prompt_efficiency:
+        measured = [
+            {"agent": a.get("agent", "?"), **a["context_compaction"]}
+            for a in agents if a.get("context_compaction")
+        ]
+        orig = sum(m["original_tokens"] for m in measured)
+        comp = sum(m["compacted_tokens"] for m in measured)
+        saved = sum(m["tokens_saved"] for m in measured)
+        prompt_efficiency = {
+            "totals": {
+                "original_tokens": orig, "compacted_tokens": comp, "tokens_saved": saved,
+                "reduction_pct": round(100.0 * saved / orig, 1) if orig else 0.0,
+                "agents_measured": len(measured),
+            },
+            "agents": measured,
+        }
+
     return {
         "totals": totals,
         "agent_count": len(active_agents),
@@ -118,6 +139,7 @@ def build_report(perf: dict) -> dict[str, Any]:
         "stage_totals": stage_totals,
         "unattributed_ms": unattributed,
         "bottlenecks": bottlenecks,
+        "prompt_efficiency": prompt_efficiency,
     }
 
 
@@ -132,7 +154,7 @@ def _ms(v: float) -> str:
 def render_markdown(report: dict, *, source: str | None = None) -> str:
     t = report["totals"]
     wall = t.get("pipeline_wall_ms", 0.0)
-    lines: list[str] = ["# Platform Performance Report (PH3.1)", ""]
+    lines: list[str] = ["# Platform Performance Report (PH3.1 / PH3.2)", ""]
     if source:
         lines += [f"**Source:** `{source}`", ""]
 
@@ -175,6 +197,31 @@ def render_markdown(report: dict, *, source: str | None = None) -> str:
         lines += ["", "**By non-LLM stage:**", ""]
         for i, s in enumerate(report["bottlenecks"]["stages"], 1):
             lines.append(f"{i}. {s['stage']} — {s['duration_ms']:,.0f} ms")
+
+    pe = report.get("prompt_efficiency", {})
+    pe_totals = pe.get("totals", {})
+    lines += ["", "## Prompt Efficiency (PH3.2 — measured, not yet applied)", ""]
+    if pe_totals.get("agents_measured"):
+        lines += [
+            f"Context-compaction opportunity measured for {pe_totals['agents_measured']} "
+            "agent(s) against their documented context profile. This is diagnostic only — "
+            "no prompt sent to the LLM has changed.",
+            "",
+            "| Agent | Original Context Size | Compacted Context Size | Reduction % | Est. Tokens Saved |",
+            "|---|--:|--:|--:|--:|",
+        ]
+        for a in sorted(pe.get("agents", []), key=lambda x: x.get("tokens_saved", 0), reverse=True):
+            lines.append(
+                f"| {a['agent']} | {a['original_tokens']:,} tok | {a['compacted_tokens']:,} tok | "
+                f"{a['reduction_pct']}% | {a['tokens_saved']:,} tok |"
+            )
+        lines.append(
+            f"| **Total** | **{pe_totals['original_tokens']:,} tok** | "
+            f"**{pe_totals['compacted_tokens']:,} tok** | **{pe_totals['reduction_pct']}%** | "
+            f"**{pe_totals['tokens_saved']:,} tok** |"
+        )
+    else:
+        lines.append("_No agents measured in this trace (pre-PH3.2 run, or no profiled agents executed)._")
 
     lines.append("")
     return "\n".join(lines)

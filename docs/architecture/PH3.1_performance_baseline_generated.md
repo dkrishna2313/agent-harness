@@ -1,4 +1,4 @@
-# Platform Performance Report (PH3.1)
+# Platform Performance Report (PH3.1 / PH3.2)
 
 **Source:** `outputs/ph1_stability_3.trace.json`
 
@@ -51,3 +51,7 @@
 3. ChallengeAgent — 62,471 ms (LLM 62,462 / non-LLM 8)
 4. DecisionAnalysisAgent — 61,439 ms (LLM 61,376 / non-LLM 63)
 5. HypothesisAgent — 57,509 ms (LLM 57,507 / non-LLM 2)
+
+## Prompt Efficiency (PH3.2 — measured, not yet applied)
+
+_No agents measured in this trace (pre-PH3.2 run, or no profiled agents executed)._

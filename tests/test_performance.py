@@ -263,12 +263,82 @@ def test_build_report_backfills_old_trace_totals():
 
 def test_render_markdown_contains_sections():
     md = pr.render_markdown(pr.build_report(_sample_summary()), source="x.json")
-    assert "# Platform Performance Report (PH3.1)" in md
+    assert "# Platform Performance Report" in md
     assert "## Pipeline totals" in md
     assert "## Per-agent timing" in md
     assert "## Non-LLM time by stage" in md
     assert "## Largest bottlenecks" in md
+    assert "## Prompt Efficiency" in md
+
+
+def test_render_markdown_prompt_efficiency_with_data():
+    tracker = PerformanceTracker()
+    tracker.record(AgentPerfRecord(
+        agent_name="PlannerAgent", wall_ms=10.0,
+        context_compaction={"original_tokens": 100, "compacted_tokens": 40,
+                             "tokens_saved": 60, "reduction_pct": 60.0},
+    ))
+    md = pr.render_markdown(pr.build_report(tracker.summary()))
+    assert "PlannerAgent" in md
+    assert "60.0%" in md
+    assert "not yet applied" in md
 
 
 def test_all_stage_categories_are_unique():
     assert len(set(STAGE_CATEGORIES)) == len(STAGE_CATEGORIES)
+
+
+# ---------------------------------------------------------------------------
+# PH3.2 — context-compaction (prompt efficiency) recording
+# ---------------------------------------------------------------------------
+
+def test_tracker_records_and_flushes_context_compaction():
+    tracker = PerformanceTracker()
+    assert tracker.flush_context_compaction() is None  # nothing pending
+    tracker.record_context_compaction({"original_tokens": 100, "compacted_tokens": 40,
+                                        "tokens_saved": 60, "reduction_pct": 60.0})
+    flushed = tracker.flush_context_compaction()
+    assert flushed["reduction_pct"] == 60.0
+    assert tracker.flush_context_compaction() is None  # drained
+
+
+def test_agent_perf_record_carries_context_compaction():
+    rec = AgentPerfRecord(
+        agent_name="PlannerAgent", wall_ms=100.0,
+        context_compaction={"original_tokens": 10, "compacted_tokens": 5,
+                             "tokens_saved": 5, "reduction_pct": 50.0},
+    )
+    d = rec.to_dict()
+    assert d["context_compaction"]["reduction_pct"] == 50.0
+
+
+def test_summary_aggregates_prompt_efficiency_across_agents():
+    tracker = PerformanceTracker()
+    tracker.record(AgentPerfRecord(
+        agent_name="PlannerAgent", wall_ms=10.0,
+        context_compaction={"original_tokens": 100, "compacted_tokens": 40,
+                             "tokens_saved": 60, "reduction_pct": 60.0},
+    ))
+    tracker.record(AgentPerfRecord(
+        agent_name="EvidenceAgent", wall_ms=10.0,
+        context_compaction={"original_tokens": 50, "compacted_tokens": 50,
+                             "tokens_saved": 0, "reduction_pct": 0.0},
+    ))
+    tracker.record(AgentPerfRecord(agent_name="ReportAgent", wall_ms=5.0))  # not measured
+    s = tracker.summary()
+    pe = s["prompt_efficiency"]
+    assert pe["totals"]["agents_measured"] == 2
+    assert pe["totals"]["original_tokens"] == 150
+    assert pe["totals"]["compacted_tokens"] == 90
+    assert pe["totals"]["tokens_saved"] == 60
+    assert pe["totals"]["reduction_pct"] == round(100 * 60 / 150, 1)
+    assert {a["agent"] for a in pe["agents"]} == {"PlannerAgent", "EvidenceAgent"}
+
+
+def test_summary_prompt_efficiency_empty_when_unmeasured():
+    tracker = PerformanceTracker()
+    tracker.record(AgentPerfRecord(agent_name="X", wall_ms=1.0))
+    pe = tracker.summary()["prompt_efficiency"]
+    assert pe["totals"]["agents_measured"] == 0
+    assert pe["totals"]["reduction_pct"] == 0.0
+    assert pe["agents"] == []
