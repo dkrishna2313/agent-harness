@@ -28,6 +28,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from research_agent.llm_normalize import normalize_llm_object, normalize_llm_items
+from .boundary_framework import BoundaryError, run_boundary
 
 
 # ---------------------------------------------------------------------------
@@ -56,14 +57,8 @@ class EvidenceOutput(BaseModel):
 # Typed boundary errors (distinct per stage)
 # ---------------------------------------------------------------------------
 
-class EvidenceBoundaryError(Exception):
+class EvidenceBoundaryError(BoundaryError):
     """Base for Evidence boundary failures; carries stage diagnostics."""
-
-    stage = "boundary"
-
-    def __init__(self, message: str, diagnostics: dict | None = None) -> None:
-        super().__init__(message)
-        self.diagnostics = diagnostics or {"failed_stage": self.stage}
 
 
 class EvidenceGenerationError(EvidenceBoundaryError):
@@ -235,26 +230,13 @@ def validate_evidence_output(normalized: dict, *, plan: dict | None = None) -> t
 # ---------------------------------------------------------------------------
 
 def finalize_evidence(raw_note: Any, *, plan: dict | None = None) -> tuple[EvidenceOutput, dict]:
-    """Run the full boundary: normalize → validate → typed EvidenceOutput.
+    """Run the full boundary: normalize → validate → typed EvidenceOutput (PH2.5).
 
-    Returns (EvidenceOutput, boundary_diagnostics). Raises a distinct
-    EvidenceBoundaryError subclass (with .diagnostics) on any stage failure.
     Generation (retrieval/extraction) is assumed complete before this call.
     """
-    stages = {"generation": "ok", "normalization": "pending", "validation": "pending"}
-    try:
-        normalized, norm_diag = normalize_evidence_note(raw_note)
-        stages["normalization"] = "ok"
-        output, val_diag = validate_evidence_output(normalized, plan=plan)
-        stages["validation"] = "ok"
-    except EvidenceBoundaryError as exc:
-        stages[exc.stage] = "failed"
-        exc.diagnostics = {**exc.diagnostics, "stages": stages, "failed_stage": exc.stage}
-        raise
-
-    return output, {
-        "stages": stages,
-        "failed_stage": None,
-        "normalization": norm_diag,
-        "validation": val_diag,
-    }
+    return run_boundary(
+        raw_note,
+        normalize=normalize_evidence_note,
+        validate=lambda n: validate_evidence_output(n, plan=plan),
+        error_base=EvidenceBoundaryError,
+    )

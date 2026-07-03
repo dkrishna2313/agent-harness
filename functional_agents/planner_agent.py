@@ -225,7 +225,7 @@ class PlannerAgent(FunctionalAgent):
         except Exception as exc:
             raise PlannerGenerationError(
                 f"planner LLM generation failed: {exc}",
-                {"failed_stage": "llm_generation"},
+                {"failed_stage": "generation"},
             ) from exc
 
         # Client predates the planner method — deterministic mock payload.

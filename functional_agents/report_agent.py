@@ -1575,13 +1575,27 @@ class ReportAgent(FunctionalAgent):
         from research_agent.markdown import memo_to_markdown, write_markdown
         from research_agent.trace import build_trace, write_trace
 
-        memo = context.trace.get("_memo")
-        documents = context.trace.get("_documents", [])
-
-        if memo is None:
-            LOGGER.error("ReportAgent: no memo on context — cannot write report")
-            self._record(context, status="error", summary="No memo available; report not written.")
+        # PH2.5 — Report boundary: normalize → validate report inputs into a typed
+        # ReportInput before rendering. Preserves the prior "no memo → error" guard.
+        from .report_boundary import finalize_report_input, ReportBoundaryError
+        try:
+            _report_input, _report_boundary = finalize_report_input({
+                "question": context.question,
+                "memo": context.trace.get("_memo"),
+                "documents": context.trace.get("_documents", []),
+                "plan": context.plan,
+                "evidence_note": context.evidence_notes[0] if context.evidence_notes else {},
+                "recommendation_count": len(context.recommendations or []),
+            })
+        except ReportBoundaryError as exc:
+            context.trace["_report_boundary"] = exc.diagnostics
+            LOGGER.error("ReportAgent: input boundary failed (%s) — cannot write report", exc)
+            self._record(context, status="error", summary=f"Report inputs invalid: {exc}")
             return context
+
+        context.trace["_report_boundary"] = _report_boundary
+        memo = _report_input.memo
+        documents = _report_input.documents
 
         # ------------------------------------------------------------------
         # J5.4 – Synthesis
@@ -1898,6 +1912,10 @@ class ReportAgent(FunctionalAgent):
         _rec_boundary = context.trace.get("_recommendation_boundary")
         if _rec_boundary:
             trace_payload["recommendation_boundary"] = _rec_boundary
+        # PH2.5 – report input boundary diagnostics (additive).
+        _report_boundary_diag = context.trace.get("_report_boundary")
+        if _report_boundary_diag:
+            trace_payload["report_boundary"] = _report_boundary_diag
 
         # Challenge generation block (J6.4)
         chal_data = context.trace.get("_challenges")

@@ -38,7 +38,7 @@ def test_valid_response_produces_typed_output():
     assert out.research_type == "RESEARCH"
     assert out.subquestions == ["q1", "q2"]
     assert diag["failed_stage"] is None
-    assert diag["stages"] == {"llm_generation": "ok", "normalization": "ok", "validation": "ok"}
+    assert diag["stages"] == {"generation": "ok", "normalization": "ok", "validation": "ok"}
 
 
 def test_stringified_json_recovered():
@@ -160,7 +160,7 @@ def test_generation_failure_classified_distinctly():
     ctx = _ctx()
     with pytest.raises(PlannerGenerationError):
         PlannerAgent(client=_GenBoomClient()).run(ctx)
-    assert ctx.trace["_planner_boundary"]["failed_stage"] == "llm_generation"
+    assert ctx.trace["_planner_boundary"]["failed_stage"] == "generation"
 
 
 def test_existing_planner_behavior_preserved_valid_inputs():

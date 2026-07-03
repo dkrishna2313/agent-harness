@@ -21,6 +21,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from research_agent.llm_normalize import normalize_llm_object
+from .boundary_framework import BoundaryError, run_boundary
 
 VALID_RESEARCH_TYPES = {"FACT_LOOKUP", "COMPARISON", "EXPLANATION", "RESEARCH"}
 
@@ -43,19 +44,13 @@ class PlannerOutput(BaseModel):
 # Typed boundary errors (distinct per stage)
 # ---------------------------------------------------------------------------
 
-class PlannerBoundaryError(Exception):
+class PlannerBoundaryError(BoundaryError):
     """Base for Planner boundary failures; carries stage diagnostics."""
-
-    stage = "boundary"
-
-    def __init__(self, message: str, diagnostics: dict | None = None) -> None:
-        super().__init__(message)
-        self.diagnostics = diagnostics or {"failed_stage": self.stage}
 
 
 class PlannerGenerationError(PlannerBoundaryError):
     """The LLM call itself failed (network, truncation, tool error)."""
-    stage = "llm_generation"
+    stage = "generation"
 
 
 class PlannerNormalizationError(PlannerBoundaryError):
@@ -185,25 +180,10 @@ def validate_planner_output(normalized: dict) -> tuple[PlannerOutput, dict]:
 # ---------------------------------------------------------------------------
 
 def plan_from_raw(raw: Any) -> tuple[PlannerOutput, dict]:
-    """Run the full boundary: normalize → validate → typed PlannerOutput.
-
-    Returns (PlannerOutput, boundary_diagnostics). Raises a distinct
-    PlannerBoundaryError subclass (with .diagnostics) on any stage failure.
-    """
-    stages = {"llm_generation": "ok", "normalization": "pending", "validation": "pending"}
-    try:
-        normalized, norm_diag = normalize_planner_payload(raw)
-        stages["normalization"] = "ok"
-        output, val_diag = validate_planner_output(normalized)
-        stages["validation"] = "ok"
-    except PlannerBoundaryError as exc:
-        stages[exc.stage] = "failed"
-        exc.diagnostics = {**exc.diagnostics, "stages": stages, "failed_stage": exc.stage}
-        raise
-
-    return output, {
-        "stages": stages,
-        "failed_stage": None,
-        "normalization": norm_diag,
-        "validation": val_diag,
-    }
+    """Run the full boundary: normalize → validate → typed PlannerOutput (PH2.5)."""
+    return run_boundary(
+        raw,
+        normalize=normalize_planner_payload,
+        validate=validate_planner_output,
+        error_base=PlannerBoundaryError,
+    )

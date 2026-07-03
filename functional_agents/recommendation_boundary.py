@@ -27,6 +27,7 @@ from pydantic import BaseModel, Field
 
 from research_agent.claude_client import RecommendationItem, RecommendationPortfolio
 from research_agent.llm_normalize import normalize_llm_object, normalize_llm_items
+from .boundary_framework import BoundaryError, run_boundary
 
 VALID_PRIORITY = {"high", "medium", "low"}
 VALID_CONFIDENCE = {"high", "medium", "low"}
@@ -67,14 +68,8 @@ class RecommendationOutput(BaseModel):
 # Typed boundary errors (distinct per stage)
 # ---------------------------------------------------------------------------
 
-class RecommendationBoundaryError(Exception):
+class RecommendationBoundaryError(BoundaryError):
     """Base for Recommendation boundary failures; carries stage diagnostics."""
-
-    stage = "boundary"
-
-    def __init__(self, message: str, diagnostics: dict | None = None) -> None:
-        super().__init__(message)
-        self.diagnostics = diagnostics or {"failed_stage": self.stage}
 
 
 class RecommendationGenerationError(RecommendationBoundaryError):
@@ -232,25 +227,10 @@ def validate_recommendation_output(normalized: dict) -> tuple[RecommendationOutp
 # ---------------------------------------------------------------------------
 
 def finalize_recommendations(raw: Any) -> tuple[RecommendationOutput, dict]:
-    """Run the full boundary: normalize → validate → typed RecommendationOutput.
-
-    Returns (RecommendationOutput, boundary_diagnostics). Raises a distinct
-    RecommendationBoundaryError subclass (with .diagnostics) on any stage failure.
-    """
-    stages = {"generation": "ok", "normalization": "pending", "validation": "pending"}
-    try:
-        normalized, norm_diag = normalize_recommendation_payload(raw)
-        stages["normalization"] = "ok"
-        output, val_diag = validate_recommendation_output(normalized)
-        stages["validation"] = "ok"
-    except RecommendationBoundaryError as exc:
-        stages[exc.stage] = "failed"
-        exc.diagnostics = {**exc.diagnostics, "stages": stages, "failed_stage": exc.stage}
-        raise
-
-    return output, {
-        "stages": stages,
-        "failed_stage": None,
-        "normalization": norm_diag,
-        "validation": val_diag,
-    }
+    """Run the full boundary: normalize → validate → typed RecommendationOutput (PH2.5)."""
+    return run_boundary(
+        raw,
+        normalize=normalize_recommendation_payload,
+        validate=validate_recommendation_output,
+        error_base=RecommendationBoundaryError,
+    )

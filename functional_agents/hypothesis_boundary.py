@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field
 
 from research_agent.claude_client import HypothesisItem
 from research_agent.llm_normalize import normalize_llm_object, normalize_llm_items
+from .boundary_framework import BoundaryError, run_boundary
 
 VALID_CONFIDENCE = {"high", "medium", "low"}
 
@@ -56,14 +57,8 @@ class HypothesisOutput(BaseModel):
 # Typed boundary errors (distinct per stage)
 # ---------------------------------------------------------------------------
 
-class HypothesisBoundaryError(Exception):
+class HypothesisBoundaryError(BoundaryError):
     """Base for Hypothesis boundary failures; carries stage diagnostics."""
-
-    stage = "boundary"
-
-    def __init__(self, message: str, diagnostics: dict | None = None) -> None:
-        super().__init__(message)
-        self.diagnostics = diagnostics or {"failed_stage": self.stage}
 
 
 class HypothesisGenerationError(HypothesisBoundaryError):
@@ -205,25 +200,10 @@ def validate_hypothesis_output(normalized: dict) -> tuple[HypothesisOutput, dict
 # ---------------------------------------------------------------------------
 
 def finalize_hypotheses(raw: Any) -> tuple[HypothesisOutput, dict]:
-    """Run the full boundary: normalize → validate → typed HypothesisOutput.
-
-    Returns (HypothesisOutput, boundary_diagnostics). Raises a distinct
-    HypothesisBoundaryError subclass (with .diagnostics) on any stage failure.
-    """
-    stages = {"generation": "ok", "normalization": "pending", "validation": "pending"}
-    try:
-        normalized, norm_diag = normalize_hypothesis_payload(raw)
-        stages["normalization"] = "ok"
-        output, val_diag = validate_hypothesis_output(normalized)
-        stages["validation"] = "ok"
-    except HypothesisBoundaryError as exc:
-        stages[exc.stage] = "failed"
-        exc.diagnostics = {**exc.diagnostics, "stages": stages, "failed_stage": exc.stage}
-        raise
-
-    return output, {
-        "stages": stages,
-        "failed_stage": None,
-        "normalization": norm_diag,
-        "validation": val_diag,
-    }
+    """Run the full boundary: normalize → validate → typed HypothesisOutput (PH2.5)."""
+    return run_boundary(
+        raw,
+        normalize=normalize_hypothesis_payload,
+        validate=validate_hypothesis_output,
+        error_base=HypothesisBoundaryError,
+    )
