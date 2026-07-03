@@ -1,0 +1,636 @@
+{
+  "totals": {
+    "pipeline_wall_ms": 18231.5,
+    "llm_total_ms": 0,
+    "llm_overhead_ms": 18231.5,
+    "non_llm_ms": 18231.5,
+    "llm_pct": 0.0,
+    "non_llm_pct": 100.0,
+    "llm_call_count": 0,
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0
+  },
+  "agent_count": 16,
+  "agents": [
+    {
+      "agent": "EvidenceAgent",
+      "wall_ms": 18060.6,
+      "llm_ms": 0.0,
+      "non_llm_ms": 18060.6,
+      "llm_pct": 0.0,
+      "llm_calls": 0,
+      "tokens": 0,
+      "stage_breakdown": {
+        "normalization": 0.1,
+        "validation": 0.1
+      },
+      "sub_phases": [
+        {
+          "name": "normalization",
+          "duration_ms": 0.1,
+          "category": "normalization"
+        },
+        {
+          "name": "validation",
+          "duration_ms": 0.1,
+          "category": "validation"
+        }
+      ]
+    },
+    {
+      "agent": "ReportAgent",
+      "wall_ms": 35.2,
+      "llm_ms": 0.0,
+      "non_llm_ms": 35.2,
+      "llm_pct": 0.0,
+      "llm_calls": 0,
+      "tokens": 0,
+      "stage_breakdown": {
+        "normalization": 0.0,
+        "validation": 0.0,
+        "report_generation": 0.1
+      },
+      "sub_phases": [
+        {
+          "name": "normalization",
+          "duration_ms": 0.0,
+          "category": "normalization"
+        },
+        {
+          "name": "validation",
+          "duration_ms": 0.0,
+          "category": "validation"
+        },
+        {
+          "name": "report:executive_render",
+          "duration_ms": 0.1,
+          "category": "report_generation"
+        }
+      ]
+    },
+    {
+      "agent": "DecisionAnalysisAgent",
+      "wall_ms": 26.8,
+      "llm_ms": 0.0,
+      "non_llm_ms": 26.8,
+      "llm_pct": 0.0,
+      "llm_calls": 0,
+      "tokens": 0,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "ExecutiveConfidenceAgent",
+      "wall_ms": 24.4,
+      "llm_ms": 0.0,
+      "non_llm_ms": 24.4,
+      "llm_pct": 0.0,
+      "llm_calls": 0,
+      "tokens": 0,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "AssumptionAgent",
+      "wall_ms": 22.1,
+      "llm_ms": 0.0,
+      "non_llm_ms": 22.1,
+      "llm_pct": 0.0,
+      "llm_calls": 0,
+      "tokens": 0,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "OpportunityAgent",
+      "wall_ms": 20.7,
+      "llm_ms": 0.0,
+      "non_llm_ms": 20.7,
+      "llm_pct": 0.0,
+      "llm_calls": 0,
+      "tokens": 0,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "RiskAgent",
+      "wall_ms": 19.6,
+      "llm_ms": 0.0,
+      "non_llm_ms": 19.6,
+      "llm_pct": 0.0,
+      "llm_calls": 0,
+      "tokens": 0,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "StrategicOptionAgent",
+      "wall_ms": 15.8,
+      "llm_ms": 0.0,
+      "non_llm_ms": 15.8,
+      "llm_pct": 0.0,
+      "llm_calls": 0,
+      "tokens": 0,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "PlannerAgent",
+      "wall_ms": 2.7,
+      "llm_ms": 0.0,
+      "non_llm_ms": 2.7,
+      "llm_pct": 0.0,
+      "llm_calls": 0,
+      "tokens": 0,
+      "stage_breakdown": {
+        "normalization": 0.0,
+        "validation": 0.0
+      },
+      "sub_phases": [
+        {
+          "name": "normalization",
+          "duration_ms": 0.0,
+          "category": "normalization"
+        },
+        {
+          "name": "validation",
+          "duration_ms": 0.0,
+          "category": "validation"
+        }
+      ]
+    },
+    {
+      "agent": "HypothesisAgent",
+      "wall_ms": 1.6,
+      "llm_ms": 0.0,
+      "non_llm_ms": 1.6,
+      "llm_pct": 0.0,
+      "llm_calls": 0,
+      "tokens": 0,
+      "stage_breakdown": {
+        "normalization": 0.0,
+        "validation": 0.0
+      },
+      "sub_phases": [
+        {
+          "name": "normalization",
+          "duration_ms": 0.0,
+          "category": "normalization"
+        },
+        {
+          "name": "validation",
+          "duration_ms": 0.0,
+          "category": "validation"
+        }
+      ]
+    },
+    {
+      "agent": "RecommendationAgent",
+      "wall_ms": 1.4,
+      "llm_ms": 0.0,
+      "non_llm_ms": 1.4,
+      "llm_pct": 0.0,
+      "llm_calls": 0,
+      "tokens": 0,
+      "stage_breakdown": {
+        "normalization": 0.0,
+        "validation": 0.0
+      },
+      "sub_phases": [
+        {
+          "name": "normalization",
+          "duration_ms": 0.0,
+          "category": "normalization"
+        },
+        {
+          "name": "validation",
+          "duration_ms": 0.0,
+          "category": "validation"
+        }
+      ]
+    },
+    {
+      "agent": "MultiProfileAgent",
+      "wall_ms": 0.2,
+      "llm_ms": 0.0,
+      "non_llm_ms": 0.2,
+      "llm_pct": 0.0,
+      "llm_calls": 0,
+      "tokens": 0,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "QAAgent",
+      "wall_ms": 0.2,
+      "llm_ms": 0.0,
+      "non_llm_ms": 0.2,
+      "llm_pct": 0.0,
+      "llm_calls": 0,
+      "tokens": 0,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "RecommendationImprovementAgent",
+      "wall_ms": 0.2,
+      "llm_ms": 0.0,
+      "non_llm_ms": 0.2,
+      "llm_pct": 0.0,
+      "llm_calls": 0,
+      "tokens": 0,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "ChallengeAgent",
+      "wall_ms": 0.1,
+      "llm_ms": 0.0,
+      "non_llm_ms": 0.1,
+      "llm_pct": 0.0,
+      "llm_calls": 0,
+      "tokens": 0,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "ScenarioAgent",
+      "wall_ms": 0.1,
+      "llm_ms": 0.0,
+      "non_llm_ms": 0.1,
+      "llm_pct": 0.0,
+      "llm_calls": 0,
+      "tokens": 0,
+      "stage_breakdown": {},
+      "sub_phases": []
+    }
+  ],
+  "stage_totals": {
+    "normalization": 0.2,
+    "validation": 0.1,
+    "report_generation": 0.1
+  },
+  "unattributed_ms": 18231.1,
+  "bottlenecks": {
+    "agents": [
+      {
+        "agent": "EvidenceAgent",
+        "wall_ms": 18060.6,
+        "llm_ms": 0,
+        "non_llm_ms": 18060.6
+      },
+      {
+        "agent": "ReportAgent",
+        "wall_ms": 35.2,
+        "llm_ms": 0,
+        "non_llm_ms": 35.2
+      },
+      {
+        "agent": "DecisionAnalysisAgent",
+        "wall_ms": 26.8,
+        "llm_ms": 0,
+        "non_llm_ms": 26.8
+      },
+      {
+        "agent": "ExecutiveConfidenceAgent",
+        "wall_ms": 24.4,
+        "llm_ms": 0,
+        "non_llm_ms": 24.4
+      },
+      {
+        "agent": "AssumptionAgent",
+        "wall_ms": 22.1,
+        "llm_ms": 0,
+        "non_llm_ms": 22.1
+      }
+    ],
+    "stages": [
+      {
+        "stage": "normalization",
+        "duration_ms": 0.2
+      },
+      {
+        "stage": "validation",
+        "duration_ms": 0.1
+      },
+      {
+        "stage": "report_generation",
+        "duration_ms": 0.1
+      }
+    ]
+  },
+  "prompt_efficiency": {
+    "totals": {
+      "original_tokens": 1194981,
+      "compacted_tokens": 465889,
+      "tokens_saved": 729092,
+      "reduction_pct": 61.0,
+      "agents_measured": 5
+    },
+    "agents": [
+      {
+        "agent": "PlannerAgent",
+        "original_sections": [
+          "question",
+          "profiles",
+          "decision_model",
+          "research_strategy",
+          "plan",
+          "evidence_notes",
+          "hypotheses",
+          "surviving_hypotheses",
+          "hypothesis_challenges",
+          "strategic_synthesis",
+          "contradictions",
+          "recommendations",
+          "recommendation_portfolio",
+          "assumptions",
+          "risks",
+          "opportunities",
+          "strategic_options",
+          "decision_analysis",
+          "executive_confidence",
+          "artifacts",
+          "documents",
+          "memo"
+        ],
+        "kept_sections": [
+          "question",
+          "profiles",
+          "decision_model"
+        ],
+        "removed_unused": [
+          "plan",
+          "evidence_notes",
+          "hypotheses",
+          "surviving_hypotheses",
+          "hypothesis_challenges",
+          "strategic_synthesis",
+          "contradictions",
+          "recommendations",
+          "recommendation_portfolio",
+          "assumptions",
+          "risks",
+          "opportunities",
+          "strategic_options",
+          "decision_analysis",
+          "executive_confidence",
+          "artifacts",
+          "documents",
+          "memo"
+        ],
+        "removed_duplicate": [
+          {
+            "name": "research_strategy",
+            "duplicate_of": "decision_model"
+          }
+        ],
+        "original_tokens": 14,
+        "compacted_tokens": 14,
+        "tokens_saved": 0,
+        "reduction_pct": 0.0
+      },
+      {
+        "agent": "EvidenceAgent",
+        "original_sections": [
+          "question",
+          "profiles",
+          "decision_model",
+          "research_strategy",
+          "plan",
+          "evidence_notes",
+          "hypotheses",
+          "surviving_hypotheses",
+          "hypothesis_challenges",
+          "strategic_synthesis",
+          "contradictions",
+          "recommendations",
+          "recommendation_portfolio",
+          "assumptions",
+          "risks",
+          "opportunities",
+          "strategic_options",
+          "decision_analysis",
+          "executive_confidence",
+          "artifacts",
+          "documents",
+          "memo"
+        ],
+        "kept_sections": [
+          "question",
+          "profiles",
+          "plan"
+        ],
+        "removed_unused": [
+          "decision_model",
+          "research_strategy",
+          "evidence_notes",
+          "hypotheses",
+          "surviving_hypotheses",
+          "hypothesis_challenges",
+          "strategic_synthesis",
+          "contradictions",
+          "recommendations",
+          "recommendation_portfolio",
+          "assumptions",
+          "risks",
+          "opportunities",
+          "strategic_options",
+          "decision_analysis",
+          "executive_confidence",
+          "artifacts",
+          "documents",
+          "memo"
+        ],
+        "removed_duplicate": [],
+        "original_tokens": 151,
+        "compacted_tokens": 151,
+        "tokens_saved": 0,
+        "reduction_pct": 0.0
+      },
+      {
+        "agent": "HypothesisAgent",
+        "original_sections": [
+          "question",
+          "profiles",
+          "decision_model",
+          "research_strategy",
+          "plan",
+          "evidence_notes",
+          "hypotheses",
+          "surviving_hypotheses",
+          "hypothesis_challenges",
+          "strategic_synthesis",
+          "contradictions",
+          "recommendations",
+          "recommendation_portfolio",
+          "assumptions",
+          "risks",
+          "opportunities",
+          "strategic_options",
+          "decision_analysis",
+          "executive_confidence",
+          "artifacts",
+          "documents",
+          "memo"
+        ],
+        "kept_sections": [
+          "profiles",
+          "decision_model",
+          "evidence_notes",
+          "contradictions"
+        ],
+        "removed_unused": [
+          "question",
+          "plan",
+          "hypotheses",
+          "surviving_hypotheses",
+          "hypothesis_challenges",
+          "strategic_synthesis",
+          "recommendations",
+          "recommendation_portfolio",
+          "assumptions",
+          "risks",
+          "opportunities",
+          "strategic_options",
+          "decision_analysis",
+          "executive_confidence",
+          "artifacts",
+          "documents",
+          "memo"
+        ],
+        "removed_duplicate": [
+          {
+            "name": "research_strategy",
+            "duplicate_of": "decision_model"
+          }
+        ],
+        "original_tokens": 395280,
+        "compacted_tokens": 31017,
+        "tokens_saved": 364263,
+        "reduction_pct": 92.2
+      },
+      {
+        "agent": "RecommendationAgent",
+        "original_sections": [
+          "question",
+          "profiles",
+          "decision_model",
+          "research_strategy",
+          "plan",
+          "evidence_notes",
+          "hypotheses",
+          "surviving_hypotheses",
+          "hypothesis_challenges",
+          "strategic_synthesis",
+          "contradictions",
+          "recommendations",
+          "recommendation_portfolio",
+          "assumptions",
+          "risks",
+          "opportunities",
+          "strategic_options",
+          "decision_analysis",
+          "executive_confidence",
+          "artifacts",
+          "documents",
+          "memo"
+        ],
+        "kept_sections": [
+          "decision_model",
+          "evidence_notes",
+          "hypotheses",
+          "surviving_hypotheses",
+          "hypothesis_challenges",
+          "strategic_synthesis",
+          "contradictions"
+        ],
+        "removed_unused": [
+          "question",
+          "profiles",
+          "plan",
+          "recommendations",
+          "recommendation_portfolio",
+          "assumptions",
+          "risks",
+          "opportunities",
+          "strategic_options",
+          "decision_analysis",
+          "executive_confidence",
+          "artifacts",
+          "documents",
+          "memo"
+        ],
+        "removed_duplicate": [
+          {
+            "name": "research_strategy",
+            "duplicate_of": "decision_model"
+          }
+        ],
+        "original_tokens": 397610,
+        "compacted_tokens": 32860,
+        "tokens_saved": 364750,
+        "reduction_pct": 91.7
+      },
+      {
+        "agent": "ReportAgent",
+        "original_sections": [
+          "question",
+          "profiles",
+          "decision_model",
+          "research_strategy",
+          "plan",
+          "evidence_notes",
+          "hypotheses",
+          "surviving_hypotheses",
+          "hypothesis_challenges",
+          "strategic_synthesis",
+          "contradictions",
+          "recommendations",
+          "recommendation_portfolio",
+          "assumptions",
+          "risks",
+          "opportunities",
+          "strategic_options",
+          "decision_analysis",
+          "executive_confidence",
+          "artifacts",
+          "documents",
+          "memo"
+        ],
+        "kept_sections": [
+          "question",
+          "profiles",
+          "plan",
+          "evidence_notes",
+          "hypotheses",
+          "surviving_hypotheses",
+          "hypothesis_challenges",
+          "recommendations",
+          "recommendation_portfolio",
+          "assumptions",
+          "risks",
+          "opportunities",
+          "strategic_options",
+          "decision_analysis",
+          "executive_confidence",
+          "artifacts",
+          "documents",
+          "memo"
+        ],
+        "removed_unused": [
+          "decision_model",
+          "research_strategy",
+          "strategic_synthesis",
+          "contradictions"
+        ],
+        "removed_duplicate": [],
+        "original_tokens": 401926,
+        "compacted_tokens": 401847,
+        "tokens_saved": 79,
+        "reduction_pct": 0.0
+      }
+    ]
+  }
+}
