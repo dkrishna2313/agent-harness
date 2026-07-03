@@ -52,6 +52,28 @@ class PlannerAgent(FunctionalAgent):
         # recorded in context.trace["_planner_boundary"].
         from .planner_boundary import PlannerBoundaryError
 
+        # PH3.3 — slice decision_model/research_strategy down to the exact
+        # sub-keys _planning_prompt (research_agent/claude_client.py) actually
+        # reads. Verified-unread fields cannot affect the prompt text or the
+        # mock's output (see context_slices.py module docstring). The same
+        # slice is reused for every reasoning-target iteration below since
+        # decision_model/research_strategy do not vary per target.
+        from .context_slices import planner_input_slice, record_slice_diagnostics
+        _slice = planner_input_slice(context)
+        sliced_decision_model = _slice["decision_model"] or None
+        sliced_research_strategy = _slice["research_strategy"] or None
+        record_slice_diagnostics(
+            context, "planner",
+            original={
+                "decision_model": context.decision_model or {},
+                "research_strategy": context.research_strategy or {},
+            },
+            sliced={
+                "decision_model": _slice["decision_model"],
+                "research_strategy": _slice["research_strategy"],
+            },
+        )
+
         domain_plans: list[dict] = []
         primary_boundary: dict | None = None
         try:
@@ -60,8 +82,8 @@ class PlannerAgent(FunctionalAgent):
                 plan, boundary = self._generate_plan(
                     planning_question,
                     profiles_context,
-                    decision_model=context.decision_model or None,
-                    research_strategy=context.research_strategy or None,
+                    decision_model=sliced_decision_model,
+                    research_strategy=sliced_research_strategy,
                 )
                 if i == 0:
                     primary_boundary = boundary

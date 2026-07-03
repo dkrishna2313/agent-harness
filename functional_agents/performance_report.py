@@ -132,6 +132,26 @@ def build_report(perf: dict) -> dict[str, Any]:
             "agents": measured,
         }
 
+    # PH3.3 — Applied Prompt Slicing: bytes actually removed from real LLM
+    # calls (distinct from PH3.2's measured-but-not-applied token estimate).
+    prompt_slice_applied = perf.get("prompt_slice_applied")
+    if not prompt_slice_applied:
+        applied = [
+            {"agent": a.get("agent", "?"), **a["prompt_slice_applied"]}
+            for a in agents if a.get("prompt_slice_applied")
+        ]
+        orig_b = sum(m["original_bytes"] for m in applied)
+        sliced_b = sum(m["sliced_bytes"] for m in applied)
+        saved_b = sum(m["bytes_saved"] for m in applied)
+        prompt_slice_applied = {
+            "totals": {
+                "original_bytes": orig_b, "sliced_bytes": sliced_b, "bytes_saved": saved_b,
+                "reduction_pct": round(100.0 * saved_b / orig_b, 1) if orig_b else 0.0,
+                "agents_applied": len(applied),
+            },
+            "agents": applied,
+        }
+
     return {
         "totals": totals,
         "agent_count": len(active_agents),
@@ -140,6 +160,7 @@ def build_report(perf: dict) -> dict[str, Any]:
         "unattributed_ms": unattributed,
         "bottlenecks": bottlenecks,
         "prompt_efficiency": prompt_efficiency,
+        "prompt_slice_applied": prompt_slice_applied,
     }
 
 
@@ -154,7 +175,7 @@ def _ms(v: float) -> str:
 def render_markdown(report: dict, *, source: str | None = None) -> str:
     t = report["totals"]
     wall = t.get("pipeline_wall_ms", 0.0)
-    lines: list[str] = ["# Platform Performance Report (PH3.1 / PH3.2)", ""]
+    lines: list[str] = ["# Platform Performance Report (PH3.1 / PH3.2 / PH3.3)", ""]
     if source:
         lines += [f"**Source:** `{source}`", ""]
 
@@ -222,6 +243,32 @@ def render_markdown(report: dict, *, source: str | None = None) -> str:
         )
     else:
         lines.append("_No agents measured in this trace (pre-PH3.2 run, or no profiled agents executed)._")
+
+    psa = report.get("prompt_slice_applied", {})
+    psa_totals = psa.get("totals", {})
+    lines += ["", "## Applied Prompt Slicing (PH3.3 — actually sent to the LLM call)", ""]
+    if psa_totals.get("agents_applied"):
+        lines += [
+            f"Real byte-size reduction applied to {psa_totals['agents_applied']} agent(s)' "
+            "LLM call inputs. Every excluded field was verified unread by both the live "
+            "prompt builder and MockClaudeClient, so this cannot change prompt wording, "
+            "reasoning, or output.",
+            "",
+            "| Agent | Original Size | Sliced Size | Reduction % | Bytes Saved | Fields Excluded |",
+            "|---|--:|--:|--:|--:|--:|",
+        ]
+        for a in sorted(psa.get("agents", []), key=lambda x: x.get("bytes_saved", 0), reverse=True):
+            lines.append(
+                f"| {a['agent']} | {a['original_bytes']:,} B | {a['sliced_bytes']:,} B | "
+                f"{a['reduction_pct']}% | {a['bytes_saved']:,} B | {a['fields_excluded_count']} |"
+            )
+        lines.append(
+            f"| **Total** | **{psa_totals['original_bytes']:,} B** | "
+            f"**{psa_totals['sliced_bytes']:,} B** | **{psa_totals['reduction_pct']}%** | "
+            f"**{psa_totals['bytes_saved']:,} B** | |"
+        )
+    else:
+        lines.append("_No agents applied slicing in this trace (pre-PH3.3 run, or no wired agents executed)._")
 
     lines.append("")
     return "\n".join(lines)

@@ -76,6 +76,27 @@ class RecommendationAgent(FunctionalAgent):
         # prioritisation when present; absent → legacy hypothesis-driven behaviour.
         strategic_synthesis: dict = context.strategic_synthesis or {}
 
+        # PH3.3 — slice decision_model/research_strategy down to the exact
+        # sub-keys _recommendation_prompt (research_agent/claude_client.py)
+        # actually reads. research_strategy is confirmed dead (never
+        # referenced) in both the live prompt and MockClaudeClient — sliced to
+        # {}. hypotheses/evidence/contradictions/strategic_synthesis are NOT
+        # trimmed here (no unused sub-fields verified, or evidence/reference
+        # content that must be preserved in full). See context_slices.py.
+        from .context_slices import recommendation_input_slice, record_slice_diagnostics
+        _slice = recommendation_input_slice(context)
+        record_slice_diagnostics(
+            context, "recommendation",
+            original={
+                "decision_model": context.decision_model or {},
+                "research_strategy": context.research_strategy or {},
+            },
+            sliced={
+                "decision_model": _slice["decision_model"],
+                "research_strategy": _slice["research_strategy"],
+            },
+        )
+
         # PH2.4 — raw payload → normalize → validate → typed RecommendationOutput
         # before any business logic. A boundary failure is deterministic and its
         # stage is recorded in context.trace["_recommendation_boundary"].
@@ -86,8 +107,8 @@ class RecommendationAgent(FunctionalAgent):
                 surviving_hypotheses=context.surviving_hypotheses,
                 hypothesis_challenges=context.hypothesis_challenges,
                 evidence_items=evidence_items,
-                decision_model=context.decision_model,
-                research_strategy=context.research_strategy,
+                decision_model=_slice["decision_model"],
+                research_strategy=_slice["research_strategy"],
                 validated_contradictions=validated_contradictions,
                 strategic_synthesis=strategic_synthesis,
             )

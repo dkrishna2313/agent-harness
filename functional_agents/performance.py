@@ -82,7 +82,8 @@ class AgentPerfRecord:
     wall_ms: float                            # monotonic elapsed for _execute()
     llm_calls: list[LLMCallRecord] = field(default_factory=list)
     sub_phases: list[SubPhaseRecord] = field(default_factory=list)
-    context_compaction: dict[str, Any] | None = None   # PH3.2 — CompactionResult.to_dict()
+    context_compaction: dict[str, Any] | None = None   # PH3.2 — CompactionResult.to_dict() (measured, not applied)
+    prompt_slice_applied: dict[str, Any] | None = None  # PH3.3 — slice_diagnostics() (actually applied to the LLM call)
 
     @property
     def llm_total_ms(self) -> float:
@@ -155,6 +156,7 @@ class AgentPerfRecord:
             "stage_breakdown": {k: round(v, 1) for k, v in self.stage_breakdown().items()},
             "unattributed_ms": round(self.unattributed_ms, 1),
             "context_compaction": self.context_compaction,
+            "prompt_slice_applied": self.prompt_slice_applied,
             "sub_phases": [
                 {
                     "name": sp.name,
@@ -182,6 +184,7 @@ class PerformanceTracker:
         self._records: list[AgentPerfRecord] = []
         self._pending_sub_phases: list[SubPhaseRecord] = []  # written by EvidenceAgent
         self._pending_compaction: dict[str, Any] | None = None  # PH3.2
+        self._pending_prompt_slice: dict[str, Any] | None = None  # PH3.3
 
     def record(self, rec: AgentPerfRecord) -> None:
         self._records.append(rec)
@@ -233,6 +236,22 @@ class PerformanceTracker:
         self._pending_compaction = None
         return result
 
+    def record_prompt_slice(self, diag: dict[str, Any]) -> None:
+        """Register the current agent's PH3.3 applied prompt-slice diagnostics.
+
+        Called by ``context_slices.record_slice_diagnostics`` from inside an
+        agent's ``_execute``; flushed onto that agent's perf record in ``run()``.
+        Distinct from PH3.2's ``record_context_compaction`` (measured, never
+        applied) — this records a slice that was actually sent to the LLM call.
+        """
+        self._pending_prompt_slice = diag
+
+    def flush_prompt_slice(self) -> dict[str, Any] | None:
+        """Drain the pending prompt-slice record (called by base class)."""
+        result = self._pending_prompt_slice
+        self._pending_prompt_slice = None
+        return result
+
     def summary(self) -> dict[str, Any]:
         """Return a structured performance summary suitable for trace JSON."""
         agents = [r.to_dict() for r in self._records]
@@ -278,6 +297,19 @@ class PerformanceTracker:
             if total_original_tokens else 0.0
         )
 
+        # PH3.3 — applied prompt-slice diagnostics (bytes actually removed from real LLM calls)
+        prompt_slice_applied: list[dict[str, Any]] = []
+        for r in self._records:
+            if r.prompt_slice_applied:
+                prompt_slice_applied.append({"agent": r.agent_name, **r.prompt_slice_applied})
+        total_original_bytes = sum(p["original_bytes"] for p in prompt_slice_applied)
+        total_sliced_bytes = sum(p["sliced_bytes"] for p in prompt_slice_applied)
+        total_bytes_saved = sum(p["bytes_saved"] for p in prompt_slice_applied)
+        slice_reduction_pct = (
+            round(100.0 * total_bytes_saved / total_original_bytes, 1)
+            if total_original_bytes else 0.0
+        )
+
         return {
             "totals": {
                 "pipeline_wall_ms": round(total_wall_ms, 1),
@@ -306,6 +338,16 @@ class PerformanceTracker:
                     "agents_measured": len(prompt_efficiency),
                 },
                 "agents": prompt_efficiency,
+            },
+            "prompt_slice_applied": {
+                "totals": {
+                    "original_bytes": total_original_bytes,
+                    "sliced_bytes": total_sliced_bytes,
+                    "bytes_saved": total_bytes_saved,
+                    "reduction_pct": slice_reduction_pct,
+                    "agents_applied": len(prompt_slice_applied),
+                },
+                "agents": prompt_slice_applied,
             },
             "agents": agents,
         }
@@ -344,12 +386,25 @@ class PerformanceTracker:
                     f"    {'└─ context: ' + str(cc['original_tokens']) + '→' + str(cc['compacted_tokens']) + ' tok':<33}"
                     f" {cc['reduction_pct']:>6.1f}%"
                 )
+            ps = a.get("prompt_slice_applied")
+            if ps:
+                print(
+                    f"    {'└─ slice: ' + str(ps['original_bytes']) + '→' + str(ps['sliced_bytes']) + ' B':<33}"
+                    f" {ps['reduction_pct']:>6.1f}%"
+                )
         pe = s.get("prompt_efficiency", {}).get("totals", {})
         if pe.get("agents_measured"):
             print(
                 f"\n  PROMPT EFFICIENCY (measured, not yet applied): "
                 f"{pe['original_tokens']:,} -> {pe['compacted_tokens']:,} tokens "
                 f"({pe['reduction_pct']:.1f}% reduction across {pe['agents_measured']} agents)"
+            )
+        psa = s.get("prompt_slice_applied", {}).get("totals", {})
+        if psa.get("agents_applied"):
+            print(
+                f"  PROMPT SLICE APPLIED: "
+                f"{psa['original_bytes']:,} -> {psa['sliced_bytes']:,} bytes "
+                f"({psa['reduction_pct']:.1f}% reduction across {psa['agents_applied']} agents)"
             )
         print()
 

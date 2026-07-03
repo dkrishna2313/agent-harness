@@ -272,6 +272,12 @@ def run_agent(
         k: v for k, v in ctx.trace.items()
         if isinstance(k, str) and k.endswith("_boundary")
     }
+    # PH3.3 — surface any applied prompt-slice diagnostics (keys ending in
+    # _prompt_slice), additively — absent entirely for agents PH3.3 didn't touch.
+    prompt_slice = {
+        k: v for k, v in ctx.trace.items()
+        if isinstance(k, str) and k.endswith("_prompt_slice")
+    }
     warnings = [
         h.get("summary", "") for h in ctx.agent_history
         if h.get("status") in ("warning", "error")
@@ -287,6 +293,7 @@ def run_agent(
         "llm_mode": "mock" if use_mock else "live",
         "normalization": norm,
         "boundary": boundary,
+        "prompt_slice": prompt_slice,
         "validation": {
             "preconditions_passed": pre_checked,
             "postconditions_passed": post_checked,
@@ -317,6 +324,13 @@ def _print_summary(res: dict[str, Any]) -> None:
         stages = bd.get("stages") if isinstance(bd, dict) else None
         failed = bd.get("failed_stage") if isinstance(bd, dict) else None
         print(f"  {name:<15}: stages={stages} failed_stage={failed}")
+    for name, ps in (mt.get("prompt_slice") or {}).items():
+        if not isinstance(ps, dict):
+            continue
+        print(
+            f"  {name:<15}: {ps.get('original_bytes')}→{ps.get('sliced_bytes')} bytes "
+            f"({ps.get('reduction_pct')}% reduction, {ps.get('fields_excluded_count')} fields excluded)"
+        )
     print("\n  Context diff:")
     print(f"    added    ({len(d['added'])}): {', '.join(d['added']) or '-'}")
     print(f"    modified ({len(d['modified'])}): {', '.join(d['modified']) or '-'}")

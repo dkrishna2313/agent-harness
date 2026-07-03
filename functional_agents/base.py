@@ -73,12 +73,14 @@ class FunctionalAgent(ABC):
             ]
             sub_phases = tracker.flush_sub_phases()
             context_compaction = tracker.flush_context_compaction()
+            prompt_slice_applied = tracker.flush_prompt_slice()
             rec = AgentPerfRecord(
                 agent_name=self.name,
                 wall_ms=wall_ms,
                 llm_calls=llm_calls,
                 sub_phases=sub_phases,
                 context_compaction=context_compaction,
+                prompt_slice_applied=prompt_slice_applied,
             )
             tracker.record(rec)
 

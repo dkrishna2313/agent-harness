@@ -53,14 +53,38 @@ class StrategicSynthesisAgent(FunctionalAgent):
         )
 
         # No-op guard: nothing to synthesize (e.g. pre-framing or empty run).
+        # IMPORTANT: this check uses the FULL (unsliced) domain_evidence length —
+        # PH3.3 slicing below only affects what is passed to _generate_synthesis,
+        # never this guard, so a domain_evidence-only run still triggers correctly.
         if domains_received == 0:
             LOGGER.warning("[StrategicSynthesisAgent] no domains — skipping synthesis")
             context.trace["_strategic_synthesis"] = {"skipped": True, "reason": "no_domains"}
             self._record(context, status="skipped", summary="No decision domains — synthesis skipped.")
             return context
 
+        # PH3.3 — domain_evidence is confirmed unread by both the live prompt
+        # (_strategic_synthesis_prompt) and MockClaudeClient's generator; slice
+        # it to [] for the actual call. decision_architecture is trimmed to its
+        # 3 verified-used keys. domain_plans/domain_hypotheses pass through in
+        # full (domain_plans is read as a mock fallback source). See
+        # context_slices.py for the verified-usage citations.
+        from .context_slices import strategic_synthesis_input_slice, record_slice_diagnostics
+        _slice = strategic_synthesis_input_slice(context)
+        record_slice_diagnostics(
+            context, "strategic_synthesis",
+            original={
+                "domain_evidence": domain_evidence,
+                "decision_architecture": decision_architecture,
+            },
+            sliced={
+                "domain_evidence": _slice["domain_evidence"],
+                "decision_architecture": _slice["decision_architecture"],
+            },
+        )
+
         payload = self._generate_synthesis(
-            domain_plans, domain_evidence, domain_hypotheses, decision_architecture
+            _slice["domain_plans"], _slice["domain_evidence"],
+            _slice["domain_hypotheses"], _slice["decision_architecture"],
         )
         synthesis = payload.model_dump()
 

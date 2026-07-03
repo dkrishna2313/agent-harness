@@ -90,19 +90,28 @@ class HypothesisAgent(FunctionalAgent):
     def _execute_single(self, context: AgentContext) -> AgentContext:
         from research_agent.log import PROGRESS
 
-        evidence_note = context.evidence_notes[0] if context.evidence_notes else {}
-        evidence_items: list[dict] = evidence_note.get("evidence_items", [])
-
-        # Derive profile_coverage in the flat {name: level} format expected by the prompt
-        raw_coverage = evidence_note.get("profile_coverage_by_profile", {})
-        profile_coverage: dict[str, str] = {
-            pname: entry.get("coverage_level", "NONE").lower()
-            for pname, entry in raw_coverage.items()
-        }
-        if not profile_coverage and context.profiles:
-            profile_coverage = {p: "unknown" for p in context.profiles}
-
-        contradictions: list[dict] = context.research_object.get("contradictions", [])
+        # PH3.3 — slice decision_model/research_strategy down to the exact
+        # sub-keys _hypothesis_prompt (research_agent/claude_client.py)
+        # actually reads. evidence_items/profile_coverage/contradictions are
+        # extracted the same way as before (unchanged) — only the two
+        # metadata dicts are trimmed. See context_slices.py module docstring
+        # for the verified-usage citations.
+        from .context_slices import hypothesis_input_slice, record_slice_diagnostics
+        _slice = hypothesis_input_slice(context)
+        evidence_items = _slice["evidence_items"]
+        profile_coverage = _slice["profile_coverage"]
+        contradictions = _slice["contradictions"]
+        record_slice_diagnostics(
+            context, "hypothesis",
+            original={
+                "decision_model": context.decision_model or {},
+                "research_strategy": context.research_strategy or {},
+            },
+            sliced={
+                "decision_model": _slice["decision_model"],
+                "research_strategy": _slice["research_strategy"],
+            },
+        )
 
         # PH2.3 — raw LLM payload → normalize → validate → typed HypothesisOutput
         # before any business logic. A boundary failure is deterministic and its
@@ -110,8 +119,8 @@ class HypothesisAgent(FunctionalAgent):
         from .hypothesis_boundary import HypothesisBoundaryError
         try:
             output, boundary = self._generate_hypotheses(
-                context.decision_model,
-                context.research_strategy,
+                _slice["decision_model"],
+                _slice["research_strategy"],
                 evidence_items,
                 profile_coverage,
                 contradictions,

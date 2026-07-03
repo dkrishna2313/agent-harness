@@ -271,6 +271,26 @@ def test_render_markdown_contains_sections():
     assert "## Prompt Efficiency" in md
 
 
+def test_render_markdown_contains_applied_slicing_section():
+    md = pr.render_markdown(pr.build_report(_sample_summary()), source="x.json")
+    assert "## Applied Prompt Slicing" in md
+
+
+def test_render_markdown_applied_slicing_with_data():
+    tracker = PerformanceTracker()
+    tracker.record(AgentPerfRecord(
+        agent_name="HypothesisAgent", wall_ms=5.0,
+        prompt_slice_applied={"original_bytes": 500, "sliced_bytes": 100,
+                               "bytes_saved": 400, "reduction_pct": 80.0,
+                               "fields_excluded_count": 2, "fields_excluded": ["a", "b"],
+                               "fields_included": ["c"]},
+    ))
+    md = pr.render_markdown(pr.build_report(tracker.summary()))
+    assert "HypothesisAgent" in md
+    assert "80.0%" in md
+    assert "verified unread" in md
+
+
 def test_render_markdown_prompt_efficiency_with_data():
     tracker = PerformanceTracker()
     tracker.record(AgentPerfRecord(
@@ -342,3 +362,46 @@ def test_summary_prompt_efficiency_empty_when_unmeasured():
     assert pe["totals"]["agents_measured"] == 0
     assert pe["totals"]["reduction_pct"] == 0.0
     assert pe["agents"] == []
+
+
+# ---------------------------------------------------------------------------
+# PH3.3 — applied prompt-slice recording (distinct from PH3.2 measurement)
+# ---------------------------------------------------------------------------
+
+def test_tracker_records_and_flushes_prompt_slice():
+    tracker = PerformanceTracker()
+    assert tracker.flush_prompt_slice() is None
+    tracker.record_prompt_slice({"original_bytes": 100, "sliced_bytes": 20,
+                                  "bytes_saved": 80, "reduction_pct": 80.0})
+    flushed = tracker.flush_prompt_slice()
+    assert flushed["reduction_pct"] == 80.0
+    assert tracker.flush_prompt_slice() is None
+
+
+def test_summary_aggregates_prompt_slice_applied_across_agents():
+    tracker = PerformanceTracker()
+    tracker.record(AgentPerfRecord(
+        agent_name="PlannerAgent", wall_ms=1.0,
+        prompt_slice_applied={"original_bytes": 100, "sliced_bytes": 40,
+                               "bytes_saved": 60, "reduction_pct": 60.0},
+    ))
+    tracker.record(AgentPerfRecord(
+        agent_name="RecommendationAgent", wall_ms=1.0,
+        prompt_slice_applied={"original_bytes": 50, "sliced_bytes": 0,
+                               "bytes_saved": 50, "reduction_pct": 100.0},
+    ))
+    tracker.record(AgentPerfRecord(agent_name="ReportAgent", wall_ms=1.0))  # not sliced
+    psa = tracker.summary()["prompt_slice_applied"]
+    assert psa["totals"]["agents_applied"] == 2
+    assert psa["totals"]["original_bytes"] == 150
+    assert psa["totals"]["sliced_bytes"] == 40
+    assert psa["totals"]["bytes_saved"] == 110
+    assert {a["agent"] for a in psa["agents"]} == {"PlannerAgent", "RecommendationAgent"}
+
+
+def test_summary_prompt_slice_applied_empty_when_none_applied():
+    tracker = PerformanceTracker()
+    tracker.record(AgentPerfRecord(agent_name="X", wall_ms=1.0))
+    psa = tracker.summary()["prompt_slice_applied"]
+    assert psa["totals"]["agents_applied"] == 0
+    assert psa["agents"] == []
