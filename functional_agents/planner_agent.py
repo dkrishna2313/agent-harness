@@ -98,6 +98,9 @@ class PlannerAgent(FunctionalAgent):
         context.trace["_planner_boundary"] = primary_boundary or {
             "stages": {}, "failed_stage": None
         }
+        # PH3.1 — record boundary normalization/validation timings (no-op w/o tracker)
+        from .performance import record_boundary_stages
+        record_boundary_stages(context, primary_boundary)
         context.domain_plans = domain_plans
 
         # Primary plan drives the pipeline. Keep context.plan to the EXISTING

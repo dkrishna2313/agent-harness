@@ -117,6 +117,9 @@ class RecommendationAgent(FunctionalAgent):
             "synthesis_note": rec_output.synthesis_note,
         }
         context.trace["_recommendation_boundary"] = rec_boundary
+        # PH3.1 — record boundary normalization/validation timings (no-op w/o tracker)
+        from .performance import record_boundary_stages
+        record_boundary_stages(context, rec_boundary)
 
         # J10.8 — additive diagnostics: how much Strategic Synthesis context was
         # available and used (capped identically to the prompt). Trace-only; the

@@ -364,6 +364,9 @@ class EvidenceAgent(FunctionalAgent):
             raise
         context.evidence_notes = [output.as_note()]
         context.trace["_evidence_boundary"] = boundary
+        # PH3.1 — record boundary normalization/validation timings (no-op w/o tracker)
+        from .performance import record_boundary_stages
+        record_boundary_stages(context, boundary)
 
     # ------------------------------------------------------------------
     # J10.5 — multi-domain helpers
@@ -459,6 +462,7 @@ class EvidenceAgent(FunctionalAgent):
             _tracker.add_sub_phase(
                 "evidence:retrieval_query",
                 _retrieval_ms,
+                category="retrieval",
                 mode=mode,
                 fetch_k=fetch_k,
                 scanned=result.total_candidates,
@@ -492,6 +496,7 @@ class EvidenceAgent(FunctionalAgent):
             _tracker.add_sub_phase(
                 "evidence:subquestion_expansion",
                 _sq_ms,
+                category="retrieval",
                 subquestions=len(subquestions),
                 added=sq_added,
                 total_after=len(candidates),
@@ -536,6 +541,7 @@ class EvidenceAgent(FunctionalAgent):
             _tracker.add_sub_phase(
                 "evidence:reranking",
                 _rerank_ms,
+                category="retrieval",
                 enabled=self._use_reranker,
                 candidates_in=pre_rerank_count,
                 candidates_out=len(candidates),
@@ -612,6 +618,7 @@ class EvidenceAgent(FunctionalAgent):
             _tracker.add_sub_phase(
                 "evidence:mapping_coverage",
                 _mapping_ms,
+                category="business_logic",
                 subquestions_covered=covered,
                 subquestions_total=len(subquestions),
                 areas_covered=mapped_areas,
@@ -653,6 +660,7 @@ class EvidenceAgent(FunctionalAgent):
             _tracker.add_sub_phase(
                 "evidence:evidence_assembly",
                 _assembly_ms,
+                category="business_logic",
                 evidence_count=len(candidates),
                 profiles_contributing=len(profiles_contributing),
             )

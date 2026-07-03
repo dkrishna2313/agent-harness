@@ -1,0 +1,290 @@
+{
+  "totals": {
+    "pipeline_wall_ms": 588978.8,
+    "llm_total_ms": 565950.1,
+    "llm_overhead_ms": 23028.7,
+    "llm_call_count": 13,
+    "prompt_tokens": 42709,
+    "completion_tokens": 29612,
+    "total_tokens": 72321,
+    "non_llm_ms": 23028.7,
+    "llm_pct": 96.1,
+    "non_llm_pct": 3.9
+  },
+  "agent_count": 18,
+  "agents": [
+    {
+      "agent": "ProblemFramingAgent",
+      "wall_ms": 67187.1,
+      "llm_ms": 67120.4,
+      "non_llm_ms": 66.7,
+      "llm_pct": 99.9,
+      "llm_calls": 2,
+      "tokens": 8498,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "StrategicOptionAgent",
+      "wall_ms": 63781.8,
+      "llm_ms": 63707.0,
+      "non_llm_ms": 74.8,
+      "llm_pct": 99.9,
+      "llm_calls": 1,
+      "tokens": 6932,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "ChallengeAgent",
+      "wall_ms": 62470.6,
+      "llm_ms": 62462.1,
+      "non_llm_ms": 8.5,
+      "llm_pct": 100.0,
+      "llm_calls": 1,
+      "tokens": 6778,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "DecisionAnalysisAgent",
+      "wall_ms": 61439.0,
+      "llm_ms": 61376.0,
+      "non_llm_ms": 63.0,
+      "llm_pct": 99.9,
+      "llm_calls": 1,
+      "tokens": 8542,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "HypothesisAgent",
+      "wall_ms": 57509.2,
+      "llm_ms": 57507.2,
+      "non_llm_ms": 2.0,
+      "llm_pct": 100.0,
+      "llm_calls": 1,
+      "tokens": 6225,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "OpportunityAgent",
+      "wall_ms": 53963.1,
+      "llm_ms": 53861.4,
+      "non_llm_ms": 101.7,
+      "llm_pct": 99.8,
+      "llm_calls": 1,
+      "tokens": 5942,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "RecommendationAgent",
+      "wall_ms": 49892.3,
+      "llm_ms": 49890.7,
+      "non_llm_ms": 1.6,
+      "llm_pct": 100.0,
+      "llm_calls": 1,
+      "tokens": 6454,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "RiskAgent",
+      "wall_ms": 49386.2,
+      "llm_ms": 49299.7,
+      "non_llm_ms": 86.5,
+      "llm_pct": 99.8,
+      "llm_calls": 1,
+      "tokens": 5542,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "ExecutiveConfidenceAgent",
+      "wall_ms": 44957.0,
+      "llm_ms": 44879.3,
+      "non_llm_ms": 77.7,
+      "llm_pct": 99.8,
+      "llm_calls": 1,
+      "tokens": 5845,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "AssumptionAgent",
+      "wall_ms": 29879.6,
+      "llm_ms": 29825.9,
+      "non_llm_ms": 53.7,
+      "llm_pct": 99.8,
+      "llm_calls": 1,
+      "tokens": 4871,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "EvidenceAgent",
+      "wall_ms": 22484.4,
+      "llm_ms": 0.0,
+      "non_llm_ms": 22484.4,
+      "llm_pct": 0.0,
+      "llm_calls": 0,
+      "tokens": 0,
+      "stage_breakdown": {},
+      "sub_phases": [
+        {
+          "name": "evidence:retrieval_query",
+          "duration_ms": 1128.9,
+          "mode": "hybrid",
+          "fetch_k": 40,
+          "scanned": 1079,
+          "matched": 1066,
+          "returned": 40
+        },
+        {
+          "name": "evidence:subquestion_expansion",
+          "duration_ms": 1139.0,
+          "subquestions": 5,
+          "added": 6,
+          "total_after": 46
+        },
+        {
+          "name": "evidence:reranking",
+          "duration_ms": 20189.7,
+          "enabled": true,
+          "candidates_in": 46,
+          "candidates_out": 46
+        },
+        {
+          "name": "evidence:mapping_coverage",
+          "duration_ms": 12.3,
+          "subquestions_covered": 4,
+          "subquestions_total": 5,
+          "areas_covered": 4,
+          "areas_total": 6
+        },
+        {
+          "name": "evidence:evidence_assembly",
+          "duration_ms": 0.5,
+          "evidence_count": 46,
+          "profiles_contributing": 1
+        }
+      ]
+    },
+    {
+      "agent": "PlannerAgent",
+      "wall_ms": 14104.6,
+      "llm_ms": 14100.3,
+      "non_llm_ms": 4.3,
+      "llm_pct": 100.0,
+      "llm_calls": 1,
+      "tokens": 3410,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "ResearchStrategyAgent",
+      "wall_ms": 11920.7,
+      "llm_ms": 11920.1,
+      "non_llm_ms": 0.6,
+      "llm_pct": 100.0,
+      "llm_calls": 1,
+      "tokens": 3282,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "QAAgent",
+      "wall_ms": 1.0,
+      "llm_ms": 0.0,
+      "non_llm_ms": 1.0,
+      "llm_pct": 0.0,
+      "llm_calls": 0,
+      "tokens": 0,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "MultiProfileAgent",
+      "wall_ms": 0.8,
+      "llm_ms": 0.0,
+      "non_llm_ms": 0.8,
+      "llm_pct": 0.0,
+      "llm_calls": 0,
+      "tokens": 0,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "ScenarioAgent",
+      "wall_ms": 0.8,
+      "llm_ms": 0.0,
+      "non_llm_ms": 0.8,
+      "llm_pct": 0.0,
+      "llm_calls": 0,
+      "tokens": 0,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "RecommendationImprovementAgent",
+      "wall_ms": 0.6,
+      "llm_ms": 0.0,
+      "non_llm_ms": 0.6,
+      "llm_pct": 0.0,
+      "llm_calls": 0,
+      "tokens": 0,
+      "stage_breakdown": {},
+      "sub_phases": []
+    },
+    {
+      "agent": "RecommendationSynthesisAgent",
+      "wall_ms": 0.1,
+      "llm_ms": 0.0,
+      "non_llm_ms": 0.1,
+      "llm_pct": 0.0,
+      "llm_calls": 0,
+      "tokens": 0,
+      "stage_breakdown": {},
+      "sub_phases": []
+    }
+  ],
+  "stage_totals": {},
+  "unattributed_ms": 23028.7,
+  "bottlenecks": {
+    "agents": [
+      {
+        "agent": "ProblemFramingAgent",
+        "wall_ms": 67187.1,
+        "llm_ms": 67120.4,
+        "non_llm_ms": 66.7
+      },
+      {
+        "agent": "StrategicOptionAgent",
+        "wall_ms": 63781.8,
+        "llm_ms": 63707.0,
+        "non_llm_ms": 74.8
+      },
+      {
+        "agent": "ChallengeAgent",
+        "wall_ms": 62470.6,
+        "llm_ms": 62462.1,
+        "non_llm_ms": 8.5
+      },
+      {
+        "agent": "DecisionAnalysisAgent",
+        "wall_ms": 61439.0,
+        "llm_ms": 61376.0,
+        "non_llm_ms": 63.0
+      },
+      {
+        "agent": "HypothesisAgent",
+        "wall_ms": 57509.2,
+        "llm_ms": 57507.2,
+        "non_llm_ms": 2.0
+      }
+    ],
+    "stages": []
+  }
+}

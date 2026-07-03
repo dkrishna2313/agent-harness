@@ -23,6 +23,7 @@ On failure the raised ``BoundaryError`` subclass carries ``.diagnostics`` with
 
 from __future__ import annotations
 
+import time
 from typing import Any, Callable
 
 
@@ -56,15 +57,26 @@ def run_boundary(
     """
     stages = {"generation": "ok", "normalization": "pending", "validation": "pending"}
     try:
+        _t0 = time.perf_counter()
         normalized, norm_diag = normalize(raw)
+        norm_ms = (time.perf_counter() - _t0) * 1000
         stages["normalization"] = "ok"
+
+        _t1 = time.perf_counter()
         output, val_diag = validate(normalized)
+        val_ms = (time.perf_counter() - _t1) * 1000
         stages["validation"] = "ok"
     except error_base as exc:
         failed = getattr(exc, "stage", "boundary")
         stages[failed] = "failed"
         exc.diagnostics = {**exc.diagnostics, "stages": stages, "failed_stage": failed}
         raise
+
+    # PH3.1 — record per-stage timing additively into the diagnostics dicts.
+    if isinstance(norm_diag, dict):
+        norm_diag = {**norm_diag, "duration_ms": round(norm_ms, 3)}
+    if isinstance(val_diag, dict):
+        val_diag = {**val_diag, "duration_ms": round(val_ms, 3)}
 
     return output, {
         "stages": stages,

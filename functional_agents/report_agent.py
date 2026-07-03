@@ -1594,6 +1594,9 @@ class ReportAgent(FunctionalAgent):
             return context
 
         context.trace["_report_boundary"] = _report_boundary
+        # PH3.1 — record boundary normalization/validation timings (no-op w/o tracker)
+        from .performance import record_boundary_stages, stage_timer
+        record_boundary_stages(context, _report_boundary)
         memo = _report_input.memo
         documents = _report_input.documents
 
@@ -1651,7 +1654,8 @@ class ReportAgent(FunctionalAgent):
         # back to the legacy memo-based path for backward compatibility.
         # ------------------------------------------------------------------
         if context.strategic_options:
-            report_content = _build_j7_executive_report(context)
+            with stage_timer(context, "report:executive_render", "report_generation"):
+                report_content = _build_j7_executive_report(context)
         else:
             report_content = memo_to_markdown(memo)
             if context.hypotheses:

@@ -138,6 +138,9 @@ class HypothesisAgent(FunctionalAgent):
             "synthesis_note": output.synthesis_note,
         }
         context.trace["_hypothesis_boundary"] = boundary
+        # PH3.1 — record boundary normalization/validation timings (no-op w/o tracker)
+        from .performance import record_boundary_stages
+        record_boundary_stages(context, boundary)
 
         LOGGER.log(
             PROGRESS,
