@@ -23,6 +23,7 @@ Schema (v1)::
       "boundaries": {<agent_key>: {...boundary diagnostics, unmodified}},
       "performance": {...} | null,
       "prompt_slices": {<agent_key>: {...slice diagnostics, unmodified}},
+      "deliverables": [{"type": "markdown", "status": "generated"}, ...],
       "contracts": {"functional_agent_contract": "...", "agents_conforming": [...]},
       "summary": {agents_run, agents_succeeded, agents_warning, agents_failed,
                   boundaries_passed, boundaries_failed, prompt_slices_applied,
@@ -112,6 +113,12 @@ def build_canonical_trace(context: Any) -> dict[str, Any]:
 
     performance = trace.get("_performance")
 
+    # J11.0 — Strategic Deliverables Framework: DeliverableArtifact records
+    # produced this run (already dicts via DeliverableArtifact.to_dict()).
+    # Additive only — not in _REQUIRED_TOP_LEVEL_KEYS, so pre-J11.0 traces
+    # remain valid canonical traces.
+    deliverables = list(getattr(context, "deliverables", None) or [])
+
     contracts = {
         "functional_agent_contract": "FunctionalAgent.run(context: AgentContext) -> AgentResult",
         "agents_conforming": sorted(agents.keys()),
@@ -145,6 +152,7 @@ def build_canonical_trace(context: Any) -> dict[str, Any]:
         "boundaries": boundaries,
         "performance": performance,
         "prompt_slices": prompt_slices,
+        "deliverables": deliverables,
         "contracts": contracts,
         "summary": {
             "agents_run": len(agents),

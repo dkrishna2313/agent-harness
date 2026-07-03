@@ -159,6 +159,13 @@ class AgentContext:
     decision_analysis: dict[str, Any] = field(default_factory=dict)
     # J7.7 — executive confidence
     executive_confidence: dict[str, Any] = field(default_factory=dict)
+    # J11.0 — Strategic Deliverables Framework. deliverable_request is the
+    # (optional) DeliverableRequest driving the current run's deliverable
+    # generation, as a dict (DeliverableRequest.to_dict()); empty means "use
+    # the default markdown deliverable". deliverables collects the resulting
+    # DeliverableArtifact records (DeliverableArtifact.to_dict()) for the trace.
+    deliverable_request: dict[str, Any] = field(default_factory=dict)
+    deliverables: list[dict[str, Any]] = field(default_factory=list)
 
     # Orchestrator state (J5.5)
     workflow_state: str = ""

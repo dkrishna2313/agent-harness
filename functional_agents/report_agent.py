@@ -1552,6 +1552,67 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
 
 
 # ---------------------------------------------------------------------------
+# J11.0 — Markdown report content assembly (used by MarkdownReportGenerator)
+# ---------------------------------------------------------------------------
+
+def build_markdown_report_content(context: "AgentContext", memo: Any) -> str:
+    """Assemble the ReportAgent markdown body from context (+ boundary-typed memo).
+
+    Extracted verbatim from ReportAgent._execute (J11.0 — Strategic
+    Deliverables Framework) so ``MarkdownReportGenerator`` can produce the
+    same markdown without duplicating the J7.6b executive-report / legacy
+    memo-based branching. Pure: reads ``context``/``memo`` only, no side
+    effects, no reasoning.
+    """
+    from research_agent.markdown import memo_to_markdown
+
+    from .performance import stage_timer
+
+    if context.strategic_options:
+        with stage_timer(context, "report:executive_render", "report_generation"):
+            return _build_j7_executive_report(context)
+
+    report_content = memo_to_markdown(memo)
+    if context.hypotheses:
+        report_content = report_content.rstrip("\n") + "\n\n" + _build_hypotheses_section(context.hypotheses)
+    if context.hypothesis_challenges:
+        report_content = report_content.rstrip("\n") + "\n\n" + _build_challenges_section(
+            context.hypothesis_challenges, context.surviving_hypotheses
+        )
+    if context.recommendations:
+        report_content = report_content.rstrip("\n") + "\n\n" + _build_recommendations_section(
+            context.recommendations, context.recommendation_portfolio
+        )
+    _rec_eval_for_md = (
+        context.research_object.get("recommendation_evaluation")
+        if context.research_object else None
+    )
+    if _rec_eval_for_md:
+        _rec_eval_section = _build_recommendation_evaluation_section(_rec_eval_for_md)
+        if _rec_eval_section:
+            report_content = report_content.rstrip("\n") + "\n\n" + _rec_eval_section
+    _improvement_data = context.recommendation_improvement
+    if _improvement_data and _improvement_data.get("improvement_records"):
+        _improvement_section = _build_recommendation_improvement_section(_improvement_data)
+        if _improvement_section:
+            report_content = report_content.rstrip("\n") + "\n\n" + _improvement_section
+    if context.scenario_analysis:
+        _scenario_section = _build_scenario_section(context.scenario_analysis)
+        if _scenario_section:
+            report_content = report_content.rstrip("\n") + "\n\n" + _scenario_section
+    if context.multi_profile_analysis and len(context.profiles) > 1:
+        _ps_section = _build_profile_synthesis_section(
+            context.multi_profile_analysis,
+            context.recommendations,
+            context.hypotheses,
+            synthesis_tradeoffs=context.synthesis_tradeoffs or None,
+        )
+        if _ps_section:
+            report_content = report_content.rstrip("\n") + "\n\n" + _ps_section
+    return report_content
+
+
+# ---------------------------------------------------------------------------
 # Agent
 # ---------------------------------------------------------------------------
 
@@ -1572,7 +1633,6 @@ class ReportAgent(FunctionalAgent):
 
     def _execute(self, context: AgentContext) -> AgentContext:
         from research_agent.log import PROGRESS
-        from research_agent.markdown import memo_to_markdown, write_markdown
         from research_agent.trace import build_trace, write_trace
 
         # PH2.5 — Report boundary: normalize → validate report inputs into a typed
@@ -1595,7 +1655,7 @@ class ReportAgent(FunctionalAgent):
 
         context.trace["_report_boundary"] = _report_boundary
         # PH3.1 — record boundary normalization/validation timings (no-op w/o tracker)
-        from .performance import record_boundary_stages, stage_timer
+        from .performance import record_boundary_stages
         record_boundary_stages(context, _report_boundary)
         memo = _report_input.memo
         documents = _report_input.documents
@@ -1648,53 +1708,22 @@ class ReportAgent(FunctionalAgent):
         )
 
         # ------------------------------------------------------------------
-        # Write markdown report
-        # J7.6b: when strategic_options are present, produce the J7 executive
-        # report (14 sections driven by the decision graph). Otherwise fall
-        # back to the legacy memo-based path for backward compatibility.
+        # Generate the markdown deliverable (J11.0 — Strategic Deliverables
+        # Framework). ReportAgent no longer assembles/writes markdown inline;
+        # it delegates to MarkdownReportGenerator via the DeliverableRegistry.
+        # build_markdown_report_content() is byte-for-byte identical to the
+        # J7.6b/legacy branching this replaces — same sections, same order.
         # ------------------------------------------------------------------
-        if context.strategic_options:
-            with stage_timer(context, "report:executive_render", "report_generation"):
-                report_content = _build_j7_executive_report(context)
-        else:
-            report_content = memo_to_markdown(memo)
-            if context.hypotheses:
-                report_content = report_content.rstrip("\n") + "\n\n" + _build_hypotheses_section(context.hypotheses)
-            if context.hypothesis_challenges:
-                report_content = report_content.rstrip("\n") + "\n\n" + _build_challenges_section(
-                    context.hypothesis_challenges, context.surviving_hypotheses
-                )
-            if context.recommendations:
-                report_content = report_content.rstrip("\n") + "\n\n" + _build_recommendations_section(
-                    context.recommendations, context.recommendation_portfolio
-                )
-            _rec_eval_for_md = (
-                context.research_object.get("recommendation_evaluation")
-                if context.research_object else None
-            )
-            if _rec_eval_for_md:
-                _rec_eval_section = _build_recommendation_evaluation_section(_rec_eval_for_md)
-                if _rec_eval_section:
-                    report_content = report_content.rstrip("\n") + "\n\n" + _rec_eval_section
-            _improvement_data = context.recommendation_improvement
-            if _improvement_data and _improvement_data.get("improvement_records"):
-                _improvement_section = _build_recommendation_improvement_section(_improvement_data)
-                if _improvement_section:
-                    report_content = report_content.rstrip("\n") + "\n\n" + _improvement_section
-            if context.scenario_analysis:
-                _scenario_section = _build_scenario_section(context.scenario_analysis)
-                if _scenario_section:
-                    report_content = report_content.rstrip("\n") + "\n\n" + _scenario_section
-            if context.multi_profile_analysis and len(context.profiles) > 1:
-                _ps_section = _build_profile_synthesis_section(
-                    context.multi_profile_analysis,
-                    context.recommendations,
-                    context.hypotheses,
-                    synthesis_tradeoffs=context.synthesis_tradeoffs or None,
-                )
-                if _ps_section:
-                    report_content = report_content.rstrip("\n") + "\n\n" + _ps_section
-        output_path = write_markdown(report_content, self._out_path)
+        from .deliverables import DeliverableRequest, default_registry
+
+        context.trace["_report_memo"] = memo
+        deliverable_request = DeliverableRequest.from_dict(context.deliverable_request)
+        context.deliverable_request = deliverable_request.to_dict()
+
+        artifact = default_registry.generate(context, deliverable_request, self._out_path)
+        context.deliverables.append(artifact.to_dict())
+
+        output_path = Path(artifact.path)
         context.artifacts["report_path"] = str(output_path)
         context.artifacts["trace_path"] = str(output_path.with_suffix(".trace.json"))
 
