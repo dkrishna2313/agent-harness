@@ -13,10 +13,11 @@ Reasoning Graph on ``AgentContext`` without changing the reasoning engine.
     DeliverableBundleGenerator  -- orchestrates N generators, builds bundle (J11.2)
 
 ``default_registry`` is the registry ReportAgent uses; it comes pre-registered
-with ``MarkdownReportGenerator`` under ``"markdown"`` and
-``ExecutiveBriefGenerator`` under ``"executive_brief"``. ReportAgent's
-default run only ever requests ``"markdown"`` — registering additional
-generators here does not change what a normal pipeline run produces.
+with ``MarkdownReportGenerator`` under ``"markdown"``,
+``ExecutiveBriefGenerator`` under ``"executive_brief"``, and
+``StrategyDeckGenerator`` under ``"strategy_deck"``. ReportAgent's default
+run only ever requests ``"markdown"`` — registering additional generators
+here does not change what a normal pipeline run produces.
 """
 
 from __future__ import annotations
@@ -28,10 +29,12 @@ from .executive_brief import ExecutiveBriefGenerator
 from .markdown_report import MarkdownReportGenerator
 from .registry import DeliverableRegistry
 from .request import DeliverableRequest
+from .strategy_deck import StrategyDeckGenerator
 
 default_registry = DeliverableRegistry()
 default_registry.register(MarkdownReportGenerator())
 default_registry.register(ExecutiveBriefGenerator())
+default_registry.register(StrategyDeckGenerator())
 
 __all__ = [
     "DeliverableRequest",
@@ -42,5 +45,6 @@ __all__ = [
     "DeliverableBundleGenerator",
     "MarkdownReportGenerator",
     "ExecutiveBriefGenerator",
+    "StrategyDeckGenerator",
     "default_registry",
 ]
