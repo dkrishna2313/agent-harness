@@ -369,8 +369,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"CanonicalTraceReservedError\n\n{exc}", file=sys.stderr)
             return 2
 
-    logging.basicConfig(level=getattr(logging, args.log_level.upper(), logging.WARNING),
-                        format="%(levelname)s %(name)s: %(message)s")
+    from research_agent.cli import _configure_logging
+    _configure_logging(verbose=False, log_level=args.log_level)
 
     try:
         res = run_agent(
