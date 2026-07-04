@@ -123,6 +123,11 @@ def build_canonical_trace(context: Any) -> dict[str, Any]:
     # ran on this context; None otherwise. Additive — not in _REQUIRED_TOP_LEVEL_KEYS.
     deliverable_bundle = dict(getattr(context, "deliverable_bundle", None) or {}) or None
 
+    # J12.0 — Executive Narrative: {"generated": True} when ExecutiveNarrativeBuilder
+    # ran on this context; None otherwise. Additive — not in _REQUIRED_TOP_LEVEL_KEYS.
+    en = dict(getattr(context, "executive_narrative", None) or {})
+    executive_narrative_entry = {"generated": True} if en else None
+
     contracts = {
         "functional_agent_contract": "FunctionalAgent.run(context: AgentContext) -> AgentResult",
         "agents_conforming": sorted(agents.keys()),
@@ -158,6 +163,7 @@ def build_canonical_trace(context: Any) -> dict[str, Any]:
         "prompt_slices": prompt_slices,
         "deliverables": deliverables,
         "deliverable_bundle": deliverable_bundle,
+        "executive_narrative": executive_narrative_entry,
         "contracts": contracts,
         "summary": {
             "agents_run": len(agents),

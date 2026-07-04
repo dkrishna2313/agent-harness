@@ -170,6 +170,11 @@ class AgentContext:
     # multi-deliverable bundle is generated from this context; empty otherwise.
     # Stored as a dict (DeliverableBundle.to_dict()) for JSON serialisability.
     deliverable_bundle: dict[str, Any] = field(default_factory=dict)
+    # J12.0 — Executive Narrative Layer. Set by ExecutiveNarrativeBuilder when
+    # the canonical executive storyline is assembled from this context; empty
+    # otherwise. Stored as a dict (ExecutiveNarrative.to_dict()) for JSON
+    # serialisability.
+    executive_narrative: dict[str, Any] = field(default_factory=dict)
 
     # Orchestrator state (J5.5)
     workflow_state: str = ""
