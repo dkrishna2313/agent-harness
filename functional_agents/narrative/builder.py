@@ -53,6 +53,8 @@ class ExecutiveNarrativeBuilder:
             executive_confidence=self._extract_executive_confidence(context),
             immediate_actions=self._extract_immediate_actions(context),
             validation_priorities=self._extract_validation_priorities(context),
+            option_rankings=self._extract_option_rankings(context),
+            critical_unknowns=self._extract_critical_unknowns(context),
         )
         context.executive_narrative = narrative.to_dict()
         return narrative
@@ -148,12 +150,21 @@ class ExecutiveNarrativeBuilder:
         ec = context.executive_confidence or {}
         if not ec:
             return {}
-        return {
+        result: dict[str, Any] = {
             "overall_confidence": ec.get("overall_confidence", ""),
             "decision_readiness": ec.get("decision_readiness", ""),
             "board_recommendation": ec.get("board_recommendation", ""),
             "confidence_rationale": ec.get("confidence_rationale", ""),
         }
+        # J12.1 — include drivers/limiters so ExecutiveBriefGenerator can render
+        # the confidence section without reading executive_confidence directly.
+        drivers = list((ec.get("confidence_drivers") or [])[:3])
+        if drivers:
+            result["confidence_drivers"] = drivers
+        limiters = list((ec.get("confidence_limiters") or [])[:3])
+        if limiters:
+            result["confidence_limiters"] = limiters
+        return result
 
     def _extract_immediate_actions(self, context: "AgentContext") -> list[dict[str, Any]]:
         near_term_ids = (context.recommendation_portfolio or {}).get("near_term", [])
@@ -172,3 +183,9 @@ class ExecutiveNarrativeBuilder:
 
     def _extract_validation_priorities(self, context: "AgentContext") -> list[str]:
         return list((context.executive_confidence or {}).get("validation_priorities") or [])
+
+    def _extract_option_rankings(self, context: "AgentContext") -> list[str]:
+        return list((context.decision_analysis or {}).get("option_rankings") or [])
+
+    def _extract_critical_unknowns(self, context: "AgentContext") -> list[str]:
+        return list((context.executive_confidence or {}).get("critical_unknowns") or [])

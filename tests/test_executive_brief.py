@@ -1,12 +1,11 @@
-"""Tests for the J11.1 Executive Brief Generator.
+"""Tests for ExecutiveBriefGenerator (J11.1 + J12.1).
 
-Covers: ExecutiveBriefGenerator registration alongside MarkdownReportGenerator,
-executive brief content assembly against the REAL production strategic-option
-schema (StrategicOptionItem — description/estimated_time_horizon/capital_intensity/
-confidence, not the legacy posture/required_capabilities shape used elsewhere in
-the test suite), graceful degradation on missing sections, and confirmation
-that adding a second generator does not change ReportAgent's default (markdown)
-output or invoke any Functional Agent.
+J11.1 coverage: registration, content assembly against the real production
+schema, graceful degradation, no Functional Agent invocation.
+
+J12.1 coverage: generator consumes ExecutiveNarrative (not raw AgentContext
+reasoning fields), module imports ExecutiveNarrativeBuilder, option_rankings
+and critical_unknowns rendered, context.executive_narrative set as side effect.
 """
 
 from __future__ import annotations
@@ -275,3 +274,82 @@ def test_report_agent_still_defaults_to_markdown_only(tmp_path):
     assert len(ctx["deliverables"]) == 1
     assert ctx["deliverables"][0]["type"] == "markdown"
     assert ctx["deliverable_request"]["type"] == "markdown"
+
+
+# ---------------------------------------------------------------------------
+# J12.1 — narrative-driven architecture constraints
+# ---------------------------------------------------------------------------
+
+def test_executive_brief_module_imports_executive_narrative_builder():
+    """Generator module must import ExecutiveNarrativeBuilder (J12.1 contract)."""
+    tree = ast.parse(inspect.getsource(executive_brief_module))
+    imported_symbols = {
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        for alias in node.names
+    }
+    assert "ExecutiveNarrativeBuilder" in imported_symbols
+    assert "ExecutiveNarrative" in imported_symbols
+
+
+def test_executive_brief_private_builders_accept_executive_narrative():
+    """Each _build_* section function (other than top-level and appendix) must
+    accept ExecutiveNarrative as its first positional parameter — not AgentContext.
+    This is the J12.1 contract: section renderers are presentation-only.
+    """
+    import inspect as _inspect
+    from functional_agents.deliverables.executive_brief import (
+        _build_executive_decision,
+        _build_executive_summary,
+        _build_recommended_option,
+        _build_why_this_option,
+        _build_key_risks,
+        _build_critical_assumptions,
+        _build_executive_confidence,
+        _build_immediate_decisions,
+        _build_validation_priorities,
+    )
+    from functional_agents.narrative import ExecutiveNarrative
+    for fn in [
+        _build_executive_decision, _build_executive_summary, _build_recommended_option,
+        _build_why_this_option, _build_key_risks, _build_critical_assumptions,
+        _build_executive_confidence, _build_immediate_decisions, _build_validation_priorities,
+    ]:
+        params = list(_inspect.signature(fn).parameters.values())
+        assert params, f"{fn.__name__} has no parameters"
+        first_param = params[0]
+        annotation = first_param.annotation
+        assert annotation is ExecutiveNarrative or annotation == "ExecutiveNarrative", (
+            f"{fn.__name__} first param annotation is {annotation!r}, expected ExecutiveNarrative"
+        )
+
+
+def test_executive_brief_sets_executive_narrative_on_context():
+    """build_executive_brief_content sets context.executive_narrative as a side effect."""
+    ctx = _make_executive_context()
+    assert ctx.executive_narrative == {}
+    build_executive_brief_content(ctx)
+    assert ctx.executive_narrative != {}
+    assert "decision" in ctx.executive_narrative
+
+
+def test_executive_brief_option_rankings_rendered_in_why_section():
+    """option_rankings from ExecutiveNarrative appear in the 'Why This Option' section."""
+    content = build_executive_brief_content(_make_executive_context())
+    section_4 = content.split("## 4.")[1].split("## 5.")[0]
+    assert "OPT-A" in section_4
+    assert "OPT-B" in section_4
+    assert "Option Rankings" in section_4
+
+
+def test_executive_brief_critical_unknowns_in_appendix():
+    """critical_unknowns from ExecutiveNarrative appear in the appendix."""
+    content = build_executive_brief_content(_make_executive_context())
+    assert "Final interconnection cost" in content
+
+
+def test_executive_brief_confidence_limiters_rendered():
+    """confidence_limiters from ExecutiveNarrative appear in the confidence section."""
+    content = build_executive_brief_content(_make_executive_context())
+    assert "Regulatory timeline uncertainty" in content

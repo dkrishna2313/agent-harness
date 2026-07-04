@@ -1,0 +1,84 @@
+{
+  "decision": "Decide AI data center power procurement strategy for 2025-2027.",
+  "executive_summary": "Cross-domain analysis favors phased deployment, preserving capital optionality.",
+  "recommended_option": {
+    "option_id": "OPT-B",
+    "title": "Phased Deployment",
+    "description": "Staged rollout securing grid interconnection first.",
+    "estimated_time_horizon": "near_term",
+    "capital_intensity": "Medium",
+    "confidence": "High"
+  },
+  "why_this_option": "Phased deployment preserves optionality while securing grid position.",
+  "key_tradeoffs": [
+    "Capital Efficiency",
+    "Execution Speed",
+    "Grid Risk"
+  ],
+  "key_risks": [
+    {
+      "risk_id": "RSK-001",
+      "statement": "Grid interconnection delay exceeds 24 months.",
+      "severity": "Critical",
+      "likelihood": "Medium"
+    },
+    {
+      "risk_id": "RSK-002",
+      "statement": "GPU supply shortage during peak procurement.",
+      "severity": "High",
+      "likelihood": "Medium"
+    }
+  ],
+  "key_opportunities": [
+    {
+      "opportunity_id": "OPP-001",
+      "title": "First-mover grid position",
+      "impact": "High",
+      "description": "Locking grid capacity ahead of competitor demand surge."
+    }
+  ],
+  "critical_assumptions": [
+    {
+      "assumption_id": "A-001",
+      "statement": "Grid queue secured within 18 months.",
+      "importance": "critical",
+      "confidence": "medium"
+    }
+  ],
+  "executive_confidence": {
+    "overall_confidence": "High",
+    "decision_readiness": "Ready",
+    "board_recommendation": "Proceed with Phased Deployment",
+    "confidence_rationale": "Strong evidence across three independent research domains.",
+    "confidence_drivers": [
+      "Diversified evidence base",
+      "Stakeholder alignment"
+    ],
+    "confidence_limiters": [
+      "Regulatory timeline uncertainty",
+      "GPU pricing volatility"
+    ]
+  },
+  "immediate_actions": [
+    {
+      "id": "R1",
+      "title": "Initiate grid interconnection filing immediately"
+    },
+    {
+      "id": "R2",
+      "title": "Negotiate GPU framework agreements"
+    }
+  ],
+  "validation_priorities": [
+    "Confirm grid queue position",
+    "Validate GPU supply contracts"
+  ],
+  "option_rankings": [
+    "OPT-B",
+    "OPT-A"
+  ],
+  "critical_unknowns": [
+    "Final interconnection cost estimate",
+    "2026 regulatory framework"
+  ]
+}

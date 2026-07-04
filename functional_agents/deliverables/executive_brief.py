@@ -1,21 +1,14 @@
-"""ExecutiveBriefGenerator — the second concrete DeliverableGenerator (J11.1).
+"""ExecutiveBriefGenerator — narrative-driven executive brief (J12.1).
 
-Renders a concise (2-4 page) executive brief from the same completed
-Strategic Reasoning Graph MarkdownReportGenerator already renders the full
-report from. Pure presentation: every value below is read directly off
-AgentContext fields already computed by upstream Functional Agents
-(RiskAgent, AssumptionAgent, DecisionAnalysisAgent, ExecutiveConfidenceAgent,
-StrategicSynthesisAgent, RecommendationAgent) — no new inference, no LLM
-call, no Functional Agent invoked. Sorting/truncating already-computed
-records (top-5 risks by severity, top-5 assumptions by importance) is
-presentation, not reasoning — the same category of operation the existing
-J7 executive report already performs (e.g. sorting assumptions by
-importance in report_agent.py's `_build_j7_executive_report`).
+Migrated from direct AgentContext inspection (J11.1) to consuming
+ExecutiveNarrative (J12.0). The generator is a presentation renderer: it
+renders the canonical executive story assembled by ExecutiveNarrativeBuilder.
+No reasoning is re-derived here — sorting, truncation, and field extraction
+all happen in the builder, not here.
 
-Field note: `context.strategic_option_portfolio` is never populated by any
-agent in this codebase (always `{}` in practice) — "Immediate Executive
-Decisions" instead reads `context.recommendation_portfolio["near_term"]`,
-which IS populated by RecommendationAgent.
+Context.profiles is still read by the top-level entry point for the appendix:
+it is metadata, not a reasoning field, and is explicitly outside the set of
+AgentContext reasoning fields that generators should stop reading directly.
 """
 
 from __future__ import annotations
@@ -25,70 +18,49 @@ from typing import TYPE_CHECKING
 
 from .artifact import DeliverableArtifact
 from .base import DeliverableGenerator
+from ..narrative import ExecutiveNarrative, ExecutiveNarrativeBuilder
 
 if TYPE_CHECKING:
     from ..context import AgentContext
 
-_SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-_IMPORTANCE_ORDER = {"critical": 0, "important": 1, "supporting": 2}
 
-
-def _rank(value: str, order: dict[str, int]) -> int:
-    return order.get(str(value or "").lower(), 99)
-
-
-def _build_executive_decision(context: "AgentContext") -> str:
-    ro = context.research_object or {}
-    arch = ro.get("decision_architecture") or {}
-    decision_statement = arch.get("decision_statement", "")
-
-    da = context.decision_analysis or {}
-    preferred = context.preferred_option or {}
-    recommended_id = da.get("recommended_option_id") or preferred.get("option_id", "")
-    title = preferred.get("title", "") or next(
-        (o.get("title", "") for o in (context.strategic_options or []) if o.get("option_id") == recommended_id),
-        "",
-    )
+def _build_executive_decision(narrative: ExecutiveNarrative) -> str:
+    decision = narrative.decision
+    rec = narrative.recommended_option
+    title = rec.get("title", "") if rec else ""
 
     lines = ["## 1. Executive Decision", ""]
-    if decision_statement:
-        lines += [f"**Decision:** {decision_statement}", ""]
+    if decision:
+        lines += [f"**Decision:** {decision}", ""]
     if title:
         lines += [f"**Recommended Option:** {title}", ""]
-    if not decision_statement and not title:
+    if not decision and not title:
         lines += ["*No decision statement or recommended option available for this run.*", ""]
     return "\n".join(lines)
 
 
-def _build_executive_summary(context: "AgentContext") -> str:
-    summary = (context.strategic_synthesis or {}).get("executive_summary", "")
-    if not summary:
-        summary = (context.decision_analysis or {}).get("executive_summary", "")
-
+def _build_executive_summary(narrative: ExecutiveNarrative) -> str:
+    summary = narrative.executive_summary
     lines = ["## 2. Executive Summary", ""]
     lines += [summary, ""] if summary else ["*No executive summary available for this run.*", ""]
     return "\n".join(lines)
 
 
-def _build_recommended_option(context: "AgentContext") -> str:
-    da = context.decision_analysis or {}
-    preferred = context.preferred_option or {}
-    options = context.strategic_options or []
-    recommended_id = da.get("recommended_option_id") or preferred.get("option_id", "")
-    option = next((o for o in options if o.get("option_id") == recommended_id), preferred)
-
+def _build_recommended_option(narrative: ExecutiveNarrative) -> str:
+    option = narrative.recommended_option
     lines = ["## 3. Recommended Strategic Option", ""]
     if not option:
         lines += ["*No strategic option data available for this run.*", ""]
         return "\n".join(lines)
 
+    option_id = option.get("option_id", "")
     title = option.get("title", "")
     description = option.get("description", "")
     horizon = (option.get("estimated_time_horizon") or "").replace("_", " ")
     capital = option.get("capital_intensity", "")
     confidence = option.get("confidence", "")
 
-    lines += [f"**{option.get('option_id', '')}: {title}**", ""]
+    lines += [f"**{option_id}: {title}**", ""]
     if description:
         lines += [description, ""]
     meta = []
@@ -103,33 +75,29 @@ def _build_recommended_option(context: "AgentContext") -> str:
     return "\n".join(lines)
 
 
-def _build_why_this_option(context: "AgentContext") -> str:
-    da = context.decision_analysis or {}
-    rationale = da.get("rationale", "")
-    dimensions = da.get("comparison_dimensions") or []
-    rankings = da.get("option_rankings") or []
+def _build_why_this_option(narrative: ExecutiveNarrative) -> str:
+    rationale = narrative.why_this_option
+    tradeoffs = narrative.key_tradeoffs
+    rankings = narrative.option_rankings
 
     lines = ["## 4. Why This Option", ""]
     if rationale:
         lines += [rationale, ""]
-    if dimensions:
+    if tradeoffs:
         lines.append("**Comparison Dimensions:**")
-        lines.extend(f"- {d}" for d in dimensions)
+        lines.extend(f"- {d}" for d in tradeoffs)
         lines.append("")
     if rankings:
         lines.append("**Option Rankings (best -> least preferred):**")
         lines.extend(f"{i + 1}. {r}" for i, r in enumerate(rankings))
         lines.append("")
-    if not rationale and not dimensions and not rankings:
+    if not rationale and not tradeoffs and not rankings:
         lines += ["*No decision rationale available for this run.*", ""]
     return "\n".join(lines)
 
 
-def _build_key_risks(context: "AgentContext", limit: int = 5) -> str:
-    risks = sorted(
-        context.risks or [], key=lambda r: _rank(r.get("severity", ""), _SEVERITY_ORDER)
-    )[:limit]
-
+def _build_key_risks(narrative: ExecutiveNarrative) -> str:
+    risks = narrative.key_risks
     lines = ["## 5. Key Strategic Risks (Top 5)", ""]
     if not risks:
         lines += ["*No risks recorded for this run.*", ""]
@@ -145,11 +113,8 @@ def _build_key_risks(context: "AgentContext", limit: int = 5) -> str:
     return "\n".join(lines)
 
 
-def _build_critical_assumptions(context: "AgentContext", limit: int = 5) -> str:
-    assumptions = sorted(
-        context.assumptions or [], key=lambda a: _rank(a.get("importance", ""), _IMPORTANCE_ORDER)
-    )[:limit]
-
+def _build_critical_assumptions(narrative: ExecutiveNarrative) -> str:
+    assumptions = narrative.critical_assumptions
     lines = ["## 6. Critical Assumptions", ""]
     if not assumptions:
         lines += ["*No assumptions recorded for this run.*", ""]
@@ -165,8 +130,8 @@ def _build_critical_assumptions(context: "AgentContext", limit: int = 5) -> str:
     return "\n".join(lines)
 
 
-def _build_executive_confidence(context: "AgentContext") -> str:
-    ec = context.executive_confidence or {}
+def _build_executive_confidence(narrative: ExecutiveNarrative) -> str:
+    ec = narrative.executive_confidence
     lines = ["## 7. Executive Confidence", ""]
     if not ec:
         lines += ["*Executive confidence assessment not available for this run.*", ""]
@@ -194,25 +159,22 @@ def _build_executive_confidence(context: "AgentContext") -> str:
     return "\n".join(lines)
 
 
-def _build_immediate_decisions(context: "AgentContext") -> str:
-    near_term_ids = (context.recommendation_portfolio or {}).get("near_term", [])
-    by_id = {r.get("id", r.get("recommendation_id", "")): r for r in (context.recommendations or [])}
-    items = [by_id[rid] for rid in near_term_ids if rid in by_id]
-
+def _build_immediate_decisions(narrative: ExecutiveNarrative) -> str:
+    items = narrative.immediate_actions
     lines = ["## 8. Immediate Executive Decisions", ""]
     if not items:
         lines += ["*No near-term recommendations flagged for immediate executive action.*", ""]
         return "\n".join(lines)
-    for r in items:
-        rid = r.get("id", r.get("recommendation_id", ""))
-        title = r.get("title", "")
+    for action in items:
+        rid = action.get("id", "")
+        title = action.get("title", "")
         lines.append(f"- **{rid}**: {title}")
     lines.append("")
     return "\n".join(lines)
 
 
-def _build_validation_priorities(context: "AgentContext") -> str:
-    priorities = (context.executive_confidence or {}).get("validation_priorities") or []
+def _build_validation_priorities(narrative: ExecutiveNarrative) -> str:
+    priorities = narrative.validation_priorities
     lines = ["## 9. Validation Priorities", ""]
     if not priorities:
         lines += ["*No validation priorities recorded for this run.*", ""]
@@ -222,9 +184,8 @@ def _build_validation_priorities(context: "AgentContext") -> str:
     return "\n".join(lines)
 
 
-def _build_appendix(context: "AgentContext") -> str:
-    critical_unknowns = (context.executive_confidence or {}).get("critical_unknowns") or []
-    profiles = context.profiles or []
+def _build_appendix(narrative: ExecutiveNarrative, profiles: list[str]) -> str:
+    critical_unknowns = narrative.critical_unknowns
     if not critical_unknowns and not profiles:
         return ""
     lines = ["## 10. Appendix", ""]
@@ -240,20 +201,23 @@ def _build_appendix(context: "AgentContext") -> str:
 def build_executive_brief_content(context: "AgentContext") -> str:
     """Assemble the executive brief markdown body from an already-completed context.
 
-    Pure presentation over already-computed Strategic Reasoning Graph fields.
-    No new inference, no LLM call, no Functional Agent invoked.
+    Builds ExecutiveNarrative (idempotent; sets context.executive_narrative),
+    then delegates each section to a renderer. No AgentContext reasoning fields
+    are read below this point — all content flows through ExecutiveNarrative.
     """
+    narrative = ExecutiveNarrativeBuilder().build(context)
+    profiles = list(context.profiles or [])
     sections = [
-        _build_executive_decision(context),
-        _build_executive_summary(context),
-        _build_recommended_option(context),
-        _build_why_this_option(context),
-        _build_key_risks(context),
-        _build_critical_assumptions(context),
-        _build_executive_confidence(context),
-        _build_immediate_decisions(context),
-        _build_validation_priorities(context),
-        _build_appendix(context),
+        _build_executive_decision(narrative),
+        _build_executive_summary(narrative),
+        _build_recommended_option(narrative),
+        _build_why_this_option(narrative),
+        _build_key_risks(narrative),
+        _build_critical_assumptions(narrative),
+        _build_executive_confidence(narrative),
+        _build_immediate_decisions(narrative),
+        _build_validation_priorities(narrative),
+        _build_appendix(narrative, profiles),
     ]
     body = "\n".join(s for s in sections if s)
     return "# Executive Strategic Brief\n\n" + body.rstrip("\n") + "\n"

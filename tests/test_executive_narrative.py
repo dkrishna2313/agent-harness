@@ -111,15 +111,18 @@ def test_executive_narrative_default_fields():
     assert en.executive_confidence == {}
     assert en.immediate_actions == []
     assert en.validation_priorities == []
+    assert en.option_rankings == []      # J12.1
+    assert en.critical_unknowns == []    # J12.1
 
 
-def test_executive_narrative_to_dict_includes_all_eleven_fields():
+def test_executive_narrative_to_dict_includes_all_fields():
     en = ExecutiveNarrative()
     d = en.to_dict()
     expected_keys = {
         "decision", "executive_summary", "recommended_option", "why_this_option",
         "key_tradeoffs", "key_risks", "key_opportunities", "critical_assumptions",
         "executive_confidence", "immediate_actions", "validation_priorities",
+        "option_rankings", "critical_unknowns",  # J12.1
     }
     assert set(d.keys()) == expected_keys
 
@@ -141,6 +144,8 @@ def test_executive_narrative_from_dict_round_trips():
         key_tradeoffs=["Cost vs Speed"],
         key_risks=[{"risk_id": "R-1", "severity": "high"}],
         validation_priorities=["Validate cost model"],
+        option_rankings=["OPT-001", "OPT-002"],
+        critical_unknowns=["Regulatory timeline"],
     )
     restored = ExecutiveNarrative.from_dict(original.to_dict())
     assert restored.decision == original.decision
@@ -148,6 +153,8 @@ def test_executive_narrative_from_dict_round_trips():
     assert restored.recommended_option == original.recommended_option
     assert restored.key_tradeoffs == original.key_tradeoffs
     assert restored.validation_priorities == original.validation_priorities
+    assert restored.option_rankings == original.option_rankings
+    assert restored.critical_unknowns == original.critical_unknowns
 
 
 def test_executive_narrative_from_dict_handles_none():
@@ -416,3 +423,58 @@ def test_canonical_trace_executive_narrative_is_none_before_build():
     trace = build_canonical_trace(ctx)
     assert "executive_narrative" in trace
     assert trace["executive_narrative"] is None
+
+
+# ---------------------------------------------------------------------------
+# J12.1 — option_rankings and critical_unknowns extraction
+# ---------------------------------------------------------------------------
+
+def test_builder_extracts_option_rankings():
+    ctx = _full_ctx()
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    assert narrative.option_rankings == ["OPT-001", "OPT-002"]
+
+
+def test_builder_option_rankings_empty_when_missing():
+    ctx = _full_ctx()
+    ctx.decision_analysis.pop("option_rankings", None)
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    assert narrative.option_rankings == []
+
+
+def test_builder_extracts_critical_unknowns():
+    ctx = _full_ctx()
+    ctx.executive_confidence["critical_unknowns"] = ["Regulation timeline", "Grid capacity"]
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    assert "Regulation timeline" in narrative.critical_unknowns
+    assert "Grid capacity" in narrative.critical_unknowns
+
+
+def test_builder_critical_unknowns_empty_when_missing():
+    ctx = _full_ctx()
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    assert narrative.critical_unknowns == []
+
+
+def test_builder_executive_confidence_includes_drivers_and_limiters():
+    ctx = _full_ctx()
+    ctx.executive_confidence["confidence_drivers"] = ["Strong data", "Aligned teams"]
+    ctx.executive_confidence["confidence_limiters"] = ["Regulatory gap"]
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    ec = narrative.executive_confidence
+    assert ec.get("confidence_drivers") == ["Strong data", "Aligned teams"]
+    assert ec.get("confidence_limiters") == ["Regulatory gap"]
+
+
+def test_builder_confidence_drivers_capped_at_three():
+    ctx = _full_ctx()
+    ctx.executive_confidence["confidence_drivers"] = ["A", "B", "C", "D", "E"]
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    assert len(narrative.executive_confidence.get("confidence_drivers", [])) == 3
+
+
+def test_builder_confidence_drivers_absent_when_empty():
+    ctx = _full_ctx()
+    ctx.executive_confidence["confidence_drivers"] = []
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    assert "confidence_drivers" not in narrative.executive_confidence
