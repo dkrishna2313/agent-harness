@@ -100,6 +100,7 @@ def _empty_ctx() -> AgentContext:
 
 def test_executive_narrative_default_fields():
     en = ExecutiveNarrative()
+    assert en.version == "1.0"           # J12.3
     assert en.decision == ""
     assert en.executive_summary == ""
     assert en.recommended_option == {}
@@ -123,6 +124,7 @@ def test_executive_narrative_to_dict_includes_all_fields():
     en = ExecutiveNarrative()
     d = en.to_dict()
     expected_keys = {
+        "version",                                       # J12.3
         "decision", "executive_summary", "recommended_option", "why_this_option",
         "key_tradeoffs", "key_risks", "key_opportunities", "critical_assumptions",
         "executive_confidence", "immediate_actions", "validation_priorities",
@@ -156,6 +158,7 @@ def test_executive_narrative_from_dict_round_trips():
         supporting_evidence=[{"id": "H-1", "title": "AI demand grows", "confidence": "high"}],
     )
     restored = ExecutiveNarrative.from_dict(original.to_dict())
+    assert restored.version == original.version       # J12.3
     assert restored.decision == original.decision
     assert restored.executive_summary == original.executive_summary
     assert restored.recommended_option == original.recommended_option
@@ -425,7 +428,7 @@ def test_canonical_trace_includes_executive_narrative_key_after_build():
     ExecutiveNarrativeBuilder().build(ctx)
     trace = build_canonical_trace(ctx)
     assert "executive_narrative" in trace
-    assert trace["executive_narrative"] == {"generated": True}
+    assert trace["executive_narrative"] == {"generated": True, "version": "1.0"}  # J12.3
 
 
 def test_canonical_trace_executive_narrative_is_none_before_build():
@@ -593,3 +596,80 @@ def test_builder_key_risks_mitigation_empty_string_when_absent():
     ctx.risks = [{"risk_id": "R-1", "statement": "Risk.", "severity": "high", "likelihood": "low"}]
     narrative = ExecutiveNarrativeBuilder().build(ctx)
     assert narrative.key_risks[0]["mitigation"] == ""
+
+
+# ---------------------------------------------------------------------------
+# J12.3 — Executive Narrative Contract (version, invariants, backward compat)
+# ---------------------------------------------------------------------------
+
+def test_executive_narrative_version_default():
+    en = ExecutiveNarrative()
+    assert en.version == "1.0"
+
+
+def test_executive_narrative_version_in_to_dict():
+    en = ExecutiveNarrative()
+    d = en.to_dict()
+    assert "version" in d
+    assert d["version"] == "1.0"
+
+
+def test_executive_narrative_from_dict_backward_compat_no_version_key():
+    """Pre-v1.0 dicts without a version key must deserialise as version 1.0."""
+    data = {"decision": "Should we invest?", "executive_summary": "Yes."}
+    en = ExecutiveNarrative.from_dict(data)
+    assert en.version == "1.0"
+    assert en.decision == "Should we invest?"
+
+
+def test_executive_narrative_from_dict_preserves_explicit_version():
+    data = {"version": "1.0", "decision": "Should we invest?"}
+    en = ExecutiveNarrative.from_dict(data)
+    assert en.version == "1.0"
+
+
+def test_builder_sets_version_in_context_narrative():
+    ctx = _full_ctx()
+    ExecutiveNarrativeBuilder().build(ctx)
+    assert ctx.executive_narrative.get("version") == "1.0"
+
+
+def test_builder_is_deterministic():
+    ctx = _full_ctx()
+    n1 = ExecutiveNarrativeBuilder().build(ctx)
+    # Reset narrative so the second build starts from the same state.
+    ctx.executive_narrative = {}
+    n2 = ExecutiveNarrativeBuilder().build(ctx)
+    assert n1.to_dict() == n2.to_dict()
+
+
+def test_executive_narrative_no_none_values_in_to_dict():
+    """to_dict() must never emit None — only "", [], or {}."""
+    ctx = _full_ctx()
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    d = narrative.to_dict()
+    for key, value in d.items():
+        assert value is not None, f"to_dict() emitted None for '{key}'"
+
+
+def test_executive_narrative_all_fields_present_in_to_dict_even_when_empty():
+    """Even an empty-context narrative must have all 18 keys in to_dict()."""
+    ctx = _empty_ctx()
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    d = narrative.to_dict()
+    assert len(d) == 18, f"Expected 18 keys, got {len(d)}: {sorted(d)}"
+    for key, value in d.items():
+        assert value is not None, f"Empty-context to_dict() emitted None for '{key}'"
+
+
+def test_builder_context_narrative_version_matches_narrative_version():
+    ctx = _full_ctx()
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    assert ctx.executive_narrative["version"] == narrative.version
+
+
+def test_canonical_trace_executive_narrative_version_is_absent_before_build():
+    """Before build(), trace executive_narrative is None — version is not present."""
+    ctx = _full_ctx()
+    trace = build_canonical_trace(ctx)
+    assert trace["executive_narrative"] is None
