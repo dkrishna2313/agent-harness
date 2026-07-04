@@ -8,6 +8,7 @@ from typing import Any
 
 from .base import FunctionalAgent
 from .context import AgentContext
+from .narrative import ExecutiveNarrative, ExecutiveNarrativeBuilder
 
 LOGGER = logging.getLogger(__name__)
 
@@ -1108,6 +1109,10 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     Called only when context.strategic_options is non-empty. Never
     re-generates analysis already present in the decision graph.
     """
+    # J12.5 — Build ExecutiveNarrative for all executive-facing prose sections.
+    # Sets context.executive_narrative as a side effect.
+    narrative: ExecutiveNarrative = ExecutiveNarrativeBuilder().build(context)
+
     da: dict = context.decision_analysis or {}
     preferred: dict = context.preferred_option or {}
     options: list[dict] = context.strategic_options or []
@@ -1119,20 +1124,16 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     question: str = context.question or ""
 
     recommended_id = da.get("recommended_option_id") or preferred.get("option_id") or ""
-    preferred_title = preferred.get("title") or next(
-        (o.get("title", "") for o in options if o.get("option_id") == recommended_id), ""
-    )
 
     lines: list[str] = []
 
     # ------------------------------------------------------------------ #
     # Section 1 — Executive Summary                                        #
     # ------------------------------------------------------------------ #
-    exec_summary = da.get("executive_summary") or preferred.get("rationale") or ""
-    # J9.3 — lead with the Executive Decision Statement (from the Decision
-    # Architecture) rather than the technical research question when available.
+    # J12.5 — decision, recommended option title, and executive summary
+    # originate from ExecutiveNarrative (built above).
+    # executive_context is architectural framing not captured in narrative.
     _arch = ro.get("decision_architecture") or {}
-    decision_statement = _arch.get("decision_statement", "")
     executive_context = _arch.get("executive_context", "")
     lines += [
         "# Executive Strategic Report",
@@ -1140,14 +1141,14 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
         "## 1. Executive Summary",
         "",
     ]
-    if decision_statement:
-        lines += [f"**Decision:** {decision_statement}", ""]
-    if preferred_title:
-        lines += [f"**Recommended Option:** {preferred_title}", ""]
+    if narrative.decision:
+        lines += [f"**Decision:** {narrative.decision}", ""]
+    if narrative.recommended_option.get("title"):
+        lines += [f"**Recommended Option:** {narrative.recommended_option['title']}", ""]
     if executive_context:
         lines += [executive_context, ""]
-    if exec_summary:
-        lines += [exec_summary, ""]
+    if narrative.executive_summary:
+        lines += [narrative.executive_summary, ""]
 
     # ------------------------------------------------------------------ #
     # Section 2 — Strategic Question                                       #
@@ -1157,23 +1158,32 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     # ------------------------------------------------------------------ #
     # Section 3 — Recommended Strategic Option                             #
     # ------------------------------------------------------------------ #
+    # J12.5 — option_id, title, description, and time_horizon from narrative.
+    # Structured details (required_capabilities, dependencies) from AgentContext.
     lines += ["## 3. Recommended Strategic Option", ""]
-    rec_opt = next((o for o in options if o.get("option_id") == recommended_id), preferred)
-    if rec_opt:
-        _oid = rec_opt.get("option_id", "")
-        _title = rec_opt.get("title", "")
-        _rationale = rec_opt.get("rationale") or rec_opt.get("strategic_logic") or ""
-        _horizon = rec_opt.get("time_horizon", "").replace("_", " ")
-        lines += [
-            f"**{_oid}: {_title}**",
-            "",
-        ]
+    _rec = narrative.recommended_option
+    _oid = _rec.get("option_id", "")
+    _title = _rec.get("title", "")
+    if _oid or _title:
+        lines += [f"**{_oid}: {_title}**", ""]
+        # narrative uses estimated_time_horizon; fall back to option's time_horizon for legacy data
+        rec_opt = next((o for o in options if o.get("option_id") == recommended_id), preferred)
+        _horizon = (
+            _rec.get("estimated_time_horizon", "")
+            or (rec_opt or {}).get("time_horizon", "")
+        ).replace("_", " ")
         if _horizon:
             lines += [f"**Time Horizon:** {_horizon}", ""]
-        if _rationale:
-            lines += [_rationale, ""]
-        caps = rec_opt.get("required_capabilities") or []
-        deps = rec_opt.get("dependencies") or []
+        # description from narrative; fall back to option-level rationale/strategic_logic
+        _desc = (
+            _rec.get("description", "")
+            or (rec_opt or {}).get("rationale", "")
+            or (rec_opt or {}).get("strategic_logic", "")
+        )
+        if _desc:
+            lines += [_desc, ""]
+        caps = (rec_opt or {}).get("required_capabilities") or []
+        deps = (rec_opt or {}).get("dependencies") or []
         if caps:
             lines.append("**Required Capabilities:**")
             lines.extend(f"- {c}" for c in caps)
@@ -1186,66 +1196,71 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     # ------------------------------------------------------------------ #
     # Section 4 — Why This Option Wins                                     #
     # ------------------------------------------------------------------ #
-    rationale = da.get("rationale") or ""
+    # J12.5 — why_this_option and option_rankings from narrative (composer
+    # enriches why_this_option with the recommended option's advantages).
+    # Comparison dimensions are structural; keep reading from decision_analysis.
     dimensions = da.get("comparison_dimensions") or []
-    rankings = da.get("option_rankings") or []
     lines += ["## 4. Why This Option Wins", ""]
-    if rationale:
-        lines += [rationale, ""]
+    if narrative.why_this_option:
+        lines += [narrative.why_this_option, ""]
     if dimensions:
         lines.append("**Comparison Dimensions:**")
         lines.extend(f"- {d}" for d in dimensions)
         lines.append("")
-    if rankings:
+    if narrative.option_rankings:
         lines.append("**Option Rankings (best → least preferred):**")
-        lines.extend(f"{i + 1}. {r}" for i, r in enumerate(rankings))
+        lines.extend(f"{i + 1}. {r}" for i, r in enumerate(narrative.option_rankings))
         lines.append("")
 
     # ------------------------------------------------------------------ #
     # Section 5 — Executive Confidence (J7.7)                              #
     # ------------------------------------------------------------------ #
-    ec: dict = context.executive_confidence or {}
+    # J12.5 — confidence summary, drivers, and limiters from narrative.
+    # validation_priorities and critical_unknowns read from narrative fields.
+    # Conditional assessment (if_hold/if_fail) and decision_horizon are detail
+    # fields not captured in narrative; fall back to context.executive_confidence.
+    nec = narrative.executive_confidence
     lines += ["## 5. Executive Confidence", ""]
-    if ec:
-        ec_conf = ec.get("overall_confidence", "")
-        ec_ready = ec.get("decision_readiness", "")
-        ec_board = ec.get("board_recommendation", "")
+    if nec:
+        ec_conf = nec.get("overall_confidence", "")
+        ec_ready = nec.get("decision_readiness", "")
+        ec_board = nec.get("board_recommendation", "")
         lines += [
             f"**Overall Confidence:** {ec_conf}  |  "
             f"**Decision Readiness:** {ec_ready}  |  "
             f"**Board Recommendation:** {ec_board}",
             "",
         ]
-        ec_rat = ec.get("confidence_rationale", "")
+        ec_rat = nec.get("confidence_rationale", "")
         if ec_rat:
             lines += [ec_rat, ""]
 
-        ec_drivers = ec.get("confidence_drivers", [])
+        ec_drivers = nec.get("confidence_drivers", [])
         if ec_drivers:
             lines.append("**Confidence Drivers:**")
             lines.extend(f"- {d}" for d in ec_drivers)
             lines.append("")
 
-        ec_limiters = ec.get("confidence_limiters", [])
+        ec_limiters = nec.get("confidence_limiters", [])
         if ec_limiters:
             lines.append("**Confidence Limiters:**")
             lines.extend(f"- {lim}" for lim in ec_limiters)
             lines.append("")
 
-        vp = ec.get("validation_priorities", [])
-        if vp:
+        if narrative.validation_priorities:
             lines.append("**Validation Priorities (Due Diligence Checklist):**")
-            lines.extend(f"{i + 1}. {p}" for i, p in enumerate(vp))
+            lines.extend(f"{i + 1}. {p}" for i, p in enumerate(narrative.validation_priorities))
             lines.append("")
 
-        cu = ec.get("critical_unknowns", [])
-        if cu:
+        if narrative.critical_unknowns:
             lines.append("**Critical Unknowns:**")
-            lines.extend(f"- {u}" for u in cu)
+            lines.extend(f"- {u}" for u in narrative.critical_unknowns)
             lines.append("")
 
-        if_hold = ec.get("confidence_if_assumptions_hold", "")
-        if_fail = ec.get("confidence_if_assumptions_fail", "")
+        # Conditional assessment and decision horizon: detail fields not in narrative.
+        ec_raw: dict = context.executive_confidence or {}
+        if_hold = ec_raw.get("confidence_if_assumptions_hold", "")
+        if_fail = ec_raw.get("confidence_if_assumptions_fail", "")
         if if_hold or if_fail:
             lines.append("**Conditional Assessment:**")
             if if_hold:
@@ -1253,7 +1268,7 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
             if if_fail:
                 lines += [f"- *If assumptions fail:* {if_fail}", ""]
 
-        horizon = ec.get("decision_horizon", "")
+        horizon = ec_raw.get("decision_horizon", "")
         if horizon:
             lines += [f"**Decision Horizon:** {horizon}", ""]
     else:
@@ -1421,10 +1436,11 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     # ------------------------------------------------------------------ #
     # Section 10 — Key Tradeoffs                                           #
     # ------------------------------------------------------------------ #
-    tradeoffs = da.get("key_tradeoffs") or []
+    # J12.5 — key_tradeoffs from narrative (prefers strategic_synthesis
+    # tradeoffs, then da.key_tradeoffs, then comparison_dimensions as fallback).
     lines += ["## 11. Key Tradeoffs", ""]
-    if tradeoffs:
-        lines.extend(f"- {t}" for t in tradeoffs)
+    if narrative.key_tradeoffs:
+        lines.extend(f"- {t}" for t in narrative.key_tradeoffs)
         lines.append("")
     else:
         lines += ["*No tradeoffs recorded.*", ""]

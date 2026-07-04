@@ -106,8 +106,11 @@ class ExecutiveNarrativeBuilder:
         tradeoffs = (context.strategic_synthesis or {}).get("key_tradeoffs") or []
         if tradeoffs:
             return list(tradeoffs)
-        # Fall back to comparison dimensions — the axes along which options
-        # were evaluated (presentation-layer label for the tradeoff space).
+        # J12.5 — explicit decision_analysis tradeoff statements before falling
+        # back to comparison_dimensions (measurement axes, not tradeoff prose).
+        da_tradeoffs = (context.decision_analysis or {}).get("key_tradeoffs") or []
+        if da_tradeoffs:
+            return list(da_tradeoffs)
         dimensions = (context.decision_analysis or {}).get("comparison_dimensions") or []
         return list(dimensions)
 
