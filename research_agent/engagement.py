@@ -168,7 +168,18 @@ def write_engagement(
 def load_engagement(engagement_id: str, base: Path = Path("outputs")) -> StrategicEngagement:
     """Load a persisted engagement by ID."""
     path = base / "engagements" / f"{engagement_id}.json"
-    data = json.loads(path.read_text(encoding="utf-8"))
+    # PH4.1 — explicit error handling so callers get an actionable message.
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Engagement not found: {path}. "
+            f"Run a pipeline first to generate engagement_id={engagement_id!r}."
+        )
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"Engagement file is not valid JSON ({path}): {exc}"
+        ) from exc
     return StrategicEngagement.model_validate(data)
 
 

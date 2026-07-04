@@ -125,9 +125,10 @@ class ExecutiveNarrativeBuilder:
                 "statement": r.get("statement", ""),
                 "severity": r.get("severity", ""),
                 "likelihood": r.get("likelihood", ""),
+                # PH4.1-H1 — RiskItem canonical field is mitigation_notes; try it first.
                 # J12.2 — deck slide 6 renders mitigation without re-reading AgentContext.
                 "mitigation": (
-                    r.get("mitigation") or r.get("mitigation_strategy")
+                    r.get("mitigation_notes") or r.get("mitigation") or r.get("mitigation_strategy")
                     or r.get("mitigation_approach") or ""
                 ),
             }
@@ -139,7 +140,8 @@ class ExecutiveNarrativeBuilder:
         return [
             {
                 "opportunity_id": o.get("opportunity_id", "") or o.get("id", ""),
-                "title": o.get("title", "") or o.get("name", ""),
+                # PH4.1-H2 — OpportunityItem has no title/name; fall back to statement as display label.
+                "title": o.get("title", "") or o.get("name", "") or o.get("statement", ""),
                 "impact": o.get("impact", "") or o.get("strategic_value", ""),
                 "description": o.get("description", "") or o.get("statement", ""),
             }

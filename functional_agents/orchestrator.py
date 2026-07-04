@@ -209,7 +209,11 @@ class AgentOrchestrator:
         termination_reason = NextAction.COMPLETE
         ctx.iteration_count = 0
 
-        while state != WorkflowState.COMPLETE:
+        # PH4.1-H3 — catch unhandled agent/IO exceptions so the orchestrator always
+        # sets a terminal state and writes a structured error entry to the trace.
+        _pipeline_exc: Exception | None = None
+        try:
+         while state != WorkflowState.COMPLETE:
 
             ctx.workflow_state = state
             LOGGER.log(PROGRESS, "[Orchestrator] state=%s  iteration=%d", state, ctx.iteration_count)
@@ -494,12 +498,27 @@ class AgentOrchestrator:
                 ctx = result.context
                 state = WorkflowState.COMPLETE
 
-        ctx.workflow_state = WorkflowState.COMPLETE
-        LOGGER.log(
-            PROGRESS,
-            "[Orchestrator] complete  path=%s  iterations=%d  reason=%s",
-            "→".join(ctx.workflow_path), ctx.iteration_count, termination_reason,
-        )
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.error(
+                "[Orchestrator] pipeline error at state=%s iteration=%d: %s",
+                state, ctx.iteration_count, exc,
+            )
+            ctx.workflow_state = WorkflowState.ERROR
+            ctx.trace["_orchestrator_error"] = {
+                "state": state,
+                "iteration": ctx.iteration_count,
+                "error": str(exc),
+                "error_type": type(exc).__name__,
+            }
+            _pipeline_exc = exc
+
+        if _pipeline_exc is None:
+            ctx.workflow_state = WorkflowState.COMPLETE
+            LOGGER.log(
+                PROGRESS,
+                "[Orchestrator] complete  path=%s  iterations=%d  reason=%s",
+                "→".join(ctx.workflow_path), ctx.iteration_count, termination_reason,
+            )
         return ctx
 
 
@@ -874,5 +893,13 @@ class Orchestrator:
             print(f"Pipeline trace → {trace_path}")
         except Exception as exc:
             LOGGER.warning("[Orchestrator] canonical pipeline trace write failed: %s", exc)
+
+        # PH4.1-H3 — raise after writing diagnostics when the pipeline error-terminated.
+        if result_ctx.workflow_state == WorkflowState.ERROR:
+            err_info = result_ctx.trace.get("_orchestrator_error", {})
+            raise RuntimeError(
+                f"Pipeline error-terminated at state {err_info.get('state', '?')!r}: "
+                f"{err_info.get('error', 'unknown error')}"
+            )
 
         return result_ctx

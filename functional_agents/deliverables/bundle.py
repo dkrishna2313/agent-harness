@@ -40,9 +40,9 @@ class DeliverableBundle:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        out: dict[str, Any] = {}
-        if self.bundle_id:
-            out["bundle_id"] = self.bundle_id
+        # PH4.1-L2 — always emit bundle_id so consumers can do bundle["bundle_id"]
+        # without guarding for a missing key (previously omitted when empty).
+        out: dict[str, Any] = {"bundle_id": self.bundle_id}
         if self.engagement_id:
             out["engagement_id"] = self.engagement_id
         if self.reasoning_graph_id:

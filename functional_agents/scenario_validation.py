@@ -248,6 +248,40 @@ def run_scenario_validation(out_path: Path | str | None = None) -> dict[str, Any
 
 
 # ---------------------------------------------------------------------------
+# Research Object helpers
+# ---------------------------------------------------------------------------
+
+def _update_latest_research_object(ro: dict[str, Any], *, out_dir: Path) -> None:
+    """Merge scenario fields into latest_research_object.json (PH4.1 extracted helper).
+
+    Warns and proceeds from an empty base if the existing file is corrupt or
+    unreadable — never silently swallows the error.
+    """
+    latest_path = out_dir / "latest_research_object.json"
+    existing: dict[str, Any] = {}
+    if latest_path.exists():
+        try:
+            existing = json.loads(latest_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            LOGGER.warning(
+                "[ScenarioValidation] could not load latest_research_object.json (%s) — "
+                "scenario fields will be written without merging prior state",
+                exc,
+            )
+            existing = {}
+    existing.update({
+        "scenarios": ro.get("scenarios", []),
+        "scenario_analysis": ro.get("scenario_analysis", {}),
+        "_j68a_validation_note": (
+            "Scenario fields populated by J6.8a validation harness using synthetic "
+            "AI infrastructure recommendations; full pipeline RO written on functional run."
+        ),
+    })
+    latest_path.write_text(json.dumps(existing, indent=2, ensure_ascii=False), encoding="utf-8")
+    LOGGER.info("[ScenarioValidation] latest_research_object.json updated with scenario fields")
+
+
+# ---------------------------------------------------------------------------
 # Trace writer
 # ---------------------------------------------------------------------------
 
@@ -294,27 +328,7 @@ def _write_trace(ctx, results: dict[str, Any], out_dir: Path) -> None:
     LOGGER.info("[ScenarioValidation] Trace written to %s", trace_path)
 
     # Also update latest_research_object.json to show scenario fields
-    ro = ctx.research_object
-    latest_path = out_dir / "latest_research_object.json"
-
-    # Load existing if present, else start from scratch
-    existing: dict[str, Any] = {}
-    if latest_path.exists():
-        try:
-            existing = json.loads(latest_path.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-
-    existing.update({
-        "scenarios": ro.get("scenarios", []),
-        "scenario_analysis": ro.get("scenario_analysis", {}),
-        "_j68a_validation_note": (
-            "Scenario fields populated by J6.8a validation harness using synthetic "
-            "AI infrastructure recommendations; full pipeline RO written on functional run."
-        ),
-    })
-    latest_path.write_text(json.dumps(existing, indent=2, ensure_ascii=False), encoding="utf-8")
-    LOGGER.info("[ScenarioValidation] latest_research_object.json updated with scenario fields")
+    _update_latest_research_object(ctx.research_object, out_dir=out_dir)
 
 
 # ---------------------------------------------------------------------------

@@ -238,8 +238,11 @@ Evolution rules (contract v1.1)
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any
+
+_LOGGER = logging.getLogger(__name__)
 
 #: Schema version for this contract. See evolution rules in the module docstring.
 #: v1.0→v1.1 (J12.4): story fields added; why_this_option enrichment introduced.
@@ -333,8 +336,18 @@ class ExecutiveNarrative:
         """
         if not data:
             return cls()
+        stored_version = data.get("version", NARRATIVE_CONTRACT_VERSION)
+        # PH4.1-M1 — warn when a stored narrative is older than the current contract
+        # so consumers know story fields may be empty or absent.
+        if stored_version != NARRATIVE_CONTRACT_VERSION:
+            _LOGGER.warning(
+                "[ExecutiveNarrative] loaded narrative version %r differs from current "
+                "contract version %r — story fields may be absent",
+                stored_version,
+                NARRATIVE_CONTRACT_VERSION,
+            )
         return cls(
-            version=data.get("version", NARRATIVE_CONTRACT_VERSION),
+            version=stored_version,
             decision=data.get("decision", ""),
             executive_summary=data.get("executive_summary", ""),
             recommended_option=data.get("recommended_option") or {},

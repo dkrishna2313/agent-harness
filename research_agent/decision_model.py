@@ -507,16 +507,29 @@ def write_decision_model(
     dm_dir.mkdir(parents=True, exist_ok=True)
     path = dm_dir / f"{dm.decision_model_id}.json"
     data = dm.to_dict()
-    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    # PH4.1 — default=str guards against non-serializable values in
+    # decision_architecture (an opaque dict field accepting arbitrary content).
+    path.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
 
     if write_latest:
         latest = base / "latest_decision_model.json"
-        latest.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        latest.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
     return path
 
 
 def load_decision_model(decision_model_id: str, base: Path = Path("outputs")) -> DecisionModel:
     """Load a persisted decision model by ID."""
     path = base / "decision_models" / f"{decision_model_id}.json"
-    data = json.loads(path.read_text(encoding="utf-8"))
+    # PH4.1 — explicit error handling so callers get an actionable message.
+    if not path.exists():
+        raise FileNotFoundError(
+            f"Decision model not found: {path}. "
+            f"Run a pipeline first to generate decision_model_id={decision_model_id!r}."
+        )
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(
+            f"Decision model file is not valid JSON ({path}): {exc}"
+        ) from exc
     return DecisionModel.model_validate(data)

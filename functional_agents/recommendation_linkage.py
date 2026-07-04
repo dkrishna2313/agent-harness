@@ -65,6 +65,18 @@ def build_recommendation_linkage(
     assumptions = copy.deepcopy(assumptions)
     recommendations = copy.deepcopy(recommendations)
 
+    # PH4.1-H4 — guard against assumptions that are missing assumption_id; a bare
+    # dict access would raise KeyError and crash the pipeline mid-run.
+    _malformed = [a for a in assumptions if not a.get("assumption_id")]
+    if _malformed:
+        LOGGER.warning(
+            "[RecommendationLinkage] %d assumption(s) missing assumption_id — excluded from linkage",
+            len(_malformed),
+        )
+        assumptions = [a for a in assumptions if a.get("assumption_id")]
+    if not assumptions:
+        return assumptions, recommendations
+
     # --- Normalise recommendation_id ---
     for i, rec in enumerate(recommendations):
         if not rec.get("recommendation_id"):
