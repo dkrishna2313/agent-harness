@@ -113,6 +113,10 @@ def test_executive_narrative_default_fields():
     assert en.validation_priorities == []
     assert en.option_rankings == []      # J12.1
     assert en.critical_unknowns == []    # J12.1
+    assert en.strategic_options == []    # J12.2
+    assert en.medium_term_actions == []  # J12.2
+    assert en.long_term_actions == []    # J12.2
+    assert en.supporting_evidence == []  # J12.2
 
 
 def test_executive_narrative_to_dict_includes_all_fields():
@@ -122,7 +126,9 @@ def test_executive_narrative_to_dict_includes_all_fields():
         "decision", "executive_summary", "recommended_option", "why_this_option",
         "key_tradeoffs", "key_risks", "key_opportunities", "critical_assumptions",
         "executive_confidence", "immediate_actions", "validation_priorities",
-        "option_rankings", "critical_unknowns",  # J12.1
+        "option_rankings", "critical_unknowns",          # J12.1
+        "strategic_options", "medium_term_actions",      # J12.2
+        "long_term_actions", "supporting_evidence",      # J12.2
     }
     assert set(d.keys()) == expected_keys
 
@@ -146,6 +152,8 @@ def test_executive_narrative_from_dict_round_trips():
         validation_priorities=["Validate cost model"],
         option_rankings=["OPT-001", "OPT-002"],
         critical_unknowns=["Regulatory timeline"],
+        strategic_options=[{"option_id": "OPT-001", "title": "Full Build"}],
+        supporting_evidence=[{"id": "H-1", "title": "AI demand grows", "confidence": "high"}],
     )
     restored = ExecutiveNarrative.from_dict(original.to_dict())
     assert restored.decision == original.decision
@@ -155,6 +163,8 @@ def test_executive_narrative_from_dict_round_trips():
     assert restored.validation_priorities == original.validation_priorities
     assert restored.option_rankings == original.option_rankings
     assert restored.critical_unknowns == original.critical_unknowns
+    assert restored.strategic_options == original.strategic_options
+    assert restored.supporting_evidence == original.supporting_evidence
 
 
 def test_executive_narrative_from_dict_handles_none():
@@ -478,3 +488,108 @@ def test_builder_confidence_drivers_absent_when_empty():
     ctx.executive_confidence["confidence_drivers"] = []
     narrative = ExecutiveNarrativeBuilder().build(ctx)
     assert "confidence_drivers" not in narrative.executive_confidence
+
+
+# ---------------------------------------------------------------------------
+# J12.2 — strategic_options, portfolio actions, supporting_evidence, mitigation
+# ---------------------------------------------------------------------------
+
+def test_builder_extracts_all_strategic_options():
+    ctx = _full_ctx()
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    ids = [o["option_id"] for o in narrative.strategic_options]
+    assert "OPT-001" in ids
+    assert "OPT-002" in ids
+
+
+def test_builder_strategic_options_include_presentation_fields():
+    ctx = _full_ctx()
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    opt = next(o for o in narrative.strategic_options if o["option_id"] == "OPT-001")
+    assert "title" in opt
+    assert "description" in opt
+    assert "estimated_time_horizon" in opt
+    assert "capital_intensity" in opt
+    assert "confidence" in opt
+    assert "advantages" in opt
+
+
+def test_builder_strategic_options_advantages_capped_at_three():
+    ctx = _full_ctx()
+    ctx.strategic_options[0]["advantages"] = ["A", "B", "C", "D", "E"]
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    opt = next(o for o in narrative.strategic_options if o["option_id"] == "OPT-001")
+    assert len(opt["advantages"]) == 3
+
+
+def test_builder_extracts_medium_term_actions():
+    ctx = _full_ctx()
+    ctx.recommendation_portfolio["medium_term"] = ["REC-002"]
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    assert len(narrative.medium_term_actions) == 1
+    assert narrative.medium_term_actions[0]["id"] == "REC-002"
+
+
+def test_builder_extracts_long_term_actions():
+    ctx = _full_ctx()
+    ctx.recommendation_portfolio["long_term"] = ["REC-001"]
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    assert len(narrative.long_term_actions) == 1
+    assert narrative.long_term_actions[0]["id"] == "REC-001"
+
+
+def test_builder_medium_term_actions_empty_when_not_set():
+    ctx = _full_ctx()
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    assert narrative.medium_term_actions == []
+
+
+def test_builder_extracts_supporting_evidence_from_surviving_hypotheses():
+    ctx = _full_ctx()
+    ctx.surviving_hypotheses = [
+        {"id": "H-001", "title": "AI demand grows 30% YoY", "confidence": "high"},
+    ]
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    assert len(narrative.supporting_evidence) == 1
+    assert narrative.supporting_evidence[0]["id"] == "H-001"
+    assert narrative.supporting_evidence[0]["title"] == "AI demand grows 30% YoY"
+
+
+def test_builder_supporting_evidence_falls_back_to_hypotheses():
+    ctx = _full_ctx()
+    ctx.surviving_hypotheses = []
+    ctx.hypotheses = [{"id": "H-002", "title": "Cost drops 20%", "confidence": "medium"}]
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    assert narrative.supporting_evidence[0]["id"] == "H-002"
+
+
+def test_builder_supporting_evidence_capped_at_six():
+    ctx = _full_ctx()
+    ctx.surviving_hypotheses = [
+        {"id": f"H-{i}", "title": f"Hypothesis {i}", "confidence": "high"}
+        for i in range(10)
+    ]
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    assert len(narrative.supporting_evidence) == 6
+
+
+def test_builder_key_risks_include_mitigation():
+    ctx = _full_ctx()
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    for r in narrative.key_risks:
+        assert "mitigation" in r
+
+
+def test_builder_key_risks_mitigation_populated_from_context():
+    ctx = _full_ctx()
+    ctx.risks = [{"risk_id": "R-1", "statement": "Risk.", "severity": "high",
+                  "likelihood": "medium", "mitigation": "Use fixed contracts."}]
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    assert narrative.key_risks[0]["mitigation"] == "Use fixed contracts."
+
+
+def test_builder_key_risks_mitigation_empty_string_when_absent():
+    ctx = _full_ctx()
+    ctx.risks = [{"risk_id": "R-1", "statement": "Risk.", "severity": "high", "likelihood": "low"}]
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    assert narrative.key_risks[0]["mitigation"] == ""

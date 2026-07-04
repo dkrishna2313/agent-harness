@@ -1,0 +1,128 @@
+{
+  "decision": "Decide AI power strategy 2025-2027.",
+  "executive_summary": "Phased strategy dominates on risk-adjusted returns.",
+  "recommended_option": {
+    "option_id": "OPT-B",
+    "title": "Phased Deployment",
+    "description": "Staged rollout.",
+    "estimated_time_horizon": "near_term",
+    "capital_intensity": "Medium",
+    "confidence": "High"
+  },
+  "why_this_option": "Phased deployment balances risk and speed.",
+  "key_tradeoffs": [
+    "Capital Efficiency",
+    "Grid Risk",
+    "Speed"
+  ],
+  "key_risks": [
+    {
+      "risk_id": "RSK-001",
+      "statement": "Grid delay.",
+      "severity": "Critical",
+      "likelihood": "Medium",
+      "mitigation": "Secure queue position early."
+    },
+    {
+      "risk_id": "RSK-002",
+      "statement": "GPU shortage.",
+      "severity": "High",
+      "likelihood": "Medium",
+      "mitigation": "Diversify suppliers."
+    }
+  ],
+  "key_opportunities": [
+    {
+      "opportunity_id": "OPP-001",
+      "title": "First-mover grid position",
+      "impact": "High",
+      "description": "Locking grid capacity ahead of competitors."
+    }
+  ],
+  "critical_assumptions": [
+    {
+      "assumption_id": "A-001",
+      "statement": "Grid secured in 18 months.",
+      "importance": "critical",
+      "confidence": "medium"
+    }
+  ],
+  "executive_confidence": {
+    "overall_confidence": "High",
+    "decision_readiness": "Ready",
+    "board_recommendation": "Proceed with Phased Deployment",
+    "confidence_rationale": "Strong cross-domain evidence.",
+    "confidence_drivers": [
+      "Diversified evidence",
+      "Stakeholder alignment"
+    ],
+    "confidence_limiters": [
+      "Regulatory uncertainty"
+    ]
+  },
+  "immediate_actions": [
+    {
+      "id": "R1",
+      "title": "Initiate grid filing"
+    },
+    {
+      "id": "R2",
+      "title": "Negotiate GPU agreements"
+    }
+  ],
+  "validation_priorities": [
+    "Confirm grid queue",
+    "Validate GPU contracts"
+  ],
+  "option_rankings": [
+    "OPT-B",
+    "OPT-A"
+  ],
+  "critical_unknowns": [
+    "Final interconnection cost"
+  ],
+  "strategic_options": [
+    {
+      "option_id": "OPT-B",
+      "title": "Phased Deployment",
+      "description": "Staged rollout.",
+      "estimated_time_horizon": "near_term",
+      "capital_intensity": "Medium",
+      "confidence": "High",
+      "advantages": [
+        "Preserves optionality",
+        "Reduces stranded capital"
+      ]
+    },
+    {
+      "option_id": "OPT-A",
+      "title": "Full Build-Out",
+      "description": "Immediate full GPU deployment.",
+      "estimated_time_horizon": "immediate",
+      "capital_intensity": "High",
+      "confidence": "Medium",
+      "advantages": [
+        "Maximum speed"
+      ]
+    }
+  ],
+  "medium_term_actions": [
+    {
+      "id": "R3",
+      "title": "Evaluate cooling vendors"
+    }
+  ],
+  "long_term_actions": [
+    {
+      "id": "R4",
+      "title": "Design 5-year roadmap"
+    }
+  ],
+  "supporting_evidence": [
+    {
+      "id": "H-001",
+      "title": "AI demand doubles by 2027",
+      "confidence": "High"
+    }
+  ]
+}

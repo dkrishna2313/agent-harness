@@ -47,6 +47,10 @@ class ExecutiveNarrative:
     validation_priorities : what must be validated before committing
     option_rankings       : ordered option IDs from decision_analysis (J12.1)
     critical_unknowns     : unknowns that must be resolved before deciding (J12.1)
+    strategic_options     : all options with presentation fields (J12.2 — slide 4 table)
+    medium_term_actions   : 90-day portfolio actions (J12.2 — slide 10)
+    long_term_actions     : 180-day portfolio actions (J12.2 — slide 10)
+    supporting_evidence   : surviving hypotheses for evidence slide (J12.2 — slide 11)
     """
 
     decision: str = ""
@@ -64,6 +68,14 @@ class ExecutiveNarrative:
     # executive_confidence reads inside the generator.
     option_rankings: list[str] = field(default_factory=list)
     critical_unknowns: list[str] = field(default_factory=list)
+    # J12.2 — required by StrategyDeckGenerator.
+    # strategic_options: full list (slide 4 table + recommended-option marker).
+    # medium_term_actions / long_term_actions: portfolio buckets beyond near-term.
+    # supporting_evidence: post-challenge hypotheses used on slide 11.
+    strategic_options: list[dict[str, Any]] = field(default_factory=list)
+    medium_term_actions: list[dict[str, Any]] = field(default_factory=list)
+    long_term_actions: list[dict[str, Any]] = field(default_factory=list)
+    supporting_evidence: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         """Serialise to a plain JSON-serialisable dict.
@@ -85,6 +97,10 @@ class ExecutiveNarrative:
             "validation_priorities": self.validation_priorities,
             "option_rankings": self.option_rankings,
             "critical_unknowns": self.critical_unknowns,
+            "strategic_options": self.strategic_options,
+            "medium_term_actions": self.medium_term_actions,
+            "long_term_actions": self.long_term_actions,
+            "supporting_evidence": self.supporting_evidence,
         }
 
     @classmethod
@@ -106,4 +122,8 @@ class ExecutiveNarrative:
             validation_priorities=list(data.get("validation_priorities") or []),
             option_rankings=list(data.get("option_rankings") or []),
             critical_unknowns=list(data.get("critical_unknowns") or []),
+            strategic_options=list(data.get("strategic_options") or []),
+            medium_term_actions=list(data.get("medium_term_actions") or []),
+            long_term_actions=list(data.get("long_term_actions") or []),
+            supporting_evidence=list(data.get("supporting_evidence") or []),
         )

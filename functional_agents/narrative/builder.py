@@ -55,6 +55,10 @@ class ExecutiveNarrativeBuilder:
             validation_priorities=self._extract_validation_priorities(context),
             option_rankings=self._extract_option_rankings(context),
             critical_unknowns=self._extract_critical_unknowns(context),
+            strategic_options=self._extract_strategic_options(context),
+            medium_term_actions=self._extract_portfolio_actions(context, "medium_term"),
+            long_term_actions=self._extract_portfolio_actions(context, "long_term"),
+            supporting_evidence=self._extract_supporting_evidence(context),
         )
         context.executive_narrative = narrative.to_dict()
         return narrative
@@ -115,12 +119,17 @@ class ExecutiveNarrativeBuilder:
                 "statement": r.get("statement", ""),
                 "severity": r.get("severity", ""),
                 "likelihood": r.get("likelihood", ""),
+                # J12.2 — deck slide 6 renders mitigation without re-reading AgentContext.
+                "mitigation": (
+                    r.get("mitigation") or r.get("mitigation_strategy")
+                    or r.get("mitigation_approach") or ""
+                ),
             }
             for r in risks
         ]
 
     def _extract_key_opportunities(self, context: "AgentContext") -> list[dict[str, Any]]:
-        opportunities = (context.opportunities or [])[:5]
+        opportunities = (context.opportunities or [])[:6]  # J12.2 — deck slide 7 uses up to 6
         return [
             {
                 "opportunity_id": o.get("opportunity_id", "") or o.get("id", ""),
@@ -189,3 +198,41 @@ class ExecutiveNarrativeBuilder:
 
     def _extract_critical_unknowns(self, context: "AgentContext") -> list[str]:
         return list((context.executive_confidence or {}).get("critical_unknowns") or [])
+
+    def _extract_strategic_options(self, context: "AgentContext") -> list[dict[str, Any]]:
+        """All strategic options with presentation-relevant fields (J12.2 — slide 4 table)."""
+        return [
+            {
+                "option_id": o.get("option_id", ""),
+                "title": o.get("title", ""),
+                "description": o.get("description", ""),
+                "estimated_time_horizon": o.get("estimated_time_horizon", ""),
+                "capital_intensity": o.get("capital_intensity", ""),
+                "confidence": o.get("confidence", ""),
+                "advantages": list((o.get("advantages") or [])[:3]),
+            }
+            for o in (context.strategic_options or [])
+        ]
+
+    def _extract_portfolio_actions(
+        self, context: "AgentContext", bucket: str
+    ) -> list[dict[str, Any]]:
+        """Extract {id, title} actions from a recommendation_portfolio bucket."""
+        ids = (context.recommendation_portfolio or {}).get(bucket, [])
+        by_id = {
+            r.get("id", r.get("recommendation_id", "")): r
+            for r in (context.recommendations or [])
+        }
+        return [{"id": rid, "title": by_id[rid].get("title", "")} for rid in ids if rid in by_id]
+
+    def _extract_supporting_evidence(self, context: "AgentContext") -> list[dict[str, Any]]:
+        """Surviving (post-challenge) hypotheses as supporting evidence (J12.2 — slide 11)."""
+        hypotheses = context.surviving_hypotheses or context.hypotheses or []
+        return [
+            {
+                "id": h.get("id", h.get("hypothesis_id", "")),
+                "title": h.get("title", "") or h.get("statement", ""),
+                "confidence": h.get("confidence", "") or h.get("confidence_level", ""),
+            }
+            for h in hypotheses[:6]
+        ]

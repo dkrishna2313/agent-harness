@@ -1,21 +1,18 @@
-"""StrategyDeckGenerator — the third concrete DeliverableGenerator (J11.3).
+"""StrategyDeckGenerator — narrative-driven strategy deck (J12.2).
 
-Renders a 12-slide strategy deck in Markdown from the same completed
-Strategic Reasoning Graph the other generators consume. Pure presentation:
-every value is read directly from AgentContext fields already computed by
-upstream Functional Agents — no new inference, no LLM call, no Functional
-Agent invoked.
+Migrated from direct AgentContext inspection (J11.3) to consuming
+ExecutiveNarrative (J12.0). The generator is a presentation renderer: it
+renders the canonical executive story assembled by ExecutiveNarrativeBuilder
+into 12 slides separated by Markdown horizontal rules — the stable parse
+contract for future PowerPoint conversion (J11.4).
 
-Each slide is separated by a Markdown horizontal rule (---) and begins with
-a `# Slide X — Title` heading, suitable as a source file for future
-PowerPoint conversion (J11.4).
+Slides that require engagement metadata (client, industry, decision horizon)
+or multi-profile metadata still receive those as explicit parameters from
+the top-level entry point, since engagement, decision_architecture, question,
+profiles, and multi_profile_analysis are not reasoning outputs and are not in
+the replace list.
 
-Field notes:
-- `context.strategic_option_portfolio` is always `{}` in production — slide 10
-  reads `recommendation_portfolio["near_term"/"medium_term"/"long_term"]`
-  instead (populated by RecommendationAgent).
-- `context.surviving_hypotheses` (post-ChallengeAgent) is preferred for
-  slide 11; falls back to `context.hypotheses` when empty.
+Each slide is: `# Slide X — Title` header, content, then `---` separator.
 """
 
 from __future__ import annotations
@@ -25,12 +22,11 @@ from typing import TYPE_CHECKING
 
 from .artifact import DeliverableArtifact
 from .base import DeliverableGenerator
+from ..narrative import ExecutiveNarrative, ExecutiveNarrativeBuilder
 
 if TYPE_CHECKING:
     from ..context import AgentContext
 
-_SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-_IMPORTANCE_ORDER = {"critical": 0, "important": 1, "supporting": 2}
 _PORTFOLIO_LABELS = {
     "near_term": "30 Days (Near-Term)",
     "medium_term": "90 Days (Medium-Term)",
@@ -38,65 +34,47 @@ _PORTFOLIO_LABELS = {
 }
 
 
-def _rank(value: str, order: dict[str, int]) -> int:
-    return order.get(str(value or "").lower(), 99)
-
-
-def _recommended_id(context: "AgentContext") -> str:
-    da = context.decision_analysis or {}
-    preferred = context.preferred_option or {}
-    return da.get("recommended_option_id") or preferred.get("option_id", "")
-
-
 # ---------------------------------------------------------------------------
-# Slide builders
+# Slide builders — primary slides consume ExecutiveNarrative only
 # ---------------------------------------------------------------------------
 
-def _build_slide_01_executive_decision(context: "AgentContext") -> str:
-    da = context.decision_analysis or {}
-    preferred = context.preferred_option or {}
-    ro = context.research_object or {}
-    da_arch = ro.get("decision_architecture") or context.decision_architecture or {}
-
-    decision_stmt = da_arch.get("decision_statement", "") or preferred.get("decision_statement", "")
-    rec_id = _recommended_id(context)
-    options = context.strategic_options or []
-    rec_option = next((o for o in options if o.get("option_id") == rec_id), preferred or {})
-    rec_title = rec_option.get("title", "") if rec_option else ""
+def _build_slide_01_executive_decision(narrative: ExecutiveNarrative) -> str:
+    decision = narrative.decision
+    rec = narrative.recommended_option
+    rec_id = rec.get("option_id", "") if rec else ""
+    rec_title = rec.get("title", "") if rec else ""
 
     lines = ["# Slide 1 — Executive Decision", ""]
-    if decision_stmt:
-        lines += [f"**Decision:** {decision_stmt}", ""]
+    if decision:
+        lines += [f"**Decision:** {decision}", ""]
     if rec_id and rec_title:
         lines += [f"**Recommended Option:** {rec_id}: {rec_title}", ""]
     elif rec_id:
         lines += [f"**Recommended Option:** {rec_id}", ""]
-    if not decision_stmt and not rec_id:
+    if not decision and not rec_id:
         lines += ["*Not available for this run.*", ""]
     return "\n".join(lines)
 
 
-def _build_slide_02_client_situation(context: "AgentContext") -> str:
-    eng = context.engagement or {}
-    da_arch = context.decision_architecture or {}
-    ro = context.research_object or {}
-    ro_arch = ro.get("decision_architecture") or {}
-
-    client = eng.get("client", "") or eng.get("client_name", "")
-    industry = eng.get("industry", "")
-    title = eng.get("title", "")
+def _build_slide_02_client_situation(
+    narrative: ExecutiveNarrative,
+    engagement: dict,
+    decision_arch: dict,
+    question: str,
+) -> str:
+    client = engagement.get("client", "") or engagement.get("client_name", "")
+    industry = engagement.get("industry", "")
+    title = engagement.get("title", "")
     strategic_q = (
-        eng.get("strategic_question", "")
-        or da_arch.get("decision_statement", "")
-        or ro_arch.get("decision_statement", "")
-        or context.question
+        engagement.get("strategic_question", "")
+        or narrative.decision  # covers decision_architecture.decision_statement
+        or question
     )
     horizon = (
-        eng.get("decision_horizon", "")
-        or da_arch.get("decision_horizon", "")
-        or ro_arch.get("decision_horizon", "")
+        engagement.get("decision_horizon", "")
+        or decision_arch.get("decision_horizon", "")
     )
-    constraints = eng.get("constraints") or eng.get("key_constraints") or []
+    constraints = engagement.get("constraints") or engagement.get("key_constraints") or []
     if isinstance(constraints, str):
         constraints = [constraints]
 
@@ -120,19 +98,16 @@ def _build_slide_02_client_situation(context: "AgentContext") -> str:
     return "\n".join(lines)
 
 
-def _build_slide_03_executive_summary(context: "AgentContext") -> str:
-    summary = (context.strategic_synthesis or {}).get("executive_summary", "")
-    if not summary:
-        summary = (context.decision_analysis or {}).get("executive_summary", "")
-
+def _build_slide_03_executive_summary(narrative: ExecutiveNarrative) -> str:
+    summary = narrative.executive_summary
     lines = ["# Slide 3 — Executive Summary", ""]
     lines += [summary, ""] if summary else ["*Not available for this run.*", ""]
     return "\n".join(lines)
 
 
-def _build_slide_04_strategic_options(context: "AgentContext") -> str:
-    options = context.strategic_options or []
-    rec_id = _recommended_id(context)
+def _build_slide_04_strategic_options(narrative: ExecutiveNarrative) -> str:
+    options = narrative.strategic_options
+    rec_id = (narrative.recommended_option or {}).get("option_id", "")
 
     lines = ["# Slide 4 — Strategic Options", ""]
     if not options:
@@ -164,11 +139,10 @@ def _build_slide_04_strategic_options(context: "AgentContext") -> str:
     return "\n".join(lines)
 
 
-def _build_slide_05_decision_matrix(context: "AgentContext") -> str:
-    da = context.decision_analysis or {}
-    dimensions = da.get("comparison_dimensions") or []
-    rankings = da.get("option_rankings") or []
-    rationale = da.get("rationale", "")
+def _build_slide_05_decision_matrix(narrative: ExecutiveNarrative) -> str:
+    dimensions = narrative.key_tradeoffs
+    rankings = narrative.option_rankings
+    rationale = narrative.why_this_option
 
     lines = ["# Slide 5 — Decision Matrix", ""]
     if dimensions:
@@ -186,12 +160,8 @@ def _build_slide_05_decision_matrix(context: "AgentContext") -> str:
     return "\n".join(lines)
 
 
-def _build_slide_06_strategic_risks(context: "AgentContext") -> str:
-    risks = sorted(
-        context.risks or [],
-        key=lambda r: _rank(r.get("severity", ""), _SEVERITY_ORDER),
-    )[:5]
-
+def _build_slide_06_strategic_risks(narrative: ExecutiveNarrative) -> str:
+    risks = narrative.key_risks
     lines = ["# Slide 6 — Strategic Risks", ""]
     if not risks:
         lines += ["*No risks recorded for this run.*", ""]
@@ -201,8 +171,7 @@ def _build_slide_06_strategic_risks(context: "AgentContext") -> str:
         rid = r.get("risk_id", "")
         stmt = r.get("statement", "")
         sev = r.get("severity", "")
-        mitigation = (r.get("mitigation") or r.get("mitigation_strategy") or
-                      r.get("mitigation_approach") or "")
+        mitigation = r.get("mitigation", "")
         lines += [f"**{rid}** _{sev}_", f"{stmt}"]
         if mitigation:
             lines.append(f"*Mitigation: {mitigation}*")
@@ -210,19 +179,18 @@ def _build_slide_06_strategic_risks(context: "AgentContext") -> str:
     return "\n".join(lines)
 
 
-def _build_slide_07_strategic_opportunities(context: "AgentContext") -> str:
-    opportunities = context.opportunities or []
-
+def _build_slide_07_strategic_opportunities(narrative: ExecutiveNarrative) -> str:
+    opportunities = narrative.key_opportunities
     lines = ["# Slide 7 — Strategic Opportunities", ""]
     if not opportunities:
         lines += ["*No opportunities recorded for this run.*", ""]
         return "\n".join(lines)
 
-    for o in opportunities[:6]:
-        oid = o.get("opportunity_id", "") or o.get("id", "")
-        title = o.get("title", "") or o.get("name", "")
-        impact = o.get("impact", "") or o.get("strategic_value", "")
-        desc = o.get("description", "") or o.get("statement", "")
+    for o in opportunities:
+        oid = o.get("opportunity_id", "")
+        title = o.get("title", "")
+        impact = o.get("impact", "")
+        desc = o.get("description", "")
         header = f"**{oid}: {title}**" if oid and title else f"**{title or oid}**"
         lines.append(header)
         if impact:
@@ -233,12 +201,8 @@ def _build_slide_07_strategic_opportunities(context: "AgentContext") -> str:
     return "\n".join(lines)
 
 
-def _build_slide_08_critical_assumptions(context: "AgentContext") -> str:
-    assumptions = sorted(
-        context.assumptions or [],
-        key=lambda a: _rank(a.get("importance", ""), _IMPORTANCE_ORDER),
-    )[:5]
-
+def _build_slide_08_critical_assumptions(narrative: ExecutiveNarrative) -> str:
+    assumptions = narrative.critical_assumptions
     lines = ["# Slide 8 — Critical Assumptions", ""]
     if not assumptions:
         lines += ["*No assumptions recorded for this run.*", ""]
@@ -255,8 +219,8 @@ def _build_slide_08_critical_assumptions(context: "AgentContext") -> str:
     return "\n".join(lines)
 
 
-def _build_slide_09_executive_confidence(context: "AgentContext") -> str:
-    ec = context.executive_confidence or {}
+def _build_slide_09_executive_confidence(narrative: ExecutiveNarrative) -> str:
+    ec = narrative.executive_confidence
     lines = ["# Slide 9 — Executive Confidence", ""]
 
     if not ec:
@@ -276,13 +240,13 @@ def _build_slide_09_executive_confidence(context: "AgentContext") -> str:
         )
         lines.append("")
 
-    unknowns = (ec.get("critical_unknowns") or [])[:4]
+    unknowns = narrative.critical_unknowns[:4]
     if unknowns:
         lines.append("**Critical Unknowns:**")
         lines.extend(f"- {u}" for u in unknowns)
         lines.append("")
 
-    priorities = (ec.get("validation_priorities") or [])[:4]
+    priorities = narrative.validation_priorities[:4]
     if priorities:
         lines.append("**Validation Priorities:**")
         lines.extend(f"{i + 1}. {p}" for i, p in enumerate(priorities))
@@ -291,23 +255,22 @@ def _build_slide_09_executive_confidence(context: "AgentContext") -> str:
     return "\n".join(lines)
 
 
-def _build_slide_10_immediate_actions(context: "AgentContext") -> str:
-    portfolio = context.recommendation_portfolio or {}
-    by_id = {
-        r.get("id", r.get("recommendation_id", "")): r
-        for r in (context.recommendations or [])
+def _build_slide_10_immediate_actions(narrative: ExecutiveNarrative) -> str:
+    buckets = {
+        "near_term": narrative.immediate_actions,
+        "medium_term": narrative.medium_term_actions,
+        "long_term": narrative.long_term_actions,
     }
 
     lines = ["# Slide 10 — Immediate Actions", ""]
     any_content = False
     for key, label in _PORTFOLIO_LABELS.items():
-        ids = portfolio.get(key, [])
-        items = [by_id[rid] for rid in ids if rid in by_id]
+        items = buckets.get(key, [])
         if items:
             lines.append(f"**{label}:**")
-            for r in items:
-                rid = r.get("id", r.get("recommendation_id", ""))
-                title = r.get("title", "")
+            for action in items:
+                rid = action.get("id", "")
+                title = action.get("title", "")
                 lines.append(f"- **{rid}**: {title}")
             lines.append("")
             any_content = True
@@ -317,18 +280,17 @@ def _build_slide_10_immediate_actions(context: "AgentContext") -> str:
     return "\n".join(lines)
 
 
-def _build_slide_11_supporting_evidence(context: "AgentContext") -> str:
-    hypotheses = context.surviving_hypotheses or context.hypotheses or []
-
+def _build_slide_11_supporting_evidence(narrative: ExecutiveNarrative) -> str:
+    evidence = narrative.supporting_evidence
     lines = ["# Slide 11 — Supporting Evidence", ""]
-    if not hypotheses:
+    if not evidence:
         lines += ["*No supporting evidence recorded for this run.*", ""]
         return "\n".join(lines)
 
-    for h in hypotheses[:6]:
-        hid = h.get("id", h.get("hypothesis_id", ""))
-        title = h.get("title", "") or h.get("statement", "")
-        confidence = h.get("confidence", "") or h.get("confidence_level", "")
+    for h in evidence:
+        hid = h.get("id", "")
+        title = h.get("title", "")
+        confidence = h.get("confidence", "")
         header = f"**{hid}: {title}**" if hid else f"**{title}**"
         lines.append(header)
         if confidence:
@@ -337,10 +299,13 @@ def _build_slide_11_supporting_evidence(context: "AgentContext") -> str:
     return "\n".join(lines)
 
 
-def _build_slide_12_appendix(context: "AgentContext") -> str:
-    critical_unknowns = (context.executive_confidence or {}).get("critical_unknowns") or []
-    profiles = context.profiles or []
-    multi = (context.multi_profile_analysis or {}).get("profiles") or []
+def _build_slide_12_appendix(
+    narrative: ExecutiveNarrative,
+    profiles: list[str],
+    multi_analysis: dict,
+) -> str:
+    critical_unknowns = narrative.critical_unknowns
+    multi = (multi_analysis or {}).get("profiles") or []
 
     if not profiles and not multi and not critical_unknowns:
         return ""
@@ -369,22 +334,31 @@ def _build_slide_12_appendix(context: "AgentContext") -> str:
 def build_strategy_deck_content(context: "AgentContext") -> str:
     """Assemble the strategy deck markdown from an already-completed context.
 
-    Pure presentation over already-computed Strategic Reasoning Graph fields.
-    No new inference, no LLM call, no Functional Agent invoked.
+    Builds ExecutiveNarrative (idempotent; sets context.executive_narrative),
+    then delegates each slide to a renderer. Engagement metadata (client,
+    industry, decision_horizon, profiles, multi_profile_analysis) is passed
+    explicitly — these are input/metadata fields not in the reasoning replace list.
     """
+    narrative = ExecutiveNarrativeBuilder().build(context)
+    engagement = dict(context.engagement or {})
+    decision_arch = dict(context.decision_architecture or {})
+    question = context.question or ""
+    profiles = list(context.profiles or [])
+    multi_analysis = dict(context.multi_profile_analysis or {})
+
     slides = [
-        _build_slide_01_executive_decision(context),
-        _build_slide_02_client_situation(context),
-        _build_slide_03_executive_summary(context),
-        _build_slide_04_strategic_options(context),
-        _build_slide_05_decision_matrix(context),
-        _build_slide_06_strategic_risks(context),
-        _build_slide_07_strategic_opportunities(context),
-        _build_slide_08_critical_assumptions(context),
-        _build_slide_09_executive_confidence(context),
-        _build_slide_10_immediate_actions(context),
-        _build_slide_11_supporting_evidence(context),
-        _build_slide_12_appendix(context),
+        _build_slide_01_executive_decision(narrative),
+        _build_slide_02_client_situation(narrative, engagement, decision_arch, question),
+        _build_slide_03_executive_summary(narrative),
+        _build_slide_04_strategic_options(narrative),
+        _build_slide_05_decision_matrix(narrative),
+        _build_slide_06_strategic_risks(narrative),
+        _build_slide_07_strategic_opportunities(narrative),
+        _build_slide_08_critical_assumptions(narrative),
+        _build_slide_09_executive_confidence(narrative),
+        _build_slide_10_immediate_actions(narrative),
+        _build_slide_11_supporting_evidence(narrative),
+        _build_slide_12_appendix(narrative, profiles, multi_analysis),
     ]
     body = "\n---\n\n".join(s for s in slides if s)
     return "# Strategy Deck\n\n" + body.rstrip("\n") + "\n"

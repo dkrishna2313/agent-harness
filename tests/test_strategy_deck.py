@@ -1,9 +1,13 @@
-"""Tests for the J11.3 StrategyDeckGenerator.
+"""Tests for StrategyDeckGenerator (J11.3 + J12.2).
 
-Covers: registration, all 12 slide headers present, content correctness,
+J11.3 coverage: registration, all 12 slide headers, content correctness,
 slide separator, no-duplicate-reasoning invariant, graceful degradation,
-AST constraint check, bundle with all 3 deliverable types, and regression
-confirmation that ReportAgent default output is unchanged.
+AST constraint, bundle with 3 deliverable types, ReportAgent regression.
+
+J12.2 coverage: generator consumes ExecutiveNarrative, module imports
+ExecutiveNarrativeBuilder, slide renderers have ExecutiveNarrative signature,
+no direct reasoning field access in slide builders, supporting_evidence and
+portfolio actions rendered, context.executive_narrative set as side effect.
 """
 
 from __future__ import annotations
@@ -431,3 +435,96 @@ def test_report_agent_still_defaults_to_markdown_only(tmp_path):
     ctx = res["context"]
     assert len(ctx["deliverables"]) == 1
     assert ctx["deliverables"][0]["type"] == "markdown"
+
+
+# ---------------------------------------------------------------------------
+# J12.2 — narrative-driven architecture constraints
+# ---------------------------------------------------------------------------
+
+def test_strategy_deck_module_imports_executive_narrative_builder():
+    """strategy_deck.py must import ExecutiveNarrativeBuilder (J12.2 contract)."""
+    from functional_agents.deliverables import strategy_deck as sd_module
+    tree = ast.parse(inspect.getsource(sd_module))
+    imported_symbols = {
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        for alias in node.names
+    }
+    assert "ExecutiveNarrativeBuilder" in imported_symbols
+    assert "ExecutiveNarrative" in imported_symbols
+
+
+def test_strategy_deck_slide_builders_have_no_direct_context_reads():
+    """No _build_slide_* function body should reference 'context' as a Name node.
+
+    The top-level build_strategy_deck_content reads metadata from context,
+    then passes only narrative + metadata dicts to each slide builder.
+    """
+    from functional_agents.deliverables.strategy_deck import (
+        _build_slide_01_executive_decision,
+        _build_slide_03_executive_summary,
+        _build_slide_04_strategic_options,
+        _build_slide_05_decision_matrix,
+        _build_slide_06_strategic_risks,
+        _build_slide_07_strategic_opportunities,
+        _build_slide_08_critical_assumptions,
+        _build_slide_09_executive_confidence,
+        _build_slide_10_immediate_actions,
+        _build_slide_11_supporting_evidence,
+    )
+    import inspect as _inspect
+    for fn in [
+        _build_slide_01_executive_decision, _build_slide_03_executive_summary,
+        _build_slide_04_strategic_options, _build_slide_05_decision_matrix,
+        _build_slide_06_strategic_risks, _build_slide_07_strategic_opportunities,
+        _build_slide_08_critical_assumptions, _build_slide_09_executive_confidence,
+        _build_slide_10_immediate_actions, _build_slide_11_supporting_evidence,
+    ]:
+        src = _inspect.getsource(fn)
+        tree = ast.parse(src)
+        context_reads = [
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.Name) and node.id == "context"
+        ]
+        assert not context_reads, (
+            f"{fn.__name__} references 'context' directly — must consume ExecutiveNarrative only"
+        )
+
+
+def test_strategy_deck_sets_executive_narrative_on_context():
+    """build_strategy_deck_content sets context.executive_narrative as a side effect."""
+    ctx = _full_ctx()
+    assert ctx.executive_narrative == {}
+    build_strategy_deck_content(ctx)
+    assert ctx.executive_narrative != {}
+    assert "decision" in ctx.executive_narrative
+
+
+def test_strategy_deck_slide_11_renders_supporting_evidence():
+    """Slide 11 renders supporting evidence from narrative.supporting_evidence."""
+    content = build_strategy_deck_content(_full_ctx())
+    assert "H-001" in content
+    assert "AI demand will grow 30% YoY" in content
+
+
+def test_strategy_deck_slide_10_renders_medium_term_bucket():
+    """Slide 10 renders medium-term portfolio from narrative.medium_term_actions."""
+    content = build_strategy_deck_content(_full_ctx())
+    assert "90 Days (Medium-Term)" in content
+    assert "REC-003" in content
+
+
+def test_strategy_deck_slide_06_renders_mitigation_from_narrative():
+    """Slide 6 renders mitigation from narrative.key_risks (not context.risks directly)."""
+    content = build_strategy_deck_content(_full_ctx())
+    assert "Fixed-price contracts" in content
+
+
+def test_strategy_deck_slide_04_marks_recommended_option_via_narrative():
+    """Slide 4 marks the recommended option using narrative.recommended_option.option_id."""
+    content = build_strategy_deck_content(_full_ctx())
+    # Split on the slide separator (\n---\n\n), not bare --- (which appears in tables)
+    slide_4 = content.split("# Slide 4")[1].split("\n---\n\n")[0]
+    assert "✓" in slide_4
+    assert "OPT-001" in slide_4
