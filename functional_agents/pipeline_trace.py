@@ -119,6 +119,10 @@ def build_canonical_trace(context: Any) -> dict[str, Any]:
     # remain valid canonical traces.
     deliverables = list(getattr(context, "deliverables", None) or [])
 
+    # J11.2 — DeliverableBundle: populated when DeliverableBundleGenerator
+    # ran on this context; None otherwise. Additive — not in _REQUIRED_TOP_LEVEL_KEYS.
+    deliverable_bundle = dict(getattr(context, "deliverable_bundle", None) or {}) or None
+
     contracts = {
         "functional_agent_contract": "FunctionalAgent.run(context: AgentContext) -> AgentResult",
         "agents_conforming": sorted(agents.keys()),
@@ -153,6 +157,7 @@ def build_canonical_trace(context: Any) -> dict[str, Any]:
         "performance": performance,
         "prompt_slices": prompt_slices,
         "deliverables": deliverables,
+        "deliverable_bundle": deliverable_bundle,
         "contracts": contracts,
         "summary": {
             "agents_run": len(agents),
