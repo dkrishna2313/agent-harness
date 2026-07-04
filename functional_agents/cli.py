@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+import time
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated
 
@@ -12,6 +15,110 @@ import typer
 from research_agent.cli import _configure_logging
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
+
+
+def _make_run_dir() -> Path:
+    """Create and return a timestamped run directory under outputs/runs/."""
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    run_dir = Path("outputs/runs") / f"RUN-{stamp}"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    return run_dir
+
+
+def _write_run_artifacts(ctx: object, run_dir: Path) -> None:
+    """Write research_object.json and engagement.json into the run directory."""
+    ro = getattr(ctx, "research_object", None)
+    if ro:
+        try:
+            (run_dir / "research_object.json").write_text(
+                json.dumps(ro, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
+        except Exception as exc:
+            logging.warning("[RunArtifacts] research_object.json write failed: %s", exc)
+
+    engagement_meta = {}
+    _trace = getattr(ctx, "trace", {}) or {}
+    _engagement_id = _trace.get("_engagement_id")
+    if _engagement_id:
+        engagement_meta["engagement_id"] = _engagement_id
+    _engagement = _trace.get("_engagement")
+    if _engagement:
+        engagement_meta.update(_engagement)
+    if engagement_meta:
+        try:
+            (run_dir / "engagement.json").write_text(
+                json.dumps(engagement_meta, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
+        except Exception as exc:
+            logging.warning("[RunArtifacts] engagement.json write failed: %s", exc)
+
+
+def _print_run_summary(
+    ctx: object,
+    mode: str,
+    out_dir: Path,
+    elapsed_s: float,
+    *,
+    is_run_dir: bool,
+) -> None:
+    """Print a structured post-run summary to stdout."""
+    _trace = getattr(ctx, "trace", {}) or {}
+    perf = _trace.get("_performance", {})
+    totals = perf.get("totals", {}) if perf else {}
+    tokens = totals.get("total_tokens", 0)
+    llm_calls = totals.get("llm_call_count", 0)
+    workflow_state = getattr(ctx, "workflow_state", "COMPLETE")
+
+    run_id = getattr(ctx, "run_id", "")
+    agents_run = [h["agent"] for h in (getattr(ctx, "agent_history", None) or [])]
+    profiles = list(getattr(ctx, "profiles", None) or [])
+
+    status = str(workflow_state).upper().replace("WORKFLOWSTATE.", "")
+    if status == "COMPLETE":
+        status_label = "SUCCESS"
+    elif status == "ERROR":
+        status_label = "ERROR"
+    else:
+        status_label = "PARTIAL"
+
+    deliverables = getattr(ctx, "deliverables", None) or []
+
+    typer.echo("")
+    typer.echo(f"Run:      {run_id}")
+    typer.echo(f"Mode:     {mode}")
+    typer.echo(f"Profiles: {', '.join(profiles)}")
+    typer.echo(f"Status:   {status_label}")
+    typer.echo(f"Agents:   {len(agents_run)} run")
+    typer.echo(f"Elapsed:  {elapsed_s:.1f}s")
+    if tokens:
+        typer.echo(f"Tokens:   {tokens:,}  ({llm_calls} LLM calls)")
+
+    report_path = (getattr(ctx, "artifacts", None) or {}).get("report_path")
+    typer.echo("")
+    typer.echo("Deliverables:")
+    if report_path:
+        typer.echo(f"  [OK] Report             {report_path}")
+    trace_path = (getattr(ctx, "artifacts", None) or {}).get("trace_path")
+    if trace_path:
+        typer.echo(f"  [OK] Agent trace        {trace_path}")
+    canonical_trace = out_dir / "pipeline.trace.json"
+    if canonical_trace.exists():
+        typer.echo(f"  [OK] Pipeline trace     {canonical_trace}")
+    if is_run_dir:
+        ro_path = out_dir / "research_object.json"
+        if ro_path.exists():
+            typer.echo(f"  [OK] Research object    {ro_path}")
+        eng_path = out_dir / "engagement.json"
+        if eng_path.exists():
+            typer.echo(f"  [OK] Engagement         {eng_path}")
+    for d in deliverables:
+        dpath = d.get("path", "")
+        dtype = d.get("type", "")
+        if dpath and dpath != report_path and Path(dpath).exists():
+            typer.echo(f"  [OK] {dtype:<19} {dpath}")
+
+    typer.echo("")
+    typer.echo(f"Output:   {out_dir}/")
 
 
 @app.command("run")
@@ -38,9 +145,9 @@ def main(
         typer.Option("--profiles", help="Comma-separated profile names. First is the execution profile."),
     ] = "ai_data_centers",
     out: Annotated[
-        Path,
-        typer.Option("--out", "-o", help="Markdown output path."),
-    ] = Path("outputs/j50a_functional_agents.md"),
+        Path | None,
+        typer.Option("--out", "-o", help="Markdown report path. Default: outputs/runs/RUN-<timestamp>/report.md"),
+    ] = None,
     model: Annotated[
         str | None,
         typer.Option("--model", help="Anthropic model name."),
@@ -82,7 +189,7 @@ def main(
     ] = False,
     log_level: Annotated[
         str | None,
-        typer.Option("--log-level", help="Logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL."),
+        typer.Option("--log-level", help="Logging level: DEBUG, INFO, PROGRESS, WARNING, ERROR, CRITICAL. Default: PROGRESS."),
     ] = None,
 ) -> None:
     """Run the functional agent pipeline and write a Markdown research memo.
@@ -125,7 +232,15 @@ def main(
             typer.echo(f"Error: {exc}", err=True)
             raise typer.Exit(code=1) from exc
 
-    _configure_logging(verbose=False, log_level=log_level or "INFO")
+    _configure_logging(verbose=False, log_level=log_level or "PROGRESS")
+
+    # Resolve output path — auto-create a timestamped run directory when --out is not set.
+    is_run_dir = out is None
+    if is_run_dir:
+        run_dir = _make_run_dir()
+        out = run_dir / "report.md"
+    else:
+        run_dir = Path(out).parent
 
     profile_names = [p.strip() for p in profiles.split(",") if p.strip()]
 
@@ -153,6 +268,7 @@ def main(
         use_reranker=rerank,
     )
 
+    _start = time.monotonic()
     try:
         if engagement_spec is not None:
             mode = "Strategic Engagement"
@@ -166,12 +282,12 @@ def main(
     except Exception as exc:
         logging.error("Functional agent pipeline failed: %s", exc)
         raise typer.Exit(code=1) from exc
+    elapsed = time.monotonic() - _start
 
-    agents_run = [h["agent"] for h in ctx.agent_history]
-    typer.echo(f"Run mode:   {mode}")
-    typer.echo(f"Agents run: {', '.join(agents_run)}")
-    typer.echo(f"Profiles:   {', '.join(ctx.profiles)}")
-    typer.echo(f"Report:     {ctx.artifacts.get('report_path', ctx.artifacts)}")
+    if is_run_dir:
+        _write_run_artifacts(ctx, run_dir)
+
+    _print_run_summary(ctx, mode, run_dir, elapsed, is_run_dir=is_run_dir)
 
 
 def _build_client(*, mock: bool, model: str | None, use_extraction_cache: bool = False):

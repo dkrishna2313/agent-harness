@@ -1,74 +1,151 @@
-# research_agent
+# Strategic Consulting Platform
 
-`research_agent` is a local research harness for AI data center infrastructure documents. It loads `.pdf`, `.md`, and `.txt` sources, uses Claude when configured, evaluates the memo in warning mode, and writes Markdown output.
-
-By default the harness uses Claude when `ANTHROPIC_API_KEY` is set. Use `--mock`
-for deterministic local testing. If `ANTHROPIC_API_KEY` is not configured or
-Claude fails, the harness logs a warning and continues with deterministic local
-fallback output.
+An agentic pipeline that transforms research questions and strategic engagement briefs
+into board-ready consulting deliverables — hypotheses, recommendations, strategic options,
+scenarios, and an executive report — grounded in evidence from your document corpus or
+knowledge store.
 
 ## Install
 
 ```bash
-python -m pip install -e ".[dev]"
+python3 -m pip install -e ".[dev]"
 ```
 
-## Run
+## Quick Start
+
+Run with a structured Strategic Engagement file:
 
 ```bash
-python -m research_agent.cli \
-  "Explain NVIDIA Rubin architecture and implications for AI data centers" \
+python3 -m functional_agents.cli run \
+  --engagement engagements/hyperscaler_ai_strategy.yaml \
+  --profiles ai_data_centers,transmission \
+  --mock
+```
+
+Or with a direct research question:
+
+```bash
+python3 -m functional_agents.cli run \
+  "What are the power and cooling requirements for AI data centers?" \
+  --profiles ai_data_centers \
   --sources ./sources \
-  --out ./outputs/rubin.md
+  --mock
 ```
 
-Each run also writes a JSON trace next to the Markdown output. For example,
-`./outputs/rubin.md` produces `./outputs/rubin.trace.json`.
+Each run automatically creates a timestamped output directory:
 
-Evidence is scored and ranked before synthesis. By default the top 50 evidence
-items are passed into memo synthesis; use `--top-evidence` to change that limit.
+```
+outputs/runs/RUN-20260705-103422/
+    report.md
+    pipeline.trace.json
+    research_object.json
+    engagement.json
+```
 
-Use `--debug` to print a concise terminal summary of loaded documents, evidence
-counts, memo sections, warnings, and the trace path:
+## CLI Reference
+
+```
+python3 -m functional_agents.cli run [OPTIONS] [QUESTION]
+```
+
+**Input (choose one):**
+
+| Option | Description |
+|---|---|
+| `QUESTION` | Research question (positional argument) |
+| `--goal TEXT` | Business goal — ProblemFramingAgent derives questions automatically |
+| `--engagement PATH` | Strategic Engagement YAML/JSON file |
+
+**Key options:**
+
+| Option | Default | Description |
+|---|---|---|
+| `--profiles TEXT` | `ai_data_centers` | Comma-separated domain profile names |
+| `--sources DIR` | `sources/` | Source documents directory |
+| `--out PATH` | auto (run dir) | Report output path |
+| `--mock` | off | Use deterministic mock client (no API key required) |
+| `--knowledge-store DIR` | auto-detect | Knowledge Store directory (hybrid retrieval) |
+| `--rerank` | off | Apply LLM reranking to retrieved evidence |
+| `--log-level LEVEL` | `PROGRESS` | `DEBUG`, `INFO`, `PROGRESS`, `WARNING`, `ERROR` |
+| `--model TEXT` | — | Override Anthropic model |
+
+## Configuration
+
+Set `ANTHROPIC_API_KEY` to run with Claude:
 
 ```bash
-python -m research_agent.cli \
-  "Explain NVIDIA Rubin architecture and implications for AI data centers" \
+export ANTHROPIC_API_KEY="sk-ant-..."
+python3 -m functional_agents.cli run \
+  --engagement engagements/hyperscaler_ai_strategy.yaml \
+  --profiles ai_data_centers,transmission
+```
+
+The default model is `claude-sonnet-4-6`. Override with `--model` or `ANTHROPIC_MODEL`.
+
+For deterministic local testing without an API key:
+
+```bash
+python3 -m functional_agents.cli run \
+  --engagement engagements/hyperscaler_ai_strategy.yaml \
+  --profiles ai_data_centers,transmission \
+  --mock
+```
+
+## Knowledge Store
+
+When a `knowledge_store/` directory is present (or specified via `--knowledge-store`),
+the platform uses hybrid semantic + lexical retrieval with optional LLM reranking instead
+of legacy document extraction. Build a knowledge store with:
+
+```bash
+python3 -m knowledge.cli ingest \
   --sources ./sources \
-  --out ./outputs/rubin.md \
-  --debug
+  --profiles ai_data_centers \
+  --out ./knowledge_store
 ```
 
-## Claude Configuration
+## Pipeline Architecture
 
-Set `ANTHROPIC_API_KEY` to use Claude. The default model is Claude Sonnet
-(`claude-sonnet-4-6`), and `ANTHROPIC_MODEL` or `--model` can override it.
+The platform runs 18 functional agents in sequence:
 
-```bash
-export ANTHROPIC_API_KEY="..."
-python -m research_agent.cli "Question" --sources ./sources --out ./outputs/memo.md
+```
+ProblemFramingAgent → ResearchStrategyAgent → PlannerAgent → EvidenceAgent
+→ HypothesisAgent → StrategicSynthesisAgent → ChallengeAgent
+→ AssumptionAgent → RiskAgent → OpportunityAgent
+→ RecommendationAgent → StrategicOptionAgent → DecisionAnalysisAgent
+→ ExecutiveConfidenceAgent → ScenarioAgent → QAAgent
+→ RecommendationImprovementAgent → ReportAgent
 ```
 
-For deterministic local testing without Claude:
+Each agent writes its outputs to `AgentContext` (a shared in-memory state object).
+`ReportAgent` assembles everything into a Markdown deliverable.
 
-```bash
-python -m research_agent.cli "Question" --sources ./sources --out ./outputs/memo.md --mock
+## Run Summary
+
+After each run the CLI prints:
+
+```
+Run:      3f7a2c9d1e8b
+Mode:     Strategic Engagement
+Profiles: ai_data_centers, transmission
+Status:   SUCCESS
+Agents:   18 run
+Elapsed:  1.4s
+
+Deliverables:
+  [OK] Report             outputs/runs/RUN-20260705-103422/report.md
+  [OK] Pipeline trace     outputs/runs/RUN-20260705-103422/pipeline.trace.json
+  [OK] Research object    outputs/runs/RUN-20260705-103422/research_object.json
+  [OK] Engagement         outputs/runs/RUN-20260705-103422/engagement.json
+
+Output:   outputs/runs/RUN-20260705-103422/
 ```
 
-## Memo Sections
+## Logging
 
-Every memo includes:
-
-- Executive Summary
-- Confirmed Facts
-- Inferences
-- Power Implications
-- Cooling Implications
-- Networking Implications
-- Rack Architecture Implications
-- Open Questions
-- Source Notes
-- Evaluation Warnings
+Use `--log-level PROGRESS` (default) to see agent progress messages during the run.
+Use `--log-level DEBUG` for full diagnostic output.
+Use `--log-level WARNING` for silent production mode.
 
 ## Tests
 
@@ -76,14 +153,32 @@ Every memo includes:
 pytest
 ```
 
-## Evaluation Suite
-
-Run the lightweight regression questions:
+Run a specific test file:
 
 ```bash
-python -m research_agent.eval_runner \
-  --sources ./sources \
-  --evals ./evals/questions.yaml \
-  --out ./outputs/eval_report.md
+pytest tests/test_ph43_ux.py -v
 ```
-# research-agent
+
+## Engagement Files
+
+Strategic Engagement files define the client context and research objectives:
+
+```yaml
+engagement:
+  title: "Hyperscaler AI Infrastructure Strategy"
+  client: "Hyperscaler Inc."
+  industry: "AI Infrastructure"
+  current_situation: "Planning a 500 MW AI data center campus."
+  objectives:
+    - "Identify power acquisition strategies"
+    - "Determine cooling architecture for GB300 deployments"
+  constraints:
+    - "24-month deployment window"
+    - "Net-zero commitment by 2030"
+  stakeholders:
+    - "CIO"
+    - "Energy Procurement"
+  decision_horizon: "24 months"
+```
+
+Example files are in `engagements/`.
