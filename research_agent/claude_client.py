@@ -2427,7 +2427,7 @@ def _planning_prompt(
     profile_lines = ""
     for p in profiles_context:
         name = p.get("name", "unknown")
-        desc = p.get("description", "")
+        desc = p.get("description", "")[:100]  # PH4.2: truncate to avoid bloat from long profile descriptions
         topics = ", ".join(p.get("key_topics", []))
         profile_lines += f"\n- {name}: {desc}"
         if topics:
@@ -2603,28 +2603,28 @@ def _hypothesis_prompt(
     areas = ", ".join(decision_model.get("decision_areas", []))
     uncertainties = "\n".join(f"  - {u}" for u in decision_model.get("critical_uncertainties", []))
 
-    # Summarise evidence (max 12 items for prompt size — J8.8b)
+    # Summarise evidence (max 8 items for prompt size — PH4.2; source omitted: not used in hypothesis reasoning)
     ev_lines = ""
-    for e in evidence_items[:12]:
+    for e in evidence_items[:8]:
         eid = e.get("evidence_id", "?")
-        claim = e.get("claim", e.get("text", ""))[:100]
-        source = e.get("source_document", "")
-        ev_lines += f"\n  [{eid}] {claim} (source: {source})"
+        claim = e.get("claim", e.get("text", ""))[:80]
+        ev_lines += f"\n  [{eid}] {claim}"
 
     # Contradictions
     contra_lines = ""
-    for c in contradictions[:5]:
-        contra_lines += f"\n  - {c.get('topic', '?')}: {c.get('summary', '')[:100]}"
+    for c in contradictions[:4]:
+        contra_lines += f"\n  - {c.get('topic', '?')}: {c.get('summary', '')[:80]}"
 
     # Coverage summary
     coverage_lines = ""
-    for profile, level in list(profile_coverage.items())[:6]:
+    for profile, level in list(profile_coverage.items())[:5]:
         coverage_lines += f"\n  - {profile}: {level}"
 
+    # Cap research questions at top 6 (sorted by priority) — PH4.2
     rq_list = "\n".join(
         f"  {i+1}. {rqp.get('question', '')}"
         for i, rqp in enumerate(
-            sorted(research_strategy.get("research_question_priorities", []), key=lambda x: x.get("priority", 99))
+            sorted(research_strategy.get("research_question_priorities", []), key=lambda x: x.get("priority", 99))[:6]
         )
     )
 
@@ -2641,7 +2641,7 @@ Critical Uncertainties:
 Research Questions (priority order):
 {rq_list if rq_list else "  (none)"}
 
-Evidence Collected (up to 12 items):
+Evidence Collected (up to 8 items):
 {ev_lines if ev_lines else "  (no evidence available)"}
 
 Profile Coverage:{coverage_lines if coverage_lines else " (none)"}
@@ -2684,7 +2684,7 @@ def _challenge_prompt(
     for h in hypotheses:
         hid = h.get("id", "?")
         title = h.get("title", "")
-        summary = h.get("summary", "")[:150]
+        summary = h.get("summary", "")[:120]  # PH4.2: 150→120
         sup = ", ".join(h.get("supporting_evidence", [])[:4]) or "none"
         con = ", ".join(h.get("contradicting_evidence", [])[:3]) or "none"
         gaps = "; ".join(h.get("evidence_gaps", [])[:2]) or "none stated"
@@ -2697,14 +2697,13 @@ def _challenge_prompt(
         )
 
     ev_lines = ""
-    for e in evidence_items[:10]:
+    for e in evidence_items[:8]:  # PH4.2: 10→8
         eid = e.get("evidence_id", "")
-        claim = e.get("claim", "")[:100]
-        src = e.get("source_document", "")
-        ev_lines += f"  {eid}: {claim} (source: {src})\n"
+        claim = e.get("claim", "")[:80]  # PH4.2: 100→80
+        ev_lines += f"  {eid}: {claim}\n"
 
     contra_lines = ""
-    for c in contradictions[:5]:
+    for c in contradictions[:4]:  # PH4.2: 5→4
         cid = c.get("contradiction_id", "?")
         topic = c.get("topic", "")
         sev = c.get("severity", "")
@@ -3140,14 +3139,14 @@ def _strategic_options_prompt(
     a_lines = ""
     for a in assumptions:
         a_id = a.get("assumption_id", "?")
-        stmt = a.get("statement", "")[:100]
+        stmt = a.get("statement", "")[:80]  # PH4.2: 100→80
         imp = a.get("importance", "")
         a_lines += f"\n  {a_id} [{imp}]: {stmt}"
 
     risk_lines = ""
     for r in risks:
         r_id = r.get("risk_id", "?")
-        stmt = r.get("statement", "")[:100]
+        stmt = r.get("statement", "")[:80]  # PH4.2: 100→80
         sev = r.get("severity", "")
         a_ids = ", ".join(r.get("related_assumption_ids", [])) or "none"
         risk_lines += f"\n  {r_id} [{sev}]: {stmt}  (threatens: {a_ids})"
@@ -3155,7 +3154,7 @@ def _strategic_options_prompt(
     opp_lines = ""
     for o in opportunities:
         o_id = o.get("opportunity_id", "?")
-        stmt = o.get("statement", "")[:100]
+        stmt = o.get("statement", "")[:80]  # PH4.2: 100→80
         imp = o.get("impact", "")
         a_ids = ", ".join(o.get("related_assumption_ids", [])) or "none"
         opp_lines += f"\n  {o_id} [{imp}]: {stmt}  (via: {a_ids})"
@@ -3163,14 +3162,14 @@ def _strategic_options_prompt(
     rec_lines = ""
     for r in recommendations:
         r_id = r.get("recommendation_id", r.get("id", "?"))
-        title = r.get("title", r.get("recommendation", ""))[:100]
+        title = r.get("title", r.get("recommendation", ""))[:80]  # PH4.2: 100→80
         a_ids = ", ".join(r.get("supported_assumption_ids", [])) or "none"
         rec_lines += f"\n  {r_id}: {title}  (assumptions: {a_ids})"
 
     ev_lines = ""
     for e in evidence_items[:6]:
         eid = e.get("evidence_id", "")
-        claim = e.get("claim", "")[:80]
+        claim = e.get("claim", "")[:70]  # PH4.2: 80→70
         ev_lines += f"\n  {eid}: {claim}"
 
     return f"""You are a senior strategy consultant producing a Strategic Options analysis.
