@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from .composer import ExecutiveNarrativeComposer
 from .executive_narrative import ExecutiveNarrative
 
 if TYPE_CHECKING:
@@ -60,6 +61,8 @@ class ExecutiveNarrativeBuilder:
             long_term_actions=self._extract_portfolio_actions(context, "long_term"),
             supporting_evidence=self._extract_supporting_evidence(context),
         )
+        # J12.4 — compose story fields and enrich why_this_option with advantages.
+        ExecutiveNarrativeComposer().compose(narrative)
         context.executive_narrative = narrative.to_dict()
         return narrative
 

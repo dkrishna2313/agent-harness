@@ -353,3 +353,29 @@ def test_executive_brief_confidence_limiters_rendered():
     """confidence_limiters from ExecutiveNarrative appear in the confidence section."""
     content = build_executive_brief_content(_make_executive_context())
     assert "Regulatory timeline uncertainty" in content
+
+
+# ---------------------------------------------------------------------------
+# J12.4 — Composer improvements (why_this_option enrichment)
+# ---------------------------------------------------------------------------
+
+def test_executive_brief_why_section_enriched_with_recommended_option_advantages():
+    """Composer enriches why_this_option with the recommended option's advantages.
+
+    _make_executive_context() has OPT-A with advantages ["Lower downside risk",
+    "Preserves flexibility"]. After J12.4 these appear in section 4.
+    """
+    content = build_executive_brief_content(_make_executive_context())
+    section_4 = content.split("## 4.")[1].split("## 5.")[0]
+    assert "Lower downside risk" in section_4
+    assert "Preserves flexibility" in section_4
+
+
+def test_executive_brief_story_fields_accessible_from_context_narrative():
+    """context.executive_narrative exposes story fields after generation."""
+    ctx = _make_executive_context()
+    build_executive_brief_content(ctx)
+    narrative_dict = ctx.executive_narrative
+    assert narrative_dict.get("decision_story", "") != ""
+    assert narrative_dict.get("risk_story", "") != ""
+    assert narrative_dict.get("confidence_story", "") != ""

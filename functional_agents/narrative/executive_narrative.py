@@ -1,7 +1,7 @@
-"""ExecutiveNarrative — canonical executive communication contract (J12.0–J12.3).
+"""ExecutiveNarrative — canonical executive communication contract (J12.0–J12.4).
 
-CONTRACT VERSION: 1.0  (frozen J12.3)
-======================================
+CONTRACT VERSION: 1.1  (frozen J12.3; extended J12.4 with story fields)
+========================================================================
 
 ExecutiveNarrative is the canonical communication model for all executive-facing
 deliverables. It is assembled once from a completed Strategic Reasoning Graph by
@@ -13,12 +13,14 @@ Architecture
 Strategic Reasoning Graph (AgentContext)
     │
     ▼  ExecutiveNarrativeBuilder.build()
+    │   (field extraction)
+    ▼  ExecutiveNarrativeComposer.compose()
+    │   (story field composition + why_this_option enrichment)
+ExecutiveNarrative  (this object — communication contract v1.1)
     │
-ExecutiveNarrative  (this object — communication contract v1.0)
-    │
-    ├── ExecutiveBriefGenerator   (J12.1)
-    ├── StrategyDeckGenerator     (J12.2)
-    └── MarkdownReportGenerator   (J12.4, planned)
+    ├── ExecutiveBriefGenerator   (J12.1, improved J12.4)
+    ├── StrategyDeckGenerator     (J12.2, improved J12.4)
+    └── MarkdownReportGenerator   (J12.5, planned)
 
 Design invariants
 -----------------
@@ -41,11 +43,12 @@ Field contract (v1.0)
 version
   Purpose   Schema version for this narrative instance. Consumers may use this
             to negotiate schema differences across pipeline versions.
-  Source    Dataclass default ``"1.0"``; not read from AgentContext.
+  Source    Dataclass default ``"1.1"``; not read from AgentContext.
   Consumers All generators (forward-compatibility guard).
-  Required  Yes — always ``"1.0"`` in this release.
-  Evolution Increment to ``"2.0"`` only when an existing field changes semantics
-            or is removed. Additive fields do not require a version bump.
+  Required  Yes — always ``"1.1"`` in this release.
+  Evolution ``"1.0"`` → ``"1.1"`` (J12.4): story fields added (additive; no
+            semantic changes to existing fields). Increment to ``"2.0"`` only
+            when an existing field changes semantics or is removed.
 
 decision
   Purpose   Executive decision statement — the question being decided.
@@ -188,13 +191,49 @@ supporting_evidence
   Required  No — empty list when HypothesisAgent / ChallengeAgent did not run.
   Evolution Add keys to each evidence dict.
 
-Evolution rules (contract v1.0)
+decision_story  [J12.4 — composed by ExecutiveNarrativeComposer]
+  Purpose   Coherent prose paragraph answering: what decision, why now, which
+            option wins, why it wins, option landscape, key tradeoffs.
+  Source    Composed from: decision, executive_summary, recommended_option,
+            why_this_option (enriched), option_rankings / strategic_options
+            (count), key_tradeoffs.
+  Consumers MarkdownReportGenerator (J12.5+), any consumer wanting a single
+            executive paragraph instead of structured sub-fields.
+  Required  No — empty string when context is insufficient.
+  Evolution Append sentences; do not remove existing composition inputs.
+
+risk_story  [J12.4 — composed by ExecutiveNarrativeComposer]
+  Purpose   Coherent prose paragraph covering risk count, severity distribution,
+            top-3 risks with mitigations, and connection to near-term actions.
+  Source    Composed from: key_risks (risk_id, statement, severity, mitigation),
+            immediate_actions (id, title).
+  Consumers MarkdownReportGenerator (J12.5+).
+  Required  No — empty string when key_risks is empty.
+  Evolution Append sentences; do not change risk count logic.
+
+confidence_story  [J12.4 — composed by ExecutiveNarrativeComposer]
+  Purpose   Coherent prose paragraph covering confidence assessment, rationale,
+            assumptions underpinning confidence, drivers/limiters, validation
+            priorities, and critical unknowns.
+  Source    Composed from: executive_confidence (overall_confidence,
+            decision_readiness, board_recommendation, confidence_rationale,
+            confidence_drivers, confidence_limiters), critical_assumptions,
+            validation_priorities, critical_unknowns.
+  Consumers MarkdownReportGenerator (J12.5+).
+  Required  No — empty string when executive_confidence is empty.
+  Evolution Append sentences; do not change assumption-filtering logic.
+
+Evolution rules (contract v1.1)
 --------------------------------
-- NEW FIELDS: always additive; default to empty string / [] / {}; no version bump.
+- NEW FIELDS: always additive; default to empty string / [] / {}. Minor version
+  bump (e.g. 1.0→1.1) is optional but recommended when a batch of fields is
+  added together, to aid schema negotiation.
 - REMOVED FIELDS: requires version increment to "2.0"; must deprecate one release
   prior by emitting the field as empty and logging a deprecation notice.
 - RENAMED FIELDS: not permitted; add a new field and emit both for one release.
 - SEMANTIC CHANGES: requires version increment to "2.0".
+- v1.0→v1.1 (J12.4): added decision_story, risk_story, confidence_story; enriched
+  why_this_option with recommended-option advantages.
 """
 
 from __future__ import annotations
@@ -202,9 +241,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-#: Schema version for this contract. Increment to "2.0" only on a semantic
-#: breaking change (removal or rename of an existing field).
-NARRATIVE_CONTRACT_VERSION = "1.0"
+#: Schema version for this contract. See evolution rules in the module docstring.
+#: v1.0→v1.1 (J12.4): story fields added; why_this_option enrichment introduced.
+NARRATIVE_CONTRACT_VERSION = "1.1"
 
 
 @dataclass
@@ -248,10 +287,15 @@ class ExecutiveNarrative:
     # ── Supporting evidence ───────────────────────────────────────────────────
     supporting_evidence: list[dict[str, Any]] = field(default_factory=list)
 
+    # ── Story fields (J12.4 — composed by ExecutiveNarrativeComposer) ─────────
+    decision_story: str = ""
+    risk_story: str = ""
+    confidence_story: str = ""
+
     def to_dict(self) -> dict[str, Any]:
         """Serialise to a plain JSON-serialisable dict.
 
-        All 18 fields are always present — consumers can rely on key presence
+        All 21 fields are always present — consumers can rely on key presence
         without ``get()`` guards. Empty values (``""``, ``[]``, ``{}``) signal
         "not computed for this run"; ``None`` is never emitted.
         """
@@ -274,6 +318,9 @@ class ExecutiveNarrative:
             "medium_term_actions": self.medium_term_actions,
             "long_term_actions": self.long_term_actions,
             "supporting_evidence": self.supporting_evidence,
+            "decision_story": self.decision_story,   # J12.4
+            "risk_story": self.risk_story,           # J12.4
+            "confidence_story": self.confidence_story,  # J12.4
         }
 
     @classmethod
@@ -281,7 +328,8 @@ class ExecutiveNarrative:
         """Restore from a dict (e.g. ``context.executive_narrative``).
 
         Forward-compatible: unknown keys are ignored; missing keys use defaults.
-        Pre-v1.0 dicts (no ``version`` key) are treated as v1.0.
+        Pre-v1.1 dicts (no ``version`` key, or version ``"1.0"``) deserialise
+        cleanly — story fields default to empty string.
         """
         if not data:
             return cls()
@@ -304,4 +352,7 @@ class ExecutiveNarrative:
             medium_term_actions=list(data.get("medium_term_actions") or []),
             long_term_actions=list(data.get("long_term_actions") or []),
             supporting_evidence=list(data.get("supporting_evidence") or []),
+            decision_story=data.get("decision_story", ""),   # J12.4
+            risk_story=data.get("risk_story", ""),           # J12.4
+            confidence_story=data.get("confidence_story", ""),  # J12.4
         )

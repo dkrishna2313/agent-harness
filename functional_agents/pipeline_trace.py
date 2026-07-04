@@ -123,11 +123,15 @@ def build_canonical_trace(context: Any) -> dict[str, Any]:
     # ran on this context; None otherwise. Additive — not in _REQUIRED_TOP_LEVEL_KEYS.
     deliverable_bundle = dict(getattr(context, "deliverable_bundle", None) or {}) or None
 
-    # J12.0 — Executive Narrative: {"generated": True, "version": "..."} when
-    # ExecutiveNarrativeBuilder ran on this context; None otherwise. Additive.
-    # J12.3 — version added so trace consumers can negotiate schema differences.
+    # J12.0 — Executive Narrative entry when ExecutiveNarrativeBuilder ran; None otherwise.
+    # J12.3 — version added for schema negotiation.
+    # J12.4 — composer flag added; always "deterministic" (NarrativeComposer is pure
+    #          string assembly over already-extracted facts).
     en = dict(getattr(context, "executive_narrative", None) or {})
-    executive_narrative_entry = {"generated": True, "version": en.get("version", "")} if en else None
+    executive_narrative_entry = (
+        {"generated": True, "version": en.get("version", ""), "composer": "deterministic"}
+        if en else None
+    )
 
     contracts = {
         "functional_agent_contract": "FunctionalAgent.run(context: AgentContext) -> AgentResult",

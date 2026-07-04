@@ -528,3 +528,29 @@ def test_strategy_deck_slide_04_marks_recommended_option_via_narrative():
     slide_4 = content.split("# Slide 4")[1].split("\n---\n\n")[0]
     assert "✓" in slide_4
     assert "OPT-001" in slide_4
+
+
+# ---------------------------------------------------------------------------
+# J12.4 — Composer improvements (why_this_option enrichment)
+# ---------------------------------------------------------------------------
+
+def test_strategy_deck_slide_05_rationale_enriched_with_advantages():
+    """Composer enriches why_this_option with OPT-001 advantages from _full_ctx().
+
+    _full_ctx() has strategic_options[0] with advantages ["Fast time to market",
+    "Full control"]. After J12.4 these appear in the slide 5 rationale line.
+    """
+    content = build_strategy_deck_content(_full_ctx())
+    slide_5 = content.split("# Slide 5")[1].split("\n---\n\n")[0]
+    assert "Fast time to market" in slide_5
+    assert "Full control" in slide_5
+
+
+def test_strategy_deck_story_fields_accessible_from_context_narrative():
+    """context.executive_narrative exposes story fields after deck generation."""
+    ctx = _full_ctx()
+    build_strategy_deck_content(ctx)
+    narrative_dict = ctx.executive_narrative
+    assert narrative_dict.get("decision_story", "") != ""
+    assert narrative_dict.get("risk_story", "") != ""
+    assert narrative_dict.get("confidence_story", "") != ""

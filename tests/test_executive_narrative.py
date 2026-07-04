@@ -100,7 +100,7 @@ def _empty_ctx() -> AgentContext:
 
 def test_executive_narrative_default_fields():
     en = ExecutiveNarrative()
-    assert en.version == "1.0"           # J12.3
+    assert en.version == "1.1"           # J12.3/J12.4
     assert en.decision == ""
     assert en.executive_summary == ""
     assert en.recommended_option == {}
@@ -118,6 +118,9 @@ def test_executive_narrative_default_fields():
     assert en.medium_term_actions == []  # J12.2
     assert en.long_term_actions == []    # J12.2
     assert en.supporting_evidence == []  # J12.2
+    assert en.decision_story == ""       # J12.4
+    assert en.risk_story == ""           # J12.4
+    assert en.confidence_story == ""     # J12.4
 
 
 def test_executive_narrative_to_dict_includes_all_fields():
@@ -131,6 +134,7 @@ def test_executive_narrative_to_dict_includes_all_fields():
         "option_rankings", "critical_unknowns",          # J12.1
         "strategic_options", "medium_term_actions",      # J12.2
         "long_term_actions", "supporting_evidence",      # J12.2
+        "decision_story", "risk_story", "confidence_story",  # J12.4
     }
     assert set(d.keys()) == expected_keys
 
@@ -158,7 +162,8 @@ def test_executive_narrative_from_dict_round_trips():
         supporting_evidence=[{"id": "H-1", "title": "AI demand grows", "confidence": "high"}],
     )
     restored = ExecutiveNarrative.from_dict(original.to_dict())
-    assert restored.version == original.version       # J12.3
+    assert restored.version == original.version           # J12.3
+    assert restored.decision_story == original.decision_story  # J12.4
     assert restored.decision == original.decision
     assert restored.executive_summary == original.executive_summary
     assert restored.recommended_option == original.recommended_option
@@ -428,7 +433,9 @@ def test_canonical_trace_includes_executive_narrative_key_after_build():
     ExecutiveNarrativeBuilder().build(ctx)
     trace = build_canonical_trace(ctx)
     assert "executive_narrative" in trace
-    assert trace["executive_narrative"] == {"generated": True, "version": "1.0"}  # J12.3
+    assert trace["executive_narrative"] == {
+        "generated": True, "version": "1.1", "composer": "deterministic",
+    }  # J12.3/J12.4
 
 
 def test_canonical_trace_executive_narrative_is_none_before_build():
@@ -604,22 +611,23 @@ def test_builder_key_risks_mitigation_empty_string_when_absent():
 
 def test_executive_narrative_version_default():
     en = ExecutiveNarrative()
-    assert en.version == "1.0"
+    assert en.version == "1.1"
 
 
 def test_executive_narrative_version_in_to_dict():
     en = ExecutiveNarrative()
     d = en.to_dict()
     assert "version" in d
-    assert d["version"] == "1.0"
+    assert d["version"] == "1.1"
 
 
 def test_executive_narrative_from_dict_backward_compat_no_version_key():
-    """Pre-v1.0 dicts without a version key must deserialise as version 1.0."""
+    """Legacy dicts without a version key deserialise as the current version."""
     data = {"decision": "Should we invest?", "executive_summary": "Yes."}
     en = ExecutiveNarrative.from_dict(data)
-    assert en.version == "1.0"
+    assert en.version == "1.1"  # defaults to NARRATIVE_CONTRACT_VERSION
     assert en.decision == "Should we invest?"
+    assert en.decision_story == ""  # J12.4 story fields default to empty
 
 
 def test_executive_narrative_from_dict_preserves_explicit_version():
@@ -631,7 +639,7 @@ def test_executive_narrative_from_dict_preserves_explicit_version():
 def test_builder_sets_version_in_context_narrative():
     ctx = _full_ctx()
     ExecutiveNarrativeBuilder().build(ctx)
-    assert ctx.executive_narrative.get("version") == "1.0"
+    assert ctx.executive_narrative.get("version") == "1.1"
 
 
 def test_builder_is_deterministic():
@@ -653,11 +661,11 @@ def test_executive_narrative_no_none_values_in_to_dict():
 
 
 def test_executive_narrative_all_fields_present_in_to_dict_even_when_empty():
-    """Even an empty-context narrative must have all 18 keys in to_dict()."""
+    """Even an empty-context narrative must have all 21 keys in to_dict()."""
     ctx = _empty_ctx()
     narrative = ExecutiveNarrativeBuilder().build(ctx)
     d = narrative.to_dict()
-    assert len(d) == 18, f"Expected 18 keys, got {len(d)}: {sorted(d)}"
+    assert len(d) == 21, f"Expected 21 keys, got {len(d)}: {sorted(d)}"
     for key, value in d.items():
         assert value is not None, f"Empty-context to_dict() emitted None for '{key}'"
 
@@ -673,3 +681,142 @@ def test_canonical_trace_executive_narrative_version_is_absent_before_build():
     ctx = _full_ctx()
     trace = build_canonical_trace(ctx)
     assert trace["executive_narrative"] is None
+
+
+# ---------------------------------------------------------------------------
+# J12.4 — Narrative Composition Engine
+# ---------------------------------------------------------------------------
+
+def test_executive_narrative_version_is_1_1():
+    en = ExecutiveNarrative()
+    assert en.version == "1.1"
+
+
+def test_builder_narrative_version_is_1_1():
+    ctx = _full_ctx()
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    assert narrative.version == "1.1"
+
+
+def test_composer_story_fields_non_empty_on_full_context():
+    ctx = _full_ctx()
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    assert narrative.decision_story != "", "decision_story should be non-empty on full context"
+    assert narrative.risk_story != "", "risk_story should be non-empty on full context"
+    assert narrative.confidence_story != "", "confidence_story should be non-empty on full context"
+
+
+def test_composer_story_fields_are_strings():
+    ctx = _empty_ctx()
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    assert isinstance(narrative.decision_story, str)
+    assert isinstance(narrative.risk_story, str)
+    assert isinstance(narrative.confidence_story, str)
+
+
+def test_composer_is_deterministic():
+    ctx = _full_ctx()
+    n1 = ExecutiveNarrativeBuilder().build(ctx)
+    ctx.executive_narrative = {}
+    n2 = ExecutiveNarrativeBuilder().build(ctx)
+    assert n1.decision_story == n2.decision_story
+    assert n1.risk_story == n2.risk_story
+    assert n1.confidence_story == n2.confidence_story
+
+
+def test_composer_decision_story_traces_decision_field():
+    ctx = _full_ctx()
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    # decision statement must appear verbatim in decision_story
+    assert narrative.decision in narrative.decision_story or \
+           narrative.decision.rstrip(".") in narrative.decision_story
+
+
+def test_composer_decision_story_traces_executive_summary():
+    ctx = _full_ctx()
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    # executive_summary text must appear in decision_story
+    summary_fragment = narrative.executive_summary[:30]
+    assert summary_fragment in narrative.decision_story
+
+
+def test_composer_risk_story_traces_key_risks():
+    ctx = _full_ctx()
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    # All risk_ids in key_risks must appear in risk_story
+    for r in narrative.key_risks:
+        assert r["risk_id"] in narrative.risk_story, \
+            f"{r['risk_id']} not found in risk_story"
+
+
+def test_composer_confidence_story_traces_executive_confidence():
+    ctx = _full_ctx()
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    ec = narrative.executive_confidence
+    # Core confidence values must appear in confidence_story
+    assert ec.get("overall_confidence", "") in narrative.confidence_story
+    assert ec.get("decision_readiness", "") in narrative.confidence_story
+
+
+def test_composer_enriches_why_this_option_with_advantages():
+    ctx = _full_ctx()
+    ctx.strategic_options[0]["advantages"] = ["Full control", "No vendor lock-in"]
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    assert "Full control" in narrative.why_this_option
+    assert "No vendor lock-in" in narrative.why_this_option
+
+
+def test_composer_enriched_why_this_option_preserves_original_rationale():
+    ctx = _full_ctx()
+    ctx.strategic_options[0]["advantages"] = ["Advantage A"]
+    original_rationale = ctx.decision_analysis["rationale"]
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    assert original_rationale.rstrip(".") in narrative.why_this_option
+
+
+def test_composer_does_not_enrich_why_this_option_when_no_advantages():
+    ctx = _full_ctx()
+    # strategic_options[0] has no advantages key in _full_ctx()
+    original = ctx.decision_analysis["rationale"]
+    narrative = ExecutiveNarrativeBuilder().build(ctx)
+    assert narrative.why_this_option == original
+
+
+def test_composer_does_not_add_to_agent_history():
+    ctx = _full_ctx()
+    ctx.agent_history.append({"agent": "FakeAgent", "status": "success"})
+    before = len(ctx.agent_history)
+    ExecutiveNarrativeBuilder().build(ctx)
+    assert len(ctx.agent_history) == before
+
+
+def test_composer_does_not_mutate_key_risks_list():
+    ctx = _full_ctx()
+    risks_snapshot = [dict(r) for r in ctx.risks]
+    ExecutiveNarrativeBuilder().build(ctx)
+    assert ctx.risks == risks_snapshot
+
+
+def test_canonical_trace_includes_composer_flag_after_build():
+    ctx = _full_ctx()
+    ExecutiveNarrativeBuilder().build(ctx)
+    trace = build_canonical_trace(ctx)
+    en_entry = trace["executive_narrative"]
+    assert en_entry is not None
+    assert en_entry.get("composer") == "deterministic"
+
+
+def test_backward_compat_v10_dict_deserialises_story_fields_as_empty():
+    """A v1.0 dict (no story fields) must deserialise with empty story fields."""
+    data = {
+        "version": "1.0",
+        "decision": "Should we invest?",
+        "executive_summary": "Yes.",
+        "why_this_option": "Best option.",
+    }
+    en = ExecutiveNarrative.from_dict(data)
+    assert en.version == "1.0"          # explicit version preserved
+    assert en.decision == "Should we invest?"
+    assert en.decision_story == ""      # graceful default
+    assert en.risk_story == ""
+    assert en.confidence_story == ""
