@@ -3558,23 +3558,26 @@ def re_findall_json_fences(text: str) -> list[str]:
 
 
 def _normalize_tool_input(tool_input: Any) -> Any:
-    """Coerce string-encoded list fields to actual lists before schema validation.
+    """Coerce string-encoded list or object fields to their parsed types before schema validation.
 
-    Some models return ``{"evidence_items": "[{...}]"}`` — a JSON-encoded string
-    where a list is expected.  Pydantic v2 does not coerce strings to lists, so
-    we pre-process the dict and decode any string-valued list fields.
+    Some models return ``{"evidence_items": "[{...}]"}`` or ``{"analysis": "{...}"}`` —
+    JSON-encoded strings where a list or object is expected. Pydantic v2 does not
+    coerce strings to lists or BaseModel instances, so we pre-process the dict and
+    decode any string-valued fields whose content is a JSON array or object.
     """
     if not isinstance(tool_input, dict):
         return tool_input
     result = dict(tool_input)
     for key, value in result.items():
-        if isinstance(value, str) and value.strip().startswith("["):
-            try:
-                decoded = json.loads(value)
-                if isinstance(decoded, list):
-                    result[key] = decoded
-            except (json.JSONDecodeError, ValueError):
-                pass
+        if isinstance(value, str):
+            stripped = value.strip()
+            if stripped.startswith("[") or stripped.startswith("{"):
+                try:
+                    decoded = json.loads(stripped)
+                    if isinstance(decoded, (list, dict)):
+                        result[key] = decoded
+                except (json.JSONDecodeError, ValueError):
+                    pass
     return result
 
 
