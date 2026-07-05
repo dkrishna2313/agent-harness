@@ -113,9 +113,13 @@ def _map_evidence_to_areas(
         eid = getattr(item, "evidence_id", "") or ""
         category = getattr(item, "category", "") or ""
         topics = getattr(item, "topics", []) or []
+        claim = getattr(item, "claim", "") or ""
 
-        # Signals: category name → canonical area + topics text
-        signal_texts = [category] + list(topics)
+        # Signals: category + topics + claim text (mirrors _map_evidence_to_subquestions).
+        # Topics is always [] in the KB path; without claim, only the short category
+        # string is available, causing investigation areas to go unmapped even when
+        # evidence clearly covers them.
+        signal_texts = [category] + list(topics) + [claim]
         combined = " ".join(signal_texts).lower()
 
         for area in investigation_areas:
