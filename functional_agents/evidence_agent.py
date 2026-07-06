@@ -211,8 +211,20 @@ def _attribute_evidence_profiles(
 
     term_sets = _build_profile_term_sets(domain_profiles)
     profile_names = [p.name for p in domain_profiles]
+    profile_name_set = set(profile_names)
 
     for item in items:
+        # J11.4 — domain-match attribution: evidence from domain D belongs to profile D
+        # when D is a requested profile name.  Knowledge builder intentionally places
+        # items in domain D; using that signal is more reliable than keyword scoring
+        # alone, which fails when a profile's content does not use its own keyword terms
+        # (e.g. ai_data_centers items about permitting/incentives score 0 for ai_data_centers
+        # hardware keywords but ≥1 for transmission keywords).
+        source_domain = item.get("source_domain", "")
+        if source_domain and source_domain in profile_name_set:
+            item["source_profile"] = source_domain
+            continue
+
         text = " ".join([
             item.get("claim", ""),
             " ".join(item.get("topics", [])),
@@ -577,6 +589,8 @@ class EvidenceAgent(FunctionalAgent):
                     c.evidence.supporting_source_ids[0]
                     if c.evidence.supporting_source_ids else "knowledge_store"
                 ),
+                # J11.4 — carry knowledge-store domain for domain-match attribution
+                "source_domain": getattr(c, "source_domain", ""),
             }
             for c in candidates
         ]

@@ -158,6 +158,9 @@ class RetrievedEvidence:
     source: Source | None = field(default=None, repr=False)
     lexical_score: float = field(default=0.0, repr=False)
     semantic_score: float = field(default=0.0, repr=False)
+    # J11.4 — track which knowledge-store domain this item came from so
+    # profile attribution can use domain-match as the primary signal.
+    source_domain: str = field(default="", repr=False)
 
     def load_source(self, store: KnowledgeStore) -> Source | None:
         """Lazy-load the primary Source for this evidence item."""
@@ -385,6 +388,8 @@ class EvidenceRetriever:
         matched_candidates = 0
         # (final_score, lex_rel, sem_score, ev, meta)
         scored: list[tuple[float, float, float, Evidence, KnowledgeMetadata]] = []
+        # J11.4 — side-map evidence_id → domain for source_domain attribution
+        domain_map: dict[str, str] = {}
         lex_count = 0
         sem_count = 0
         both_count = 0
@@ -411,6 +416,7 @@ class EvidenceRetriever:
                         continue
                     matched_candidates += 1
                     scored.append((score, score, 0.0, ev, meta))
+                    domain_map[ev.evidence_id] = dom
 
                 elif mode == RETRIEVAL_MODE_SEMANTIC:
                     sem = self._cosine(ev.evidence_id, q_norm)
@@ -421,6 +427,7 @@ class EvidenceRetriever:
                         continue
                     matched_candidates += 1
                     scored.append((score, 0.0, sem, ev, meta))
+                    domain_map[ev.evidence_id] = dom
 
                 else:  # hybrid
                     lex_rel = self._relevance_score(ev.statement, query_terms, intent)
@@ -445,6 +452,7 @@ class EvidenceRetriever:
                         continue
                     matched_candidates += 1
                     scored.append((score, lex_rel, sem, ev, meta))
+                    domain_map[ev.evidence_id] = dom
 
         # Sort by combined score; tiebreak on overall_score
         scored.sort(key=lambda x: (x[0], x[4].overall_score), reverse=True)
@@ -459,6 +467,7 @@ class EvidenceRetriever:
                 rank=rank,
                 lexical_score=round(lex_rel, 4),
                 semantic_score=round(sem, 4),
+                source_domain=domain_map.get(ev.evidence_id, ""),
             )
             if load_sources:
                 item.load_source(self.store)
