@@ -42,14 +42,35 @@ def _overlap_score(text: str, reference: str) -> int:
     return len(_tokens(text) & _tokens(reference))
 
 
+# Minimum token-overlap score for secondary subquestion assignment (J11.5).
+# Primary assignment is always winner-take-all. Secondary assignment lets an
+# item also appear in any additional subquestion that scores >= this threshold,
+# so that composite/synthesis subquestions (which ask for a ranking or
+# assessment derived from several component topics) receive coverage from
+# evidence that is primarily mapped to their component subquestions.
+_SQ_SECONDARY_THRESHOLD = 3
+
+
 def _map_evidence_to_subquestions(
     evidence_items: list[Any],
     subquestions: list[str],
 ) -> dict[str, list[str]]:
-    """Map each evidence item to its best-matching subquestion by token overlap.
+    """Map each evidence item to subquestions by token overlap.
 
-    An item is assigned to the subquestion with the highest overlap score.
+    Primary assignment: winner-take-all — each item is assigned to the
+    subquestion with the highest overlap score.
+
+    Secondary assignment: the item is also assigned to any additional
+    subquestion that scores >= _SQ_SECONDARY_THRESHOLD.  This ensures that
+    composite/synthesis subquestions (e.g. "which state carries the greatest
+    delay risk, based on a composite assessment of queue depth, upgrade cost,
+    load growth, and RTO reform") receive coverage from evidence primarily
+    mapped to their component subquestions.  Without secondary assignment
+    those questions are never the winner in a token-overlap competition against
+    the more specific component questions.
+
     Items with zero overlap on all subquestions go into "_unmapped".
+    An evidence item may appear in more than one subquestion list.
     """
     mapping: dict[str, list[str]] = {sq: [] for sq in subquestions}
     mapping["_unmapped"] = []
@@ -58,14 +79,19 @@ def _map_evidence_to_subquestions(
         item_text = f"{getattr(item, 'claim', '')} {getattr(item, 'evidence_snippet', '')}"
         best_sq = None
         best_score = 0
+        all_scores: dict[str, int] = {}
         for sq in subquestions:
             score = _overlap_score(item_text, sq)
+            all_scores[sq] = score
             if score > best_score:
                 best_score = score
                 best_sq = sq
         eid = getattr(item, "evidence_id", "") or ""
         if best_sq and best_score > 0:
             mapping[best_sq].append(eid)
+            for sq, score in all_scores.items():
+                if sq != best_sq and score >= _SQ_SECONDARY_THRESHOLD:
+                    mapping[sq].append(eid)
         else:
             mapping["_unmapped"].append(eid)
 
