@@ -31,12 +31,13 @@ from functional_agents.strategic_option_agent import StrategicOptionAgent
 from functional_agents.decision_analysis_agent import DecisionAnalysisAgent
 from functional_agents.strategic_synthesis_agent import StrategicSynthesisAgent
 from functional_agents.research_gap_agent import ResearchGapAgent
+from functional_agents.iteration_plan_agent import IterationPlanAgent  # J12.2
 
 _ALL_AGENT_CLASSES = [
     PlannerAgent, EvidenceAgent, QAAgent, ReportAgent,
     ScenarioAgent, RecommendationImprovementAgent, MultiProfileAgent,
     RecommendationSynthesisAgent, StrategicOptionAgent, DecisionAnalysisAgent,
-    StrategicSynthesisAgent, ResearchGapAgent,
+    StrategicSynthesisAgent, ResearchGapAgent, IterationPlanAgent,
 ]
 
 
@@ -217,7 +218,7 @@ def test_validate_all_classes_returns_all_agents():
         "RiskAgent", "OpportunityAgent", "RecommendationAgent",
         "MultiProfileAgent", "ScenarioAgent", "RecommendationImprovementAgent",
         "RecommendationSynthesisAgent", "StrategicOptionAgent", "DecisionAnalysisAgent",
-        "ExecutiveConfidenceAgent", "QAAgent", "ReportAgent",
+        "ExecutiveConfidenceAgent", "IterationPlanAgent", "QAAgent", "ReportAgent",
     }
 
 

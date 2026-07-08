@@ -175,6 +175,7 @@ class AgentOrchestrator:
         strategic_option_factory: Any = None,
         decision_analysis_factory: Any = None,
         executive_confidence_factory: Any = None,  # J7.7
+        iteration_plan_factory: Any = None,        # J12.2
         max_iterations: int = 3,
     ) -> None:
         self._problem_framing_factory   = problem_framing_factory
@@ -194,6 +195,7 @@ class AgentOrchestrator:
         self._strategic_option_factory  = strategic_option_factory
         self._decision_analysis_factory = decision_analysis_factory
         self._executive_confidence_factory = executive_confidence_factory  # J7.7
+        self._iteration_plan_factory    = iteration_plan_factory           # J12.2
         self._planner_factory  = planner_factory
         self._evidence_factory = evidence_factory
         self._qa_factory       = qa_factory
@@ -495,6 +497,24 @@ class AgentOrchestrator:
                 result = _step(self._executive_confidence_factory(), ctx)
                 ctx = result.context
                 state = (
+                    WorkflowState.ITERATION_PLAN
+                    if self._iteration_plan_factory is not None
+                    else (
+                        WorkflowState.MULTI_PROFILE
+                        if self._multi_profile_factory is not None
+                        else (
+                            WorkflowState.SCENARIO
+                            if self._scenario_factory is not None
+                            else WorkflowState.QA
+                        )
+                    )
+                )
+
+            # ---- ITERATION PLAN (J12.2) -------------------------------------
+            elif state == WorkflowState.ITERATION_PLAN:
+                result = _step(self._iteration_plan_factory(), ctx)
+                ctx = result.context
+                state = (
                     WorkflowState.MULTI_PROFILE
                     if self._multi_profile_factory is not None
                     else (
@@ -654,6 +674,7 @@ class Orchestrator:
         from .strategic_option_agent            import StrategicOptionAgent
         from .decision_analysis_agent           import DecisionAnalysisAgent
         from .executive_confidence_agent        import ExecutiveConfidenceAgent  # J7.7
+        from .iteration_plan_agent             import IterationPlanAgent        # J12.2
 
         execution_profile = self._profile_names[0] if self._profile_names else ""
         mock_mode = self._client is not None and getattr(self._client, "is_mock", False)
@@ -719,6 +740,9 @@ class Orchestrator:
 
         def executive_confidence_factory() -> ExecutiveConfidenceAgent:
             return ExecutiveConfidenceAgent(client=self._client, domain_profiles=loaded_profiles)
+
+        def iteration_plan_factory() -> IterationPlanAgent:
+            return IterationPlanAgent()
 
         def planner_factory() -> PlannerAgent:
             return PlannerAgent(client=self._client, domain_profiles=loaded_profiles)
@@ -884,6 +908,7 @@ class Orchestrator:
             strategic_option_factory=strategic_option_factory,
             decision_analysis_factory=decision_analysis_factory,
             executive_confidence_factory=executive_confidence_factory,
+            iteration_plan_factory=iteration_plan_factory,
             planner_factory=planner_factory,
             evidence_factory=evidence_factory,
             qa_factory=qa_factory,

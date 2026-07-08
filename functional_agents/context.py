@@ -42,6 +42,7 @@ class WorkflowState:
     STRATEGIC_OPTIONS            = "STRATEGIC_OPTIONS"
     DECISION_ANALYSIS            = "DECISION_ANALYSIS"    # J7.6
     EXECUTIVE_CONFIDENCE         = "EXECUTIVE_CONFIDENCE" # J7.7
+    ITERATION_PLAN               = "ITERATION_PLAN"       # J12.2
     QA                           = "QA"
     REPORT      = "REPORT"
     COMPLETE    = "COMPLETE"
@@ -160,6 +161,8 @@ class AgentContext:
     decision_analysis: dict[str, Any] = field(default_factory=dict)
     # J7.7 — executive confidence
     executive_confidence: dict[str, Any] = field(default_factory=dict)
+    # J12.2 — IterationPlanAgent structured next-iteration research plan
+    iteration_plan: dict[str, Any] = field(default_factory=dict)
     # J11.0 — Strategic Deliverables Framework. deliverable_request is the
     # (optional) DeliverableRequest driving the current run's deliverable
     # generation, as a dict (DeliverableRequest.to_dict()); empty means "use
