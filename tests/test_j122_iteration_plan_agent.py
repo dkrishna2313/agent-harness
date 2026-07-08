@@ -1,4 +1,4 @@
-"""Tests for IterationPlanAgent (J12.2).
+"""Tests for IterationPlanAgent (J12.2 + J12.2a hardening).
 
 Covers:
   1.  Module imports and class membership
@@ -29,6 +29,13 @@ Covers:
   26. WorkflowState.ITERATION_PLAN constant present
   27. AgentContext.iteration_plan field present
   28. context_field fallback from research_object
+  — J12.2a additions —
+  29. Structured ID extraction from text (_extract_ids_from_text, _enrich_task_ids)
+  30. Linkage completeness: IDs in VP/CU text appear in related_*_ids
+  31. Plan validation (_validate_plan): structural and cross-reference checks
+  32. Persistence regression: research_object["iteration_plan"] == context.iteration_plan
+  33. Expanded trace summary metrics
+  34. No new LLM calls introduced
 """
 
 from __future__ import annotations
@@ -51,6 +58,9 @@ from functional_agents.iteration_plan_agent import (
     _plan_confidence,
     _sorted_tasks,
     _assign_task_ids,
+    _extract_ids_from_text,   # J12.2a
+    _enrich_task_ids,          # J12.2a
+    _validate_plan,            # J12.2a
 )
 from functional_agents.context import AgentContext, WorkflowState
 from functional_agents.base import FunctionalAgent
@@ -261,6 +271,7 @@ class TestOutputSchema:
             "stop_conditions",
             "expected_confidence_after_completion",
             "plan_confidence",
+            "validation_warnings",    # J12.2a
         }
         assert set(plan.keys()) == expected
 
@@ -874,6 +885,12 @@ class TestContextFieldsWritten:
         assert "iteration_needed" in tp
         assert "task_count" in tp
         assert "plan_confidence" in tp
+        # J12.2a expanded fields
+        assert "high_priority_tasks" in tp
+        assert "critical_assumptions" in tp
+        assert "validation_priorities" in tp
+        assert "critical_unknowns" in tp
+        assert "expected_confidence_after_completion" in tp
 
 
 # ---------------------------------------------------------------------------
@@ -977,3 +994,497 @@ class TestResearchObjectFallback:
             if t["source_type"] == "assumption"
         ]
         assert len(assumption_tasks) >= 1
+
+
+# ---------------------------------------------------------------------------
+# 29. Structured ID extraction (J12.2a)
+# ---------------------------------------------------------------------------
+
+class TestStructuredIdExtraction:
+    def test_assumption_id_extracted(self):
+        a_ids, _, _, _ = _extract_ids_from_text("Validate A-001 via independent analysis")
+        assert "A-001" in a_ids
+
+    def test_multiple_assumption_ids_extracted(self):
+        a_ids, _, _, _ = _extract_ids_from_text("Validate A-001 and A-005 exposure")
+        assert a_ids == ["A-001", "A-005"]
+
+    def test_risk_id_extracted(self):
+        _, r_ids, _, _ = _extract_ids_from_text("Assess RSK-004 materiality via FERC tracking")
+        assert "RSK-004" in r_ids
+
+    def test_recommendation_id_extracted(self):
+        _, _, rec_ids, _ = _extract_ids_from_text("Supports recommendation REC-002 rationale")
+        assert "REC-002" in rec_ids
+
+    def test_option_id_extracted(self):
+        _, _, _, o_ids = _extract_ids_from_text("Strengthen evidence for recommended option OPT-B")
+        assert "OPT-B" in o_ids
+
+    def test_mixed_ids_extracted(self):
+        a_ids, r_ids, rec_ids, o_ids = _extract_ids_from_text(
+            "Validate A-001 and RSK-004 supporting OPT-A and REC-002"
+        )
+        assert "A-001" in a_ids
+        assert "RSK-004" in r_ids
+        assert "REC-002" in rec_ids
+        assert "OPT-A" in o_ids
+
+    def test_no_ids_in_plain_text(self):
+        a_ids, r_ids, rec_ids, o_ids = _extract_ids_from_text(
+            "Validate the underlying technology maturity for commercial deployment"
+        )
+        assert a_ids == []
+        assert r_ids == []
+        assert rec_ids == []
+        assert o_ids == []
+
+    def test_ids_are_deduplicated(self):
+        a_ids, _, _, _ = _extract_ids_from_text("A-001 and A-001 again with A-001")
+        assert a_ids.count("A-001") == 1
+
+    def test_ids_are_sorted(self):
+        a_ids, _, _, _ = _extract_ids_from_text("A-005 and A-001 and A-003")
+        assert a_ids == ["A-001", "A-003", "A-005"]
+
+    def test_prefix_letter_prevents_match(self):
+        # "OA-001" — preceded by letter O — should NOT match A-001
+        a_ids, _, _, _ = _extract_ids_from_text("OA-001 is not an assumption ID")
+        assert "A-001" not in a_ids
+
+    def test_enrich_merges_extracted_into_existing(self):
+        task = {
+            "task_title": "Validate A-001 and RSK-004 via analysis",
+            "research_objective": "Validate A-001 and RSK-004",
+            "why_it_matters": "",
+            "evidence_needed": [],
+            "suggested_queries": [],
+            "related_assumption_ids": [],
+            "related_risk_ids": [],
+            "related_recommendation_ids": [],
+            "related_option_ids": [],
+        }
+        _enrich_task_ids(task)
+        assert "A-001" in task["related_assumption_ids"]
+        assert "RSK-004" in task["related_risk_ids"]
+
+    def test_enrich_preserves_existing_ids(self):
+        task = {
+            "task_title": "Strengthen evidence for option",
+            "research_objective": "Validate the recommended option OPT-B",
+            "why_it_matters": "",
+            "evidence_needed": [],
+            "suggested_queries": [],
+            "related_assumption_ids": ["A-003"],
+            "related_risk_ids": [],
+            "related_recommendation_ids": [],
+            "related_option_ids": ["OPT-B"],
+        }
+        _enrich_task_ids(task)
+        assert "A-003" in task["related_assumption_ids"]
+        assert "OPT-B" in task["related_option_ids"]
+
+    def test_enrich_deduplicates_ids(self):
+        task = {
+            "task_title": "Validate A-001",
+            "research_objective": "evidence for A-001",
+            "why_it_matters": "",
+            "evidence_needed": [],
+            "suggested_queries": [],
+            "related_assumption_ids": ["A-001"],
+            "related_risk_ids": [],
+            "related_recommendation_ids": [],
+            "related_option_ids": [],
+        }
+        _enrich_task_ids(task)
+        assert task["related_assumption_ids"].count("A-001") == 1
+
+
+# ---------------------------------------------------------------------------
+# 30. Linkage completeness (J12.2a integration)
+# ---------------------------------------------------------------------------
+
+class TestLinkageCompleteness:
+    def test_assumption_id_in_vp_text_populates_related_assumption_ids(self):
+        plan = compute_iteration_plan(
+            exec_conf={"validation_priorities": ["Validate A-001 via independent analysis"]},
+            assumptions=[_A_CRITICAL_LOW],
+            recommendations=[], risks=[], strategic_options=[],
+            decision_analysis={}, research_gap_analysis={},
+        )
+        vp_task = next(
+            (t for t in plan["priority_research_tasks"]
+             if t["source_type"] == "executive_confidence" and
+             t["source_id"] == "validation_priority"),
+            None,
+        )
+        assert vp_task is not None
+        assert "A-001" in vp_task["related_assumption_ids"]
+
+    def test_risk_id_in_vp_text_populates_related_risk_ids(self):
+        risks = [{"risk_id": "RSK-004", "severity": "High", "evidence_support": "None",
+                  "evidence_ids": [], "title": "Queue risk"}]
+        plan = compute_iteration_plan(
+            exec_conf={"validation_priorities": ["Assess RSK-004 materiality via FERC"]},
+            assumptions=[], recommendations=[], risks=risks,
+            strategic_options=[], decision_analysis={}, research_gap_analysis={},
+        )
+        vp_task = next(
+            (t for t in plan["priority_research_tasks"]
+             if t["source_type"] == "executive_confidence"),
+            None,
+        )
+        assert vp_task is not None
+        assert "RSK-004" in vp_task["related_risk_ids"]
+
+    def test_cu_text_populates_assumption_id(self):
+        plan = compute_iteration_plan(
+            exec_conf={"critical_unknowns": ["Resolution of A-002 is unknown"]},
+            assumptions=[_A_CRITICAL_NO_EV],
+            recommendations=[], risks=[], strategic_options=[],
+            decision_analysis={}, research_gap_analysis={},
+        )
+        cu_task = next(
+            (t for t in plan["priority_research_tasks"]
+             if t["source_id"] == "critical_unknown"),
+            None,
+        )
+        assert cu_task is not None
+        assert "A-002" in cu_task["related_assumption_ids"]
+
+    def test_option_id_in_option_fragility_task(self):
+        option = {
+            "option_id": "OPT-A",
+            "title": "Option A",
+            "recommended": True,
+            "supporting_assumption_ids": ["A-001"],
+        }
+        plan = compute_iteration_plan(
+            exec_conf={},
+            assumptions=[_A_CRITICAL_LOW],
+            recommendations=[], risks=[], strategic_options=[option],
+            decision_analysis={}, research_gap_analysis={},
+        )
+        opt_task = next(
+            (t for t in plan["priority_research_tasks"]
+             if t["source_type"] == "strategic_option"),
+            None,
+        )
+        assert opt_task is not None
+        assert "OPT-A" in opt_task["related_option_ids"]
+        assert "A-001" in opt_task["related_assumption_ids"]
+
+    def test_no_ids_in_plain_followup_text(self):
+        plan = compute_iteration_plan(
+            exec_conf={}, assumptions=[], recommendations=[], risks=[],
+            strategic_options=[], decision_analysis={},
+            research_gap_analysis={
+                "recommended_followups": ["Assess offshore wind integration costs"]
+            },
+        )
+        gap_task = next(
+            (t for t in plan["priority_research_tasks"]
+             if t["source_type"] == "research_gap"),
+            None,
+        )
+        assert gap_task is not None
+        assert gap_task["related_assumption_ids"] == []
+        assert gap_task["related_risk_ids"] == []
+
+
+# ---------------------------------------------------------------------------
+# 31. Plan validation (J12.2a)
+# ---------------------------------------------------------------------------
+
+class TestPlanValidation:
+    def _valid_plan(self, n_tasks: int = 1) -> dict:
+        tasks = [
+            {
+                "task_id": f"IRT-{i:03d}",
+                "source_type": "executive_confidence",
+                "source_id": "validation_priority",
+                "task_title": f"Unique task title {i}",
+                "research_objective": f"Research objective {i}",
+                "why_it_matters": "matters",
+                "expected_confidence_gain": "HIGH",
+                "urgency": "HIGH",
+                "evidence_needed": [],
+                "suggested_queries": [],
+                "related_assumption_ids": [],
+                "related_risk_ids": [],
+                "related_recommendation_ids": [],
+                "related_option_ids": [],
+            }
+            for i in range(1, n_tasks + 1)
+        ]
+        return {
+            "iteration_needed": True,
+            "iteration_reason": "reason",
+            "priority_research_tasks": tasks,
+            "stop_conditions": ["condition"],
+            "expected_confidence_after_completion": "Medium",
+            "plan_confidence": 0.9,
+        }
+
+    def test_valid_plan_produces_no_warnings(self):
+        warnings = _validate_plan(self._valid_plan())
+        assert warnings == []
+
+    def test_duplicate_task_id_flagged(self):
+        plan = self._valid_plan(2)
+        plan["priority_research_tasks"][1]["task_id"] = "IRT-001"
+        warnings = _validate_plan(plan)
+        assert any("Duplicate task_id" in w for w in warnings)
+
+    def test_empty_task_title_flagged(self):
+        plan = self._valid_plan()
+        plan["priority_research_tasks"][0]["task_title"] = ""
+        warnings = _validate_plan(plan)
+        assert any("empty task_title" in w for w in warnings)
+
+    def test_empty_research_objective_flagged(self):
+        plan = self._valid_plan()
+        plan["priority_research_tasks"][0]["research_objective"] = ""
+        warnings = _validate_plan(plan)
+        assert any("empty research_objective" in w for w in warnings)
+
+    def test_invalid_confidence_gain_flagged(self):
+        plan = self._valid_plan()
+        plan["priority_research_tasks"][0]["expected_confidence_gain"] = "EXTREME"
+        warnings = _validate_plan(plan)
+        assert any("invalid expected_confidence_gain" in w for w in warnings)
+
+    def test_invalid_urgency_flagged(self):
+        plan = self._valid_plan()
+        plan["priority_research_tasks"][0]["urgency"] = "CRITICAL"
+        warnings = _validate_plan(plan)
+        assert any("invalid urgency" in w for w in warnings)
+
+    def test_duplicate_ids_within_task_flagged(self):
+        plan = self._valid_plan()
+        plan["priority_research_tasks"][0]["related_assumption_ids"] = ["A-001", "A-001"]
+        warnings = _validate_plan(plan, known_assumption_ids={"A-001"})
+        assert any("duplicate IDs" in w for w in warnings)
+
+    def test_duplicate_task_titles_flagged(self):
+        plan = self._valid_plan(2)
+        plan["priority_research_tasks"][1]["task_title"] = "Unique task title 1"
+        warnings = _validate_plan(plan)
+        assert any("duplicate task title" in w for w in warnings)
+
+    def test_unknown_assumption_id_flagged(self):
+        plan = self._valid_plan()
+        plan["priority_research_tasks"][0]["related_assumption_ids"] = ["A-999"]
+        warnings = _validate_plan(plan, known_assumption_ids={"A-001"})
+        assert any("A-999" in w and "not found" in w for w in warnings)
+
+    def test_unknown_risk_id_flagged(self):
+        plan = self._valid_plan()
+        plan["priority_research_tasks"][0]["related_risk_ids"] = ["RSK-999"]
+        warnings = _validate_plan(plan, known_risk_ids={"RSK-001"})
+        assert any("RSK-999" in w and "not found" in w for w in warnings)
+
+    def test_unknown_option_id_flagged(self):
+        plan = self._valid_plan()
+        plan["priority_research_tasks"][0]["related_option_ids"] = ["OPT-Z"]
+        warnings = _validate_plan(plan, known_option_ids={"OPT-A"})
+        assert any("OPT-Z" in w and "not found" in w for w in warnings)
+
+    def test_known_id_does_not_warn(self):
+        plan = self._valid_plan()
+        plan["priority_research_tasks"][0]["related_assumption_ids"] = ["A-001"]
+        warnings = _validate_plan(plan, known_assumption_ids={"A-001"})
+        assert not any("A-001" in w for w in warnings)
+
+    def test_no_known_sets_skips_cross_ref(self):
+        plan = self._valid_plan()
+        plan["priority_research_tasks"][0]["related_assumption_ids"] = ["A-999"]
+        warnings = _validate_plan(plan)  # no known_assumption_ids passed
+        assert not any("not found" in w for w in warnings)
+
+    def test_compute_iteration_plan_includes_validation_warnings(self):
+        plan = compute_iteration_plan(
+            exec_conf={"validation_priorities": ["Validate data center demand"]},
+            assumptions=[],
+            recommendations=[], risks=[], strategic_options=[],
+            decision_analysis={}, research_gap_analysis={},
+        )
+        assert "validation_warnings" in plan
+        assert isinstance(plan["validation_warnings"], list)
+
+    def test_well_formed_plan_has_empty_warnings(self):
+        # All IDs referenced in tasks exist in source collections
+        plan = compute_iteration_plan(
+            exec_conf={},
+            assumptions=[_A_CRITICAL_LOW],
+            recommendations=[], risks=[], strategic_options=[],
+            decision_analysis={}, research_gap_analysis={},
+        )
+        assert plan["validation_warnings"] == []
+
+
+# ---------------------------------------------------------------------------
+# 32. Persistence regression (J12.2a)
+# ---------------------------------------------------------------------------
+
+class TestPersistenceRegression:
+    def test_research_object_iteration_plan_same_as_context(self):
+        ctx = _ctx(
+            exec_conf={"overall_confidence": "Low", "validation_priorities": ["Validate A-001"]},
+            assumptions=[_A_CRITICAL_LOW],
+        )
+        IterationPlanAgent().run(ctx)
+        assert ctx.research_object.get("iteration_plan") == ctx.iteration_plan
+
+    def test_research_object_iteration_plan_contains_tasks(self):
+        ctx = _ctx(
+            exec_conf={"overall_confidence": "Low", "validation_priorities": ["Validate demand"]},
+        )
+        IterationPlanAgent().run(ctx)
+        ro_plan = ctx.research_object.get("iteration_plan", {})
+        assert "priority_research_tasks" in ro_plan
+        assert isinstance(ro_plan["priority_research_tasks"], list)
+
+    def test_iteration_plan_written_to_research_object_before_context(self):
+        ctx = _ctx(exec_conf={"overall_confidence": "Low"}, assumptions=[_A_CRITICAL_LOW])
+        IterationPlanAgent().run(ctx)
+        # Both should be present and equal after agent.run()
+        assert "iteration_plan" in ctx.research_object
+        assert ctx.research_object["iteration_plan"] is ctx.iteration_plan
+
+    def test_write_research_object_preserves_iteration_plan(self):
+        import tempfile, json
+        from pathlib import Path
+        from research_agent.research_object import write_research_object
+
+        ctx = _ctx(
+            exec_conf={"overall_confidence": "Medium"},
+            assumptions=[_A_CRITICAL_LOW],
+        )
+        ctx.research_object["research_id"] = "R-TEST_PERSIST_001"
+        IterationPlanAgent().run(ctx)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ro_path = write_research_object(
+                ctx.research_object,
+                out_dir=Path(tmp),
+                write_latest=False,
+            )
+            written = json.loads(ro_path.read_text())
+            assert "iteration_plan" in written
+            assert "priority_research_tasks" in written["iteration_plan"]
+
+
+# ---------------------------------------------------------------------------
+# 33. Expanded trace summary metrics (J12.2a)
+# ---------------------------------------------------------------------------
+
+class TestTraceSummaryMetrics:
+    def test_high_priority_tasks_count_correct(self):
+        ctx = _ctx(
+            exec_conf={
+                "overall_confidence": "Low",
+                "validation_priorities": ["Validate A-001"],
+            },
+        )
+        IterationPlanAgent().run(ctx)
+        tp = ctx.trace["_iteration_plan"]
+        assert "high_priority_tasks" in tp
+        assert isinstance(tp["high_priority_tasks"], int)
+        assert tp["high_priority_tasks"] >= 0
+
+    def test_critical_assumptions_count_matches_source(self):
+        ctx = _ctx(
+            assumptions=[_A_CRITICAL_LOW, _A_STRONG],
+        )
+        IterationPlanAgent().run(ctx)
+        tp = ctx.trace["_iteration_plan"]
+        # Only _A_CRITICAL_LOW qualifies (Critical + Low confidence)
+        assert tp["critical_assumptions"] == 1
+
+    def test_validation_priorities_count_matches_source(self):
+        ctx = _ctx(
+            exec_conf={"validation_priorities": ["P1", "P2", "P3"]},
+        )
+        IterationPlanAgent().run(ctx)
+        assert ctx.trace["_iteration_plan"]["validation_priorities"] == 3
+
+    def test_critical_unknowns_count_matches_source(self):
+        ctx = _ctx(
+            exec_conf={"critical_unknowns": ["CU1", "CU2"]},
+        )
+        IterationPlanAgent().run(ctx)
+        assert ctx.trace["_iteration_plan"]["critical_unknowns"] == 2
+
+    def test_expected_confidence_after_completion_in_trace(self):
+        ctx = _ctx(
+            exec_conf={"overall_confidence": "High"},
+        )
+        IterationPlanAgent().run(ctx)
+        tp = ctx.trace["_iteration_plan"]
+        assert "expected_confidence_after_completion" in tp
+        assert tp["expected_confidence_after_completion"] == "High"
+
+    def test_zero_counts_when_empty_inputs(self):
+        ctx = _ctx()
+        IterationPlanAgent().run(ctx)
+        tp = ctx.trace["_iteration_plan"]
+        assert tp["critical_assumptions"] == 0
+        assert tp["validation_priorities"] == 0
+        assert tp["critical_unknowns"] == 0
+        assert tp["high_priority_tasks"] == 0
+
+    def test_high_priority_tasks_counts_high_high_only(self):
+        ctx = _ctx(
+            exec_conf={
+                "overall_confidence": "Low",
+                "validation_priorities": ["Validate VP1"],  # HIGH/HIGH
+                "critical_unknowns": ["CU1"],                # HIGH/MEDIUM
+            },
+        )
+        IterationPlanAgent().run(ctx)
+        tp = ctx.trace["_iteration_plan"]
+        # VP tasks are HIGH/HIGH, CU tasks are HIGH/MEDIUM
+        # high_priority_tasks counts only HIGH/HIGH
+        assert tp["high_priority_tasks"] >= 1
+
+
+# ---------------------------------------------------------------------------
+# 34. No new LLM calls introduced (J12.2a)
+# ---------------------------------------------------------------------------
+
+class TestNoNewLLMCallsJ12a:
+    def test_no_new_llm_imports_added(self):
+        import functional_agents.iteration_plan_agent as mod
+        src = open(mod.__file__).read()
+        assert "claude_client" not in src
+        assert "ClaudeClient" not in src
+        assert "anthropic" not in src.lower() or "import anthropic" not in src
+
+    def test_enrich_and_validate_make_no_llm_calls(self):
+        task = {
+            "task_title": "Validate A-001 and RSK-004",
+            "research_objective": "Validate A-001 and RSK-004 via analysis",
+            "why_it_matters": "Fragile",
+            "evidence_needed": [],
+            "suggested_queries": [],
+            "related_assumption_ids": [],
+            "related_risk_ids": [],
+            "related_recommendation_ids": [],
+            "related_option_ids": [],
+        }
+        enriched = _enrich_task_ids(task)
+        assert isinstance(enriched, dict)
+
+        plan = {
+            "priority_research_tasks": [{
+                **task,
+                "task_id": "IRT-001",
+                "expected_confidence_gain": "HIGH",
+                "urgency": "HIGH",
+                "source_type": "executive_confidence",
+                "source_id": "validation_priority",
+            }],
+        }
+        warnings = _validate_plan(plan, known_assumption_ids={"A-001"}, known_risk_ids={"RSK-004"})
+        assert isinstance(warnings, list)

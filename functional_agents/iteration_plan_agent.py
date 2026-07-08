@@ -20,6 +20,7 @@ No LLM calls. Does not modify any upstream artifact.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from .base import FunctionalAgent
@@ -28,6 +29,12 @@ from .context import AgentContext, NextAction
 LOGGER = logging.getLogger(__name__)
 
 _MAX_TASKS = 10
+
+# Regex patterns for structured artifact ID extraction (J12.2a)
+_A_RE = re.compile(r'(?<![A-Za-z])A-\d+')    # assumption IDs: A-001
+_RSK_RE = re.compile(r'\bRSK-\d+')            # risk IDs: RSK-001
+_REC_RE = re.compile(r'\bREC-\d+')            # recommendation IDs: REC-001
+_OPT_RE = re.compile(r'\bOPT-[A-Z]\b')        # option IDs: OPT-A
 
 
 # ---------------------------------------------------------------------------
@@ -91,6 +98,137 @@ def _extract_text(item: Any) -> str:
             item.get("title") or item.get("summary") or ""
         ).strip()
     return ""
+
+
+def _extract_ids_from_text(text: str) -> tuple[list[str], list[str], list[str], list[str]]:
+    """Extract structured artifact IDs from a text string (J12.2a).
+
+    Returns (assumption_ids, risk_ids, recommendation_ids, option_ids).
+    Each list is sorted and deduplicated.
+    """
+    return (
+        sorted(set(_A_RE.findall(text))),
+        sorted(set(_RSK_RE.findall(text))),
+        sorted(set(_REC_RE.findall(text))),
+        sorted(set(_OPT_RE.findall(text))),
+    )
+
+
+def _enrich_task_ids(task: dict) -> dict:
+    """Merge IDs found in task text fields into the structured ID lists (J12.2a).
+
+    Ensures linkage completeness: any structured ID (A-NNN, RSK-NNN, REC-NNN,
+    OPT-X) appearing in any task text field is also present in the corresponding
+    related_*_ids list. Deduplicates and sorts each list.
+    """
+    parts: list[str] = [
+        task.get("task_title") or "",
+        task.get("research_objective") or "",
+        task.get("why_it_matters") or "",
+    ]
+    for s in task.get("evidence_needed") or []:
+        if s:
+            parts.append(s)
+    for s in task.get("suggested_queries") or []:
+        if s:
+            parts.append(s)
+    combined = " ".join(parts)
+    a_ids, r_ids, rec_ids, o_ids = _extract_ids_from_text(combined)
+    task["related_assumption_ids"] = sorted(
+        set((task.get("related_assumption_ids") or []) + a_ids)
+    )
+    task["related_risk_ids"] = sorted(
+        set((task.get("related_risk_ids") or []) + r_ids)
+    )
+    task["related_recommendation_ids"] = sorted(
+        set((task.get("related_recommendation_ids") or []) + rec_ids)
+    )
+    task["related_option_ids"] = sorted(
+        set((task.get("related_option_ids") or []) + o_ids)
+    )
+    return task
+
+
+def _validate_plan(
+    plan: dict,
+    *,
+    known_assumption_ids: set[str] | None = None,
+    known_risk_ids: set[str] | None = None,
+    known_option_ids: set[str] | None = None,
+) -> list[str]:
+    """Validate the iteration_plan artifact (J12.2a).
+
+    Returns a list of warning strings. Empty list means no issues.
+    Structural violations are always checked; cross-reference warnings
+    require the corresponding known_* sets to be provided.
+    """
+    warnings_out: list[str] = []
+    tasks = plan.get("priority_research_tasks") or []
+
+    # Task IDs unique
+    seen_task_ids: set[str] = set()
+    for t in tasks:
+        tid = t.get("task_id") or ""
+        if tid and tid in seen_task_ids:
+            warnings_out.append(f"Duplicate task_id: {tid!r}")
+        elif tid:
+            seen_task_ids.add(tid)
+
+    # No duplicate tasks (by normalized title)
+    seen_titles: set[str] = set()
+    for t in tasks:
+        norm = _normalize_text(t.get("task_title") or "")
+        if norm and norm in seen_titles:
+            warnings_out.append(f"{t.get('task_id', '?')}: duplicate task title")
+        elif norm:
+            seen_titles.add(norm)
+
+    for t in tasks:
+        tid = t.get("task_id") or "?"
+
+        if not (t.get("task_title") or "").strip():
+            warnings_out.append(f"{tid}: empty task_title")
+        if not (t.get("research_objective") or "").strip():
+            warnings_out.append(f"{tid}: empty research_objective")
+        gain = t.get("expected_confidence_gain")
+        if gain not in ("HIGH", "MEDIUM", "LOW"):
+            warnings_out.append(f"{tid}: invalid expected_confidence_gain={gain!r}")
+        urgency = t.get("urgency")
+        if urgency not in ("HIGH", "MEDIUM", "LOW"):
+            warnings_out.append(f"{tid}: invalid urgency={urgency!r}")
+
+        # Structured IDs unique within task
+        for field in (
+            "related_assumption_ids",
+            "related_risk_ids",
+            "related_recommendation_ids",
+            "related_option_ids",
+        ):
+            ids_list = t.get(field) or []
+            if len(set(ids_list)) < len(ids_list):
+                warnings_out.append(f"{tid}: duplicate IDs in {field}")
+
+        # Cross-reference: linked IDs should exist in source collections
+        if known_assumption_ids is not None:
+            for aid in (t.get("related_assumption_ids") or []):
+                if aid not in known_assumption_ids:
+                    warnings_out.append(
+                        f"{tid}: assumption {aid!r} not found in input assumptions"
+                    )
+        if known_risk_ids is not None:
+            for rid in (t.get("related_risk_ids") or []):
+                if rid not in known_risk_ids:
+                    warnings_out.append(
+                        f"{tid}: risk {rid!r} not found in input risks"
+                    )
+        if known_option_ids is not None:
+            for oid in (t.get("related_option_ids") or []):
+                if oid not in known_option_ids:
+                    warnings_out.append(
+                        f"{tid}: option {oid!r} not found in input strategic_options"
+                    )
+
+    return warnings_out
 
 
 # ---------------------------------------------------------------------------
@@ -754,6 +892,7 @@ def compute_iteration_plan(
     tasks.extend(_tasks_from_research_gap_followups(research_gap_analysis, seen_text))
 
     tasks = _sorted_tasks(tasks)[:max_tasks]
+    tasks = [_enrich_task_ids(t) for t in tasks]   # J12.2a: linkage completeness
     tasks = _assign_task_ids(tasks)
 
     needed, reason = _iteration_needed(
@@ -763,7 +902,7 @@ def compute_iteration_plan(
     exp_conf = _expected_confidence_after_completion(exec_conf, assumptions, tasks)
     confidence = _plan_confidence(exec_conf, assumptions, risks, strategic_options, tasks)
 
-    return {
+    plan: dict[str, Any] = {
         "iteration_needed": needed,
         "iteration_reason": reason,
         "priority_research_tasks": tasks,
@@ -771,6 +910,23 @@ def compute_iteration_plan(
         "expected_confidence_after_completion": exp_conf,
         "plan_confidence": confidence,
     }
+
+    # J12.2a: deterministic validation
+    known_assumption_ids: set[str] = set(assumptions_by_id.keys())
+    known_risk_ids: set[str] = {
+        (r.get("risk_id") or "").strip() for r in risks if r.get("risk_id")
+    } - {""}
+    known_option_ids: set[str] = {
+        (o.get("option_id") or "").strip() for o in strategic_options if o.get("option_id")
+    } - {""}
+    plan["validation_warnings"] = _validate_plan(
+        plan,
+        known_assumption_ids=known_assumption_ids,
+        known_risk_ids=known_risk_ids,
+        known_option_ids=known_option_ids,
+    )
+
+    return plan
 
 
 # ---------------------------------------------------------------------------
@@ -837,19 +993,49 @@ class IterationPlanAgent(FunctionalAgent):
             research_gap_analysis=research_gap_analysis,
         )
 
+        tasks = plan["priority_research_tasks"]
+        high_priority_tasks = sum(
+            1 for t in tasks
+            if t.get("expected_confidence_gain") == "HIGH" and t.get("urgency") == "HIGH"
+        )
+        critical_assumptions_count = sum(
+            1 for a in assumptions
+            if (a.get("importance") or "").strip() == "Critical" and
+               (a.get("confidence") or "").strip() == "Low"
+        )
+        validation_priorities_count = len(exec_conf.get("validation_priorities") or [])
+        critical_unknowns_count = len(exec_conf.get("critical_unknowns") or [])
+        exp_conf_after = plan["expected_confidence_after_completion"]
+        warn_count = len(plan.get("validation_warnings") or [])
+
         context.iteration_plan = plan
         ro["iteration_plan"] = plan
         context.trace["_iteration_plan"] = {
             "iteration_needed": plan["iteration_needed"],
-            "task_count": len(plan["priority_research_tasks"]),
+            "task_count": len(tasks),
             "plan_confidence": plan["plan_confidence"],
+            "high_priority_tasks": high_priority_tasks,
+            "critical_assumptions": critical_assumptions_count,
+            "validation_priorities": validation_priorities_count,
+            "critical_unknowns": critical_unknowns_count,
+            "expected_confidence_after_completion": exp_conf_after,
+            "validation_warning_count": warn_count,
         }
+
+        if warn_count:
+            LOGGER.warning(
+                "[IterationPlanAgent] %d validation warning(s): %s",
+                warn_count,
+                "; ".join(plan["validation_warnings"][:3]),
+            )
 
         LOGGER.log(
             PROGRESS,
-            "[IterationPlanAgent] iteration_needed=%s  tasks=%d  plan_confidence=%.2f",
+            "[IterationPlanAgent] iteration_needed=%s  tasks=%d  high_priority=%d  "
+            "plan_confidence=%.2f",
             plan["iteration_needed"],
-            len(plan["priority_research_tasks"]),
+            len(tasks),
+            high_priority_tasks,
             plan["plan_confidence"],
         )
 
@@ -858,13 +1044,19 @@ class IterationPlanAgent(FunctionalAgent):
             status="success",
             summary=(
                 f"Iteration plan: needed={plan['iteration_needed']}  "
-                f"tasks={len(plan['priority_research_tasks'])}  "
+                f"tasks={len(tasks)}  "
                 f"confidence={plan['plan_confidence']}"
             ),
             next_action=NextAction.CONTINUE,
             iteration_needed=plan["iteration_needed"],
-            task_count=len(plan["priority_research_tasks"]),
+            task_count=len(tasks),
             plan_confidence=plan["plan_confidence"],
+            high_priority_tasks=high_priority_tasks,
+            critical_assumptions=critical_assumptions_count,
+            validation_priorities=validation_priorities_count,
+            critical_unknowns=critical_unknowns_count,
+            expected_confidence_after_completion=exp_conf_after,
+            validation_warning_count=warn_count,
         )
         return context
 
