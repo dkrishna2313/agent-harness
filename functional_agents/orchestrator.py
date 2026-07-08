@@ -161,6 +161,7 @@ class AgentOrchestrator:
         problem_framing_factory: Any = None,
         research_strategy_factory: Any = None,
         hypothesis_factory: Any = None,
+        research_gap_factory: Any = None,          # J12.0
         strategic_synthesis_factory: Any = None,  # J10.7
         challenge_factory: Any = None,
         assumption_factory: Any = None,
@@ -179,6 +180,7 @@ class AgentOrchestrator:
         self._problem_framing_factory   = problem_framing_factory
         self._research_strategy_factory = research_strategy_factory
         self._hypothesis_factory        = hypothesis_factory
+        self._research_gap_factory      = research_gap_factory           # J12.0
         self._strategic_synthesis_factory = strategic_synthesis_factory  # J10.7
         self._challenge_factory         = challenge_factory
         self._assumption_factory        = assumption_factory
@@ -253,6 +255,24 @@ class AgentOrchestrator:
             # ---- HYPOTHESIS (J6.3) ------------------------------------------
             elif state == WorkflowState.HYPOTHESIS:
                 result = _step(self._hypothesis_factory(), ctx)
+                ctx = result.context
+                state = (
+                    WorkflowState.RESEARCH_GAP
+                    if self._research_gap_factory is not None
+                    else (
+                        WorkflowState.STRATEGIC_SYNTHESIS
+                        if self._strategic_synthesis_factory is not None
+                        else (
+                            WorkflowState.CHALLENGE
+                            if self._challenge_factory is not None
+                            else WorkflowState.QA
+                        )
+                    )
+                )
+
+            # ---- RESEARCH GAP (J12.0) ---------------------------------------
+            elif state == WorkflowState.RESEARCH_GAP:
+                result = _step(self._research_gap_factory(), ctx)
                 ctx = result.context
                 state = (
                     WorkflowState.STRATEGIC_SYNTHESIS
@@ -620,6 +640,7 @@ class Orchestrator:
         from .problem_framing_agent     import ProblemFramingAgent
         from .research_strategy_agent   import ResearchStrategyAgent
         from .hypothesis_agent          import HypothesisAgent
+        from .research_gap_agent        import ResearchGapAgent
         from .strategic_synthesis_agent import StrategicSynthesisAgent
         from .challenge_agent           import ChallengeAgent
         from .assumption_agent          import AssumptionAgent
@@ -656,6 +677,9 @@ class Orchestrator:
 
         def hypothesis_factory() -> HypothesisAgent:
             return HypothesisAgent(client=self._client, domain_profiles=loaded_profiles)
+
+        def research_gap_factory() -> ResearchGapAgent:
+            return ResearchGapAgent()
 
         def strategic_synthesis_factory() -> StrategicSynthesisAgent:
             return StrategicSynthesisAgent(client=self._client, domain_profiles=loaded_profiles)
@@ -846,6 +870,7 @@ class Orchestrator:
             problem_framing_factory=problem_framing_factory if goal else None,
             research_strategy_factory=research_strategy_factory if goal else None,
             hypothesis_factory=hypothesis_factory,
+            research_gap_factory=research_gap_factory,
             strategic_synthesis_factory=strategic_synthesis_factory,
             challenge_factory=challenge_factory,
             assumption_factory=assumption_factory,

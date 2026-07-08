@@ -28,6 +28,7 @@ class WorkflowState:
     PLANNING    = "PLANNING"
     EVIDENCE    = "EVIDENCE"
     HYPOTHESIS  = "HYPOTHESIS"
+    RESEARCH_GAP        = "RESEARCH_GAP"           # J12.0
     STRATEGIC_SYNTHESIS = "STRATEGIC_SYNTHESIS"   # J10.7
     CHALLENGE       = "CHALLENGE"
     ASSUMPTION      = "ASSUMPTION"          # J7.1
@@ -170,6 +171,9 @@ class AgentContext:
     # multi-deliverable bundle is generated from this context; empty otherwise.
     # Stored as a dict (DeliverableBundle.to_dict()) for JSON serialisability.
     deliverable_bundle: dict[str, Any] = field(default_factory=dict)
+    # J12.0 — ResearchGapAgent structured completeness assessment. Set by
+    # ResearchGapAgent immediately after HypothesisAgent; empty otherwise.
+    research_gap_analysis: dict[str, Any] = field(default_factory=dict)
     # J12.0 — Executive Narrative Layer. Set by ExecutiveNarrativeBuilder when
     # the canonical executive storyline is assembled from this context; empty
     # otherwise. Stored as a dict (ExecutiveNarrative.to_dict()) for JSON

@@ -35,6 +35,7 @@ def _agent_classes() -> list[type]:
     from .problem_framing_agent               import ProblemFramingAgent
     from .research_strategy_agent             import ResearchStrategyAgent
     from .hypothesis_agent                    import HypothesisAgent
+    from .research_gap_agent                  import ResearchGapAgent  # J12.0
     from .challenge_agent                     import ChallengeAgent
     from .assumption_agent                    import AssumptionAgent
     from .risk_agent                          import RiskAgent
@@ -51,7 +52,7 @@ def _agent_classes() -> list[type]:
     return [
         ProblemFramingAgent, ResearchStrategyAgent,
         PlannerAgent, EvidenceAgent,
-        HypothesisAgent, StrategicSynthesisAgent, ChallengeAgent, AssumptionAgent, RiskAgent, OpportunityAgent, RecommendationAgent,
+        HypothesisAgent, ResearchGapAgent, StrategicSynthesisAgent, ChallengeAgent, AssumptionAgent, RiskAgent, OpportunityAgent, RecommendationAgent,
         MultiProfileAgent, ScenarioAgent, RecommendationImprovementAgent,
         RecommendationSynthesisAgent, StrategicOptionAgent, DecisionAnalysisAgent,
         ExecutiveConfidenceAgent, QAAgent, ReportAgent,
