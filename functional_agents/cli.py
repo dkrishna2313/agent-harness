@@ -987,5 +987,158 @@ def dep_affected(
     typer.echo("")
 
 
+# ---------------------------------------------------------------------------
+# staleness sub-app (J13.2)
+# ---------------------------------------------------------------------------
+
+staleness_app = typer.Typer(
+    no_args_is_help=True,
+    help="Dependency staleness analysis (J13.2).",
+)
+app.add_typer(staleness_app, name="staleness")
+
+
+def _print_staleness_plan(plan: object) -> None:
+    """Render a StalenessPlan to stdout."""
+    typer.echo(f"\nStaleness Plan:  {plan.plan_id}")
+    typer.echo(f"Confidence:      {plan.confidence}")
+    typer.echo(f"Created:         {plan.created_at}")
+    if plan.source_changes:
+        typer.echo(f"Source changes:  {', '.join(plan.source_changes)}")
+    else:
+        typer.echo("Source changes:  (none)")
+
+    typer.echo("")
+    typer.echo(f"Changed paths ({len(plan.changed_paths)}):")
+    for p in plan.changed_paths:
+        from functional_agents.staleness import classify_path
+        kind = classify_path(p)
+        typer.echo(f"  {p:<45}  [{kind}]")
+    if not plan.changed_paths:
+        typer.echo("  (none)")
+
+    typer.echo("")
+    typer.echo(f"Stale paths ({len(plan.stale_paths)}):")
+    for p in plan.stale_paths:
+        from functional_agents.staleness import classify_path
+        kind = classify_path(p)
+        typer.echo(f"  {p:<45}  [{kind}]")
+    if not plan.stale_paths:
+        typer.echo("  (none)")
+
+    typer.echo("")
+    typer.echo(f"Required producers ({len(plan.required_producers)}):")
+    for a in plan.required_producers:
+        typer.echo(f"  {a}")
+    if not plan.required_producers:
+        typer.echo("  (none)")
+
+    typer.echo("")
+    typer.echo(f"Stale agents ({len(plan.stale_agents)}):")
+    for a in plan.stale_agents:
+        typer.echo(f"  {a}")
+    if not plan.stale_agents:
+        typer.echo("  (none)")
+
+    typer.echo("")
+    typer.echo(f"Execution-only paths ({len(plan.execution_only_paths)}):")
+    for p in plan.execution_only_paths:
+        typer.echo(f"  {p}")
+    if not plan.execution_only_paths:
+        typer.echo("  (none)")
+
+    typer.echo("")
+    typer.echo(f"External dependencies ({len(plan.external_dependencies)}):")
+    for p in plan.external_dependencies:
+        typer.echo(f"  {p}")
+    if not plan.external_dependencies:
+        typer.echo("  (none)")
+
+    typer.echo("")
+    typer.echo("Reasoning:")
+    if plan.reasoning:
+        for path, reason in sorted(plan.reasoning.items()):
+            # Wrap long reasons for readability
+            typer.echo(f"  {path}:")
+            typer.echo(f"    {reason}")
+    else:
+        typer.echo("  (none)")
+    typer.echo("")
+
+
+@staleness_app.command("explain")
+def staleness_explain(
+    session_file: Path = typer.Option(
+        ..., "--session", help="Path to a session JSON file."
+    ),
+) -> None:
+    """Analyze all StateChanges in a session and print the StalenessPlan."""
+    from functional_agents.session import load_session_file
+    from functional_agents.staleness import DependencyReasoner
+
+    try:
+        session = load_session_file(session_file)
+    except Exception as exc:
+        typer.echo(f"Error loading session: {exc}", err=True)
+        raise typer.Exit(1)
+
+    if not session.state_changes:
+        typer.echo("Session has no StateChanges. Nothing to analyze.")
+        raise typer.Exit(0)
+
+    plan = DependencyReasoner().analyze(session.research_state, session.state_changes)
+    _print_staleness_plan(plan)
+
+
+@staleness_app.command("path")
+def staleness_path(
+    path: str = typer.Option(
+        ..., "--path", help="Logical path to analyze (e.g. research_object.evidence)."
+    ),
+) -> None:
+    """Show what would be stale if the given path changed."""
+    from functional_agents.session.state_change import ChangeType, StateChange
+    from functional_agents.staleness import DependencyReasoner
+
+    synthetic = StateChange.create(
+        source="cli",
+        change_type=ChangeType.UPDATE,
+        affected_paths=[path],
+        description=f"Synthetic change for staleness analysis of '{path}'",
+    )
+    plan = DependencyReasoner().analyze(None, [synthetic])
+    _print_staleness_plan(plan)
+
+
+@staleness_app.command("agent")
+def staleness_agent(
+    agent: str = typer.Option(
+        ..., "--agent", help="Agent class name (e.g. EvidenceAgent)."
+    ),
+) -> None:
+    """Show what would be stale if the given agent re-ran."""
+    from functional_agents.dependencies import DependencyRegistry
+    from functional_agents.session.state_change import ChangeType, StateChange
+    from functional_agents.staleness import DependencyReasoner
+
+    try:
+        dep = DependencyRegistry.get_dependency(agent)
+    except KeyError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1)
+
+    synthetics = [
+        StateChange.create(
+            source="cli",
+            change_type=ChangeType.REPLACE,
+            affected_paths=[p],
+            description=f"Synthetic: {agent} re-ran and replaced '{p}'",
+        )
+        for p in dep.produces
+    ]
+    plan = DependencyReasoner().analyze(None, synthetics)
+    _print_staleness_plan(plan)
+
+
 if __name__ == "__main__":
     app()

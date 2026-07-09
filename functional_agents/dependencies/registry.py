@@ -17,6 +17,7 @@ from .agent_dependency import AgentDependency
 # Canonical path shorthand constants — avoid string typos
 # ---------------------------------------------------------------------------
 
+_KS = "knowledge_store"
 _ENG = "engagement"
 _DM = "decision_model"
 _DA = "decision_architecture"
@@ -107,7 +108,7 @@ _DECLARATIONS: list[AgentDependency] = [
     ),
     AgentDependency(
         agent_name="EvidenceAgent",
-        consumes=[_PL, _RS, _DM],
+        consumes=[_KS, _PL, _RS, _DM],
         produces=[_RO_EV],
         invalidates=_AFTER_EVIDENCE,
     ),

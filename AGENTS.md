@@ -118,6 +118,60 @@ Session IDs use format: `SS-{YYYYMMDD}-{HHMMSS}-{hex6}`
 - All session operations are best-effort: failures are logged, never propagated.
 - Backward compatibility: existing CLI, benchmarks, and agent contracts unchanged.
 
+# Dependency Reasoner Architecture (J13.2)
+
+J13.2 introduces a deterministic staleness engine that analyzes StateChanges to
+produce a StalenessPlan. It is analysis-only — the pipeline is unchanged.
+
+## Path Classification
+
+Every dependency path has exactly one kind:
+
+| Kind | Meaning |
+|---|---|
+| `PERSISTED` | Stored in ResearchState; survives pipeline runs |
+| `EXECUTION_ONLY` | In AgentContext only; not persisted; must be re-produced each run |
+| `EXTERNAL` | Provided by environment (knowledge store, user); never recomputed |
+
+## StalenessPlan
+
+Output of `DependencyReasoner.analyze(research_state, state_changes)`:
+
+| Field | Description |
+|---|---|
+| `changed_paths` | Paths explicitly changed (expanded from StateChange.affected_paths) |
+| `stale_paths` | All PERSISTED + EXECUTION_ONLY paths now stale |
+| `stale_agents` | Agents whose produces overlap stale_paths |
+| `required_producers` | Agents needed to restore stale PERSISTED paths |
+| `persisted_paths` | Subset of stale_paths with PathKind.PERSISTED |
+| `execution_only_paths` | Subset with PathKind.EXECUTION_ONLY |
+| `external_dependencies` | EXTERNAL paths that triggered changes |
+| `reasoning` | path → human-readable explanation of why it is stale |
+| `confidence` | HIGH (known specific paths) / MEDIUM (container expansion) / LOW (unknown paths) |
+
+## Algorithm
+
+BFS through the consumption graph:
+1. Expand container paths from StateChanges (e.g. `research_state` → all PERSISTED sub-paths)
+2. For each changed path: find agents that consume it → their produces become stale
+3. Repeat until no new stale paths
+4. EXTERNAL paths propagate BFS but are not themselves stale (cannot be recomputed)
+
+## CLI
+
+```
+staleness explain --session <path>   # analyze all StateChanges in a session
+staleness path    --path <path>      # synthetic analysis: what if this path changed?
+staleness agent   --agent <name>     # synthetic analysis: what if this agent re-ran?
+```
+
+## Design constraints
+
+- No execution. DependencyReasoner never calls agents.
+- No incremental orchestration. Pipeline runs all 22 agents unchanged.
+- No state diffing. Staleness is derived from declared dependencies, not observed state.
+- Conservative: false positives acceptable; false negatives are not.
+
 # Engineering Principles
 
 - Keep implementation simple.
