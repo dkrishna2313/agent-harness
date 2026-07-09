@@ -211,6 +211,17 @@ def main(
         str | None,
         typer.Option("--log-level", help="Logging level: DEBUG, INFO, PROGRESS, WARNING, ERROR, CRITICAL. Default: PROGRESS."),
     ] = None,
+    incremental: Annotated[
+        bool,
+        typer.Option(
+            "--incremental",
+            help=(
+                "Incremental execution mode (J13.4). Requires --session. "
+                "Runs only the agents needed to restore stale PERSISTED state instead of "
+                "the full pipeline. The session must have StateChanges to analyze."
+            ),
+        ),
+    ] = False,
 ) -> None:
     """Run the functional agent pipeline and write a Markdown research memo.
 
@@ -221,7 +232,18 @@ def main(
     When a knowledge store is available (default: knowledge_store/), evidence is
     retrieved via the Knowledge Layer (hybrid retrieval + optional LLM reranking)
     instead of the legacy document extraction pipeline.
+
+    With --incremental (requires --session): only the required agents run based on
+    the session's recorded StateChanges. The full pipeline is NOT run.
     """
+
+    # J13.4 — incremental mode requires --session
+    if incremental and session_file is None:
+        typer.echo(
+            "Error: --incremental requires --session (a session file with prior StateChanges).",
+            err=True,
+        )
+        raise typer.Exit(code=1)
 
     # J9.1 / J13.1 – four mutually exclusive entry points.
     provided = [
@@ -255,20 +277,23 @@ def main(
         except SessionNotFoundError as exc:
             typer.echo(f"Error: {exc}", err=True)
             raise typer.Exit(code=1) from exc
-        spec_dict = _cli_session.metadata.get("engagement_spec") or {}
-        if not spec_dict:
-            typer.echo(
-                f"Error: session {session_file} has no engagement_spec in metadata. "
-                "Create the session with 'session create --engagement <file>'.",
-                err=True,
-            )
-            raise typer.Exit(code=1)
-        from .engagement_spec import EngagementSpec, EngagementError
-        try:
-            engagement_spec = EngagementSpec.model_validate(spec_dict)
-        except Exception as exc:
-            typer.echo(f"Error: could not reconstruct engagement spec from session: {exc}", err=True)
-            raise typer.Exit(code=1) from exc
+        # J13.4 — incremental mode does not require engagement_spec; it reads
+        # ResearchState and StateChanges directly from the session.
+        if not incremental:
+            spec_dict = _cli_session.metadata.get("engagement_spec") or {}
+            if not spec_dict:
+                typer.echo(
+                    f"Error: session {session_file} has no engagement_spec in metadata. "
+                    "Create the session with 'session create --engagement <file>'.",
+                    err=True,
+                )
+                raise typer.Exit(code=1)
+            from .engagement_spec import EngagementSpec, EngagementError
+            try:
+                engagement_spec = EngagementSpec.model_validate(spec_dict)
+            except Exception as exc:
+                typer.echo(f"Error: could not reconstruct engagement spec from session: {exc}", err=True)
+                raise typer.Exit(code=1) from exc
 
     elif engagement is not None:
         from .engagement_spec import load_engagement_spec, EngagementError
@@ -299,6 +324,77 @@ def main(
 
     # Build client
     client = _build_client(mock=mock, model=model, use_extraction_cache=use_extraction_cache)
+
+    # J13.4 — incremental execution mode: use IncrementalExecutor, then return.
+    if incremental:
+        _configure_logging(verbose=False, log_level=log_level or "PROGRESS")
+        assert _cli_session is not None  # guaranteed by the earlier mutual-exclusivity check
+        if not _cli_session.state_changes:
+            typer.echo(
+                f"Session {session_file} has no StateChanges — nothing to run incrementally.\n"
+                "Use 'run --session' (without --incremental) to do a full pipeline run.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        from .staleness import DependencyReasoner
+        from .planning import ExecutionPlanner
+        from .execution import IncrementalExecutor, ExecutionStatus
+        from .session import save_session_file
+
+        staleness_plan = DependencyReasoner().analyze(
+            _cli_session.research_state, _cli_session.state_changes
+        )
+        if not staleness_plan.stale_agents:
+            typer.echo("Nothing is stale — no incremental execution needed.")
+            raise typer.Exit(code=0)
+
+        execution_plan = ExecutionPlanner().plan(staleness_plan)
+        if not execution_plan.required_agents:
+            typer.echo("Execution plan is empty — no agents to run.")
+            raise typer.Exit(code=0)
+
+        _inc_out = out if out is not None else Path("outputs") / "report.md"
+        executor = IncrementalExecutor(
+            client=client,
+            profile_names=profile_names,
+            sources_dir=sources,
+            out_path=_inc_out,
+            top_evidence=top_evidence,
+            top_chunks=top_chunks,
+            web_search=web_search,
+            knowledge_store=resolved_ks,
+            use_reranker=rerank,
+        )
+
+        _inc_start = time.monotonic()
+        result = executor.execute(execution_plan, _cli_session)
+        _inc_elapsed = time.monotonic() - _inc_start
+
+        try:
+            save_session_file(result.session, session_file)
+        except Exception as exc:
+            logging.warning("[Incremental] session save failed: %s", exc)
+
+        typer.echo("")
+        typer.echo(f"Incremental Execution")
+        typer.echo(f"Status:          {result.status}")
+        typer.echo(f"Elapsed:         {_inc_elapsed:.1f}s")
+        typer.echo(f"Agents run:      {len(result.completed_agents)}/{len(execution_plan.required_agents)}")
+        typer.echo(f"Plan steps:      {execution_plan.estimated_steps}")
+        if result.failed_agent:
+            typer.echo(f"Failed at:       {result.failed_agent}")
+            typer.echo(f"Reason:          {result.failure_reason}")
+        typer.echo(f"Session:         {session_file}")
+        typer.echo(f"Plan ID:         {execution_plan.plan_id}")
+        typer.echo("")
+        if result.completed_agents:
+            typer.echo(f"Completed agents ({len(result.completed_agents)}):")
+            for a in result.completed_agents:
+                typer.echo(f"  {a}")
+            typer.echo("")
+        if result.status == ExecutionStatus.FAILED:
+            raise typer.Exit(code=1)
+        return
 
     from .orchestrator import Orchestrator
 

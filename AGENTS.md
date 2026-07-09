@@ -226,6 +226,80 @@ execution plan --session <path> --verbose   # full plan with per-agent reasoning
 - No incremental orchestration. Pipeline runs all 22 agents unchanged.
 - Conservative: if an agent needs an EXECUTION_ONLY input, its producer is required.
 
+# Incremental Executor Architecture (J13.4)
+
+J13.4 introduces `IncrementalExecutor`, which consumes an `ExecutionPlan` and
+executes only the `required_agents` against an existing `ResearchSession`.
+
+## IncrementalExecutor
+
+```python
+executor = IncrementalExecutor(client=client, profile_names=[...], sources_dir=..., out_path=...)
+result = executor.execute(execution_plan, session)  # → ExecutionResult
+```
+
+`IncrementalExecutor` is intentionally analysis-free: it receives a fully-computed
+`ExecutionPlan` (from `ExecutionPlanner`) and runs agents in topological order.
+It does NOT reason about dependencies, compute staleness, or build plans.
+
+## ExecutionResult
+
+| Field | Description |
+|---|---|
+| `status` | `COMPLETE` / `FAILED` / `EMPTY` |
+| `session` | Updated `ResearchSession` — always consistent, never corrupted |
+| `completed_agents` | Agents that ran without error |
+| `failed_agent` | Name of the first agent that raised, or `None` |
+| `failure_reason` | `str(exception)` from the failed agent, or `None` |
+| `execution_plan_id` | `plan_id` of the consumed `ExecutionPlan` |
+| `trace` | Optional diagnostics dict |
+
+## Session Contract
+
+Regardless of success or failure, the returned session is always consistent:
+
+1. `research_state` — updated from the context after the last successful agent.
+2. `state_changes` — one `StateChange(source="incremental_executor")` appended.
+3. `iteration_history` — one `IterationRecord(trigger="incremental")` appended.
+4. `snapshots` — one snapshot taken.
+
+An empty plan (`required_agents=[]`) returns `EMPTY` immediately; the session is
+not modified.
+
+## Failure Handling
+
+On agent exception: execution stops immediately. No retries. The session is
+finalized against the context of the last successful agent. `failed_agent` and
+`failure_reason` are populated in the result.
+
+## Agent Factories
+
+Two categories of production agents, mirroring `Orchestrator`:
+
+- **No-arg agents** (7) — `ResearchGapAgent`, `MultiProfileAgent`, `ScenarioAgent`,
+  `RecommendationImprovementAgent`, `RecommendationSynthesisAgent`, `QAAgent`,
+  `IterationPlanAgent` — constructed with no arguments.
+- **Client agents** (13) — `PlannerAgent`, `ProblemFramingAgent`, etc. — constructed
+  with `(client=..., domain_profiles=...)`.
+- **Special** — `EvidenceAgent` (full retriever config) and `ReportAgent` (out_path).
+
+## CLI
+
+```
+run --session <path> --incremental    # run IncrementalExecutor against existing session
+```
+
+Requirements: `--session` must point to an existing session file. The session must
+have at least one `StateChange`; otherwise the command exits with code 1.
+
+## Design Constraints
+
+- No retries. An agent either succeeds or the run fails.
+- No parallel execution. Agents run sequentially in topological order.
+- No LLM planning. `ExecutionPlan` must already be computed by `ExecutionPlanner`.
+- No dependency reasoning. `DependencyReasoner` must already have run.
+- Session is the only mutable state. The executor never writes files directly.
+
 # Engineering Principles
 
 - Keep implementation simple.
