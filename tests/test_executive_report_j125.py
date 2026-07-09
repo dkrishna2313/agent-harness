@@ -280,26 +280,26 @@ def test_section5_critical_unknowns_from_narrative():
 # Section 11 — Key Tradeoffs from narrative
 # ---------------------------------------------------------------------------
 
-def test_section11_key_tradeoffs_from_narrative():
-    """§11 key tradeoffs come from narrative.key_tradeoffs (da.key_tradeoffs path)."""
+def test_section4_key_tradeoffs_from_narrative():
+    """§4 key tradeoffs come from narrative.key_tradeoffs (da.key_tradeoffs path)."""
     ctx = _make_narrative_context()
     report = _build_j7_executive_report(ctx)
-    section_11 = report.split("## 11.")[1].split("## 12.")[0]
-    assert "Speed vs. Capital Efficiency" in section_11
-    assert "Risk vs. Return" in section_11
+    section_4 = report.split("## 4.")[1].split("## 5.")[0]
+    assert "Speed vs. Capital Efficiency" in section_4
+    assert "Risk vs. Return" in section_4
 
 
-def test_section11_key_tradeoffs_prefer_strategic_synthesis():
-    """§11 prefers strategic_synthesis.key_tradeoffs over da.key_tradeoffs."""
+def test_section4_key_tradeoffs_prefer_strategic_synthesis():
+    """§4 prefers strategic_synthesis.key_tradeoffs over da.key_tradeoffs."""
     ctx = _make_narrative_context()
     ctx.strategic_synthesis = {
         "executive_summary": "Cross-domain synthesis.",
         "key_tradeoffs": ["Strategic tradeoff from synthesis"],
     }
     report = _build_j7_executive_report(ctx)
-    section_11 = report.split("## 11.")[1].split("## 12.")[0]
-    assert "Strategic tradeoff from synthesis" in section_11
-    assert "Speed vs. Capital Efficiency" not in section_11
+    section_4 = report.split("## 4.")[1].split("## 5.")[0]
+    assert "Strategic tradeoff from synthesis" in section_4
+    assert "Speed vs. Capital Efficiency" not in section_4
 
 
 # ---------------------------------------------------------------------------
@@ -307,26 +307,26 @@ def test_section11_key_tradeoffs_prefer_strategic_synthesis():
 # ---------------------------------------------------------------------------
 
 def test_structured_sections_still_from_agentcontext():
-    """Structured sections (assumptions, risks, options tables) still render from AgentContext."""
+    """Structured tables (assumptions, risks, options) still render from AgentContext."""
     ctx = _make_narrative_context()
     report = _build_j7_executive_report(ctx)
-    # Assumptions table
+    # Assumptions present (Section 6 exec summary + Appendix B)
     assert "A-001" in report
     assert "Grid connection secured in 24 months" in report
-    # Risks table
+    # Risks present (Section 7 exec summary + Appendix C)
     assert "RSK-001" in report
     assert "Grid interconnection delay" in report
-    # Strategic options section (§9)
-    section_9 = report.split("## 9.")[1].split("## 10.")[0]
-    assert "OPT-B" in section_9
-    assert "Aggressive Build" in section_9
+    # Strategic options detail in Appendix A (Section 10)
+    appendix = report.split("## 10.")[1]
+    assert "OPT-B" in appendix
+    assert "Aggressive Build" in appendix
 
 
-def test_all_15_sections_present_with_narrative_context():
-    """All 15 report sections render correctly with the production-schema fixture."""
+def test_all_10_sections_present_with_narrative_context():
+    """All 10 report sections render correctly with the production-schema fixture."""
     ctx = _make_narrative_context()
     report = _build_j7_executive_report(ctx)
-    for i in range(1, 16):
+    for i in range(1, 11):
         assert f"## {i}." in report, f"Missing section {i}"
 
 

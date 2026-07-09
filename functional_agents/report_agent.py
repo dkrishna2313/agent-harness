@@ -1355,268 +1355,324 @@ def _build_j7_executive_summary_section(
     return lines
 
 
-def _build_j7_executive_report(context: "AgentContext") -> str:
-    """Build the 14-section J7 executive report from the decision graph.
+# ---------------------------------------------------------------------------
+# P1.3 — Executive Abstraction Layer helpers
+# ---------------------------------------------------------------------------
 
-    Called only when context.strategic_options is non-empty. Never
-    re-generates analysis already present in the decision graph.
+def _build_j7_recommendation_rationale_section(
+    narrative: "ExecutiveNarrative",
+    da: dict[str, Any],
+    options: list[dict[str, Any]],
+    recommended_id: str,
+) -> list[str]:
+    """Section 4 — Recommendation Rationale.
+
+    Answers: Why should we choose this option?
+    Merges: rationale + compact option comparison + decision matrix + key tradeoffs.
     """
-    # J12.5 — Build ExecutiveNarrative for all executive-facing prose sections.
-    # Sets context.executive_narrative as a side effect.
-    narrative: ExecutiveNarrative = ExecutiveNarrativeBuilder().build(context)
-
-    da: dict = context.decision_analysis or {}
-    preferred: dict = context.preferred_option or {}
-    options: list[dict] = context.strategic_options or []
-    assumptions: list[dict] = context.assumptions or []
-    risks: list[dict] = context.risks or []
-    opps: list[dict] = context.opportunities or []
-    recs: list[dict] = context.recommendations or []
-    ro: dict = context.research_object or {}
-    question: str = context.question or ""
-    eng: dict = context.engagement or {}  # P1.1 — engagement metadata for display
-
-    recommended_id = da.get("recommended_option_id") or preferred.get("option_id") or ""
-    eng_title = _display_engagement_title(context)  # P1.1 — short display title
-
     lines: list[str] = []
-
-    # ------------------------------------------------------------------ #
-    # Section 1 — Executive Summary (P1.1 — recommendation-led)           #
-    # ------------------------------------------------------------------ #
-    lines += [
-        "# Executive Strategic Report",
-        "",
-        "## 1. Executive Summary",
-        "",
-    ]
-    lines += _build_j7_executive_summary_section(context, narrative)
-
-    # ------------------------------------------------------------------ #
-    # Section 2 — Strategic Question (P1.1 — use engagement title)         #
-    # ------------------------------------------------------------------ #
-    lines += ["## 2. Strategic Question", ""]
-    if eng.get("title"):
-        lines += [f"**{eng_title}**", ""]
-        _client_str = eng.get("client", "")
-        _industry_str = eng.get("industry", "")
-        if _client_str and _industry_str:
-            lines += [f"*{_client_str} — {_industry_str}*", ""]
-        elif _client_str:
-            lines += [f"*{_client_str}*", ""]
-        _first_obj = (eng.get("objectives") or [""])[0]
-        if _first_obj:
-            lines += [str(_first_obj), ""]
-        elif eng.get("current_situation"):
-            lines += [str(eng["current_situation"]), ""]
-    else:
-        lines += [question, ""]
-
-    # ------------------------------------------------------------------ #
-    # Section 3 — Recommended Strategic Option                             #
-    # ------------------------------------------------------------------ #
-    # J12.5 — option_id, title, description, and time_horizon from narrative.
-    # Structured details (required_capabilities, dependencies) from AgentContext.
-    lines += ["## 3. Recommended Strategic Option", ""]
-    _rec = narrative.recommended_option
-    _oid = _rec.get("option_id", "")
-    _title = _rec.get("title", "")
-    if _oid or _title:
-        lines += [f"**{_oid}: {_title}**", ""]
-        # narrative uses estimated_time_horizon; fall back to option's time_horizon for legacy data
-        rec_opt = next((o for o in options if o.get("option_id") == recommended_id), preferred)
-        _horizon = (
-            _rec.get("estimated_time_horizon", "")
-            or (rec_opt or {}).get("time_horizon", "")
-        ).replace("_", " ")
-        if _horizon:
-            lines += [f"**Time Horizon:** {_horizon}", ""]
-        # description from narrative; fall back to option-level rationale/strategic_logic
-        _desc = (
-            _rec.get("description", "")
-            or (rec_opt or {}).get("rationale", "")
-            or (rec_opt or {}).get("strategic_logic", "")
-        )
-        if _desc:
-            lines += [_desc, ""]
-        caps = (rec_opt or {}).get("required_capabilities") or []
-        deps = (rec_opt or {}).get("dependencies") or []
-        if caps:
-            lines.append("**Required Capabilities:**")
-            lines.extend(f"- {c}" for c in caps)
-            lines.append("")
-        if deps:
-            lines.append("**Key Dependencies:**")
-            lines.extend(f"- {d}" for d in deps)
-            lines.append("")
-
-    # ------------------------------------------------------------------ #
-    # Section 4 — Why This Option Wins                                     #
-    # ------------------------------------------------------------------ #
-    # J12.5 — why_this_option and option_rankings from narrative (composer
-    # enriches why_this_option with the recommended option's advantages).
-    # Comparison dimensions are structural; keep reading from decision_analysis.
     dimensions = da.get("comparison_dimensions") or []
-    lines += ["## 4. Why This Option Wins", ""]
+
+    # Full rationale (cleaned)
     if narrative.why_this_option:
         lines += [_clean_internal_language(narrative.why_this_option), ""]
+
+    # Compact option comparison — one line per option
+    if options:
+        lines.append("**Compared Against Alternatives:**")
+        for opt in options:
+            oid = opt.get("option_id", "")
+            t = opt.get("title", "")
+            rat = (
+                opt.get("rationale")
+                or opt.get("strategic_logic")
+                or opt.get("description")
+                or ""
+            ).split(".")[0].strip()
+            label = f"- **{oid}: {t}**"
+            if oid == recommended_id:
+                label += " *(Recommended)*"
+            if rat:
+                label += f" — {rat}"
+            lines.append(label)
+        lines.append("")
+
     if dimensions:
         lines.append("**Comparison Dimensions:**")
         lines.extend(f"- {d}" for d in dimensions)
         lines.append("")
+
     if narrative.option_rankings:
         lines.append("**Option Rankings (best → least preferred):**")
         lines.extend(f"{i + 1}. {r}" for i, r in enumerate(narrative.option_rankings))
         lines.append("")
 
-    # ------------------------------------------------------------------ #
-    # Section 5 — Executive Confidence (J7.7 / P1.1)                      #
-    # ------------------------------------------------------------------ #
-    # J12.5 — confidence summary, drivers, and limiters from narrative.
-    # P1.1 — present confidence, readiness, and board recommendation as
-    # individual fields rather than a single pipe-separated line.
+    # Decision matrix table
+    matrix: list[dict] = da.get("decision_matrix") or []
+    if matrix:
+        _SCORE_COLS = [
+            ("strategic_fit", "Strategic Fit"),
+            ("implementation_risk", "Impl. Risk"),
+            ("execution_complexity", "Exec. Complexity"),
+            ("capital_requirement", "Capital Req."),
+            ("expected_return", "Expected Return"),
+            ("time_to_value", "Time to Value"),
+            ("dependency_strength", "Dependency"),
+            ("assumption_strength", "Assumption"),
+            ("risk_exposure", "Risk Exposure"),
+            ("opportunity_capture", "Opportunity"),
+            ("overall_score", "Overall"),
+        ]
+        col_headers = "| Option | " + " | ".join(h for _, h in _SCORE_COLS) + " |"
+        col_divider = "|---|" + "---|" * len(_SCORE_COLS)
+        lines += ["**Decision Matrix:**", "", col_headers, col_divider]
+        _opt_titles = {o.get("option_id", ""): o.get("title", "") for o in options}
+        for entry in matrix:
+            eid = entry.get("option_id", "")
+            opt_label = f"{eid}: {_opt_titles.get(eid, '')}" if _opt_titles.get(eid) else eid
+            if eid == recommended_id:
+                opt_label += " ✓"
+            scores = " | ".join(entry.get(k, "—") for k, _ in _SCORE_COLS)
+            lines.append(f"| {opt_label} | {scores} |")
+        lines.append("")
+        for entry in matrix:
+            eid = entry.get("option_id", "")
+            strengths = entry.get("strengths") or []
+            weaknesses = entry.get("weaknesses") or []
+            if strengths or weaknesses:
+                lines += [f"**{eid} — Strengths & Weaknesses**", ""]
+                if strengths:
+                    lines.append("Strengths:")
+                    lines.extend(f"+ {s}" for s in strengths)
+                    lines.append("")
+                if weaknesses:
+                    lines.append("Weaknesses:")
+                    lines.extend(f"- {w}" for w in weaknesses)
+                    lines.append("")
+
+    # Key tradeoffs
+    if narrative.key_tradeoffs:
+        lines.append("**Key Trade-offs:**")
+        lines.extend(f"- {t}" for t in narrative.key_tradeoffs)
+        lines.append("")
+
+    return lines
+
+
+def _build_j7_decision_readiness_section(
+    narrative: "ExecutiveNarrative",
+    da: dict[str, Any],
+    context: "AgentContext",
+) -> list[str]:
+    """Section 5 — Decision Readiness.
+
+    Answers: Can the Board approve this decision today?
+    Merges Executive Confidence + Confidence Assessment (deduped).
+    """
+    lines: list[str] = []
     nec = narrative.executive_confidence
-    lines += ["## 5. Executive Confidence", ""]
-    if nec:
-        ec_conf = nec.get("overall_confidence", "")
-        ec_ready = nec.get("decision_readiness", "")
-        ec_board = nec.get("board_recommendation", "")
-        if ec_conf:
-            lines += [f"**Overall Confidence:** {ec_conf}", ""]
-        if ec_ready:
-            lines += [f"**Decision Readiness:** {ec_ready}", ""]
-        if ec_board:
-            lines += [f"**Board Recommendation:** {ec_board}", ""]
 
-        ec_rat = _clean_internal_language(nec.get("confidence_rationale", "") or "")
-        if ec_rat:
-            lines += [f"*{ec_rat}*", ""]
-
-        ec_drivers = [
-            _clean_internal_language(d) for d in (nec.get("confidence_drivers") or [])
-        ]
-        if ec_drivers:
-            lines.append("**Key Confidence Drivers:**")
-            lines.extend(f"- {d}" for d in ec_drivers)
-            lines.append("")
-
-        ec_limiters = [_humanize_limiter(lim) for lim in (nec.get("confidence_limiters") or [])]
-        if ec_limiters:
-            lines.append("**Key Confidence Limiters:**")
-            lines.extend(f"- {lim}" for lim in ec_limiters)
-            lines.append("")
-
-        if narrative.validation_priorities:
-            _crit_assump = list(narrative.critical_assumptions or [])
-            lines.append("**Validation Priorities:**")
-            for i, p in enumerate(narrative.validation_priorities):
-                _cleaned_p = _clean_validation_text(p, _crit_assump)
-                if _cleaned_p:
-                    lines.append(f"{i + 1}. {_cleaned_p}")
-            lines.append("")
-
-        if narrative.critical_unknowns:
-            lines.append("**Critical Unknowns:**")
-            lines.extend(f"- {u}" for u in narrative.critical_unknowns)
-            lines.append("")
-
-        # Conditional assessment and decision horizon: detail fields not in narrative.
-        ec_raw: dict = context.executive_confidence or {}
-        if_hold = ec_raw.get("confidence_if_assumptions_hold", "")
-        if_fail = ec_raw.get("confidence_if_assumptions_fail", "")
-        if if_hold or if_fail:
-            lines.append("**Conditional Assessment:**")
-            if if_hold:
-                lines += [f"- *If assumptions hold:* {if_hold}", ""]
-            if if_fail:
-                lines += [f"- *If assumptions fail:* {if_fail}", ""]
-
-        horizon = ec_raw.get("decision_horizon", "")
-        if horizon:
-            lines += [f"**Decision Horizon:** {horizon}", ""]
-    else:
+    if not nec:
         lines += ["*Executive confidence assessment not available for this run.*", ""]
+        return lines
 
-    # ------------------------------------------------------------------ #
-    # Section 6 — Strategic Assumptions (was §5)                           #
-    # ------------------------------------------------------------------ #
-    lines += ["## 6. Strategic Assumptions", ""]
-    if assumptions:
-        sorted_assumptions = sorted(
-            assumptions,
-            key=lambda a: _IMPORTANCE_ORDER.get(a.get("importance", "Supporting"), 99),
-        )
-        lines += [
-            "| ID | Assumption | Importance | Confidence | Evidence Support |",
-            "|---|---|---|---|---|",
-        ]
-        for a in sorted_assumptions:
-            aid = a.get("assumption_id", "")
-            stmt = a.get("statement", "").replace("|", "\\|")
-            imp = a.get("importance", "")
-            conf = a.get("confidence", "")
-            ev_sup = a.get("evidence_support", "")
-            lines.append(f"| {aid} | {stmt} | {imp} | {conf} | {ev_sup} |")
+    ec_conf = nec.get("overall_confidence", "")
+    ec_ready = nec.get("decision_readiness", "")
+    ec_board = nec.get("board_recommendation", "")
+    if ec_conf:
+        lines += [f"**Overall Confidence:** {ec_conf}", ""]
+    if ec_ready:
+        lines += [f"**Decision Readiness:** {ec_ready}", ""]
+    if ec_board:
+        lines += [f"**Board Recommendation:** {ec_board}", ""]
+
+    # Confidence rationale from executive_confidence; da.confidence_summary as supplement
+    ec_rat = _clean_internal_language(nec.get("confidence_rationale", "") or "")
+    da_conf_summary = da.get("confidence_summary") or ""
+    if ec_rat:
+        lines += [f"*{ec_rat}*", ""]
+    if da_conf_summary and da_conf_summary != ec_rat:
+        lines += [f"*{da_conf_summary}*", ""]
+
+    ec_drivers = [
+        _clean_internal_language(d) for d in (nec.get("confidence_drivers") or [])
+    ]
+    if ec_drivers:
+        lines.append("**Key Confidence Drivers:**")
+        lines.extend(f"- {d}" for d in ec_drivers)
         lines.append("")
-    else:
-        lines += ["*No assumptions recorded.*", ""]
 
-    # ------------------------------------------------------------------ #
-    # Section 6 — Strategic Risks                                          #
-    # ------------------------------------------------------------------ #
-    lines += ["## 7. Strategic Risks", ""]
-    if risks:
-        lines += [
-            "| ID | Risk | Severity | Likelihood | Related Assumptions | Affected Recommendations |",
-            "|---|---|---|---|---|---|",
-        ]
-        for r in risks:
-            rid = r.get("risk_id", "")
-            stmt = r.get("statement", r.get("title", r.get("description", ""))).replace("|", "\\|")[:120]
-            sev = r.get("severity", "")
-            lhood = r.get("likelihood", "")
-            rel_assump = ", ".join(r.get("related_assumption_ids", [])) or "—"
-            aff_rec = ", ".join(r.get("affected_recommendation_ids", [])) or "—"
-            lines.append(f"| {rid} | {stmt} | {sev} | {lhood} | {rel_assump} | {aff_rec} |")
+    ec_limiters = [_humanize_limiter(lim) for lim in (nec.get("confidence_limiters") or [])]
+    if ec_limiters:
+        lines.append("**Key Confidence Limiters:**")
+        lines.extend(f"- {lim}" for lim in ec_limiters)
         lines.append("")
-        # Mitigation notes as sub-bullets
-        for r in risks:
-            mit = r.get("mitigation_notes") or r.get("mitigation") or ""
-            if mit:
-                rid = r.get("risk_id", "")
-                lines += [f"**{rid} Mitigation:** {mit}", ""]
-    else:
-        lines += ["*No risks recorded.*", ""]
 
-    # ------------------------------------------------------------------ #
-    # Section 7 — Strategic Opportunities                                  #
-    # ------------------------------------------------------------------ #
-    lines += ["## 8. Strategic Opportunities", ""]
-    if opps:
-        lines += [
-            "| ID | Statement | Category | Likelihood | Impact |",
-            "|---|---|---|---|---|",
-        ]
-        for o in opps:
-            oid2 = o.get("opportunity_id", "")
-            stmt = o.get("statement", o.get("title", o.get("description", ""))).replace("|", "\\|")[:120]
-            cat = o.get("category", "")
-            lhood = o.get("likelihood", o.get("probability", ""))
-            impact = o.get("impact", "")
-            lines.append(f"| {oid2} | {stmt} | {cat} | {lhood} | {impact} |")
+    if narrative.validation_priorities:
+        _crit_assump = list(narrative.critical_assumptions or [])
+        lines.append("**Validation Priorities:**")
+        for i, p in enumerate(narrative.validation_priorities):
+            _cleaned_p = _clean_validation_text(p, _crit_assump)
+            if _cleaned_p:
+                lines.append(f"{i + 1}. {_cleaned_p}")
         lines.append("")
-    else:
-        lines += ["*No opportunities recorded.*", ""]
 
-    # ------------------------------------------------------------------ #
-    # Section 8 — Strategic Options                                        #
-    # ------------------------------------------------------------------ #
-    lines += ["## 9. Strategic Options", ""]
+    if narrative.critical_unknowns:
+        lines.append("**Critical Unknowns:**")
+        lines.extend(f"- {u}" for u in narrative.critical_unknowns)
+        lines.append("")
+
+    # Conditional assessment and decision horizon
+    ec_raw: dict = context.executive_confidence or {}
+    if_hold = ec_raw.get("confidence_if_assumptions_hold", "")
+    if_fail = ec_raw.get("confidence_if_assumptions_fail", "")
+    if if_hold or if_fail:
+        lines.append("**Conditional Assessment:**")
+        if if_hold:
+            lines += [f"- *If assumptions hold:* {if_hold}", ""]
+        if if_fail:
+            lines += [f"- *If assumptions fail:* {if_fail}", ""]
+
+    horizon = ec_raw.get("decision_horizon", "")
+    if horizon:
+        lines += [f"**Decision Horizon:** {horizon}", ""]
+
+    # Key uncertainties from decision_analysis (merged from Confidence Assessment)
+    uncertainties = da.get("key_uncertainties") or []
+    if uncertainties:
+        lines.append("**Key Uncertainties:**")
+        lines.extend(f"- {u}" for u in uncertainties)
+        lines.append("")
+
+    return lines
+
+
+def _build_j7_critical_assumptions_section(
+    assumptions: list[dict[str, Any]],
+) -> list[str]:
+    """Section 6 — Critical Assumptions (executive summary only).
+
+    Answers: What could change the recommendation?
+    Shows Critical + Important assumptions. Full register in Appendix B.
+    """
+    if not assumptions:
+        return ["*No assumptions recorded.*", ""]
+
+    sorted_assumptions = sorted(
+        assumptions,
+        key=lambda a: _IMPORTANCE_ORDER.get(a.get("importance", "Supporting"), 99),
+    )
+    # Executive view: Critical + Important only; fall back to all if none qualify
+    exec_assumptions = [
+        a for a in sorted_assumptions
+        if a.get("importance", "Supporting") in ("Critical", "Important")
+    ]
+    if not exec_assumptions:
+        exec_assumptions = sorted_assumptions[:5]
+
+    lines: list[str] = [
+        "| ID | Assumption | Importance | Confidence |",
+        "|---|---|---|---|",
+    ]
+    for a in exec_assumptions:
+        aid = a.get("assumption_id", "")
+        stmt = a.get("statement", "").replace("|", "\\|")
+        imp = a.get("importance", "")
+        conf = a.get("confidence", "")
+        lines.append(f"| {aid} | {stmt} | {imp} | {conf} |")
+    lines += ["", "*Full assumption register in Appendix B.*", ""]
+    return lines
+
+
+def _build_j7_key_risks_section(risks: list[dict[str, Any]]) -> list[str]:
+    """Section 7 — Key Risks (executive summary only).
+
+    Answers: What could derail execution?
+    Shows High-severity risks first. Full register in Appendix C.
+    """
+    if not risks:
+        return ["*No risks recorded.*", ""]
+
+    sorted_risks = sorted(
+        risks,
+        key=lambda r: {"High": 0, "Medium": 1, "Low": 2}.get(r.get("severity", "Low"), 3),
+    )
+    high_risks = [r for r in sorted_risks if r.get("severity") == "High"]
+    med_risks = [r for r in sorted_risks if r.get("severity") == "Medium"]
+    exec_risks = high_risks + med_risks[:max(0, 5 - len(high_risks))]
+
+    lines: list[str] = [
+        "| ID | Risk | Severity | Likelihood |",
+        "|---|---|---|---|",
+    ]
+    for r in exec_risks:
+        rid = r.get("risk_id", "")
+        stmt = r.get("statement", r.get("title", r.get("description", ""))).replace("|", "\\|")[:120]
+        sev = r.get("severity", "")
+        lhood = r.get("likelihood", "")
+        lines.append(f"| {rid} | {stmt} | {sev} | {lhood} |")
+    lines += ["", "*Full risk register in Appendix C.*", ""]
+    return lines
+
+
+def _build_j7_strategic_opportunities_section(
+    opps: list[dict[str, Any]],
+) -> list[str]:
+    """Section 8 — Strategic Opportunities (executive summary only).
+
+    Answers: Where is the upside?
+    Shows top opportunities by impact. Full register in Appendix D.
+    """
+    if not opps:
+        return ["*No opportunities recorded.*", ""]
+
+    sorted_opps = sorted(
+        opps,
+        key=lambda o: {"High": 0, "Medium": 1, "Low": 2}.get(o.get("impact", "Low"), 3),
+    )
+    exec_opps = sorted_opps[:5]
+
+    lines: list[str] = [
+        "| ID | Opportunity | Category | Impact | Likelihood |",
+        "|---|---|---|---|---|",
+    ]
+    for o in exec_opps:
+        oid2 = o.get("opportunity_id", "")
+        stmt = o.get("statement", o.get("title", o.get("description", ""))).replace("|", "\\|")[:120]
+        cat = o.get("category", "")
+        impact = o.get("impact", "")
+        lhood = o.get("likelihood", o.get("probability", ""))
+        lines.append(f"| {oid2} | {stmt} | {cat} | {impact} | {lhood} |")
+    lines += ["", "*Full opportunity register in Appendix D.*", ""]
+    return lines
+
+
+def _build_j7_appendix(
+    context: "AgentContext",
+    narrative: "ExecutiveNarrative",
+    da: dict[str, Any],
+    assumptions: list[dict[str, Any]],
+    risks: list[dict[str, Any]],
+    opps: list[dict[str, Any]],
+    options: list[dict[str, Any]],
+    recommended_id: str,
+    ro: dict[str, Any],
+) -> list[str]:
+    """Section 10 — Appendix: detailed analytical artifacts for analyst traceability.
+
+    Answers: How do I verify the analysis?
+    Contains: Strategic Options Detail, Assumption Register, Risk Register,
+    Opportunity Register, Confidence Analysis, Supporting Evidence.
+    """
+    lines: list[str] = ["---", ""]
+
+    # --- Appendix A — Strategic Options Detail ---
+    lines += ["### Appendix A — Strategic Options Detail", ""]
     for opt in options:
         oid3 = opt.get("option_id", "")
         t = opt.get("title", "")
         is_rec = oid3 == recommended_id
-        heading = f"### {oid3}: {t}"
+        heading = f"#### {oid3}: {t}"
         if is_rec:
             heading += " *(Recommended)*"
         lines += [heading, ""]
@@ -1646,85 +1702,86 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
         if sup_recs:
             lines += [f"**Supporting Recommendations:** {', '.join(sup_recs)}", ""]
 
-    # ------------------------------------------------------------------ #
-    # Section 9 — Decision Matrix                                          #
-    # ------------------------------------------------------------------ #
-    matrix: list[dict] = da.get("decision_matrix") or []
-    lines += ["## 10. Decision Matrix", ""]
-    if matrix:
-        _SCORE_COLS = [
-            ("strategic_fit", "Strategic Fit"),
-            ("implementation_risk", "Impl. Risk"),
-            ("execution_complexity", "Exec. Complexity"),
-            ("capital_requirement", "Capital Req."),
-            ("expected_return", "Expected Return"),
-            ("time_to_value", "Time to Value"),
-            ("dependency_strength", "Dependency"),
-            ("assumption_strength", "Assumption"),
-            ("risk_exposure", "Risk Exposure"),
-            ("opportunity_capture", "Opportunity"),
-            ("overall_score", "Overall"),
+    lines += ["---", ""]
+
+    # --- Appendix B — Complete Assumption Register ---
+    lines += ["### Appendix B — Complete Assumption Register", ""]
+    if assumptions:
+        sorted_assumptions = sorted(
+            assumptions,
+            key=lambda a: _IMPORTANCE_ORDER.get(a.get("importance", "Supporting"), 99),
+        )
+        lines += [
+            "| ID | Assumption | Importance | Confidence | Evidence Support |",
+            "|---|---|---|---|---|",
         ]
-        col_headers = "| Option | " + " | ".join(h for _, h in _SCORE_COLS) + " |"
-        col_divider = "|---|" + "---|" * len(_SCORE_COLS)
-        lines += [col_headers, col_divider]
-        # Build option_id → title lookup
-        _opt_titles = {o.get("option_id", ""): o.get("title", "") for o in options}
-        for entry in matrix:
-            eid = entry.get("option_id", "")
-            opt_label = f"{eid}: {_opt_titles.get(eid, '')}" if _opt_titles.get(eid) else eid
-            if eid == recommended_id:
-                opt_label += " ✓"
-            scores = " | ".join(entry.get(k, "—") for k, _ in _SCORE_COLS)
-            lines.append(f"| {opt_label} | {scores} |")
-        lines.append("")
-        # Strengths/weaknesses per option
-        for entry in matrix:
-            eid = entry.get("option_id", "")
-            strengths = entry.get("strengths") or []
-            weaknesses = entry.get("weaknesses") or []
-            if strengths or weaknesses:
-                lines += [f"**{eid} — Strengths & Weaknesses**", ""]
-                if strengths:
-                    lines.append("Strengths:")
-                    lines.extend(f"+ {s}" for s in strengths)
-                    lines.append("")
-                if weaknesses:
-                    lines.append("Weaknesses:")
-                    lines.extend(f"- {w}" for w in weaknesses)
-                    lines.append("")
-    else:
-        lines += ["*No decision matrix available.*", ""]
-
-    # ------------------------------------------------------------------ #
-    # Section 10 — Key Tradeoffs                                           #
-    # ------------------------------------------------------------------ #
-    # J12.5 — key_tradeoffs from narrative (prefers strategic_synthesis
-    # tradeoffs, then da.key_tradeoffs, then comparison_dimensions as fallback).
-    lines += ["## 11. Key Tradeoffs", ""]
-    if narrative.key_tradeoffs:
-        lines.extend(f"- {t}" for t in narrative.key_tradeoffs)
+        for a in sorted_assumptions:
+            aid = a.get("assumption_id", "")
+            stmt = a.get("statement", "").replace("|", "\\|")
+            imp = a.get("importance", "")
+            conf = a.get("confidence", "")
+            ev_sup = a.get("evidence_support", "")
+            lines.append(f"| {aid} | {stmt} | {imp} | {conf} | {ev_sup} |")
         lines.append("")
     else:
-        lines += ["*No tradeoffs recorded.*", ""]
+        lines += ["*No assumptions recorded.*", ""]
 
-    # ------------------------------------------------------------------ #
-    # Section 11 — Sensitivity Analysis                                    #
-    # ------------------------------------------------------------------ #
+    lines += ["---", ""]
+
+    # --- Appendix C — Complete Risk Register ---
+    lines += ["### Appendix C — Complete Risk Register", ""]
+    if risks:
+        lines += [
+            "| ID | Risk | Severity | Likelihood | Related Assumptions | Affected Recommendations |",
+            "|---|---|---|---|---|---|",
+        ]
+        for r in risks:
+            rid = r.get("risk_id", "")
+            stmt = r.get("statement", r.get("title", r.get("description", ""))).replace("|", "\\|")[:120]
+            sev = r.get("severity", "")
+            lhood = r.get("likelihood", "")
+            rel_assump = ", ".join(r.get("related_assumption_ids", [])) or "—"
+            aff_rec = ", ".join(r.get("affected_recommendation_ids", [])) or "—"
+            lines.append(f"| {rid} | {stmt} | {sev} | {lhood} | {rel_assump} | {aff_rec} |")
+        lines.append("")
+        for r in risks:
+            mit = r.get("mitigation_notes") or r.get("mitigation") or ""
+            if mit:
+                rid = r.get("risk_id", "")
+                lines += [f"**{rid} Mitigation:** {mit}", ""]
+    else:
+        lines += ["*No risks recorded.*", ""]
+
+    lines += ["---", ""]
+
+    # --- Appendix D — Complete Opportunity Register ---
+    lines += ["### Appendix D — Complete Opportunity Register", ""]
+    if opps:
+        lines += [
+            "| ID | Statement | Category | Likelihood | Impact |",
+            "|---|---|---|---|---|",
+        ]
+        for o in opps:
+            oid2 = o.get("opportunity_id", "")
+            stmt = o.get("statement", o.get("title", o.get("description", ""))).replace("|", "\\|")[:120]
+            cat = o.get("category", "")
+            lhood = o.get("likelihood", o.get("probability", ""))
+            impact = o.get("impact", "")
+            lines.append(f"| {oid2} | {stmt} | {cat} | {lhood} | {impact} |")
+        lines.append("")
+    else:
+        lines += ["*No opportunities recorded.*", ""]
+
+    lines += ["---", ""]
+
+    # --- Appendix E — Detailed Confidence Analysis ---
+    lines += ["### Appendix E — Detailed Confidence Analysis", ""]
     sensitivity = da.get("sensitivity_analysis") or ""
-    lines += ["## 12. Sensitivity Analysis", ""]
     if sensitivity:
-        lines += [sensitivity, ""]
-    else:
-        lines += ["*No sensitivity analysis available.*", ""]
-
-    # ------------------------------------------------------------------ #
-    # Section 12 — Confidence Assessment                                   #
-    # ------------------------------------------------------------------ #
-    conf_summary = da.get("confidence_summary") or ""
+        lines += ["**Sensitivity Analysis:**", "", sensitivity, ""]
     conf_level = da.get("confidence") or ""
+    conf_summary = da.get("confidence_summary") or ""
     uncertainties = da.get("key_uncertainties") or []
-    lines += ["## 13. Confidence Assessment", ""]
     if conf_level:
         lines += [f"**Overall Confidence:** {conf_level}", ""]
     if conf_summary:
@@ -1734,74 +1791,23 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
         lines.extend(f"- {u}" for u in uncertainties)
         lines.append("")
 
-    # ------------------------------------------------------------------ #
-    # Section 13 — Immediate Actions                                       #
-    # ------------------------------------------------------------------ #
-    lines += ["## 14. Immediate Actions", ""]
-    if recs:
-        grouped: dict[str, list[dict]] = {}
-        for rec in recs:
-            # Recommendations use time_horizon (DM schema) or timeframe (legacy)
-            raw_tf = rec.get("time_horizon") or rec.get("timeframe") or ""
-            tf = _normalise_timeframe(raw_tf)
-            grouped.setdefault(tf, []).append(rec)
-        ordered_tfs = [tf for tf in _TIMEFRAME_ORDER if tf in grouped]
-        for tf in grouped:
-            if tf not in ordered_tfs:
-                ordered_tfs.append(tf)
-        for tf in ordered_tfs:
-            tf_recs = grouped.get(tf, [])
-            if not tf_recs:
-                continue
-            display = _TIMEFRAME_DISPLAY.get(tf, tf)
-            lines += [f"### {display}", ""]
-            for rec in tf_recs:
-                rid = rec.get("recommendation_id", "")
-                rtitle = rec.get("title", "")
-                # summary is the DM field; fall back to rationale/description for legacy
-                rbody = rec.get("summary") or rec.get("rationale") or rec.get("description") or ""
-                rpri = rec.get("priority", "")
-                lines.append(f"**{rid}: {rtitle}**" + (f" *(Priority: {rpri})*" if rpri else ""))
-                if rbody:
-                    lines += [rbody, ""]
-                else:
-                    lines.append("")
-    else:
-        lines += ["*No recommendations recorded.*", ""]
+    lines += ["---", ""]
 
-    # ------------------------------------------------------------------ #
-    # Section 14 — Supporting Evidence                                     #
-    # ------------------------------------------------------------------ #
-    # evidence_summary is populated by EvidenceAgent before ReportAgent runs;
-    # summary.evidence_count is only set by update_research_object() which runs
-    # after _build_j7_executive_report(). Use evidence_summary as primary source.
+    # --- Appendix F — Supporting Evidence ---
+    lines += ["### Appendix F — Supporting Evidence", ""]
     ev_summary = ro.get("evidence_summary") or ro.get("summary") or {}
     ev_count = ev_summary.get("total_evidence_items", ev_summary.get("evidence_count", 0))
-    # J8.10 — citation_count is computed by _build_key_findings() and stored in
-    # context.report["report_grounding_score"]; the TRACE reads it from there.
-    # The report previously read it from evidence_summary (which never carries
-    # the key), so it always rendered "Citations: 0" while the trace recorded a
-    # non-zero count. Read from the same source the trace uses to keep them
-    # consistent, falling back to evidence_summary / the RO for legacy objects.
     report_block = context.report or ro.get("report") or {}
     grounding = report_block.get("report_grounding_score") or {}
     cite_count = grounding.get("citation_count", ev_summary.get("citation_count", 0))
-    # Fall back to evidence_ids list length when dedicated counts are missing
     if not ev_count:
         ev_count = len(ro.get("evidence_ids", []))
     profiles = ro.get("profiles") or context.profiles or []
     lines += [
-        "## 15. Supporting Evidence",
-        "",
         f"**Evidence Items:** {ev_count}  |  **Citations:** {cite_count}  |  "
         f"**Source Profiles:** {', '.join(profiles) if profiles else 'N/A'}",
         "",
     ]
-
-    # J8.10 — surface the evidence-backed findings so conclusions are traceable.
-    # Each finding carries inline [Source: <doc>, Evidence: <id>] markers plus
-    # its supporting evidence IDs, making the chain from claim → evidence visible
-    # in the report itself (not only in the trace).
     key_findings = report_block.get("key_findings") or []
     if key_findings:
         lines.append("**Evidence-Backed Findings:**")
@@ -1819,13 +1825,182 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
             if ids:
                 lines.append(f"  - Supporting evidence: {', '.join(ids)}")
         lines.append("")
-
     topics = ro.get("evidence_topics") or {}
     if topics:
         top_topics = sorted(topics.items(), key=lambda x: -x[1])[:8]
         lines.append("**Top Evidence Topics:**")
         lines.extend(f"- {topic} ({count} items)" for topic, count in top_topics)
         lines.append("")
+
+    return lines
+
+
+def _build_j7_executive_report(context: "AgentContext") -> str:
+    """Build the 10-section J7 executive report from the decision graph.
+
+    P1.3 — Executive Abstraction Layer: organized around executive questions.
+    Only called when context.strategic_options is non-empty. Never
+    re-generates analysis already present in the decision graph.
+    """
+    # J12.5 — Build ExecutiveNarrative for all executive-facing prose sections.
+    # Sets context.executive_narrative as a side effect.
+    narrative: ExecutiveNarrative = ExecutiveNarrativeBuilder().build(context)
+
+    da: dict = context.decision_analysis or {}
+    preferred: dict = context.preferred_option or {}
+    options: list[dict] = context.strategic_options or []
+    assumptions: list[dict] = context.assumptions or []
+    risks: list[dict] = context.risks or []
+    opps: list[dict] = context.opportunities or []
+    recs: list[dict] = context.recommendations or []
+    ro: dict = context.research_object or {}
+    question: str = context.question or ""
+    eng: dict = context.engagement or {}
+
+    recommended_id = da.get("recommended_option_id") or preferred.get("option_id") or ""
+    eng_title = _display_engagement_title(context)
+
+    lines: list[str] = []
+
+    # ------------------------------------------------------------------ #
+    # Section 1 — Executive Summary                                        #
+    # ------------------------------------------------------------------ #
+    lines += [
+        "# Executive Strategic Report",
+        "",
+        "## 1. Executive Summary",
+        "",
+    ]
+    lines += _build_j7_executive_summary_section(context, narrative)
+
+    # ------------------------------------------------------------------ #
+    # Section 2 — Strategic Context (P1.3 — renamed from Strategic Question)#
+    # ------------------------------------------------------------------ #
+    lines += ["## 2. Strategic Context", ""]
+    if eng.get("title"):
+        lines += [f"**{eng_title}**", ""]
+        _client_str = eng.get("client", "")
+        _industry_str = eng.get("industry", "")
+        if _client_str and _industry_str:
+            lines += [f"*{_client_str} — {_industry_str}*", ""]
+        elif _client_str:
+            lines += [f"*{_client_str}*", ""]
+        _first_obj = (eng.get("objectives") or [""])[0]
+        if _first_obj:
+            lines += [str(_first_obj), ""]
+        elif eng.get("current_situation"):
+            lines += [str(eng["current_situation"]), ""]
+    else:
+        lines += [question, ""]
+
+    # ------------------------------------------------------------------ #
+    # Section 3 — Strategic Recommendation                                 #
+    # P1.3 — renamed from "Recommended Strategic Option"                   #
+    # ------------------------------------------------------------------ #
+    lines += ["## 3. Strategic Recommendation", ""]
+    _rec = narrative.recommended_option
+    _oid = _rec.get("option_id", "")
+    _title = _rec.get("title", "")
+    if _oid or _title:
+        lines += [f"**{_oid}: {_title}**", ""]
+        rec_opt = next((o for o in options if o.get("option_id") == recommended_id), preferred)
+        _horizon = (
+            _rec.get("estimated_time_horizon", "")
+            or (rec_opt or {}).get("time_horizon", "")
+        ).replace("_", " ")
+        if _horizon:
+            lines += [f"**Time Horizon:** {_horizon}", ""]
+        _desc = (
+            _rec.get("description", "")
+            or (rec_opt or {}).get("rationale", "")
+            or (rec_opt or {}).get("strategic_logic", "")
+        )
+        if _desc:
+            lines += [_desc, ""]
+        caps = (rec_opt or {}).get("required_capabilities") or []
+        deps = (rec_opt or {}).get("dependencies") or []
+        if caps:
+            lines.append("**Required Capabilities:**")
+            lines.extend(f"- {c}" for c in caps)
+            lines.append("")
+        if deps:
+            lines.append("**Key Dependencies:**")
+            lines.extend(f"- {d}" for d in deps)
+            lines.append("")
+
+    # ------------------------------------------------------------------ #
+    # Section 4 — Recommendation Rationale                                 #
+    # P1.3: Merges Why This Option Wins + Decision Matrix + Key Tradeoffs  #
+    # ------------------------------------------------------------------ #
+    lines += ["## 4. Recommendation Rationale", ""]
+    lines += _build_j7_recommendation_rationale_section(narrative, da, options, recommended_id)
+
+    # ------------------------------------------------------------------ #
+    # Section 5 — Decision Readiness                                       #
+    # P1.3: Merges Executive Confidence + Confidence Assessment (deduped)  #
+    # ------------------------------------------------------------------ #
+    lines += ["## 5. Decision Readiness", ""]
+    lines += _build_j7_decision_readiness_section(narrative, da, context)
+
+    # ------------------------------------------------------------------ #
+    # Section 6 — Critical Assumptions (executive summary only)            #
+    # ------------------------------------------------------------------ #
+    lines += ["## 6. Critical Assumptions", ""]
+    lines += _build_j7_critical_assumptions_section(assumptions)
+
+    # ------------------------------------------------------------------ #
+    # Section 7 — Key Risks (executive summary only)                       #
+    # ------------------------------------------------------------------ #
+    lines += ["## 7. Key Risks", ""]
+    lines += _build_j7_key_risks_section(risks)
+
+    # ------------------------------------------------------------------ #
+    # Section 8 — Strategic Opportunities (executive summary only)         #
+    # ------------------------------------------------------------------ #
+    lines += ["## 8. Strategic Opportunities", ""]
+    lines += _build_j7_strategic_opportunities_section(opps)
+
+    # ------------------------------------------------------------------ #
+    # Section 9 — Immediate Actions                                        #
+    # ------------------------------------------------------------------ #
+    lines += ["## 9. Immediate Actions", ""]
+    if recs:
+        grouped: dict[str, list[dict]] = {}
+        for rec in recs:
+            raw_tf = rec.get("time_horizon") or rec.get("timeframe") or ""
+            tf = _normalise_timeframe(raw_tf)
+            grouped.setdefault(tf, []).append(rec)
+        ordered_tfs = [tf for tf in _TIMEFRAME_ORDER if tf in grouped]
+        for tf in grouped:
+            if tf not in ordered_tfs:
+                ordered_tfs.append(tf)
+        for tf in ordered_tfs:
+            tf_recs = grouped.get(tf, [])
+            if not tf_recs:
+                continue
+            display = _TIMEFRAME_DISPLAY.get(tf, tf)
+            lines += [f"### {display}", ""]
+            for rec in tf_recs:
+                rid = rec.get("recommendation_id", "")
+                rtitle = rec.get("title", "")
+                rbody = rec.get("summary") or rec.get("rationale") or rec.get("description") or ""
+                rpri = rec.get("priority", "")
+                lines.append(f"**{rid}: {rtitle}**" + (f" *(Priority: {rpri})*" if rpri else ""))
+                if rbody:
+                    lines += [rbody, ""]
+                else:
+                    lines.append("")
+    else:
+        lines += ["*No recommendations recorded.*", ""]
+
+    # ------------------------------------------------------------------ #
+    # Section 10 — Appendix                                               #
+    # P1.3: Detailed analytical artifacts for analyst traceability        #
+    # ------------------------------------------------------------------ #
+    lines += ["## 10. Appendix", ""]
+    lines += _build_j7_appendix(
+        context, narrative, da, assumptions, risks, opps, options, recommended_id, ro
+    )
 
     return "\n".join(lines)
 
