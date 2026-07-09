@@ -889,6 +889,33 @@ class Orchestrator:
             ctx.profiles, ctx.execution_profile, ctx.goal[:60] if ctx.goal else "",
         )
 
+        # J13.0 — create transient ResearchSession for this pipeline execution.
+        # Best-effort: session failures must never block the pipeline.
+        from .session import ResearchSession, ResearchState, IterationRecord, SessionStore
+        _session_store = SessionStore()
+        _session = ResearchSession.create(
+            metadata={
+                "run_id": ctx.run_id,
+                "profiles": list(ctx.profiles),
+                "execution_profile": ctx.execution_profile,
+                "run_mode": run_mode,
+                "engagement_id": engagement.engagement_id,
+            },
+            research_state=ResearchState.from_context(ctx),
+        )
+        _session.add_iteration(IterationRecord(
+            iteration_number=0,
+            timestamp=_session.created_at,
+            trigger="initial",
+            summary=f"Pipeline execution started — run_id={ctx.run_id}",
+            completed_tasks=[],
+            notes="",
+        ))
+        try:
+            _session_store.create(_session)
+        except Exception as _sess_exc:
+            LOGGER.warning("[Session] session create failed: %s", _sess_exc)
+
         # Hand off to the adaptive orchestrator
         orchestrator = AgentOrchestrator(
             problem_framing_factory=problem_framing_factory if goal else None,
@@ -916,6 +943,18 @@ class Orchestrator:
             max_iterations=self._max_iterations,
         )
         result_ctx = orchestrator.run(ctx)
+
+        # J13.0 — finalize and persist session after pipeline completion.
+        # Best-effort: failures must never block post-run diagnostics or the caller.
+        try:
+            _session.research_state = ResearchState.from_context(result_ctx)
+            _session.take_snapshot()
+            if result_ctx.workflow_state == WorkflowState.COMPLETE:
+                _session.complete()
+            _session_store.save(_session)
+            result_ctx.trace["_session_id"] = _session.session_id
+        except Exception as _sess_exc:
+            LOGGER.warning("[Session] post-run session save failed: %s", _sess_exc)
 
         # J8.8a – emit performance summary after pipeline completes
         from research_agent.log import PROGRESS
