@@ -222,6 +222,16 @@ def main(
             ),
         ),
     ] = False,
+    save_context: Annotated[
+        Path | None,
+        typer.Option(
+            "--save-context",
+            help=(
+                "Persist the completed AgentContext as JSON suitable for replay with "
+                "`functional_agents.run_agent --fixture`. Only written on successful completion."
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Run the functional agent pipeline and write a Markdown research memo.
 
@@ -451,6 +461,21 @@ def main(
 
     if is_run_dir:
         _write_run_artifacts(ctx, run_dir)
+
+    # DX1 — persist completed AgentContext for isolated agent replay.
+    if save_context is not None:
+        from .context_snapshot import context_to_jsonable
+        try:
+            save_context.parent.mkdir(parents=True, exist_ok=True)
+            save_context.write_text(
+                json.dumps(context_to_jsonable(ctx), indent=2, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            typer.echo(f"Context saved → {save_context}")
+        except Exception as exc:
+            raise RuntimeError(
+                f"--save-context: failed to write AgentContext to {save_context}: {exc}"
+            ) from exc
 
     _print_run_summary(
         ctx, mode, run_dir, elapsed,
