@@ -18,6 +18,7 @@ from typing import Any
 from .iteration_record import IterationRecord
 from .research_state import ResearchState
 from .snapshot import Snapshot
+from .state_change import StateChange
 
 
 class SessionStatus:
@@ -57,6 +58,7 @@ class ResearchSession:
     research_state: ResearchState
     iteration_history: list[IterationRecord] = field(default_factory=list)
     snapshots: list[Snapshot] = field(default_factory=list)
+    state_changes: list[StateChange] = field(default_factory=list)
 
     @classmethod
     def create(
@@ -79,6 +81,7 @@ class ResearchSession:
             research_state=research_state,
             iteration_history=[],
             snapshots=[],
+            state_changes=[],
         )
 
     def _touch(self) -> None:
@@ -98,6 +101,11 @@ class ResearchSession:
         self.snapshots.append(snap)
         self._touch()
         return snap
+
+    def record_state_change(self, change: StateChange) -> None:
+        """Append a StateChange record to the session's audit trail."""
+        self.state_changes.append(change)
+        self._touch()
 
     def complete(self) -> None:
         """Transition to COMPLETED status."""
@@ -119,6 +127,7 @@ class ResearchSession:
             "research_state": self.research_state.to_dict(),
             "iteration_history": [r.to_dict() for r in self.iteration_history],
             "snapshots": [s.to_dict() for s in self.snapshots],
+            "state_changes": [c.to_dict() for c in self.state_changes],
         }
 
     @classmethod
@@ -135,5 +144,8 @@ class ResearchSession:
             ],
             snapshots=[
                 Snapshot.from_dict(s) for s in (d.get("snapshots") or [])
+            ],
+            state_changes=[
+                StateChange.from_dict(c) for c in (d.get("state_changes") or [])
             ],
         )

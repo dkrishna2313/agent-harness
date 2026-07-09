@@ -889,5 +889,103 @@ def session_show_cmd(
     typer.echo("")
 
 
+# ---------------------------------------------------------------------------
+# dependencies sub-app (J13.1)
+# ---------------------------------------------------------------------------
+
+dependencies_app = typer.Typer(
+    no_args_is_help=True,
+    help="Inspect agent dependency declarations.",
+)
+app.add_typer(dependencies_app, name="dependencies")
+
+
+@dependencies_app.command("list")
+def dep_list() -> None:
+    """List all registered agent dependency declarations."""
+    from functional_agents.dependencies import DependencyRegistry
+    deps = DependencyRegistry.list_dependencies()
+    typer.echo(f"Registered agents ({len(deps)}):")
+    for dep in deps:
+        typer.echo(
+            f"  {dep.agent_name:<40}  "
+            f"consumes={len(dep.consumes):<3} "
+            f"produces={len(dep.produces):<3} "
+            f"invalidates={len(dep.invalidates)}"
+        )
+
+
+@dependencies_app.command("show")
+def dep_show(
+    agent: str = typer.Option(..., "--agent", help="Agent class name (e.g. EvidenceAgent)"),
+) -> None:
+    """Show dependency details for a specific agent."""
+    from functional_agents.dependencies import DependencyRegistry
+    try:
+        dep = DependencyRegistry.get_dependency(agent)
+    except KeyError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(1)
+
+    typer.echo(f"\n{dep.agent_name}")
+    typer.echo("")
+    typer.echo("  Consumes:")
+    for p in dep.consumes:
+        typer.echo(f"    - {p}")
+    if not dep.consumes:
+        typer.echo("    (none)")
+    typer.echo("")
+    typer.echo("  Produces:")
+    for p in dep.produces:
+        typer.echo(f"    - {p}")
+    if not dep.produces:
+        typer.echo("    (none)")
+    typer.echo("")
+    typer.echo("  Invalidates:")
+    for p in dep.invalidates:
+        typer.echo(f"    - {p}")
+    if not dep.invalidates:
+        typer.echo("    (none — terminal agent)")
+    typer.echo("")
+
+
+@dependencies_app.command("affected")
+def dep_affected(
+    path: str = typer.Option(
+        ..., "--path", help="Logical path to query (e.g. research_object.evidence)"
+    ),
+) -> None:
+    """Show agents consuming, producing, or invalidated by a given path."""
+    from functional_agents.dependencies import DependencyRegistry
+
+    consumers = DependencyRegistry.agents_consuming(path)
+    producers = DependencyRegistry.agents_producing(path)
+    invalidated = DependencyRegistry.agents_invalidated_by(path)
+
+    typer.echo(f"\nAffected by: {path}")
+    typer.echo("")
+    typer.echo(f"  Producers ({len(producers)}) — agents that write this path:")
+    for a in producers:
+        typer.echo(f"    {a}")
+    if not producers:
+        typer.echo("    (none)")
+    typer.echo("")
+    typer.echo(f"  Consumers ({len(consumers)}) — agents that read this path:")
+    for a in consumers:
+        typer.echo(f"    {a}")
+    if not consumers:
+        typer.echo("    (none)")
+    typer.echo("")
+    typer.echo(
+        f"  Invalidated by producers ({len(invalidated)}) — "
+        "agents that declare this path in their invalidates list:"
+    )
+    for a in invalidated:
+        typer.echo(f"    {a}")
+    if not invalidated:
+        typer.echo("    (none)")
+    typer.echo("")
+
+
 if __name__ == "__main__":
     app()

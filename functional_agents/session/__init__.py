@@ -1,4 +1,4 @@
-"""Research Session package — persistent investigation management (J13.0).
+"""Research Session package — persistent investigation management (J13.0+J13.1).
 
 Public API
 ----------
@@ -7,6 +7,8 @@ SessionStatus    — session lifecycle constants (ACTIVE / COMPLETED / ARCHIVED)
 ResearchState    — canonical mutable state owning reasoning artifacts
 IterationRecord  — immutable record of one pipeline execution
 Snapshot         — full ResearchState capture at a point in time
+StateChange      — first-class record of a single ResearchState mutation (J13.1)
+ChangeType       — StateChange type constants (J13.1)
 SessionStore     — JSON-backed persistence layer
 SessionNotFoundError — raised by SessionStore.load() when session is absent
 """
@@ -21,6 +23,7 @@ from .session_store import (
     save_session_file,
 )
 from .snapshot import Snapshot
+from .state_change import ChangeType, StateChange
 
 __all__ = [
     "ResearchSession",
@@ -28,6 +31,8 @@ __all__ = [
     "ResearchState",
     "IterationRecord",
     "Snapshot",
+    "StateChange",
+    "ChangeType",
     "SessionStore",
     "SessionNotFoundError",
     "load_session_file",

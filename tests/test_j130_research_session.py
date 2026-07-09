@@ -426,6 +426,7 @@ class TestResearchSessionSerialization:
         assert set(d.keys()) == {
             "session_id", "created_at", "updated_at", "status",
             "metadata", "research_state", "iteration_history", "snapshots",
+            "state_changes",
         }
 
     def test_to_dict_from_dict_empty_session(self):

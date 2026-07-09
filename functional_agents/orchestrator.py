@@ -947,8 +947,19 @@ class Orchestrator:
         # J13.0 — finalize and persist session after pipeline completion.
         # Best-effort: failures must never block post-run diagnostics or the caller.
         try:
+            from .session import StateChange, ChangeType
             _session.research_state = ResearchState.from_context(result_ctx)
             _session.take_snapshot()
+            _session.record_state_change(StateChange.create(
+                source="orchestrator",
+                change_type=ChangeType.REPLACE,
+                affected_paths=["research_state"],
+                description=(
+                    f"Full pipeline execution replaced ResearchState — "
+                    f"run_id={result_ctx.run_id}"
+                ),
+                metadata={"run_id": result_ctx.run_id},
+            ))
             if result_ctx.workflow_state == WorkflowState.COMPLETE:
                 _session.complete()
             _session_store.save(_session)
