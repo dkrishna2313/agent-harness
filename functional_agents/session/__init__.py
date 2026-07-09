@@ -14,7 +14,12 @@ SessionNotFoundError — raised by SessionStore.load() when session is absent
 from .iteration_record import IterationRecord
 from .research_session import ResearchSession, SessionStatus
 from .research_state import ResearchState
-from .session_store import SessionNotFoundError, SessionStore
+from .session_store import (
+    SessionNotFoundError,
+    SessionStore,
+    load_session_file,
+    save_session_file,
+)
 from .snapshot import Snapshot
 
 __all__ = [
@@ -25,4 +30,6 @@ __all__ = [
     "Snapshot",
     "SessionStore",
     "SessionNotFoundError",
+    "load_session_file",
+    "save_session_file",
 ]

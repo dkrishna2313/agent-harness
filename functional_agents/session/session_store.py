@@ -106,3 +106,27 @@ class SessionStore:
         if not self._base_dir.exists():
             return []
         return sorted(p.stem for p in self._base_dir.glob("SS-*.json"))
+
+
+# ---------------------------------------------------------------------------
+# Path-based helpers (J13.1) — load/save at an explicit file path rather
+# than through the auto-ID store directory.
+# ---------------------------------------------------------------------------
+
+def load_session_file(path: Path | str) -> ResearchSession:
+    """Load a ResearchSession from an explicit file path."""
+    path = Path(path)
+    if not path.exists():
+        raise SessionNotFoundError(f"Session file not found: {path}")
+    return ResearchSession.from_dict(json.loads(path.read_text(encoding="utf-8")))
+
+
+def save_session_file(session: ResearchSession, path: Path | str) -> None:
+    """Write a ResearchSession to an explicit file path."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(session.to_dict(), indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    LOGGER.debug("[SessionStore] saved %s → %s", session.session_id, path)

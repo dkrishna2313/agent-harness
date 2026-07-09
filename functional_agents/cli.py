@@ -1,4 +1,4 @@
-"""CLI for the functional agent pipeline (J5.0a.7)."""
+"""CLI for the functional agent pipeline (J5.0a.7 / J13.1)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 import logging
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated
 
@@ -15,6 +15,13 @@ import typer
 from research_agent.cli import _configure_logging
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
+
+# ---------------------------------------------------------------------------
+# session sub-app (J13.1)
+# ---------------------------------------------------------------------------
+
+session_app = typer.Typer(no_args_is_help=True, help="Manage research sessions.")
+app.add_typer(session_app, name="session")
 
 
 def _make_run_dir() -> Path:
@@ -60,6 +67,7 @@ def _print_run_summary(
     elapsed_s: float,
     *,
     is_run_dir: bool,
+    session_file: Path | None = None,
 ) -> None:
     """Print a structured post-run summary to stdout."""
     _trace = getattr(ctx, "trace", {}) or {}
@@ -92,6 +100,8 @@ def _print_run_summary(
     typer.echo(f"Elapsed:  {elapsed_s:.1f}s")
     if tokens:
         typer.echo(f"Tokens:   {tokens:,}  ({llm_calls} LLM calls)")
+    if session_file is not None:
+        typer.echo(f"Session:  {session_file}")
 
     report_path = (getattr(ctx, "artifacts", None) or {}).get("report_path")
     typer.echo("")
@@ -133,6 +143,16 @@ def main(
         typer.Option(
             "--engagement",
             help="Path to a Strategic Engagement file (.yaml/.yml/.json). Strategic Engagement Mode. Mutually exclusive with QUESTION and --goal.",
+        ),
+    ] = None,
+    session_file: Annotated[
+        Path | None,
+        typer.Option(
+            "--session",
+            help=(
+                "Path to a session file (.json). Session-driven mode: loads the engagement from the "
+                "session and updates the session after the run. Mutually exclusive with QUESTION, --goal, --engagement."
+            ),
         ),
     ] = None,
     sources: Annotated[
@@ -203,28 +223,54 @@ def main(
     instead of the legacy document extraction pipeline.
     """
 
-    # J9.1 – three mutually exclusive entry points: QUESTION, --goal, --engagement.
+    # J9.1 / J13.1 – four mutually exclusive entry points.
     provided = [
         name for name, val in (
             ("QUESTION", bool(question)),
             ("--goal", bool(goal)),
             ("--engagement", engagement is not None),
+            ("--session", session_file is not None),
         ) if val
     ]
     if len(provided) > 1:
         typer.echo(
-            f"Error: provide exactly one of QUESTION, --goal, or --engagement "
+            f"Error: provide exactly one of QUESTION, --goal, --engagement, or --session "
             f"(got: {', '.join(provided)}).",
             err=True,
         )
         raise typer.Exit(code=1)
     if not provided:
-        typer.echo("Error: provide a QUESTION, --goal, or --engagement.", err=True)
+        typer.echo("Error: provide a QUESTION, --goal, --engagement, or --session.", err=True)
         raise typer.Exit(code=1)
 
     # Load and validate the engagement up front so errors are clear and early.
     engagement_spec = None
-    if engagement is not None:
+    _cli_session = None  # J13.1 — loaded session when --session is used
+
+    if session_file is not None:
+        # J13.1 — session-driven mode: load engagement spec from the session file.
+        from .session import load_session_file, SessionNotFoundError
+        try:
+            _cli_session = load_session_file(session_file)
+        except SessionNotFoundError as exc:
+            typer.echo(f"Error: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
+        spec_dict = _cli_session.metadata.get("engagement_spec") or {}
+        if not spec_dict:
+            typer.echo(
+                f"Error: session {session_file} has no engagement_spec in metadata. "
+                "Create the session with 'session create --engagement <file>'.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        from .engagement_spec import EngagementSpec, EngagementError
+        try:
+            engagement_spec = EngagementSpec.model_validate(spec_dict)
+        except Exception as exc:
+            typer.echo(f"Error: could not reconstruct engagement spec from session: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
+
+    elif engagement is not None:
         from .engagement_spec import load_engagement_spec, EngagementError
         try:
             engagement_spec = load_engagement_spec(engagement)
@@ -270,7 +316,10 @@ def main(
 
     _start = time.monotonic()
     try:
-        if engagement_spec is not None:
+        if session_file is not None:
+            mode = "Strategic Engagement (session)"
+            ctx = orchestrator.run_from_engagement(engagement_spec)
+        elif engagement_spec is not None:
             mode = "Strategic Engagement"
             ctx = orchestrator.run_from_engagement(engagement_spec)
         elif goal:
@@ -284,10 +333,34 @@ def main(
         raise typer.Exit(code=1) from exc
     elapsed = time.monotonic() - _start
 
+    # J13.1 — update and persist the explicit session after the run.
+    if _cli_session is not None and session_file is not None:
+        try:
+            from .session import ResearchState, IterationRecord, save_session_file
+            trigger = "continuation" if _cli_session.iteration_history else "initial"
+            _cli_session.research_state = ResearchState.from_context(ctx)
+            _cli_session.add_iteration(IterationRecord(
+                iteration_number=len(_cli_session.iteration_history),
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                trigger=trigger,
+                summary=f"Pipeline completed — run_id={getattr(ctx, 'run_id', '')}",
+                completed_tasks=[],
+                notes="",
+            ))
+            _cli_session.take_snapshot()
+            _cli_session.complete()
+            save_session_file(_cli_session, session_file)
+        except Exception as exc:
+            logging.warning("[Session] session update failed: %s", exc)
+
     if is_run_dir:
         _write_run_artifacts(ctx, run_dir)
 
-    _print_run_summary(ctx, mode, run_dir, elapsed, is_run_dir=is_run_dir)
+    _print_run_summary(
+        ctx, mode, run_dir, elapsed,
+        is_run_dir=is_run_dir,
+        session_file=session_file,
+    )
 
 
 def _build_client(*, mock: bool, model: str | None, use_extraction_cache: bool = False):
@@ -660,6 +733,160 @@ def analyze_extraction_cmd(
     for diag, count in sorted(summary.diagnosis_breakdown.items(), key=lambda x: -x[1]):
         pct = 100 * count // max(summary.chunks_analyzed, 1)
         typer.echo(f"  {diag:<45}: {count} ({pct}%)")
+
+
+# ---------------------------------------------------------------------------
+# session create (J13.1)
+# ---------------------------------------------------------------------------
+
+@session_app.command("create")
+def session_create_cmd(
+    engagement: Annotated[
+        Path,
+        typer.Option(
+            "--engagement",
+            help="Path to a Strategic Engagement file (.yaml/.yml/.json).",
+        ),
+    ],
+    session_out: Annotated[
+        Path,
+        typer.Option("--session", help="Output path for the new session file."),
+    ],
+    log_level: Annotated[
+        str | None,
+        typer.Option("--log-level", help="Logging level."),
+    ] = None,
+) -> None:
+    """Create a new research session from a Strategic Engagement file.
+
+    The session file stores the engagement spec and is ready to be passed to
+    'run --session' for pipeline execution.
+
+    Example:
+        python3 -m functional_agents.cli session create \\
+            --engagement engagements/my_engagement.yaml \\
+            --session outputs/my_session.json
+    """
+    _configure_logging(verbose=False, log_level=log_level or "WARNING")
+
+    from .engagement_spec import load_engagement_spec, EngagementError
+    try:
+        spec = load_engagement_spec(engagement)
+    except EngagementError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    from .session import ResearchSession, ResearchState, save_session_file
+
+    session = ResearchSession.create(
+        metadata={
+            "engagement_file": str(engagement),
+            "engagement_spec": spec.model_dump(),
+            "run_mode": "strategic_engagement",
+        },
+        research_state=ResearchState(),
+    )
+
+    try:
+        save_session_file(session, session_out)
+    except Exception as exc:
+        typer.echo(f"Error: could not write session file: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    typer.echo(f"Session created:  {session_out}")
+    typer.echo(f"Session ID:       {session.session_id}")
+    typer.echo(f"Engagement:       {engagement}")
+    typer.echo(f"Status:           {session.status}")
+    typer.echo("")
+    typer.echo("Ready to run:")
+    typer.echo(f"  python3 -m functional_agents.cli run \\")
+    typer.echo(f"      --session {session_out} \\")
+    typer.echo(f"      --profiles <profile1,profile2> \\")
+    typer.echo(f"      --out <output.md>")
+
+
+# ---------------------------------------------------------------------------
+# session show (J13.1)
+# ---------------------------------------------------------------------------
+
+@session_app.command("show")
+def session_show_cmd(
+    session_path: Annotated[
+        Path,
+        typer.Option("--session", help="Path to the session file."),
+    ],
+) -> None:
+    """Show research session status, metadata, and iteration history.
+
+    Example:
+        python3 -m functional_agents.cli session show \\
+            --session outputs/my_session.json
+    """
+    from .session import load_session_file, SessionNotFoundError
+
+    try:
+        session = load_session_file(session_path)
+    except SessionNotFoundError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    state = session.research_state
+    meta = session.metadata
+
+    def _present(d: dict) -> str:
+        return "present" if d else "empty"
+
+    typer.echo("")
+    typer.echo(f"Session:      {session.session_id}")
+    typer.echo(f"Status:       {session.status}")
+    typer.echo(f"Created:      {session.created_at}")
+    typer.echo(f"Updated:      {session.updated_at}")
+    typer.echo("")
+    typer.echo("Metadata:")
+    eng_file = meta.get("engagement_file") or "(not set)"
+    typer.echo(f"  Engagement:  {eng_file}")
+    profiles = meta.get("profiles") or []
+    typer.echo(f"  Profiles:    {', '.join(profiles) if profiles else '(not set)'}")
+    typer.echo(f"  Run mode:    {meta.get('run_mode') or '(not set)'}")
+    run_id = meta.get("run_id") or ""
+    if run_id:
+        typer.echo(f"  Run ID:      {run_id}")
+    typer.echo("")
+    typer.echo("Research State:")
+    typer.echo(f"  engagement             [{_present(state.engagement)}]")
+    typer.echo(f"  research_object        [{_present(state.research_object)}]")
+    typer.echo(f"  decision_model         [{_present(state.decision_model)}]")
+    typer.echo(f"  research_gap_analysis  [{_present(state.research_gap_analysis)}]")
+    typer.echo(f"  executive_confidence   [{_present(state.executive_confidence)}]")
+    typer.echo(f"  iteration_plan         [{_present(state.iteration_plan)}]")
+    typer.echo("")
+    typer.echo(f"Iterations:   {len(session.iteration_history)}")
+    typer.echo(f"Snapshots:    {len(session.snapshots)}")
+
+    if session.iteration_history:
+        typer.echo("")
+        typer.echo("Iteration History:")
+        for rec in session.iteration_history:
+            tasks_str = f"  tasks={rec.completed_tasks}" if rec.completed_tasks else ""
+            typer.echo(
+                f"  [{rec.iteration_number}]  {rec.timestamp[:19]}  "
+                f"{rec.trigger:<14}  {rec.summary}{tasks_str}"
+            )
+
+    if state.iteration_plan:
+        tasks = state.iteration_plan.get("priority_research_tasks") or []
+        iteration_needed = state.iteration_plan.get("iteration_needed")
+        typer.echo("")
+        typer.echo("Iteration Plan:")
+        typer.echo(f"  iteration_needed:  {iteration_needed}")
+        typer.echo(f"  tasks:             {len(tasks)}")
+        if tasks:
+            for t in tasks[:5]:
+                typer.echo(f"    {t.get('task_id', '?')}  {t.get('task_title', '')[:70]}")
+            if len(tasks) > 5:
+                typer.echo(f"    … and {len(tasks) - 5} more")
+
+    typer.echo("")
 
 
 if __name__ == "__main__":
