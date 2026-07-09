@@ -1140,5 +1140,129 @@ def staleness_agent(
     _print_staleness_plan(plan)
 
 
+# ---------------------------------------------------------------------------
+# execution sub-app (J13.3)
+# ---------------------------------------------------------------------------
+
+execution_app = typer.Typer(
+    no_args_is_help=True,
+    help="Execution planning — convert a StalenessPlan into an ExecutionPlan (J13.3).",
+)
+app.add_typer(execution_app, name="execution")
+
+
+def _print_execution_plan(plan: object) -> None:
+    """Render an ExecutionPlan to stdout."""
+    typer.echo(f"\nExecution Plan:  {plan.plan_id}")
+    typer.echo(f"Confidence:      {plan.confidence}")
+    typer.echo(f"Created:         {plan.created_at}")
+    typer.echo(f"Staleness Plan:  {plan.staleness_plan_id}")
+    if plan.triggering_state_changes:
+        typer.echo(f"State changes:   {', '.join(plan.triggering_state_changes)}")
+    else:
+        typer.echo("State changes:   (none)")
+
+    typer.echo("")
+    typer.echo(f"Required agents ({len(plan.required_agents)}):")
+    for a in plan.required_agents:
+        typer.echo(f"  {a}")
+    if not plan.required_agents:
+        typer.echo("  (none)")
+
+    typer.echo("")
+    typer.echo(f"Optional agents ({len(plan.optional_agents)}):")
+    for a in plan.optional_agents:
+        typer.echo(f"  {a}")
+    if not plan.optional_agents:
+        typer.echo("  (none — all stale agents are required)")
+
+    if plan.blocked_agents:
+        typer.echo("")
+        typer.echo(f"Blocked agents ({len(plan.blocked_agents)}):")
+        for a in plan.blocked_agents:
+            reason = plan.blocked_reasons.get(a, "unknown")
+            typer.echo(f"  {a}: {reason}")
+
+    typer.echo("")
+    typer.echo(f"Execution groups ({plan.estimated_steps} steps):")
+    for i, group in enumerate(plan.execution_groups, 1):
+        parallel = " [parallel]" if len(group) > 1 else ""
+        typer.echo(f"  Step {i}{parallel}:")
+        for a in group:
+            tag = "(optional)" if a in set(plan.optional_agents) else "(required)"
+            typer.echo(f"    {a}  {tag}")
+    if not plan.execution_groups:
+        typer.echo("  (no agents to execute)")
+
+    typer.echo("")
+    typer.echo("Reasoning:")
+    if plan.reasoning:
+        for agent_name, reason in sorted(plan.reasoning.items()):
+            typer.echo(f"  {agent_name}:")
+            typer.echo(f"    {reason}")
+    else:
+        typer.echo("  (none)")
+    typer.echo("")
+
+
+@execution_app.command("plan")
+def execution_plan_cmd(
+    session_file: Path = typer.Option(
+        ..., "--session", help="Path to a session JSON file."
+    ),
+    verbose: bool = typer.Option(
+        False, "--verbose", "-v", help="Show full reasoning for each agent."
+    ),
+) -> None:
+    """Compute the execution plan for a session's StateChanges.
+
+    Analyzes all StateChanges in the session via DependencyReasoner, then
+    converts the resulting StalenessPlan into a topologically-ordered
+    ExecutionPlan showing which agents must run, in what sequence, and
+    which can execute in parallel.
+
+    Example:
+        python3 -m functional_agents.cli execution plan \\
+            --session outputs/sessions/my_session.json
+    """
+    from functional_agents.session import load_session_file
+    from functional_agents.staleness import DependencyReasoner
+    from functional_agents.planning import ExecutionPlanner
+
+    try:
+        session = load_session_file(session_file)
+    except Exception as exc:
+        typer.echo(f"Error loading session: {exc}", err=True)
+        raise typer.Exit(1)
+
+    if not session.state_changes:
+        typer.echo("Session has no StateChanges — nothing to plan.")
+        raise typer.Exit(0)
+
+    staleness_plan = DependencyReasoner().analyze(
+        session.research_state, session.state_changes
+    )
+    execution_plan = ExecutionPlanner().plan(staleness_plan)
+
+    if verbose:
+        _print_execution_plan(execution_plan)
+    else:
+        # Compact summary
+        typer.echo(f"\nExecution Plan:  {execution_plan.plan_id}")
+        typer.echo(f"Confidence:      {execution_plan.confidence}")
+        typer.echo(f"Steps:           {execution_plan.estimated_steps}")
+        typer.echo(f"Required agents: {len(execution_plan.required_agents)}")
+        typer.echo(f"Optional agents: {len(execution_plan.optional_agents)}")
+        if execution_plan.blocked_agents:
+            typer.echo(f"Blocked agents:  {len(execution_plan.blocked_agents)}")
+        typer.echo("")
+        typer.echo(f"Execution order ({len(execution_plan.execution_order)} agents):")
+        for i, group in enumerate(execution_plan.execution_groups, 1):
+            parallel = " [parallel]" if len(group) > 1 else ""
+            agents_str = ", ".join(group)
+            typer.echo(f"  Step {i}{parallel}: {agents_str}")
+        typer.echo("")
+
+
 if __name__ == "__main__":
     app()

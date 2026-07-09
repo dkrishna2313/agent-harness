@@ -172,6 +172,60 @@ staleness agent   --agent <name>     # synthetic analysis: what if this agent re
 - No state diffing. Staleness is derived from declared dependencies, not observed state.
 - Conservative: false positives acceptable; false negatives are not.
 
+# Execution Planner Architecture (J13.3)
+
+J13.3 introduces a deterministic Execution Planner that converts a StalenessPlan
+into an ExecutionPlan.  It is analysis-only — the pipeline is unchanged.
+
+## ExecutionPlan
+
+Output of `ExecutionPlanner.plan(staleness_plan)`:
+
+| Field | Description |
+|---|---|
+| `required_agents` | Agents needed to restore all stale PERSISTED paths, including EXECUTION_ONLY prerequisites |
+| `optional_agents` | Stale agents producing only EXECUTION_ONLY paths not needed for PERSISTED restoration |
+| `blocked_agents` | Agents whose consumed EXECUTION_ONLY path has no known producer (defensive; should be empty) |
+| `execution_order` | Topological ordering of all planned agents (required + optional) |
+| `execution_groups` | Agents grouped by topological level; agents within a group may run in parallel |
+| `estimated_steps` | Number of sequential steps (len(execution_groups)) |
+| `reasoning` | agent_name → why it appears in the plan |
+
+## Algorithm
+
+1. **required_agents** — start from `StalenessPlan.required_producers` (agents
+   producing stale PERSISTED paths).  For each agent, find all EXECUTION_ONLY
+   consumed paths and add their producers to the required set.  Repeat until
+   fixpoint.  EXECUTION_ONLY paths are never in ResearchState, so their producers
+   must always run even when the path is stale.
+
+2. **optional_agents** — `stale_agents` not in `required_agents`; produce only
+   EXECUTION_ONLY stale paths not needed by any required_agent.
+
+3. **execution_groups** — Kahn's topological leveling over the planned subgraph.
+   Only edges between agents within the plan are considered; dependencies on
+   out-of-plan agents (PERSISTED paths read from ResearchState) are ignored.
+
+## Key invariants
+
+- `required_agents` is always a superset of `StalenessPlan.required_producers`.
+- Every agent in `execution_order` appears exactly once.
+- No intra-group dependency edges exist within a single execution_group.
+- `estimated_steps = len(execution_groups)`.
+
+## CLI
+
+```
+execution plan --session <path>             # compact execution plan summary
+execution plan --session <path> --verbose   # full plan with per-agent reasoning
+```
+
+## Design constraints
+
+- No execution. ExecutionPlanner never calls agents.
+- No incremental orchestration. Pipeline runs all 22 agents unchanged.
+- Conservative: if an agent needs an EXECUTION_ONLY input, its producer is required.
+
 # Engineering Principles
 
 - Keep implementation simple.
