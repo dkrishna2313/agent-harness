@@ -160,20 +160,22 @@ def test_report_sets_executive_narrative_on_context():
 # ---------------------------------------------------------------------------
 
 def test_section1_executive_summary_from_narrative():
-    """§1 shows strategic_synthesis executive_summary (narrative preference) not da.executive_summary."""
+    """§1 is recommendation-led; raw DA executive_summary is not shown (P1.1)."""
     ctx = _make_narrative_context()
     report = _build_j7_executive_report(ctx)
     section_1 = report.split("## 2.")[0]
-    assert "Cross-domain synthesis favors phased deployment" in section_1
+    # Section 1 is now recommendation-led; the raw DA executive_summary must not appear
     assert "DA summary" not in section_1
+    # The recommendation from narrative is present
+    assert "Phased Deployment" in section_1
 
 
 def test_section1_recommended_option_title_from_narrative():
-    """§1 recommended option title comes from narrative.recommended_option."""
+    """§1 recommendation line uses narrative.recommended_option title (P1.1)."""
     ctx = _make_narrative_context()
     report = _build_j7_executive_report(ctx)
     section_1 = report.split("## 2.")[0]
-    assert "**Recommended Option:** Phased Deployment" in section_1
+    assert "**Recommendation:** Phased Deployment" in section_1
 
 
 # ---------------------------------------------------------------------------

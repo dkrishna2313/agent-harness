@@ -1103,6 +1103,104 @@ def _normalise_timeframe(tf: str) -> str:
     return _TIMEFRAME_ALIASES.get(tf.lower().replace(" ", "_"), tf)
 
 
+# ---------------------------------------------------------------------------
+# P1.1 — Executive Narrative Polish helpers
+# ---------------------------------------------------------------------------
+
+def _display_engagement_title(context: "AgentContext") -> str:
+    """Return a short display title for the engagement.
+
+    Prefers engagement.title (clean short form). Falls back to stripping
+    verbose prefixes from context.question / decision_statement.
+    """
+    eng = context.engagement or {}
+    title = (eng.get("title") or "").strip()
+    if title:
+        return title
+    question = (context.question or "").strip()
+    for prefix in (
+        "Research and analyse: ",
+        "What is the current state of: ",
+        "Analyse: ",
+        "Research: ",
+    ):
+        if question.lower().startswith(prefix.lower()):
+            question = question[len(prefix):]
+            break
+    short = question.split("\n")[0].split("(")[0].strip().rstrip(",").strip()
+    return short[:100] if short else "Strategic Engagement"
+
+
+def _build_j7_executive_summary_section(
+    context: "AgentContext",
+    narrative: "ExecutiveNarrative",
+) -> list[str]:
+    """Render Section 1 (Executive Summary) as a recommendation-led executive block.
+
+    Structure:
+      Recommendation → Decision Readiness → Why this matters →
+      Why this option wins → Confidence (with top limiters) → Immediate next step
+    """
+    lines: list[str] = []
+    eng = context.engagement or {}
+    nec = narrative.executive_confidence
+
+    # Recommendation — option title + ID
+    _rec = narrative.recommended_option
+    if _rec.get("title"):
+        _opt_label = _rec["title"]
+        if _rec.get("option_id"):
+            _opt_label += f" ({_rec['option_id']})"
+        lines += [f"**Recommendation:** {_opt_label}", ""]
+
+    # Decision readiness and board stance
+    if nec:
+        _readiness = (nec.get("decision_readiness") or "").strip()
+        _board = (nec.get("board_recommendation") or "").strip()
+        if _readiness or _board:
+            _parts = [p for p in [_readiness, _board] if p]
+            lines += [f"**Decision Readiness:** {' — '.join(_parts)}", ""]
+
+    # Why this matters — first engagement objective or opening of current_situation
+    _why_matters = ""
+    _objectives = eng.get("objectives") or []
+    if _objectives:
+        _why_matters = str(_objectives[0]).strip()
+    elif eng.get("current_situation"):
+        _cs = str(eng["current_situation"]).strip()
+        _first = _cs.split(".")[0].strip()
+        _why_matters = (_first + ".") if _first and not _first.endswith(".") else _first
+    if _why_matters:
+        lines += [f"**Why this matters:** {_why_matters}", ""]
+
+    # Why this option wins — first two sentences of the rationale
+    _why_wins = (narrative.why_this_option or "").strip()
+    if _why_wins:
+        _sents = _why_wins.split(". ")
+        _short = ". ".join(s.strip() for s in _sents[:2]).strip()
+        if _short and not _short.endswith("."):
+            _short += "."
+        if _short:
+            lines += [f"**Why this option wins:** {_short}", ""]
+
+    # Confidence + top two limiters
+    if nec:
+        _conf = (nec.get("overall_confidence") or "").strip()
+        _limiters = list(nec.get("confidence_limiters") or [])[:2]
+        if _conf:
+            _conf_text = f"{_conf} confidence"
+            if _limiters:
+                _conf_text += f", limited by: {'; '.join(_limiters)}"
+            lines += [f"**Confidence:** {_conf_text}", ""]
+
+    # Immediate next step — first validation priority
+    _prios = list(narrative.validation_priorities or [])
+    if _prios:
+        lines += [f"**Immediate next step:** {_prios[0]}", ""]
+
+    return lines
+
+
 def _build_j7_executive_report(context: "AgentContext") -> str:
     """Build the 14-section J7 executive report from the decision graph.
 
@@ -1122,38 +1220,43 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     recs: list[dict] = context.recommendations or []
     ro: dict = context.research_object or {}
     question: str = context.question or ""
+    eng: dict = context.engagement or {}  # P1.1 — engagement metadata for display
 
     recommended_id = da.get("recommended_option_id") or preferred.get("option_id") or ""
+    eng_title = _display_engagement_title(context)  # P1.1 — short display title
 
     lines: list[str] = []
 
     # ------------------------------------------------------------------ #
-    # Section 1 — Executive Summary                                        #
+    # Section 1 — Executive Summary (P1.1 — recommendation-led)           #
     # ------------------------------------------------------------------ #
-    # J12.5 — decision, recommended option title, and executive summary
-    # originate from ExecutiveNarrative (built above).
-    # executive_context is architectural framing not captured in narrative.
-    _arch = ro.get("decision_architecture") or {}
-    executive_context = _arch.get("executive_context", "")
     lines += [
         "# Executive Strategic Report",
         "",
         "## 1. Executive Summary",
         "",
     ]
-    if narrative.decision:
-        lines += [f"**Decision:** {narrative.decision}", ""]
-    if narrative.recommended_option.get("title"):
-        lines += [f"**Recommended Option:** {narrative.recommended_option['title']}", ""]
-    if executive_context:
-        lines += [executive_context, ""]
-    if narrative.executive_summary:
-        lines += [narrative.executive_summary, ""]
+    lines += _build_j7_executive_summary_section(context, narrative)
 
     # ------------------------------------------------------------------ #
-    # Section 2 — Strategic Question                                       #
+    # Section 2 — Strategic Question (P1.1 — use engagement title)         #
     # ------------------------------------------------------------------ #
-    lines += ["## 2. Strategic Question", "", question, ""]
+    lines += ["## 2. Strategic Question", ""]
+    if eng.get("title"):
+        lines += [f"**{eng_title}**", ""]
+        _client_str = eng.get("client", "")
+        _industry_str = eng.get("industry", "")
+        if _client_str and _industry_str:
+            lines += [f"*{_client_str} — {_industry_str}*", ""]
+        elif _client_str:
+            lines += [f"*{_client_str}*", ""]
+        _first_obj = (eng.get("objectives") or [""])[0]
+        if _first_obj:
+            lines += [str(_first_obj), ""]
+        elif eng.get("current_situation"):
+            lines += [str(eng["current_situation"]), ""]
+    else:
+        lines += [question, ""]
 
     # ------------------------------------------------------------------ #
     # Section 3 — Recommended Strategic Option                             #
@@ -1213,42 +1316,42 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
         lines.append("")
 
     # ------------------------------------------------------------------ #
-    # Section 5 — Executive Confidence (J7.7)                              #
+    # Section 5 — Executive Confidence (J7.7 / P1.1)                      #
     # ------------------------------------------------------------------ #
     # J12.5 — confidence summary, drivers, and limiters from narrative.
-    # validation_priorities and critical_unknowns read from narrative fields.
-    # Conditional assessment (if_hold/if_fail) and decision_horizon are detail
-    # fields not captured in narrative; fall back to context.executive_confidence.
+    # P1.1 — present confidence, readiness, and board recommendation as
+    # individual fields rather than a single pipe-separated line.
     nec = narrative.executive_confidence
     lines += ["## 5. Executive Confidence", ""]
     if nec:
         ec_conf = nec.get("overall_confidence", "")
         ec_ready = nec.get("decision_readiness", "")
         ec_board = nec.get("board_recommendation", "")
-        lines += [
-            f"**Overall Confidence:** {ec_conf}  |  "
-            f"**Decision Readiness:** {ec_ready}  |  "
-            f"**Board Recommendation:** {ec_board}",
-            "",
-        ]
+        if ec_conf:
+            lines += [f"**Overall Confidence:** {ec_conf}", ""]
+        if ec_ready:
+            lines += [f"**Decision Readiness:** {ec_ready}", ""]
+        if ec_board:
+            lines += [f"**Board Recommendation:** {ec_board}", ""]
+
         ec_rat = nec.get("confidence_rationale", "")
         if ec_rat:
-            lines += [ec_rat, ""]
+            lines += [f"*{ec_rat}*", ""]
 
         ec_drivers = nec.get("confidence_drivers", [])
         if ec_drivers:
-            lines.append("**Confidence Drivers:**")
+            lines.append("**Key Confidence Drivers:**")
             lines.extend(f"- {d}" for d in ec_drivers)
             lines.append("")
 
         ec_limiters = nec.get("confidence_limiters", [])
         if ec_limiters:
-            lines.append("**Confidence Limiters:**")
+            lines.append("**Key Confidence Limiters:**")
             lines.extend(f"- {lim}" for lim in ec_limiters)
             lines.append("")
 
         if narrative.validation_priorities:
-            lines.append("**Validation Priorities (Due Diligence Checklist):**")
+            lines.append("**Validation Priorities:**")
             lines.extend(f"{i + 1}. {p}" for i, p in enumerate(narrative.validation_priorities))
             lines.append("")
 

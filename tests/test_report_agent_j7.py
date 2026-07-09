@@ -225,9 +225,14 @@ def test_all_15_sections_present():
 
 
 def test_section1_contains_executive_summary():
+    """§1 is recommendation-led; shows option title and rationale (P1.1)."""
     ctx = _make_context()
     report = _build_j7_executive_report(ctx)
-    assert "OPT-A is the preferred path" in report
+    section_1 = report.split("## 2.")[0]
+    # Section 1 now leads with the recommendation from narrative
+    assert "**Recommendation:** Aggressive Expansion" in section_1
+    # Rationale from narrative.why_this_option appears as "Why this option wins"
+    assert "OPT-A wins on strategic fit" in section_1
 
 
 def test_section1_contains_recommended_title():
