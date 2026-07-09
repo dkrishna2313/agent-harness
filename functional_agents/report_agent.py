@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -1104,8 +1105,160 @@ def _normalise_timeframe(tf: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# P1.1 — Executive Narrative Polish helpers
+# P1.1 / P1.2 — Executive Narrative Polish helpers
 # ---------------------------------------------------------------------------
+
+# Ordered longest-match-first to avoid partial substitution.
+_MACHINE_PHRASE_SUBS: list[tuple[str, str]] = [
+    (
+        "achieves the highest overall score on the decision matrix, particularly on",
+        "delivers the strongest balance of",
+    ),
+    (
+        "achieves the highest overall score on the decision matrix",
+        "delivers the strongest risk-adjusted outcome",
+    ),
+    ("highest overall score on the decision matrix", "strongest risk-adjusted outcome"),
+    ("on the decision matrix", "in the comparative analysis"),
+    ("This assessment synthesises the full J7 decision graph.", ""),
+    ("This assessment synthesises the full J7 decision graph", ""),
+    ("synthesises the full J7 decision graph", ""),
+    ("J7 decision graph", "the decision analysis"),
+    ("Cross-domain synthesis for ", ""),
+    ("cross-domain synthesis", "multi-domain analysis"),
+    (" explicitly compared", " evaluated"),
+    ("assumption(s)", "assumptions"),
+    ("risk(s)", "risks"),
+    ("option(s)", "options"),
+]
+
+_NUM_WORDS: dict[str, str] = {
+    "1": "one", "2": "two", "3": "three", "4": "four", "5": "five",
+    "6": "six", "7": "seven", "8": "eight", "9": "nine", "10": "ten",
+}
+
+# Word endings that signal a complete English word (no truncation).
+_COMPLETE_ENDINGS = (
+    "ing", "ed", "ly", "tion", "ment", "ity", "ness", "al", "ive", "ous",
+    "ent", "ant", "ist", "ism", "ate", "ize", "ise", "ure", "ble", "age",
+    "ogy", "ary", "ery", "ial", "ular", "ular",
+)
+
+
+def _clean_internal_language(text: str) -> str:
+    """Replace machine-generated internal language with executive prose."""
+    if not text:
+        return text
+    for src, dst in _MACHINE_PHRASE_SUBS:
+        text = text.replace(src, dst)
+    text = re.sub(r"  +", " ", text).strip()
+    text = re.sub(r"\.\s*\.", ".", text)
+    return text
+
+
+def _strip_trailing_fragment(text: str) -> str:
+    """Remove a likely-truncated trailing word fragment.
+
+    If the text does not end with sentence-final punctuation and the last
+    space-delimited token has no standard English word ending, it is stripped.
+    This prevents exposing machine-truncated strings like "commerc" or "inves".
+    """
+    if not text or text[-1] in ".!?;:,":
+        return text
+    parts = text.rsplit(" ", 1)
+    if len(parts) != 2:
+        return text
+    last_word = parts[1].rstrip(".,;:!?")
+    # Keep the word if it ends in a known suffix or a vowel (likely complete)
+    if any(last_word.endswith(sfx) for sfx in _COMPLETE_ENDINGS):
+        return text
+    if last_word and last_word[-1] in "aeiou":
+        return text
+    # Strip the fragment if it's short (≤ 9 chars) — heuristic for truncation
+    if len(last_word) <= 9:
+        return parts[0]
+    return text
+
+
+def _clean_validation_text(
+    priority: str,
+    assumptions: list[dict[str, Any]] | None = None,
+) -> str:
+    """Return a clean, executive-readable validation priority.
+
+    - Strips "Validate:" / "Mitigate:" prefixes.
+    - Resolves truncated assumption text against full assumption statements.
+    - Falls back to _strip_trailing_fragment for unresolvable truncations.
+    """
+    if not priority:
+        return ""
+    text = priority.strip()
+
+    if text.lower().startswith("validate:"):
+        fragment = text[len("validate:"):].strip()
+        # Cross-reference against full assumption statements to resolve truncation
+        if assumptions and len(fragment) >= 15:
+            match_prefix = fragment.lower()[:min(35, len(fragment))]
+            for a in assumptions:
+                stmt = (a.get("statement") or "").strip()
+                if stmt and stmt.lower().startswith(match_prefix):
+                    first = stmt[0].lower()
+                    return f"Validate that {first}{stmt[1:]}"
+        fragment = _strip_trailing_fragment(fragment)
+        if fragment:
+            first = fragment[0].lower()
+            return f"Validate that {first}{fragment[1:]}"
+        return ""
+
+    # Non-"Validate:" priority — clean language and strip fragment
+    return _clean_internal_language(_strip_trailing_fragment(text))
+
+
+def _humanize_limiter(text: str) -> str:
+    """Convert machine-generated confidence limiter text to natural language."""
+    text = text.strip()
+    # "N assumption(s) have Weak evidence support"
+    text = re.sub(
+        r"\b(\d+) assumption\(s\) have (\w+) evidence",
+        lambda m: (
+            f"{_NUM_WORDS.get(m.group(1), m.group(1))} "
+            f"assumption{'s have' if int(m.group(1)) > 1 else ' has'} "
+            f"{m.group(2).lower()} evidence"
+        ),
+        text,
+    )
+    # "N High-severity risk(s) require mitigation"
+    text = re.sub(
+        r"\b(\d+) High-severity risk\(s\) require",
+        lambda m: (
+            f"{_NUM_WORDS.get(m.group(1), m.group(1))} "
+            f"high-severity risk{'s' if int(m.group(1)) != 1 else ''} require"
+        ),
+        text,
+    )
+    # "N Critical assumption(s) must hold"
+    text = re.sub(
+        r"\b(\d+) Critical assumption\(s\) must",
+        lambda m: (
+            f"{_NUM_WORDS.get(m.group(1), m.group(1))} "
+            f"critical assumption{'s' if int(m.group(1)) != 1 else ''} must"
+        ),
+        text,
+    )
+    return text.lower()
+
+
+def _format_confidence_sentence(overall_confidence: str, limiters: list[str]) -> str:
+    """Build a natural-language executive confidence sentence."""
+    if not overall_confidence:
+        return ""
+    conf = overall_confidence.capitalize()
+    if not limiters:
+        return f"Decision confidence is {conf}."
+    humanized = [_humanize_limiter(lim) for lim in limiters[:2]]
+    body = humanized[0] if len(humanized) == 1 else f"{humanized[0]} and {humanized[1]}"
+    return f"Decision confidence remains {conf}: {body}."
+
 
 def _display_engagement_title(context: "AgentContext") -> str:
     """Return a short display title for the engagement.
@@ -1173,8 +1326,8 @@ def _build_j7_executive_summary_section(
     if _why_matters:
         lines += [f"**Why this matters:** {_why_matters}", ""]
 
-    # Why this option wins — first two sentences of the rationale
-    _why_wins = (narrative.why_this_option or "").strip()
+    # Why this option wins — first two sentences of the rationale, cleaned
+    _why_wins = _clean_internal_language((narrative.why_this_option or "").strip())
     if _why_wins:
         _sents = _why_wins.split(". ")
         _short = ". ".join(s.strip() for s in _sents[:2]).strip()
@@ -1183,20 +1336,21 @@ def _build_j7_executive_summary_section(
         if _short:
             lines += [f"**Why this option wins:** {_short}", ""]
 
-    # Confidence + top two limiters
+    # Confidence — natural-language sentence (P1.2)
     if nec:
         _conf = (nec.get("overall_confidence") or "").strip()
         _limiters = list(nec.get("confidence_limiters") or [])[:2]
         if _conf:
-            _conf_text = f"{_conf} confidence"
-            if _limiters:
-                _conf_text += f", limited by: {'; '.join(_limiters)}"
-            lines += [f"**Confidence:** {_conf_text}", ""]
+            _conf_text = _format_confidence_sentence(_conf, _limiters)
+            if _conf_text:
+                lines += [f"**Confidence:** {_conf_text}", ""]
 
-    # Immediate next step — first validation priority
+    # Immediate next step — cleaned, non-truncated validation text (P1.2)
     _prios = list(narrative.validation_priorities or [])
     if _prios:
-        lines += [f"**Immediate next step:** {_prios[0]}", ""]
+        _next = _clean_validation_text(_prios[0], list(narrative.critical_assumptions or []))
+        if _next:
+            lines += [f"**Immediate next step:** {_next}", ""]
 
     return lines
 
@@ -1305,7 +1459,7 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     dimensions = da.get("comparison_dimensions") or []
     lines += ["## 4. Why This Option Wins", ""]
     if narrative.why_this_option:
-        lines += [narrative.why_this_option, ""]
+        lines += [_clean_internal_language(narrative.why_this_option), ""]
     if dimensions:
         lines.append("**Comparison Dimensions:**")
         lines.extend(f"- {d}" for d in dimensions)
@@ -1334,25 +1488,31 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
         if ec_board:
             lines += [f"**Board Recommendation:** {ec_board}", ""]
 
-        ec_rat = nec.get("confidence_rationale", "")
+        ec_rat = _clean_internal_language(nec.get("confidence_rationale", "") or "")
         if ec_rat:
             lines += [f"*{ec_rat}*", ""]
 
-        ec_drivers = nec.get("confidence_drivers", [])
+        ec_drivers = [
+            _clean_internal_language(d) for d in (nec.get("confidence_drivers") or [])
+        ]
         if ec_drivers:
             lines.append("**Key Confidence Drivers:**")
             lines.extend(f"- {d}" for d in ec_drivers)
             lines.append("")
 
-        ec_limiters = nec.get("confidence_limiters", [])
+        ec_limiters = [_humanize_limiter(lim) for lim in (nec.get("confidence_limiters") or [])]
         if ec_limiters:
             lines.append("**Key Confidence Limiters:**")
             lines.extend(f"- {lim}" for lim in ec_limiters)
             lines.append("")
 
         if narrative.validation_priorities:
+            _crit_assump = list(narrative.critical_assumptions or [])
             lines.append("**Validation Priorities:**")
-            lines.extend(f"{i + 1}. {p}" for i, p in enumerate(narrative.validation_priorities))
+            for i, p in enumerate(narrative.validation_priorities):
+                _cleaned_p = _clean_validation_text(p, _crit_assump)
+                if _cleaned_p:
+                    lines.append(f"{i + 1}. {_cleaned_p}")
             lines.append("")
 
         if narrative.critical_unknowns:
