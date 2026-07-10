@@ -1100,6 +1100,105 @@ _TIMEFRAME_DISPLAY: dict[str, str] = {
 _IMPORTANCE_ORDER = {"Critical": 0, "Important": 1, "Supporting": 2}
 
 
+# ---------------------------------------------------------------------------
+# P2.3 — Acronym Expansion & Executive Glossary
+# ---------------------------------------------------------------------------
+
+# acronym → full expansion.  Processed longest-first to avoid prefix conflicts
+# (e.g., CAPEX expanded before OPEX, MWh before MW).
+# SMR is intentionally excluded — it is the engagement subject and is expected
+# to be known by readers of an SMR-focused report.
+_ACRONYM_EXPANSIONS: dict[str, str] = {
+    "FERC": "Federal Energy Regulatory Commission",
+    "LCOE": "Levelized Cost of Energy",
+    "CAPEX": "Capital Expenditure",
+    "OPEX": "Operating Expenditure",
+    "EPC": "Engineering, Procurement and Construction",
+    "NPV": "Net Present Value",
+    "IRR": "Internal Rate of Return",
+    "GPU": "Graphics Processing Unit",
+    "LLM": "Large Language Model",
+    "NRC": "Nuclear Regulatory Commission",
+    "PPA": "Power Purchase Agreement",
+    "GW": "Gigawatt",
+    "MW": "Megawatt",
+    "AI": "Artificial Intelligence",
+}
+
+# term → one-sentence business definition for the executive glossary.
+# Single-word terms are matched with a word-boundary regex; multi-word and
+# hyphenated terms use case-insensitive substring matching.
+_GLOSSARY_DEFINITIONS: dict[str, str] = {
+    "AI": "Software that performs cognitive tasks — pattern recognition, language processing, and reasoning — traditionally requiring human intelligence.",
+    "LLM": "A generative AI system trained on large text corpora, capable of producing text, code, and analysis at scale.",
+    "GPU": "A parallel-processing chip and the dominant hardware accelerator for AI model training and inference workloads.",
+    "PPA": "A long-term bilateral contract fixing the price and volume of electricity between a buyer and a power generator.",
+    "CAPEX": "Capital expenditure — funds deployed to acquire or construct long-lived physical assets, capitalized and depreciated over the asset's useful life.",
+    "OPEX": "Operating expenditure — recurring costs of day-to-day operations, including power, staffing, and maintenance.",
+    "NRC": "The U.S. federal agency responsible for licensing and regulatory oversight of civilian nuclear power facilities.",
+    "FERC": "The U.S. federal agency that regulates interstate electricity transmission and wholesale power markets.",
+    "MW": "Megawatt — one million watts; the standard unit for power generation capacity or large-scale electricity demand.",
+    "GW": "Gigawatt — one billion watts (1,000 MW); used to describe utility-scale generation capacity or total grid load.",
+    "LCOE": "The average cost per unit of electricity produced over a plant's lifetime, incorporating capital, financing, fuel, and operating costs.",
+    "IRR": "The discount rate at which a project's net present value equals zero; used to assess whether returns exceed the cost of capital.",
+    "NPV": "Net present value — the sum of discounted future cash flows minus initial investment; positive NPV indicates value creation.",
+    "EPC": "A contract model in which a single firm holds end-to-end responsibility for engineering, procurement, and construction, typically at a fixed price.",
+    "Capacity Factor": "The ratio of actual energy output to maximum possible output over a period; a higher capacity factor means more consistent generation and better project economics.",
+    "Grid Interconnection": "The technical and regulatory process of connecting a new power source or large electricity consumer to the transmission network, including queue position, studies, and upgrade obligations.",
+    "Colocation": "A data center model in which multiple tenants share physical infrastructure — power, cooling, and space — while operating their own compute and networking equipment.",
+    "Hyperscaler": "A technology company that operates cloud or AI infrastructure at very large scale, typically requiring hundreds of megawatts of power across multiple campuses.",
+    "Load Factor": "The ratio of average electrical load to peak load over a period; a high load factor indicates consistent demand and improves economics for generation and transmission.",
+    "Stranded Asset": "A capital asset that loses value prematurely due to regulatory change, technological disruption, or market shifts before reaching its expected end of useful life.",
+}
+
+
+def _expand_first_acronyms(text: str) -> str:
+    """Expand each acronym in ``_ACRONYM_EXPANSIONS`` on its first occurrence only."""
+    for acronym in sorted(_ACRONYM_EXPANSIONS, key=len, reverse=True):
+        expansion = _ACRONYM_EXPANSIONS[acronym]
+        text = re.sub(
+            rf'\b{re.escape(acronym)}\b',
+            f'{expansion} ({acronym})',
+            text,
+            count=1,
+        )
+    return text
+
+
+def _build_glossary_section(text: str) -> list[str]:
+    """Return Markdown lines for a Glossary of terms that appear in *text*.
+
+    Only terms from ``_GLOSSARY_DEFINITIONS`` that are found in the rendered
+    report are included, sorted alphabetically.  Returns an empty list if no
+    glossary terms are present.
+    """
+    present: dict[str, str] = {}
+    for term, definition in _GLOSSARY_DEFINITIONS.items():
+        if " " in term or "-" in term:
+            if term.lower() in text.lower():
+                present[term] = definition
+        else:
+            if re.search(rf'\b{re.escape(term)}\b', text):
+                present[term] = definition
+    if not present:
+        return []
+    lines: list[str] = [
+        "---",
+        "",
+        "## Glossary",
+        "",
+        "*Technical terms used in this report.*",
+        "",
+        "| Term | Definition |",
+        "|---|---|",
+    ]
+    for term in sorted(present, key=str.casefold):
+        defn = present[term].replace("|", "\\|")
+        lines.append(f"| **{term}** | {defn} |")
+    lines.append("")
+    return lines
+
+
 def _normalise_timeframe(tf: str) -> str:
     return _TIMEFRAME_ALIASES.get(tf.lower().replace(" ", "_"), tf)
 
@@ -2054,7 +2153,16 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
         context, narrative, da, assumptions, risks, opps, options, recommended_id, ro
     )
 
-    return "\n".join(lines)
+    # P2.3 — Post-processing: expand acronyms on first use, then insert glossary
+    report_text = "\n".join(lines)
+    report_text = _expand_first_acronyms(report_text)
+    _glossary = _build_glossary_section(report_text)
+    if _glossary:
+        _marker = "\n---\n\n## 10. Appendix"
+        report_text = report_text.replace(
+            _marker, "\n" + "\n".join(_glossary) + _marker, 1
+        )
+    return report_text
 
 
 # ---------------------------------------------------------------------------
