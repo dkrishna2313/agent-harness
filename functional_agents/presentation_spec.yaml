@@ -1,0 +1,137 @@
+# Presentation Specification — Strategic Research Harness
+# P2.5: Configurable presentation policy for the executive report renderer.
+#
+# This file is the canonical owner of stable presentation conventions.
+# The renderer reads from this spec rather than defining policy inline.
+#
+# Scope: report visual language only.
+# Do NOT place reasoning policy, communication logic, or analytical parameters here.
+
+version: "1.0"
+
+presentation:
+
+  # ---------------------------------------------------------------------------
+  # Component templates
+  # Documents the rendering template used by each named report component.
+  # The renderer applies these conventions; the spec names them declaratively.
+  # ---------------------------------------------------------------------------
+  components:
+    executive_summary:
+      template: callout          # Section 1 — blockquote with bold labels
+    decision_summary:
+      template: field_value_table  # Section 3 — | Field | Value | table
+    assumption_summary:
+      template: executive_table  # Section 6 — | Assumption | Importance | Impact if Invalid |
+    risk_summary:
+      template: executive_table  # Section 7 — | Risk | Likelihood | Business Impact | Mitigation |
+    opportunity_summary:
+      template: executive_table  # Section 8 — | Opportunity | Category | Expected Benefit | Likelihood |
+    action_plan:
+      template: grouped_table    # Section 9 — per-timeframe | ID | Priority | Action | Details |
+    glossary:
+      template: alphabetical     # Between Section 9 and Appendix — | Term | Definition |
+
+  # ---------------------------------------------------------------------------
+  # Stable presentation conventions
+  # These are applied uniformly throughout the rendered report.
+  # ---------------------------------------------------------------------------
+  conventions:
+    section_separator: true       # "---" inserted before each major section
+    subtitle_style: italic_question  # Each section opens with *italic subtitle.*
+    table_intro_style: italic     # Tables are preceded by an *italic intro sentence.*
+    bullet_style: "-"             # All list items use "- " prefix
+    missing_value: "Not specified"  # Fallback for absent optional fields in tables
+    capitalize_generated_bullets: true  # Auto-generated bullet text is sentence-cased
+
+  # ---------------------------------------------------------------------------
+  # Terminology
+  # Each entry may carry:
+  #   expand_first — expand this acronym on its first occurrence in the report
+  #   glossary     — include this definition in the executive glossary
+  #
+  # Notes:
+  #   - Acronyms are expanded longest-first to avoid prefix conflicts
+  #     (e.g. CAPEX before EPC, LCOE before LCO).
+  #   - SMR is excluded from expand_first — it is the engagement subject and
+  #     is expected to be known by readers of an SMR-focused report.
+  #   - Terms with spaces or hyphens (e.g. "Capacity Factor") are glossary-only;
+  #     they are included in the glossary when found in the rendered text.
+  # ---------------------------------------------------------------------------
+  terminology:
+
+    FERC:
+      expand_first: "Federal Energy Regulatory Commission"
+      glossary: "The U.S. federal agency that regulates interstate electricity transmission and wholesale power markets."
+
+    LCOE:
+      expand_first: "Levelized Cost of Energy"
+      glossary: "The average cost per unit of electricity produced over a plant's lifetime, incorporating capital, financing, fuel, and operating costs."
+
+    CAPEX:
+      expand_first: "Capital Expenditure"
+      glossary: "Capital expenditure — funds deployed to acquire or construct long-lived physical assets, capitalized and depreciated over the asset's useful life."
+
+    OPEX:
+      expand_first: "Operating Expenditure"
+      glossary: "Operating expenditure — recurring costs of day-to-day operations, including power, staffing, and maintenance."
+
+    EPC:
+      expand_first: "Engineering, Procurement and Construction"
+      glossary: "A contract model in which a single firm holds end-to-end responsibility for engineering, procurement, and construction, typically at a fixed price."
+
+    NPV:
+      expand_first: "Net Present Value"
+      glossary: "Net present value — the sum of discounted future cash flows minus initial investment; positive NPV indicates value creation."
+
+    IRR:
+      expand_first: "Internal Rate of Return"
+      glossary: "The discount rate at which a project's net present value equals zero; used to assess whether returns exceed the cost of capital."
+
+    GPU:
+      expand_first: "Graphics Processing Unit"
+      glossary: "A parallel-processing chip and the dominant hardware accelerator for AI model training and inference workloads."
+
+    LLM:
+      expand_first: "Large Language Model"
+      glossary: "A generative AI system trained on large text corpora, capable of producing text, code, and analysis at scale."
+
+    NRC:
+      expand_first: "Nuclear Regulatory Commission"
+      glossary: "The U.S. federal agency responsible for licensing and regulatory oversight of civilian nuclear power facilities."
+
+    PPA:
+      expand_first: "Power Purchase Agreement"
+      glossary: "A long-term bilateral contract fixing the price and volume of electricity between a buyer and a power generator."
+
+    GW:
+      expand_first: "Gigawatt"
+      glossary: "Gigawatt — one billion watts (1,000 MW); used to describe utility-scale generation capacity or total grid load."
+
+    MW:
+      expand_first: "Megawatt"
+      glossary: "Megawatt — one million watts; the standard unit for power generation capacity or large-scale electricity demand."
+
+    AI:
+      expand_first: "Artificial Intelligence"
+      glossary: "Software that performs cognitive tasks — pattern recognition, language processing, and reasoning — traditionally requiring human intelligence."
+
+    # Glossary-only terms (no expand_first — matched by substring in rendered text)
+
+    Capacity Factor:
+      glossary: "The ratio of actual energy output to maximum possible output over a period; a higher capacity factor means more consistent generation and better project economics."
+
+    Grid Interconnection:
+      glossary: "The technical and regulatory process of connecting a new power source or large electricity consumer to the transmission network, including queue position, studies, and upgrade obligations."
+
+    Colocation:
+      glossary: "A data center model in which multiple tenants share physical infrastructure — power, cooling, and space — while operating their own compute and networking equipment."
+
+    Hyperscaler:
+      glossary: "A technology company that operates cloud or AI infrastructure at very large scale, typically requiring hundreds of megawatts of power across multiple campuses."
+
+    Load Factor:
+      glossary: "The ratio of average electrical load to peak load over a period; a high load factor indicates consistent demand and improves economics for generation and transmission."
+
+    Stranded Asset:
+      glossary: "A capital asset that loses value prematurely due to regulatory change, technological disruption, or market shifts before reaching its expected end of useful life."

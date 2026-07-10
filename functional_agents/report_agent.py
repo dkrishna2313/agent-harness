@@ -10,6 +10,7 @@ from typing import Any
 from .base import FunctionalAgent
 from .context import AgentContext
 from .narrative import ExecutiveNarrative, ExecutiveNarrativeBuilder
+from .presentation_spec import _SPEC as _PRESENTATION_SPEC
 
 LOGGER = logging.getLogger(__name__)
 
@@ -1101,55 +1102,20 @@ _IMPORTANCE_ORDER = {"Critical": 0, "Important": 1, "Supporting": 2}
 
 
 # ---------------------------------------------------------------------------
-# P2.3 — Acronym Expansion & Executive Glossary
+# P2.3 — Acronym Expansion & Executive Glossary  (P2.5: driven by spec)
 # ---------------------------------------------------------------------------
 
-# acronym → full expansion.  Processed longest-first to avoid prefix conflicts
-# (e.g., CAPEX expanded before OPEX, MWh before MW).
-# SMR is intentionally excluded — it is the engagement subject and is expected
-# to be known by readers of an SMR-focused report.
-_ACRONYM_EXPANSIONS: dict[str, str] = {
-    "FERC": "Federal Energy Regulatory Commission",
-    "LCOE": "Levelized Cost of Energy",
-    "CAPEX": "Capital Expenditure",
-    "OPEX": "Operating Expenditure",
-    "EPC": "Engineering, Procurement and Construction",
-    "NPV": "Net Present Value",
-    "IRR": "Internal Rate of Return",
-    "GPU": "Graphics Processing Unit",
-    "LLM": "Large Language Model",
-    "NRC": "Nuclear Regulatory Commission",
-    "PPA": "Power Purchase Agreement",
-    "GW": "Gigawatt",
-    "MW": "Megawatt",
-    "AI": "Artificial Intelligence",
-}
+# Loaded from presentation_spec.yaml — edit that file to add/remove terms.
+# Acronyms processed longest-first to avoid prefix conflicts (CAPEX before EPC).
+# SMR excluded from expand_first in spec — engagement subject, assumed known.
+_ACRONYM_EXPANSIONS: dict[str, str] = _PRESENTATION_SPEC.acronym_expansions
 
-# term → one-sentence business definition for the executive glossary.
-# Single-word terms are matched with a word-boundary regex; multi-word and
+# Single-word terms matched with word-boundary regex; multi-word and
 # hyphenated terms use case-insensitive substring matching.
-_GLOSSARY_DEFINITIONS: dict[str, str] = {
-    "AI": "Software that performs cognitive tasks — pattern recognition, language processing, and reasoning — traditionally requiring human intelligence.",
-    "LLM": "A generative AI system trained on large text corpora, capable of producing text, code, and analysis at scale.",
-    "GPU": "A parallel-processing chip and the dominant hardware accelerator for AI model training and inference workloads.",
-    "PPA": "A long-term bilateral contract fixing the price and volume of electricity between a buyer and a power generator.",
-    "CAPEX": "Capital expenditure — funds deployed to acquire or construct long-lived physical assets, capitalized and depreciated over the asset's useful life.",
-    "OPEX": "Operating expenditure — recurring costs of day-to-day operations, including power, staffing, and maintenance.",
-    "NRC": "The U.S. federal agency responsible for licensing and regulatory oversight of civilian nuclear power facilities.",
-    "FERC": "The U.S. federal agency that regulates interstate electricity transmission and wholesale power markets.",
-    "MW": "Megawatt — one million watts; the standard unit for power generation capacity or large-scale electricity demand.",
-    "GW": "Gigawatt — one billion watts (1,000 MW); used to describe utility-scale generation capacity or total grid load.",
-    "LCOE": "The average cost per unit of electricity produced over a plant's lifetime, incorporating capital, financing, fuel, and operating costs.",
-    "IRR": "The discount rate at which a project's net present value equals zero; used to assess whether returns exceed the cost of capital.",
-    "NPV": "Net present value — the sum of discounted future cash flows minus initial investment; positive NPV indicates value creation.",
-    "EPC": "A contract model in which a single firm holds end-to-end responsibility for engineering, procurement, and construction, typically at a fixed price.",
-    "Capacity Factor": "The ratio of actual energy output to maximum possible output over a period; a higher capacity factor means more consistent generation and better project economics.",
-    "Grid Interconnection": "The technical and regulatory process of connecting a new power source or large electricity consumer to the transmission network, including queue position, studies, and upgrade obligations.",
-    "Colocation": "A data center model in which multiple tenants share physical infrastructure — power, cooling, and space — while operating their own compute and networking equipment.",
-    "Hyperscaler": "A technology company that operates cloud or AI infrastructure at very large scale, typically requiring hundreds of megawatts of power across multiple campuses.",
-    "Load Factor": "The ratio of average electrical load to peak load over a period; a high load factor indicates consistent demand and improves economics for generation and transmission.",
-    "Stranded Asset": "A capital asset that loses value prematurely due to regulatory change, technological disruption, or market shifts before reaching its expected end of useful life.",
-}
+_GLOSSARY_DEFINITIONS: dict[str, str] = _PRESENTATION_SPEC.glossary_definitions
+
+# Fallback text for absent optional fields in tables.
+_MISSING_VALUE: str = _PRESENTATION_SPEC.missing_value
 
 
 def _expand_first_acronyms(text: str) -> str:
@@ -1691,7 +1657,7 @@ def _build_j7_critical_assumptions_section(
         aid = a.get("assumption_id", "")
         stmt = a.get("statement", "").replace("|", "\\|")
         imp = a.get("importance", "")
-        impact = _risk_impact.get(aid, "Not specified")
+        impact = _risk_impact.get(aid, _MISSING_VALUE)
         lines.append(f"| {stmt} | {imp} | {impact} |")
     lines += ["", "*Full assumption register in Appendix B.*", ""]
     return lines
@@ -1722,9 +1688,9 @@ def _build_j7_key_risks_section(risks: list[dict[str, Any]]) -> list[str]:
     ]
     for r in exec_risks:
         stmt = r.get("statement", r.get("title", r.get("description", ""))).replace("|", "\\|")[:100]
-        lhood = r.get("likelihood", "") or "Not specified"
-        sev = r.get("severity", "") or "Not specified"
-        mit = (r.get("mitigation_notes") or r.get("mitigation") or "Not specified").replace("|", "\\|")[:80]
+        lhood = r.get("likelihood", "") or _MISSING_VALUE
+        sev = r.get("severity", "") or _MISSING_VALUE
+        mit = (r.get("mitigation_notes") or r.get("mitigation") or _MISSING_VALUE).replace("|", "\\|")[:80]
         lines.append(f"| {stmt} | {lhood} | {sev} | {mit} |")
     lines += ["", "*Full risk register in Appendix C.*", ""]
     return lines
@@ -1756,8 +1722,8 @@ def _build_j7_strategic_opportunities_section(
     for o in exec_opps:
         stmt = o.get("statement", o.get("title", o.get("description", ""))).replace("|", "\\|")[:100]
         cat = o.get("category", "")
-        impact = o.get("impact", "") or "Not specified"
-        lhood = o.get("likelihood", o.get("probability", "")) or "Not specified"
+        impact = o.get("impact", "") or _MISSING_VALUE
+        lhood = o.get("likelihood", o.get("probability", "")) or _MISSING_VALUE
         lines.append(f"| {stmt} | {cat} | {impact} | {lhood} |")
     lines += ["", "*Full opportunity register in Appendix D.*", ""]
     return lines
