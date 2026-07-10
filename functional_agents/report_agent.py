@@ -1524,7 +1524,7 @@ def _build_j7_recommendation_rationale_section(
         ]
         col_headers = "| Option | " + " | ".join(h for _, h in _SCORE_COLS) + " |"
         col_divider = "|---|" + "---|" * len(_SCORE_COLS)
-        lines += ["---", "", "**Decision Matrix:**", "", col_headers, col_divider]
+        lines += ["---", "", "**Decision Matrix:**", "", "*Scorecard comparing all options across key strategic dimensions.*", "", col_headers, col_divider]
         _opt_titles = {o.get("option_id", ""): o.get("title", "") for o in options}
         for entry in matrix:
             eid = entry.get("option_id", "")
@@ -1541,11 +1541,11 @@ def _build_j7_recommendation_rationale_section(
             if strengths or weaknesses:
                 lines += [f"**{eid} — Strengths & Weaknesses**", ""]
                 if strengths:
-                    lines.append("Strengths:")
-                    lines.extend(f"+ {s}" for s in strengths)
+                    lines.append("**Strengths:**")
+                    lines.extend(f"- {s}" for s in strengths)
                     lines.append("")
                 if weaknesses:
-                    lines.append("Weaknesses:")
+                    lines.append("**Weaknesses:**")
                     lines.extend(f"- {w}" for w in weaknesses)
                     lines.append("")
 
@@ -1608,7 +1608,7 @@ def _build_j7_decision_readiness_section(
     ec_limiters = [_humanize_limiter(lim) for lim in (nec.get("confidence_limiters") or [])]
     if ec_limiters:
         lines.append("**Key Confidence Limiters:**")
-        lines.extend(f"- {lim}" for lim in ec_limiters)
+        lines.extend(f"- {lim[0].upper() + lim[1:]}" for lim in ec_limiters)
         lines.append("")
 
     if narrative.validation_priorities:
@@ -1715,7 +1715,7 @@ def _build_j7_key_risks_section(risks: list[dict[str, Any]]) -> list[str]:
     exec_risks = high_risks + med_risks[:max(0, 5 - len(high_risks))]
 
     lines: list[str] = [
-        "*High-severity risks that could derail execution.*",
+        "*High and medium-severity risks ordered by business impact, with available mitigations.*",
         "",
         "| Risk | Likelihood | Business Impact | Mitigation |",
         "|---|---|---|---|",
@@ -1748,7 +1748,7 @@ def _build_j7_strategic_opportunities_section(
     exec_opps = sorted_opps[:5]
 
     lines: list[str] = [
-        "*Top opportunities if conditions prove better than expected.*",
+        "*Top opportunities ranked by expected benefit and likelihood.*",
         "",
         "| Opportunity | Category | Expected Benefit | Likelihood |",
         "|---|---|---|---|",
@@ -2058,7 +2058,7 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
             _trunc = _principal_risk_stmt[:90] + "…" if len(_principal_risk_stmt) > 90 else _principal_risk_stmt
             _summary_rows.append(("Principal Risk", _trunc))
 
-        lines += ["| Field | Value |", "|---|---|"]
+        lines += ["*Summary of key decision parameters.*", "", "| Field | Value |", "|---|---|"]
         for _field, _val in _summary_rows:
             lines.append(f"| {_field} | {_val} |")
         lines.append("")
