@@ -1407,7 +1407,7 @@ def _build_j7_recommendation_rationale_section(
         lines.extend(f"{i + 1}. {r}" for i, r in enumerate(narrative.option_rankings))
         lines.append("")
 
-    # Decision matrix table
+    # Decision matrix — visual separator before the table block
     matrix: list[dict] = da.get("decision_matrix") or []
     if matrix:
         _SCORE_COLS = [
@@ -1425,7 +1425,7 @@ def _build_j7_recommendation_rationale_section(
         ]
         col_headers = "| Option | " + " | ".join(h for _, h in _SCORE_COLS) + " |"
         col_divider = "|---|" + "---|" * len(_SCORE_COLS)
-        lines += ["**Decision Matrix:**", "", col_headers, col_divider]
+        lines += ["---", "", "**Decision Matrix:**", "", col_headers, col_divider]
         _opt_titles = {o.get("option_id", ""): o.get("title", "") for o in options}
         for entry in matrix:
             eid = entry.get("option_id", "")
@@ -1450,8 +1450,9 @@ def _build_j7_recommendation_rationale_section(
                     lines.extend(f"- {w}" for w in weaknesses)
                     lines.append("")
 
-    # Key tradeoffs
+    # Key tradeoffs — visual separator before the list
     if narrative.key_tradeoffs:
+        lines += ["---", ""]
         lines.append("**Key Trade-offs:**")
         lines.extend(f"- {t}" for t in narrative.key_tradeoffs)
         lines.append("")
@@ -1485,6 +1486,9 @@ def _build_j7_decision_readiness_section(
         lines += [f"**Decision Readiness:** {ec_ready}", ""]
     if ec_board:
         lines += [f"**Board Recommendation:** {ec_board}", ""]
+
+    if ec_conf or ec_ready or ec_board:
+        lines += ["---", ""]
 
     # Confidence rationale from executive_confidence; da.confidence_summary as supplement
     ec_rat = _clean_internal_language(nec.get("confidence_rationale", "") or "")
@@ -1571,6 +1575,8 @@ def _build_j7_critical_assumptions_section(
         exec_assumptions = sorted_assumptions[:5]
 
     lines: list[str] = [
+        "*Critical and important assumptions underpinning the recommended path.*",
+        "",
         "| ID | Assumption | Importance | Confidence |",
         "|---|---|---|---|",
     ]
@@ -1602,6 +1608,8 @@ def _build_j7_key_risks_section(risks: list[dict[str, Any]]) -> list[str]:
     exec_risks = high_risks + med_risks[:max(0, 5 - len(high_risks))]
 
     lines: list[str] = [
+        "*High-severity risks that could derail execution.*",
+        "",
         "| ID | Risk | Severity | Likelihood |",
         "|---|---|---|---|",
     ]
@@ -1633,6 +1641,8 @@ def _build_j7_strategic_opportunities_section(
     exec_opps = sorted_opps[:5]
 
     lines: list[str] = [
+        "*Top opportunities if conditions prove better than expected.*",
+        "",
         "| ID | Opportunity | Category | Impact | Likelihood |",
         "|---|---|---|---|---|",
     ]
@@ -1871,12 +1881,17 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
         "## 1. Executive Summary",
         "",
     ]
-    lines += _build_j7_executive_summary_section(context, narrative)
+    _summary_lines = _build_j7_executive_summary_section(context, narrative)
+    for _sl in _summary_lines:
+        lines.append(f"> {_sl}" if _sl else ">")
+    while lines and lines[-1] == ">":
+        lines.pop()
+    lines.append("")
 
     # ------------------------------------------------------------------ #
     # Section 2 — Strategic Context (P1.3 — renamed from Strategic Question)#
     # ------------------------------------------------------------------ #
-    lines += ["## 2. Strategic Context", ""]
+    lines += ["---", "", "## 2. Strategic Context", "", "*What decision does the Board need to make, and why now?*", ""]
     if eng.get("title"):
         lines += [f"**{eng_title}**", ""]
         _client_str = eng.get("client", "")
@@ -1897,7 +1912,7 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     # Section 3 — Strategic Recommendation                                 #
     # P1.3 — renamed from "Recommended Strategic Option"                   #
     # ------------------------------------------------------------------ #
-    lines += ["## 3. Strategic Recommendation", ""]
+    lines += ["---", "", "## 3. Strategic Recommendation", "", "*Which path does the team recommend, and on what terms?*", ""]
     _rec = narrative.recommended_option
     _oid = _rec.get("option_id", "")
     _title = _rec.get("title", "")
@@ -1932,38 +1947,38 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     # Section 4 — Recommendation Rationale                                 #
     # P1.3: Merges Why This Option Wins + Decision Matrix + Key Tradeoffs  #
     # ------------------------------------------------------------------ #
-    lines += ["## 4. Recommendation Rationale", ""]
+    lines += ["---", "", "## 4. Recommendation Rationale", "", "*Why does this option win, and how does it compare to alternatives?*", ""]
     lines += _build_j7_recommendation_rationale_section(narrative, da, options, recommended_id)
 
     # ------------------------------------------------------------------ #
     # Section 5 — Decision Readiness                                       #
     # P1.3: Merges Executive Confidence + Confidence Assessment (deduped)  #
     # ------------------------------------------------------------------ #
-    lines += ["## 5. Decision Readiness", ""]
+    lines += ["---", "", "## 5. Decision Readiness", "", "*Can the Board approve this decision today?*", ""]
     lines += _build_j7_decision_readiness_section(narrative, da, context)
 
     # ------------------------------------------------------------------ #
     # Section 6 — Critical Assumptions (executive summary only)            #
     # ------------------------------------------------------------------ #
-    lines += ["## 6. Critical Assumptions", ""]
+    lines += ["---", "", "## 6. Critical Assumptions", "", "*What must be true for this strategy to succeed?*", ""]
     lines += _build_j7_critical_assumptions_section(assumptions)
 
     # ------------------------------------------------------------------ #
     # Section 7 — Key Risks (executive summary only)                       #
     # ------------------------------------------------------------------ #
-    lines += ["## 7. Key Risks", ""]
+    lines += ["---", "", "## 7. Key Risks", "", "*What could derail execution, and how exposed are we?*", ""]
     lines += _build_j7_key_risks_section(risks)
 
     # ------------------------------------------------------------------ #
     # Section 8 — Strategic Opportunities (executive summary only)         #
     # ------------------------------------------------------------------ #
-    lines += ["## 8. Strategic Opportunities", ""]
+    lines += ["---", "", "## 8. Strategic Opportunities", "", "*Where is the upside if conditions prove better than expected?*", ""]
     lines += _build_j7_strategic_opportunities_section(opps)
 
     # ------------------------------------------------------------------ #
     # Section 9 — Immediate Actions                                        #
     # ------------------------------------------------------------------ #
-    lines += ["## 9. Immediate Actions", ""]
+    lines += ["---", "", "## 9. Immediate Actions", "", "*What needs to happen in the next 90 days?*", ""]
     if recs:
         grouped: dict[str, list[dict]] = {}
         for rec in recs:
@@ -1997,7 +2012,7 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     # Section 10 — Appendix                                               #
     # P1.3: Detailed analytical artifacts for analyst traceability        #
     # ------------------------------------------------------------------ #
-    lines += ["## 10. Appendix", ""]
+    lines += ["---", "", "## 10. Appendix", ""]
     lines += _build_j7_appendix(
         context, narrative, da, assumptions, risks, opps, options, recommended_id, ro
     )
