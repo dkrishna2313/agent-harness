@@ -1553,6 +1553,7 @@ def _build_j7_decision_readiness_section(
 
 def _build_j7_critical_assumptions_section(
     assumptions: list[dict[str, Any]],
+    risks: list[dict[str, Any]] = None,
 ) -> list[str]:
     """Section 6 — Critical Assumptions (executive summary only).
 
@@ -1574,18 +1575,25 @@ def _build_j7_critical_assumptions_section(
     if not exec_assumptions:
         exec_assumptions = sorted_assumptions[:5]
 
+    # Build impact map: assumption_id → statement of first linked risk
+    _risk_impact: dict[str, str] = {}
+    for _r in (risks or []):
+        for _aid in (_r.get("related_assumption_ids") or []):
+            if _aid not in _risk_impact:
+                _risk_impact[_aid] = _r.get("statement", "").replace("|", "\\|")[:100]
+
     lines: list[str] = [
         "*Critical and important assumptions underpinning the recommended path.*",
         "",
-        "| ID | Assumption | Importance | Confidence |",
-        "|---|---|---|---|",
+        "| Assumption | Importance | Impact if Invalid |",
+        "|---|---|---|",
     ]
     for a in exec_assumptions:
         aid = a.get("assumption_id", "")
         stmt = a.get("statement", "").replace("|", "\\|")
         imp = a.get("importance", "")
-        conf = a.get("confidence", "")
-        lines.append(f"| {aid} | {stmt} | {imp} | {conf} |")
+        impact = _risk_impact.get(aid, "Not specified")
+        lines.append(f"| {stmt} | {imp} | {impact} |")
     lines += ["", "*Full assumption register in Appendix B.*", ""]
     return lines
 
@@ -1610,15 +1618,15 @@ def _build_j7_key_risks_section(risks: list[dict[str, Any]]) -> list[str]:
     lines: list[str] = [
         "*High-severity risks that could derail execution.*",
         "",
-        "| ID | Risk | Severity | Likelihood |",
+        "| Risk | Likelihood | Business Impact | Mitigation |",
         "|---|---|---|---|",
     ]
     for r in exec_risks:
-        rid = r.get("risk_id", "")
-        stmt = r.get("statement", r.get("title", r.get("description", ""))).replace("|", "\\|")[:120]
-        sev = r.get("severity", "")
-        lhood = r.get("likelihood", "")
-        lines.append(f"| {rid} | {stmt} | {sev} | {lhood} |")
+        stmt = r.get("statement", r.get("title", r.get("description", ""))).replace("|", "\\|")[:100]
+        lhood = r.get("likelihood", "") or "Not specified"
+        sev = r.get("severity", "") or "Not specified"
+        mit = (r.get("mitigation_notes") or r.get("mitigation") or "Not specified").replace("|", "\\|")[:80]
+        lines.append(f"| {stmt} | {lhood} | {sev} | {mit} |")
     lines += ["", "*Full risk register in Appendix C.*", ""]
     return lines
 
@@ -1643,16 +1651,15 @@ def _build_j7_strategic_opportunities_section(
     lines: list[str] = [
         "*Top opportunities if conditions prove better than expected.*",
         "",
-        "| ID | Opportunity | Category | Impact | Likelihood |",
-        "|---|---|---|---|---|",
+        "| Opportunity | Category | Expected Benefit | Likelihood |",
+        "|---|---|---|---|",
     ]
     for o in exec_opps:
-        oid2 = o.get("opportunity_id", "")
-        stmt = o.get("statement", o.get("title", o.get("description", ""))).replace("|", "\\|")[:120]
+        stmt = o.get("statement", o.get("title", o.get("description", ""))).replace("|", "\\|")[:100]
         cat = o.get("category", "")
-        impact = o.get("impact", "")
-        lhood = o.get("likelihood", o.get("probability", ""))
-        lines.append(f"| {oid2} | {stmt} | {cat} | {impact} | {lhood} |")
+        impact = o.get("impact", "") or "Not specified"
+        lhood = o.get("likelihood", o.get("probability", "")) or "Not specified"
+        lines.append(f"| {stmt} | {cat} | {impact} | {lhood} |")
     lines += ["", "*Full opportunity register in Appendix D.*", ""]
     return lines
 
@@ -1917,14 +1924,46 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     _oid = _rec.get("option_id", "")
     _title = _rec.get("title", "")
     if _oid or _title:
-        lines += [f"**{_oid}: {_title}**", ""]
         rec_opt = next((o for o in options if o.get("option_id") == recommended_id), preferred)
         _horizon = (
             _rec.get("estimated_time_horizon", "")
             or (rec_opt or {}).get("time_horizon", "")
         ).replace("_", " ")
+        _nec = narrative.executive_confidence
+        _ec_ready = (_nec or {}).get("decision_readiness", "") or ""
+        _ec_conf = (_nec or {}).get("overall_confidence", "") or da.get("confidence", "")
+        _ec_board = (_nec or {}).get("board_recommendation", "") or ""
+        _primary_benefit = ((rec_opt or {}).get("advantages") or [None])[0] or ""
+        _sorted_risks = sorted(
+            risks, key=lambda r: {"High": 0, "Medium": 1, "Low": 2}.get(r.get("severity", "Low"), 3)
+        )
+        _principal_risk_stmt = next(
+            (r.get("statement", "") for r in _sorted_risks if r.get("severity") == "High"), ""
+        )
+
+        # Decision summary table
+        _summary_rows: list[tuple[str, str]] = [
+            ("Recommended Option", f"{_oid}: {_title}" if _oid and _title else _title or _oid),
+        ]
         if _horizon:
-            lines += [f"**Time Horizon:** {_horizon}", ""]
+            _summary_rows.append(("Time Horizon", _horizon))
+        if _ec_ready:
+            _summary_rows.append(("Decision Readiness", _ec_ready))
+        if _ec_conf:
+            _summary_rows.append(("Confidence", _ec_conf))
+        if _ec_board:
+            _summary_rows.append(("Board Recommendation", _ec_board))
+        if _primary_benefit:
+            _summary_rows.append(("Primary Benefit", _primary_benefit))
+        if _principal_risk_stmt:
+            _trunc = _principal_risk_stmt[:90] + "…" if len(_principal_risk_stmt) > 90 else _principal_risk_stmt
+            _summary_rows.append(("Principal Risk", _trunc))
+
+        lines += ["| Field | Value |", "|---|---|"]
+        for _field, _val in _summary_rows:
+            lines.append(f"| {_field} | {_val} |")
+        lines.append("")
+
         _desc = (
             _rec.get("description", "")
             or (rec_opt or {}).get("rationale", "")
@@ -1961,7 +2000,7 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     # Section 6 — Critical Assumptions (executive summary only)            #
     # ------------------------------------------------------------------ #
     lines += ["---", "", "## 6. Critical Assumptions", "", "*What must be true for this strategy to succeed?*", ""]
-    lines += _build_j7_critical_assumptions_section(assumptions)
+    lines += _build_j7_critical_assumptions_section(assumptions, risks)
 
     # ------------------------------------------------------------------ #
     # Section 7 — Key Risks (executive summary only)                       #
@@ -1995,16 +2034,14 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
                 continue
             display = _TIMEFRAME_DISPLAY.get(tf, tf)
             lines += [f"### {display}", ""]
+            lines += ["| ID | Priority | Action | Details |", "|---|---|---|---|"]
             for rec in tf_recs:
                 rid = rec.get("recommendation_id", "")
-                rtitle = rec.get("title", "")
-                rbody = rec.get("summary") or rec.get("rationale") or rec.get("description") or ""
-                rpri = rec.get("priority", "")
-                lines.append(f"**{rid}: {rtitle}**" + (f" *(Priority: {rpri})*" if rpri else ""))
-                if rbody:
-                    lines += [rbody, ""]
-                else:
-                    lines.append("")
+                rtitle = rec.get("title", "").replace("|", "\\|")
+                rbody = (rec.get("summary") or rec.get("rationale") or rec.get("description") or "").replace("|", "\\|")[:100]
+                rpri = (rec.get("priority", "") or "").title()
+                lines.append(f"| {rid} | {rpri} | {rtitle} | {rbody} |")
+            lines.append("")
     else:
         lines += ["*No recommendations recorded.*", ""]
 
