@@ -11,6 +11,7 @@ from .base import FunctionalAgent
 from .context import AgentContext
 from .narrative import ExecutiveNarrative, ExecutiveNarrativeBuilder
 from .presentation_spec import _SPEC as _PRESENTATION_SPEC
+from .reference import Reference, ReferenceBuilder
 
 LOGGER = logging.getLogger(__name__)
 
@@ -1170,6 +1171,89 @@ def _normalise_timeframe(tf: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# K1.2 — Reference helpers
+# ---------------------------------------------------------------------------
+
+_UUID_RE = re.compile(
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+    re.IGNORECASE,
+)
+_CITATION_MARKER_RE = re.compile(
+    r"\[Source:[^\]]+,\s*Evidence:\s*([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]",
+    re.IGNORECASE,
+)
+_SUPPORTING_EV_RE = re.compile(r"(  - Supporting evidence: )([^\n]+)")
+
+
+def _build_domain_evidence_for_references(context: "AgentContext") -> list[dict[str, Any]]:
+    """Flatten domain_evidence into normalized evidence dicts for ReferenceBuilder.
+
+    Normalizes the ``source_document`` field name used in domain_evidence items
+    to ``supporting_source_ids`` as expected by ReferenceBuilder.
+    """
+    result: list[dict[str, Any]] = []
+    for domain_item in (context.domain_evidence or []):
+        for ev in (domain_item.get("evidence") or []):
+            source_doc = ev.get("source_document", "")
+            result.append({
+                "evidence_id": ev.get("evidence_id", ""),
+                "supporting_source_ids": [source_doc] if source_doc else [],
+            })
+    return result
+
+
+def _build_references_section(refs: list[Reference]) -> list[str]:
+    """Return Markdown lines for a numbered References section."""
+    if not refs:
+        return []
+    lines: list[str] = ["---", "", "## References", "", "*Sources cited in this report.*", ""]
+    for i, ref in enumerate(refs, 1):
+        lines.append(f"{i}. {ref.citation_text}")
+    lines.append("")
+    return lines
+
+
+def _replace_uuid_citation_markers(
+    text: str,
+    eid_to_citation: dict[str, str],
+) -> str:
+    """Replace [Source: X, Evidence: uuid] markers with [citation_text]."""
+    if not eid_to_citation:
+        return text
+
+    def _sub(m: re.Match) -> str:
+        eid = m.group(1)
+        citation = eid_to_citation.get(eid)
+        return f"[{citation}]" if citation else m.group(0)
+
+    return _CITATION_MARKER_RE.sub(_sub, text)
+
+
+def _replace_supporting_evidence_uuids(
+    text: str,
+    eid_to_citation: dict[str, str],
+) -> str:
+    """Replace raw UUID lists on 'Supporting evidence:' lines with citation text."""
+    if not eid_to_citation:
+        return text
+
+    def _sub(m: re.Match) -> str:
+        prefix = m.group(1)
+        raw_ids = m.group(2)
+        parts = [p.strip() for p in raw_ids.split(",")]
+        rendered: list[str] = []
+        for part in parts:
+            if _UUID_RE.fullmatch(part.strip()):
+                citation = eid_to_citation.get(part.strip())
+                rendered.append(citation if citation else part)
+            else:
+                rendered.append(part)
+        return prefix + "; ".join(rendered)
+
+    return _SUPPORTING_EV_RE.sub(_sub, text)
+
+
+# ---------------------------------------------------------------------------
 # P1.1 / P1.2 — Executive Narrative Polish helpers
 # ---------------------------------------------------------------------------
 
@@ -1942,6 +2026,25 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
     recommended_id = da.get("recommended_option_id") or preferred.get("option_id") or ""
     eng_title = _display_engagement_title(context)
 
+    # K1.2 — Build Reference objects from domain_evidence for citation rendering.
+    # Graceful fallback: if KnowledgeStore is unavailable, _refs is empty and
+    # UUID markers are preserved unchanged.
+    _refs: list[Reference] = []
+    _eid_to_citation: dict[str, str] = {}
+    try:
+        from knowledge.store import KnowledgeStore as _KS
+        _ks_path = Path("knowledge_store")
+        _resolver = _KS(_ks_path).find_source if _ks_path.exists() else lambda _: None
+        _all_ev = _build_domain_evidence_for_references(context)
+        if _all_ev:
+            _refs = ReferenceBuilder(_resolver).build(_all_ev)
+            for _r in _refs:
+                for _eid in _r.evidence_ids:
+                    if _eid:
+                        _eid_to_citation[_eid] = _r.citation_text
+    except Exception:
+        pass
+
     lines: list[str] = []
 
     # ------------------------------------------------------------------ #
@@ -2119,15 +2222,30 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
         context, narrative, da, assumptions, risks, opps, options, recommended_id, ro
     )
 
-    # P2.3 — Post-processing: expand acronyms on first use, then insert glossary
+    # Post-processing: expand acronyms, replace UUID markers, insert sections
     report_text = "\n".join(lines)
     report_text = _expand_first_acronyms(report_text)
+
+    # K1.2 — Replace internal UUID citation markers with human-readable citations
+    if _eid_to_citation:
+        report_text = _replace_uuid_citation_markers(report_text, _eid_to_citation)
+        report_text = _replace_supporting_evidence_uuids(report_text, _eid_to_citation)
+
+    # P2.3 — Insert glossary before Appendix
     _glossary = _build_glossary_section(report_text)
+    _marker = "\n---\n\n## 10. Appendix"
     if _glossary:
-        _marker = "\n---\n\n## 10. Appendix"
         report_text = report_text.replace(
             _marker, "\n" + "\n".join(_glossary) + _marker, 1
         )
+
+    # K1.2 — Insert References section before Appendix (after Glossary if present)
+    _ref_section = _build_references_section(_refs)
+    if _ref_section:
+        report_text = report_text.replace(
+            _marker, "\n" + "\n".join(_ref_section) + _marker, 1
+        )
+
     return report_text
 
 
