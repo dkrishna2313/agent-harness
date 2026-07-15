@@ -1385,5 +1385,254 @@ def execution_plan_cmd(
         typer.echo("")
 
 
+# ---------------------------------------------------------------------------
+# debug sub-app — developer-only isolated agent debugging (PF1)
+# ---------------------------------------------------------------------------
+
+debug_app = typer.Typer(
+    no_args_is_help=True,
+    help="Developer debugging commands — isolated agent execution.",
+)
+app.add_typer(debug_app, name="debug")
+
+
+@debug_app.command("problem-framing")
+def debug_problem_framing_cmd(
+    engagement: Annotated[
+        Path,
+        typer.Option(
+            "--engagement",
+            help="Path to a Strategic Engagement file (.yaml/.yml/.json).",
+        ),
+    ],
+    out: Annotated[
+        Path,
+        typer.Option("--out", "-o", help="Output directory for debug artifacts."),
+    ] = Path("outputs/problem_framing"),
+    profiles: Annotated[
+        str,
+        typer.Option("--profiles", help="Comma-separated profile names."),
+    ] = "ai_data_centers",
+    model: Annotated[
+        str | None,
+        typer.Option("--model", help="Anthropic model name."),
+    ] = None,
+    mock: Annotated[
+        bool,
+        typer.Option("--mock", help="Use deterministic mock client instead of Claude."),
+    ] = False,
+    log_level: Annotated[
+        str | None,
+        typer.Option("--log-level", help="Logging level."),
+    ] = None,
+) -> None:
+    """Run ONLY ProblemFramingAgent against an Engagement YAML and write debug artifacts.
+
+    Writes engagement.json, prompt.txt, raw_response.json, decision_model.json,
+    and trace.json to the output directory.  No downstream agents execute.
+
+    Example:
+        python3 -m functional_agents.cli debug problem-framing \\
+            --engagement engagements/my_engagement.yaml \\
+            --out outputs/problem_framing/
+    """
+    import hashlib
+    import os
+    import time
+    from datetime import datetime, timezone
+
+    _configure_logging(verbose=False, log_level=log_level or "PROGRESS")
+
+    # ---- Load engagement spec -----------------------------------------------
+    from .engagement_spec import load_engagement_spec, EngagementError
+    try:
+        spec = load_engagement_spec(engagement)
+    except EngagementError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    # ---- Build profiles / client --------------------------------------------
+    from research_agent.profile import load_profile
+    profile_names = [p.strip() for p in profiles.split(",") if p.strip()]
+    loaded_profiles = []
+    for name in profile_names:
+        try:
+            loaded_profiles.append(load_profile(name))
+        except Exception as exc:
+            typer.echo(f"Warning: could not load profile '{name}': {exc}", err=True)
+
+    client = _build_client(mock=mock, model=model)
+
+    # ---- Artifact capture state ---------------------------------------------
+    _raw_captures: dict[str, object] = {}
+    _prompt_captures: dict[str, str] = {}
+
+    # Wrap real client to capture raw Anthropic API responses (pre-validation).
+    _has_anthropic_client = hasattr(client, "_client") and hasattr(
+        getattr(client, "_client", None), "messages"
+    )
+    if _has_anthropic_client:
+        _orig_messages = client._client.messages
+
+        class _ResponseCaptor:
+            def create(self, **kwargs):
+                response = _orig_messages.create(**kwargs)
+                tools = kwargs.get("tools") or []
+                if tools:
+                    op = tools[0].get("name", "unknown") if isinstance(tools[0], dict) else "unknown"
+                    for block in getattr(response, "content", []):
+                        if getattr(block, "type", None) == "tool_use":
+                            _raw_captures[op] = block.input
+                            break
+                return response
+
+        client._client.messages = _ResponseCaptor()
+
+    # Wrap frame_problem to capture the prompt text and mock raw response.
+    _orig_frame_problem = client.frame_problem
+
+    def _wrapped_frame_problem(goal: str, profiles_context: list) -> object:
+        from research_agent.claude_client import _problem_framing_prompt, SYSTEM_PROMPT
+        _prompt_captures["problem_framing"] = (
+            f"### System\n{SYSTEM_PROMPT}\n\n### User\n{_problem_framing_prompt(goal, profiles_context)}"
+        )
+        result = _orig_frame_problem(goal, profiles_context)
+        if not _has_anthropic_client:
+            _raw_captures["problem_framing"] = (
+                result.model_dump() if hasattr(result, "model_dump") else dict(result)
+            )
+        return result
+
+    client.frame_problem = _wrapped_frame_problem  # type: ignore[method-assign]
+
+    # Wrap frame_executive_decision to capture its prompt text and mock raw response.
+    _orig_frame_exec = getattr(client, "frame_executive_decision", None)
+    if _orig_frame_exec is not None:
+        def _wrapped_frame_exec(engagement_dict, decision_model_dict, profiles_context) -> object:
+            from research_agent.claude_client import _executive_framing_prompt, SYSTEM_PROMPT
+            _prompt_captures["executive_framing"] = (
+                f"### System\n{SYSTEM_PROMPT}\n\n"
+                f"### User\n{_executive_framing_prompt(engagement_dict, decision_model_dict, profiles_context)}"
+            )
+            result = _orig_frame_exec(engagement_dict, decision_model_dict, profiles_context)
+            if not _has_anthropic_client:
+                _raw_captures["executive_framing"] = (
+                    result.model_dump() if hasattr(result, "model_dump") else dict(result)
+                )
+            return result
+
+        client.frame_executive_decision = _wrapped_frame_exec  # type: ignore[method-assign]
+
+    # ---- Build AgentContext (mirrors Orchestrator.run_from_engagement) ------
+    from .context import AgentContext
+
+    brief = spec.to_framing_brief()
+    ctx = AgentContext(
+        question="",
+        goal=brief,
+        engagement=spec.model_dump(),
+        profiles=profile_names,
+        execution_profile=profile_names[0] if profile_names else "",
+        research_object={},
+        run_id="debug-pf",
+    )
+
+    # ---- Run ONLY ProblemFramingAgent ---------------------------------------
+    from .problem_framing_agent import ProblemFramingAgent
+
+    agent = ProblemFramingAgent(client=client, domain_profiles=loaded_profiles)
+    _t0 = time.monotonic()
+    timestamp = datetime.now(timezone.utc).isoformat()
+    try:
+        result = agent.run(ctx)
+        ctx = result.context
+    except Exception as exc:
+        typer.echo(f"Error: ProblemFramingAgent failed: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    elapsed_s = time.monotonic() - _t0
+
+    # ---- Compute Decision Model fingerprint (SHA-256 over canonical JSON) ---
+    dm = ctx.decision_model or {}
+    arch = ctx.decision_architecture or {}
+
+    _fingerprint_data = {
+        "decision_statement": arch.get("decision_statement", ""),
+        "decision_scope": arch.get("decision_scope", {}),
+        "decision_areas": dm.get("decision_areas", []),
+        "research_questions": dm.get("research_questions", []),
+        "evidence_requirements": dm.get("evidence_requirements", []),
+        "strategic_themes": arch.get("strategic_themes", []),
+        "decision_streams": arch.get("decision_streams", []),
+        "executive_unknowns": arch.get("executive_unknowns", []),
+        "board_decisions_required": arch.get("board_decisions_required", []),
+        "success_definition": arch.get("success_definition", []),
+    }
+    _canonical = json.dumps(_fingerprint_data, sort_keys=True, ensure_ascii=False)
+    _fingerprint = hashlib.sha256(_canonical.encode("utf-8")).hexdigest()
+
+    # ---- Write output artifacts ----------------------------------------------
+    out.mkdir(parents=True, exist_ok=True)
+
+    # engagement.json — the parsed engagement spec as supplied
+    (out / "engagement.json").write_text(
+        json.dumps(spec.model_dump(), indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    # prompt.txt — all captured prompts concatenated
+    _prompt_sections = []
+    for op, text in _prompt_captures.items():
+        _prompt_sections.append(f"## Operation: {op}\n\n{text}")
+    (out / "prompt.txt").write_text(
+        "\n\n---\n\n".join(_prompt_sections) or "(no prompts captured — mock client with no frame_problem wrapper)",
+        encoding="utf-8",
+    )
+
+    # raw_response.json — raw payloads before normalization/condensing
+    (out / "raw_response.json").write_text(
+        json.dumps(_raw_captures, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    # decision_model.json — normalized DM exactly as passed to downstream agents
+    (out / "decision_model.json").write_text(
+        json.dumps(dm, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    # trace.json — run metadata + fingerprint
+    _call_traces = getattr(client, "call_traces", [])
+    _trace_calls = [
+        {"operation": t.operation, "model": t.model_name, "success": t.success,
+         "duration_ms": t.duration_ms, "timestamp": t.request_timestamp}
+        for t in _call_traces
+    ]
+    _trace = {
+        "model": getattr(client, "model", "mock"),
+        "temperature": None,
+        "max_tokens": getattr(client, "max_tokens", None),
+        "timestamp": timestamp,
+        "elapsed_s": round(elapsed_s, 3),
+        "mock": mock or not _has_anthropic_client,
+        "profiles": profile_names,
+        "engagement_file": str(engagement),
+        "llm_calls": _trace_calls,
+        "decision_model_fingerprint": _fingerprint,
+    }
+    (out / "trace.json").write_text(
+        json.dumps(_trace, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    typer.echo(f"ProblemFramingAgent debug run complete ({elapsed_s:.1f}s)")
+    typer.echo(f"  decision_areas       : {len(dm.get('decision_areas', []))}")
+    typer.echo(f"  research_questions   : {len(dm.get('research_questions', []))}")
+    typer.echo(f"  decision_streams     : {len(arch.get('decision_streams', []))}")
+    typer.echo(f"  fingerprint          : {_fingerprint[:16]}…")
+    typer.echo(f"")
+    typer.echo(f"Artifacts written to  : {out}/")
+    typer.echo(f"  engagement.json")
+    typer.echo(f"  prompt.txt")
+    typer.echo(f"  raw_response.json")
+    typer.echo(f"  decision_model.json")
+    typer.echo(f"  trace.json")
+
+
 if __name__ == "__main__":
     app()
