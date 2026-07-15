@@ -1706,6 +1706,8 @@ class ClaudeClient:
         self._extraction_cache: ExtractionCache | None = (
             ExtractionCache() if use_extraction_cache else None
         )
+        from .planning_cache import PlanningCache
+        self._planning_cache = PlanningCache()
         LOGGER.debug(
             "ClaudeClient: synthesis_model=%s  extraction_model=%s  cache=%s",
             self.model,
@@ -1733,12 +1735,18 @@ class ClaudeClient:
         profiles_context: list[dict],
     ) -> DecisionModelPayload:
         """Transform a business goal into a structured Decision Model (J6.1)."""
+        _cache_inputs = {"goal": goal, "profiles_context": profiles_context}
+        cached = self._planning_cache.get("problem_framing", _cache_inputs)
+        if cached is not None:
+            return DecisionModelPayload.model_validate(cached)
         payload = self._call_json(
             operation="problem_framing",
             schema_name="problem_framing",
             prompt=_problem_framing_prompt(goal, profiles_context),
             max_tokens=2000,
+            temperature=0.0,
         )
+        self._planning_cache.put("problem_framing", _cache_inputs, payload)
         return DecisionModelPayload.model_validate(payload)
 
     def frame_executive_decision(
@@ -1757,12 +1765,22 @@ class ClaudeClient:
         # for tool-call JSON of nested streams. Schema + prompt cap counts so this
         # is not driven higher; the agent falls back to deterministic derivation if
         # the response still truncates.
+        _cache_inputs = {
+            "engagement": engagement or {},
+            "decision_model": decision_model,
+            "profiles_context": profiles_context,
+        }
+        cached = self._planning_cache.get("executive_framing", _cache_inputs)
+        if cached is not None:
+            return DecisionArchitecturePayload.model_validate(cached)
         payload = self._call_json(
             operation="executive_framing",
             schema_name="executive_framing",
             prompt=_executive_framing_prompt(engagement, decision_model, profiles_context),
             max_tokens=4000,
+            temperature=0.0,
         )
+        self._planning_cache.put("executive_framing", _cache_inputs, payload)
         return DecisionArchitecturePayload.model_validate(payload)
 
     def generate_research_strategy(
@@ -2229,6 +2247,7 @@ class ClaudeClient:
         max_tokens: int | None = None,
         response_schema_name: str | None = None,
         model_override: str | None = None,
+        temperature: float | None = None,
     ) -> dict[str, Any] | list[Any]:
         # response_schema_name lets callers use one schema for the tool definition
         # (what Claude sees) and a different, more lenient schema for parsing the
@@ -2238,7 +2257,7 @@ class ClaudeClient:
         request_timestamp = datetime.now(timezone.utc).isoformat()
         _t0 = time.monotonic()
         try:
-            response = self._client.messages.create(
+            _create_kwargs: dict[str, Any] = dict(
                 model=_model,
                 max_tokens=max_tokens or self.max_tokens,
                 system=SYSTEM_PROMPT,
@@ -2246,6 +2265,9 @@ class ClaudeClient:
                 tools=[_tool_definition(operation, schema_name)],
                 tool_choice={"type": "tool", "name": operation},
             )
+            if temperature is not None:
+                _create_kwargs["temperature"] = temperature
+            response = self._client.messages.create(**_create_kwargs)
             _llm_ms = (time.monotonic() - _t0) * 1000
             stop_reason = getattr(response, "stop_reason", None)
             output_tokens = getattr(getattr(response, "usage", None), "output_tokens", None)
