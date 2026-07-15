@@ -1466,6 +1466,7 @@ def debug_problem_framing_cmd(
     # ---- Artifact capture state ---------------------------------------------
     _raw_captures: dict[str, object] = {}
     _prompt_captures: dict[str, str] = {}
+    _cache_hits: list[str] = []  # operations served from PlanningCache (no LLM call)
 
     # Wrap real client to capture raw Anthropic API responses (pre-validation).
     _has_anthropic_client = hasattr(client, "_client") and hasattr(
@@ -1488,7 +1489,9 @@ def debug_problem_framing_cmd(
 
         client._client.messages = _ResponseCaptor()
 
-    # Wrap frame_problem to capture the prompt text and mock raw response.
+    # Wrap frame_problem to capture the prompt text and populate raw_response.
+    # For real clients: _ResponseCaptor fires on LLM calls; on cache hits it doesn't,
+    # so fall back to the validated result to keep raw_response.json non-empty.
     _orig_frame_problem = client.frame_problem
 
     def _wrapped_frame_problem(goal: str, profiles_context: list) -> object:
@@ -1497,15 +1500,17 @@ def debug_problem_framing_cmd(
             f"### System\n{SYSTEM_PROMPT}\n\n### User\n{_problem_framing_prompt(goal, profiles_context)}"
         )
         result = _orig_frame_problem(goal, profiles_context)
-        if not _has_anthropic_client:
+        if "problem_framing" not in _raw_captures:
             _raw_captures["problem_framing"] = (
                 result.model_dump() if hasattr(result, "model_dump") else dict(result)
             )
+            if _has_anthropic_client:
+                _cache_hits.append("problem_framing")
         return result
 
     client.frame_problem = _wrapped_frame_problem  # type: ignore[method-assign]
 
-    # Wrap frame_executive_decision to capture its prompt text and mock raw response.
+    # Wrap frame_executive_decision similarly.
     _orig_frame_exec = getattr(client, "frame_executive_decision", None)
     if _orig_frame_exec is not None:
         def _wrapped_frame_exec(engagement_dict, decision_model_dict, profiles_context) -> object:
@@ -1515,10 +1520,12 @@ def debug_problem_framing_cmd(
                 f"### User\n{_executive_framing_prompt(engagement_dict, decision_model_dict, profiles_context)}"
             )
             result = _orig_frame_exec(engagement_dict, decision_model_dict, profiles_context)
-            if not _has_anthropic_client:
+            if "executive_framing" not in _raw_captures:
                 _raw_captures["executive_framing"] = (
                     result.model_dump() if hasattr(result, "model_dump") else dict(result)
                 )
+                if _has_anthropic_client:
+                    _cache_hits.append("executive_framing")
             return result
 
         client.frame_executive_decision = _wrapped_frame_exec  # type: ignore[method-assign]
@@ -1606,7 +1613,7 @@ def debug_problem_framing_cmd(
     ]
     _trace = {
         "model": getattr(client, "model", "mock"),
-        "temperature": None,
+        "temperature": 0.0 if _has_anthropic_client else None,
         "max_tokens": getattr(client, "max_tokens", None),
         "timestamp": timestamp,
         "elapsed_s": round(elapsed_s, 3),
@@ -1614,6 +1621,7 @@ def debug_problem_framing_cmd(
         "profiles": profile_names,
         "engagement_file": str(engagement),
         "llm_calls": _trace_calls,
+        "planning_cache_hits": _cache_hits,
         "decision_model_fingerprint": _fingerprint,
     }
     (out / "trace.json").write_text(
