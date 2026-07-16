@@ -2170,5 +2170,198 @@ def debug_research_strategy_cmd(
     typer.echo(f"  trace.json")
 
 
+@debug_app.command("research-gap")
+def debug_research_gap_cmd(
+    planner: Annotated[
+        Path,
+        typer.Option(
+            "--planner",
+            help="Path to a frozen planner.json produced by 'debug planner'.",
+        ),
+    ],
+    out: Annotated[
+        Path,
+        typer.Option("--out", "-o", help="Output directory for debug artifacts."),
+    ] = Path("outputs/research_gap"),
+    log_level: Annotated[
+        str | None,
+        typer.Option("--log-level", help="Logging level."),
+    ] = None,
+) -> None:
+    """Run ONLY ResearchGapAgent against a frozen planner.json and write debug artifacts.
+
+    Writes planner_input.json, prompt.txt, raw_response.json, research_gap.json,
+    and trace.json to the output directory.  No downstream agents execute.
+
+    ResearchGapAgent is a pure heuristic agent with no LLM calls.  Determinism
+    is intrinsic — no PlanningCache is required.  Synthetic evidence coverage is
+    derived deterministically from the planner artifact (all subquestions NONE,
+    all investigation areas missing) to produce a reproducible gap analysis.
+
+    Example:
+        python3 -m functional_agents.cli debug research-gap \\
+            --planner outputs/planner_run1/planner.json \\
+            --out outputs/research_gap/
+    """
+    import hashlib
+    import time
+    from datetime import datetime, timezone
+
+    _configure_logging(verbose=False, log_level=log_level or "PROGRESS")
+
+    # ---- Load frozen Planner output -----------------------------------------
+    if not planner.exists():
+        typer.echo(f"Error: planner file not found: {planner}", err=True)
+        raise typer.Exit(code=1)
+    try:
+        planner_input = json.loads(planner.read_text(encoding="utf-8"))
+    except Exception as exc:
+        typer.echo(f"Error: could not parse planner.json: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+
+    subquestions: list = planner_input.get("subquestions", [])
+    investigation_areas: list = planner_input.get("investigation_areas", [])
+
+    if not subquestions or not investigation_areas:
+        typer.echo(
+            "Error: planner.json must contain 'subquestions' and 'investigation_areas'.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    # ---- Build synthetic evidence_notes from planner (deterministic) ---------
+    # ResearchGapAgent skips when evidence_notes is empty.  We construct a
+    # minimal synthetic note with NONE coverage for every subquestion and no
+    # evidence for every investigation area.  This is fully determined by the
+    # planner artifact — identical inputs always produce identical coverage.
+    _synthetic_coverage: dict = {
+        sq: {"coverage": "NONE", "evidence_count": 0}
+        for sq in subquestions
+    }
+    _synthetic_by_area: dict = {area: [] for area in investigation_areas}
+    _synthetic_evidence_notes = [
+        {
+            "coverage_by_subquestion": _synthetic_coverage,
+            "evidence_by_area": _synthetic_by_area,
+            "evidence_items": [],
+        }
+    ]
+
+    # ---- Build AgentContext -------------------------------------------------
+    from .context import AgentContext
+
+    ctx = AgentContext(
+        question=planner_input.get("question", ""),
+        goal="",
+        profiles=[],
+        execution_profile="",
+        research_object={},
+        run_id="debug-rg",
+        plan=planner_input,
+        evidence_notes=_synthetic_evidence_notes,
+        hypotheses=[],
+        validated_contradictions=[],
+    )
+
+    # ---- Run ONLY ResearchGapAgent ------------------------------------------
+    from .research_gap_agent import ResearchGapAgent
+
+    agent = ResearchGapAgent()
+    _t0 = time.monotonic()
+    timestamp = datetime.now(timezone.utc).isoformat()
+    try:
+        result = agent.run(ctx)
+        ctx = result.context
+    except Exception as exc:
+        typer.echo(f"Error: ResearchGapAgent failed: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    elapsed_s = time.monotonic() - _t0
+
+    # ---- Compute Research Gap fingerprint (SHA-256 over canonical JSON) ------
+    analysis = ctx.research_gap_analysis or {}
+    _fingerprint_data = {
+        "overall_research_health":     analysis.get("overall_research_health", ""),
+        "weak_questions":              analysis.get("weak_questions", []),
+        "missing_investigation_areas": analysis.get("missing_investigation_areas", []),
+        "decision_support_gaps":       analysis.get("decision_support_gaps", []),
+        "recommended_followups":       analysis.get("recommended_followups", []),
+        "assumption_heavy_topics":     analysis.get("assumption_heavy_topics", []),
+    }
+    _canonical = json.dumps(_fingerprint_data, sort_keys=True, ensure_ascii=False)
+    _fingerprint = hashlib.sha256(_canonical.encode("utf-8")).hexdigest()
+
+    # ---- Write output artifacts ---------------------------------------------
+    out.mkdir(parents=True, exist_ok=True)
+
+    # planner_input.json — the frozen planner artifact used for execution
+    (out / "planner_input.json").write_text(
+        json.dumps(planner_input, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    # prompt.txt — ResearchGapAgent has no LLM call; record the input context
+    # (the synthetic evidence coverage derived from the planner) as the "prompt"
+    _prompt_content = (
+        "## ResearchGapAgent — no LLM call\n\n"
+        "ResearchGapAgent uses pure heuristic computation. No prompt is sent to an LLM.\n"
+        "The input context below is what the agent computed over.\n\n"
+        "### Planner Input\n\n"
+        f"{json.dumps(planner_input, indent=2, ensure_ascii=False)}\n\n"
+        "### Synthetic Evidence Coverage (derived from planner)\n\n"
+        "coverage_by_subquestion:\n"
+        + "\n".join(
+            f"  {sq[:80]}: NONE (0 items)"
+            for sq in subquestions
+        )
+        + "\n\nmissing_investigation_areas:\n"
+        + "\n".join(f"  {area}" for area in investigation_areas)
+    )
+    (out / "prompt.txt").write_text(_prompt_content, encoding="utf-8")
+
+    # raw_response.json — no LLM call; empty by design
+    (out / "raw_response.json").write_text(
+        json.dumps({}, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    # research_gap.json — normalized gap analysis as consumed by downstream agents
+    (out / "research_gap.json").write_text(
+        json.dumps(analysis, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    # trace.json — run metadata + fingerprint
+    _trace = {
+        "model": "none",
+        "cache_mode": "none",
+        "timestamp": timestamp,
+        "elapsed_s": round(elapsed_s, 6),
+        "mock": False,
+        "llm_calls": [],
+        "planning_cache_hits": [],
+        "planning_cache_written": [],
+        "planner_input": str(planner),
+        "subquestions": len(subquestions),
+        "investigation_areas": len(investigation_areas),
+        "research_gap_fingerprint": _fingerprint,
+    }
+    (out / "trace.json").write_text(
+        json.dumps(_trace, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    typer.echo(f"ResearchGapAgent debug run complete ({elapsed_s * 1000:.1f}ms)")
+    typer.echo(f"  overall_health      : {analysis.get('overall_research_health', '')}")
+    typer.echo(f"  confidence          : {analysis.get('confidence', 0.0):.3f}")
+    typer.echo(f"  weak_questions      : {len(analysis.get('weak_questions', []))}")
+    typer.echo(f"  missing_areas       : {len(analysis.get('missing_investigation_areas', []))}")
+    typer.echo(f"  decision_support_gaps: {len(analysis.get('decision_support_gaps', []))}")
+    typer.echo(f"  followups           : {len(analysis.get('recommended_followups', []))}")
+    typer.echo(f"  fingerprint         : {_fingerprint[:16]}…")
+    typer.echo(f"")
+    typer.echo(f"Artifacts written to  : {out}/")
+    typer.echo(f"  planner_input.json")
+    typer.echo(f"  prompt.txt")
+    typer.echo(f"  raw_response.json")
+    typer.echo(f"  research_gap.json")
+    typer.echo(f"  trace.json")
+
+
 if __name__ == "__main__":
     app()
