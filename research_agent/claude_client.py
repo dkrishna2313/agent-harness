@@ -2079,7 +2079,16 @@ class ClaudeClient:
         The functional Planner normalizes + validates this via planner_boundary,
         so business logic never consumes unvalidated model output.
         """
-        return self._call_json(
+        _cache_inputs = {
+            "question": question,
+            "profiles_context": profiles_context,
+            "decision_model": decision_model or {},
+            "research_strategy": research_strategy or {},
+        }
+        cached = self._planning_cache.get("planner", _cache_inputs)
+        if cached is not None:
+            return cached
+        payload = self._call_json(
             operation="plan_research_question",
             schema_name="research_planning",
             prompt=_planning_prompt(
@@ -2088,7 +2097,10 @@ class ClaudeClient:
                 research_strategy=research_strategy,
             ),
             max_tokens=2000,
+            temperature=0.0,
         )
+        self._planning_cache.put("planner", _cache_inputs, payload)
+        return payload
 
     def plan_research_question(
         self,

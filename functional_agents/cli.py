@@ -1669,6 +1669,263 @@ def debug_problem_framing_cmd(
     typer.echo(f"  trace.json")
 
 
+@debug_app.command("planner")
+def debug_planner_cmd(
+    research_strategy: Annotated[
+        Path,
+        typer.Option(
+            "--research-strategy",
+            help="Path to a frozen research_strategy.json produced by 'debug research-strategy'.",
+        ),
+    ],
+    out: Annotated[
+        Path,
+        typer.Option("--out", "-o", help="Output directory for debug artifacts."),
+    ] = Path("outputs/planner"),
+    question: Annotated[
+        str | None,
+        typer.Option("--question", "-q", help="Research question. Derived from research_strategy if omitted."),
+    ] = None,
+    profiles: Annotated[
+        str,
+        typer.Option("--profiles", help="Comma-separated profile names."),
+    ] = "ai_data_centers",
+    model: Annotated[
+        str | None,
+        typer.Option("--model", help="Anthropic model name."),
+    ] = None,
+    mock: Annotated[
+        bool,
+        typer.Option("--mock", help="Use deterministic mock client instead of Claude."),
+    ] = False,
+    cache: Annotated[
+        str,
+        typer.Option("--cache", help="Cache execution policy: normal | refresh | transient. Default: normal."),
+    ] = "normal",
+    log_level: Annotated[
+        str | None,
+        typer.Option("--log-level", help="Logging level."),
+    ] = None,
+) -> None:
+    """Run ONLY PlannerAgent against a frozen research_strategy.json and write debug artifacts.
+
+    Writes research_strategy_input.json, prompt.txt, raw_response.json,
+    planner.json, and trace.json to the output directory.
+    No downstream agents execute.
+
+    Cache modes: normal (default) reads cache and writes on miss; refresh always
+    regenerates and updates the cache; transient always regenerates without writing.
+
+    Example:
+        python3 -m functional_agents.cli debug planner \\
+            --research-strategy outputs/research_strategy_run1/research_strategy.json \\
+            --out outputs/planner/
+    """
+    import hashlib
+    import time
+    from datetime import datetime, timezone
+
+    _configure_logging(verbose=False, log_level=log_level or "PROGRESS")
+
+    _VALID_CACHE_MODES = ("normal", "refresh", "transient")
+    if cache not in _VALID_CACHE_MODES:
+        typer.echo(f"Error: --cache must be one of: {', '.join(_VALID_CACHE_MODES)}", err=True)
+        raise typer.Exit(code=1)
+
+    # ---- Load frozen Research Strategy --------------------------------------
+    if not research_strategy.exists():
+        typer.echo(f"Error: research strategy file not found: {research_strategy}", err=True)
+        raise typer.Exit(code=1)
+    try:
+        rs_input = json.loads(research_strategy.read_text(encoding="utf-8"))
+    except Exception as exc:
+        typer.echo(f"Error: could not parse research_strategy.json: {exc}", err=True)
+        raise typer.Exit(code=1)
+
+    # ---- Derive research question if not provided ---------------------------
+    if not question:
+        rq_prios = sorted(
+            rs_input.get("research_question_priorities", []),
+            key=lambda x: x.get("priority", 99),
+        )
+        question = rq_prios[0].get("question", "") if rq_prios else ""
+    if not question:
+        typer.echo("Error: could not derive question from research_strategy; supply --question.", err=True)
+        raise typer.Exit(code=1)
+
+    # ---- Build profiles / client --------------------------------------------
+    from research_agent.profile import load_profile
+    profile_names = [p.strip() for p in profiles.split(",") if p.strip()]
+    loaded_profiles = []
+    for name in profile_names:
+        try:
+            loaded_profiles.append(load_profile(name))
+        except Exception as exc:
+            typer.echo(f"Warning: could not load profile '{name}': {exc}", err=True)
+
+    client = _build_client(mock=mock, model=model)
+
+    # Apply cache execution policy.
+    if hasattr(client, "_planning_cache"):
+        from research_agent.planning_cache import CachePolicy as _CachePolicy
+        client._planning_cache.policy = _CachePolicy(cache)
+
+    # ---- Artifact capture state ---------------------------------------------
+    _raw_captures: dict[str, object] = {}
+    _prompt_captures: dict[str, str] = {}
+    _cache_hits: list[str] = []
+    _cache_written: list[str] = []
+
+    # Wrap real client to capture raw Anthropic API responses (pre-validation).
+    _has_anthropic_client = hasattr(client, "_client") and hasattr(
+        getattr(client, "_client", None), "messages"
+    )
+    if _has_anthropic_client:
+        _orig_messages = client._client.messages
+
+        class _ResponseCaptor:
+            def create(self, **kwargs):
+                response = _orig_messages.create(**kwargs)
+                tools = kwargs.get("tools") or []
+                if tools:
+                    op = tools[0].get("name", "unknown") if isinstance(tools[0], dict) else "unknown"
+                    for block in getattr(response, "content", []):
+                        if getattr(block, "type", None) == "tool_use":
+                            _raw_captures[op] = block.input
+                            break
+                return response
+
+        client._client.messages = _ResponseCaptor()
+
+    # Wrap plan_research_question_raw to capture the prompt and handle cache/LLM.
+    _orig_plan_raw = getattr(client, "plan_research_question_raw", None)
+    if _orig_plan_raw is not None:
+        def _wrapped_plan_raw(q: str, profiles_ctx: list, decision_model=None, research_strategy=None) -> object:
+            from research_agent.claude_client import _planning_prompt, SYSTEM_PROMPT
+            _prompt_captures["plan_research_question"] = (
+                f"### System\n{SYSTEM_PROMPT}\n\n### User\n"
+                f"{_planning_prompt(q, profiles_ctx, decision_model=decision_model, research_strategy=research_strategy)}"
+            )
+            result = _orig_plan_raw(q, profiles_ctx, decision_model=decision_model, research_strategy=research_strategy)
+            if "plan_research_question" not in _raw_captures:
+                _raw_captures["plan_research_question"] = result if isinstance(result, dict) else dict(result)
+                if _has_anthropic_client:
+                    _cache_hits.append("plan_research_question")
+            else:
+                if _has_anthropic_client and cache != "transient":
+                    _cache_written.append("plan_research_question")
+            return result
+
+        client.plan_research_question_raw = _wrapped_plan_raw  # type: ignore[method-assign]
+
+    # ---- Build AgentContext with frozen Research Strategy -------------------
+    from .context import AgentContext
+
+    ctx = AgentContext(
+        question=question,
+        goal="",
+        profiles=profile_names,
+        execution_profile=profile_names[0] if profile_names else "",
+        research_object={},
+        run_id="debug-planner",
+        research_strategy=rs_input,
+    )
+
+    # ---- Run ONLY PlannerAgent ----------------------------------------------
+    from .planner_agent import PlannerAgent
+
+    agent = PlannerAgent(client=client, domain_profiles=loaded_profiles)
+    _t0 = time.monotonic()
+    timestamp = datetime.now(timezone.utc).isoformat()
+    try:
+        result = agent.run(ctx)
+        ctx = result.context
+    except Exception as exc:
+        typer.echo(f"Error: PlannerAgent failed: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    elapsed_s = time.monotonic() - _t0
+
+    # ---- Compute Planner fingerprint (SHA-256 over canonical JSON) ----------
+    plan = ctx.plan or {}
+    _fingerprint_data = {
+        "research_type":       plan.get("research_type", ""),
+        "subquestions":        plan.get("subquestions", []),
+        "investigation_areas": plan.get("investigation_areas", []),
+        "profiles_used":       plan.get("profiles_used", []),
+        "reasoning":           plan.get("reasoning", ""),
+    }
+    _canonical = json.dumps(_fingerprint_data, sort_keys=True, ensure_ascii=False)
+    _fingerprint = hashlib.sha256(_canonical.encode("utf-8")).hexdigest()
+
+    # ---- Write output artifacts ---------------------------------------------
+    out.mkdir(parents=True, exist_ok=True)
+
+    # research_strategy_input.json — the frozen input as supplied
+    (out / "research_strategy_input.json").write_text(
+        json.dumps(rs_input, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    # prompt.txt — rendered prompts
+    _prompt_sections = []
+    for op, text in _prompt_captures.items():
+        _prompt_sections.append(f"## Operation: {op}\n\n{text}")
+    (out / "prompt.txt").write_text(
+        "\n\n---\n\n".join(_prompt_sections) or "(no prompts captured)",
+        encoding="utf-8",
+    )
+
+    # raw_response.json — raw payload before normalization/boundary
+    (out / "raw_response.json").write_text(
+        json.dumps(_raw_captures, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    # planner.json — normalized plan as consumed by downstream agents
+    (out / "planner.json").write_text(
+        json.dumps(plan, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    # trace.json — run metadata + fingerprint
+    _call_traces = getattr(client, "call_traces", [])
+    _trace_calls = [
+        {"operation": t.operation, "model": t.model_name, "success": t.success,
+         "duration_ms": t.duration_ms, "timestamp": t.request_timestamp}
+        for t in _call_traces
+    ]
+    _trace = {
+        "model": getattr(client, "model", "mock"),
+        "temperature": 0.0 if _has_anthropic_client else None,
+        "max_tokens": 2000 if not mock else None,
+        "timestamp": timestamp,
+        "elapsed_s": round(elapsed_s, 3),
+        "mock": mock or not _has_anthropic_client,
+        "profiles": profile_names,
+        "research_strategy_input": str(research_strategy),
+        "question": question,
+        "llm_calls": _trace_calls,
+        "cache_mode": cache,
+        "planning_cache_hits": _cache_hits,
+        "planning_cache_written": _cache_written,
+        "planner_fingerprint": _fingerprint,
+    }
+    (out / "trace.json").write_text(
+        json.dumps(_trace, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    typer.echo(f"PlannerAgent debug run complete ({elapsed_s:.1f}s)")
+    typer.echo(f"  research_type       : {plan.get('research_type', '')}")
+    typer.echo(f"  subquestions        : {len(plan.get('subquestions', []))}")
+    typer.echo(f"  investigation_areas : {len(plan.get('investigation_areas', []))}")
+    typer.echo(f"  question            : {question[:70]}{'…' if len(question) > 70 else ''}")
+    typer.echo(f"  fingerprint         : {_fingerprint[:16]}…")
+    typer.echo(f"")
+    typer.echo(f"Artifacts written to  : {out}/")
+    typer.echo(f"  research_strategy_input.json")
+    typer.echo(f"  prompt.txt")
+    typer.echo(f"  raw_response.json")
+    typer.echo(f"  planner.json")
+    typer.echo(f"  trace.json")
+
+
 @debug_app.command("research-strategy")
 def debug_research_strategy_cmd(
     decision_model: Annotated[
