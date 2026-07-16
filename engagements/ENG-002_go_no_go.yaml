@@ -1,0 +1,58 @@
+engagement:
+  title: Small Modular Reactor Technology Go / No-Go Assessment
+  client: Infrastructure Investment Group
+  industry: Nuclear Energy / Power Generation
+
+  current_situation: >
+    The client is evaluating whether to commit capital to a portfolio of Small
+    Modular Reactor (SMR) development projects in the United Kingdom. The
+    decision window is 18 months and requires a clear go / no-go recommendation
+    before the regulatory licensing round closes. Three technology vendors are
+    under consideration. Significant uncertainty remains around regulatory
+    timelines, construction cost maturity, and grid connection feasibility.
+
+  objectives:
+    - Determine whether SMR technology is sufficiently mature for a capital commitment
+    - Assess the regulatory pathway and timeline risk for UK deployment
+    - Compare the three candidate technology vendors on readiness, cost, and risk
+    - Identify the conditions under which a go decision is defensible
+
+  constraints:
+    - Capital commitment must be made within 18 months
+    - Minimum viable fleet size is two units per site for economics
+    - Regulatory approval must reach a defined milestone before funds are released
+    - Vendor selection is constrained to the three currently in active dialogue
+
+  stakeholders:
+    - Investment Committee
+    - Technical Due Diligence Team
+    - Regulatory Affairs
+    - Grid Connection Office
+    - Legal and Compliance
+
+  assumptions:
+    - SMR construction costs will converge toward announced estimates by first-of-a-kind builds
+    - UK regulatory framework for SMRs will remain on the current published schedule
+    - Grid connection agreements are achievable within the investment horizon
+
+  success_criteria:
+    - A defensible go / no-go recommendation supported by evidence
+    - Identification of the conditions that would flip the recommendation
+    - A risk-ranked comparison of the three vendor candidates
+
+  decision_horizon: 18 months (commitment); 10 years (deployment and operation)
+
+  priorities:
+    - Regulatory certainty
+    - Construction cost confidence
+    - Technology readiness level
+
+  risks:
+    - Regulatory timeline slippage beyond the commitment window
+    - Cost overruns on first-of-a-kind construction
+    - Grid connection delays invalidating site economics
+
+  known_unknowns:
+    - Final construction cost estimates for first-of-a-kind UK builds
+    - Regulatory approval timeline under the Generic Design Assessment
+    - Long-term electricity price assumptions required to underwrite the investment
