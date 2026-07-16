@@ -1789,6 +1789,10 @@ class ClaudeClient:
         profiles_context: list[dict],
     ) -> ResearchStrategyPayload:
         """Transform a Decision Model into an executable research strategy (J6.2)."""
+        _cache_inputs = {"decision_model": decision_model, "profiles_context": profiles_context}
+        cached = self._planning_cache.get("research_strategy", _cache_inputs)
+        if cached is not None:
+            return ResearchStrategyPayload.model_validate(cached)
         # J9.1b — 2000 is ample for the bounded strategy object (~600-800 tokens
         # incl. tool-call JSON). The prompt and ResearchStrategyPayload schema now
         # cap counts and forbid restating the brief, so this is not raised; the
@@ -1798,7 +1802,9 @@ class ClaudeClient:
             schema_name="research_strategy",
             prompt=_strategy_prompt(decision_model, profiles_context),
             max_tokens=2000,
+            temperature=0.0,
         )
+        self._planning_cache.put("research_strategy", _cache_inputs, payload)
         return ResearchStrategyPayload.model_validate(payload)
 
     def generate_hypotheses_raw(

@@ -1642,5 +1642,225 @@ def debug_problem_framing_cmd(
     typer.echo(f"  trace.json")
 
 
+@debug_app.command("research-strategy")
+def debug_research_strategy_cmd(
+    decision_model: Annotated[
+        Path,
+        typer.Option(
+            "--decision-model",
+            help="Path to a frozen decision_model.json produced by 'debug problem-framing'.",
+        ),
+    ],
+    out: Annotated[
+        Path,
+        typer.Option("--out", "-o", help="Output directory for debug artifacts."),
+    ] = Path("outputs/research_strategy"),
+    profiles: Annotated[
+        str,
+        typer.Option("--profiles", help="Comma-separated profile names."),
+    ] = "ai_data_centers",
+    model: Annotated[
+        str | None,
+        typer.Option("--model", help="Anthropic model name."),
+    ] = None,
+    mock: Annotated[
+        bool,
+        typer.Option("--mock", help="Use deterministic mock client instead of Claude."),
+    ] = False,
+    log_level: Annotated[
+        str | None,
+        typer.Option("--log-level", help="Logging level."),
+    ] = None,
+) -> None:
+    """Run ONLY ResearchStrategyAgent against a frozen decision_model.json and write debug artifacts.
+
+    Writes decision_model_input.json, prompt.txt, raw_response.json,
+    research_strategy.json, and trace.json to the output directory.
+    No downstream agents execute.
+
+    Example:
+        python3 -m functional_agents.cli debug research-strategy \\
+            --decision-model outputs/ENG-001_run1/decision_model.json \\
+            --out outputs/research_strategy/
+    """
+    import hashlib
+    import time
+    from datetime import datetime, timezone
+
+    _configure_logging(verbose=False, log_level=log_level or "PROGRESS")
+
+    # ---- Load frozen Decision Model -----------------------------------------
+    if not decision_model.exists():
+        typer.echo(f"Error: decision model file not found: {decision_model}", err=True)
+        raise typer.Exit(code=1)
+    try:
+        dm_input = json.loads(decision_model.read_text(encoding="utf-8"))
+    except Exception as exc:
+        typer.echo(f"Error: could not parse decision_model.json: {exc}", err=True)
+        raise typer.Exit(code=1)
+
+    # ---- Build profiles / client --------------------------------------------
+    from research_agent.profile import load_profile
+    profile_names = [p.strip() for p in profiles.split(",") if p.strip()]
+    loaded_profiles = []
+    for name in profile_names:
+        try:
+            loaded_profiles.append(load_profile(name))
+        except Exception as exc:
+            typer.echo(f"Warning: could not load profile '{name}': {exc}", err=True)
+
+    client = _build_client(mock=mock, model=model)
+
+    # ---- Artifact capture state ---------------------------------------------
+    _raw_captures: dict[str, object] = {}
+    _prompt_captures: dict[str, str] = {}
+    _cache_hits: list[str] = []
+
+    # Wrap real client to capture raw Anthropic API responses (pre-validation).
+    _has_anthropic_client = hasattr(client, "_client") and hasattr(
+        getattr(client, "_client", None), "messages"
+    )
+    if _has_anthropic_client:
+        _orig_messages = client._client.messages
+
+        class _ResponseCaptor:
+            def create(self, **kwargs):
+                response = _orig_messages.create(**kwargs)
+                tools = kwargs.get("tools") or []
+                if tools:
+                    op = tools[0].get("name", "unknown") if isinstance(tools[0], dict) else "unknown"
+                    for block in getattr(response, "content", []):
+                        if getattr(block, "type", None) == "tool_use":
+                            _raw_captures[op] = block.input
+                            break
+                return response
+
+        client._client.messages = _ResponseCaptor()
+
+    # Wrap generate_research_strategy to capture the prompt and handle cache hits.
+    _orig_generate = getattr(client, "generate_research_strategy", None)
+    if _orig_generate is not None:
+        def _wrapped_generate(dm: dict, profiles_ctx: list) -> object:
+            from research_agent.claude_client import _strategy_prompt, SYSTEM_PROMPT
+            _prompt_captures["generate_research_strategy"] = (
+                f"### System\n{SYSTEM_PROMPT}\n\n### User\n{_strategy_prompt(dm, profiles_ctx)}"
+            )
+            result = _orig_generate(dm, profiles_ctx)
+            if "generate_research_strategy" not in _raw_captures:
+                _raw_captures["generate_research_strategy"] = (
+                    result.model_dump() if hasattr(result, "model_dump") else dict(result)
+                )
+                if _has_anthropic_client:
+                    _cache_hits.append("generate_research_strategy")
+            return result
+
+        client.generate_research_strategy = _wrapped_generate  # type: ignore[method-assign]
+
+    # ---- Build AgentContext with frozen Decision Model ----------------------
+    from .context import AgentContext
+
+    ctx = AgentContext(
+        question="",
+        goal="",
+        profiles=profile_names,
+        execution_profile=profile_names[0] if profile_names else "",
+        research_object={},
+        run_id="debug-rs",
+        decision_model=dm_input,
+    )
+
+    # ---- Run ONLY ResearchStrategyAgent -------------------------------------
+    from .research_strategy_agent import ResearchStrategyAgent
+
+    agent = ResearchStrategyAgent(client=client, domain_profiles=loaded_profiles)
+    _t0 = time.monotonic()
+    timestamp = datetime.now(timezone.utc).isoformat()
+    try:
+        result = agent.run(ctx)
+        ctx = result.context
+    except Exception as exc:
+        typer.echo(f"Error: ResearchStrategyAgent failed: {exc}", err=True)
+        raise typer.Exit(code=1) from exc
+    elapsed_s = time.monotonic() - _t0
+
+    # ---- Compute Research Strategy fingerprint (SHA-256 over canonical JSON) -
+    rs = ctx.research_strategy or {}
+    _fingerprint_data = {
+        "profile_priorities":             rs.get("profile_priorities", {}),
+        "research_question_priorities":   rs.get("research_question_priorities", []),
+        "required_evidence":              rs.get("required_evidence", []),
+        "source_priorities":              rs.get("source_priorities", []),
+        "coverage_targets":               rs.get("coverage_targets", {}),
+        "strategy_rationale":             rs.get("strategy_rationale", ""),
+    }
+    _canonical = json.dumps(_fingerprint_data, sort_keys=True, ensure_ascii=False)
+    _fingerprint = hashlib.sha256(_canonical.encode("utf-8")).hexdigest()
+
+    # ---- Write output artifacts ---------------------------------------------
+    out.mkdir(parents=True, exist_ok=True)
+
+    # decision_model_input.json — the frozen input as supplied
+    (out / "decision_model_input.json").write_text(
+        json.dumps(dm_input, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    # prompt.txt — rendered prompts
+    _prompt_sections = []
+    for op, text in _prompt_captures.items():
+        _prompt_sections.append(f"## Operation: {op}\n\n{text}")
+    (out / "prompt.txt").write_text(
+        "\n\n---\n\n".join(_prompt_sections) or "(no prompts captured)",
+        encoding="utf-8",
+    )
+
+    # raw_response.json — raw payloads before normalization
+    (out / "raw_response.json").write_text(
+        json.dumps(_raw_captures, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    # research_strategy.json — normalized strategy as passed to downstream agents
+    (out / "research_strategy.json").write_text(
+        json.dumps(rs, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    # trace.json — run metadata + fingerprint
+    _call_traces = getattr(client, "call_traces", [])
+    _trace_calls = [
+        {"operation": t.operation, "model": t.model_name, "success": t.success,
+         "duration_ms": t.duration_ms, "timestamp": t.request_timestamp}
+        for t in _call_traces
+    ]
+    _trace = {
+        "model": getattr(client, "model", "mock"),
+        "temperature": 0.0 if _has_anthropic_client else None,
+        "max_tokens": 2000 if not mock else None,
+        "timestamp": timestamp,
+        "elapsed_s": round(elapsed_s, 3),
+        "mock": mock or not _has_anthropic_client,
+        "profiles": profile_names,
+        "decision_model_input": str(decision_model),
+        "llm_calls": _trace_calls,
+        "planning_cache_hits": _cache_hits,
+        "research_strategy_fingerprint": _fingerprint,
+    }
+    (out / "trace.json").write_text(
+        json.dumps(_trace, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    typer.echo(f"ResearchStrategyAgent debug run complete ({elapsed_s:.1f}s)")
+    typer.echo(f"  profile_priorities           : {len(rs.get('profile_priorities', {}))}")
+    typer.echo(f"  research_question_priorities : {len(rs.get('research_question_priorities', []))}")
+    typer.echo(f"  required_evidence            : {len(rs.get('required_evidence', []))}")
+    typer.echo(f"  coverage_targets             : {len(rs.get('coverage_targets', {}))}")
+    typer.echo(f"  fingerprint                  : {_fingerprint[:16]}…")
+    typer.echo(f"")
+    typer.echo(f"Artifacts written to  : {out}/")
+    typer.echo(f"  decision_model_input.json")
+    typer.echo(f"  prompt.txt")
+    typer.echo(f"  raw_response.json")
+    typer.echo(f"  research_strategy.json")
+    typer.echo(f"  trace.json")
+
+
 if __name__ == "__main__":
     app()
