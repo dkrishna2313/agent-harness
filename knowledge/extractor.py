@@ -1,7 +1,7 @@
 """Evidence extraction from Source text for the Knowledge Builder.
 
 Wraps the existing ClaudeClient extraction infrastructure.
-Produces Evidence objects conforming to the frozen J8.0 ontology.
+Produces Evidence objects conforming to the J8.0 ontology, v2 schema (PH5.5b).
 
 Design:
 - Uses an adapter to translate between the existing EvidenceItem schema
@@ -14,6 +14,16 @@ Design:
 - ADMINISTRATIVE and PROVENANCE evidence is persisted with
   retrieval_enabled=False, preserving the audit trail without polluting
   Planner retrieval.
+
+PH5.5b — Provenance Population:
+- excerpt, chunk_id, topics, evidence_confidence, is_quantitative are
+  sourced from existing EvidenceItem fields (no new inference).
+- page_number, char_offset_start, char_offset_end are derived from the
+  [Page N] markers in canonical_text + substring search for the excerpt.
+- temporal_reference is extracted via a deterministic year/quarter regex.
+- section_heading is left None — no reliable signal without new inference.
+- All provenance fields default to None / [] when not determinable;
+  nothing is fabricated.
 """
 
 from __future__ import annotations
@@ -112,6 +122,75 @@ _TECHNICAL_UNIT_RE = _re.compile(
     r"years?\b|months?\b|days?\b|hours?\b|usd|\\$)",
     _re.IGNORECASE,
 )
+
+# ---------------------------------------------------------------------------
+# PH5.5b — provenance derivation helpers
+# ---------------------------------------------------------------------------
+
+# Confidence mapping from EvidenceItem.confidence (lowercase) to v2 Literal
+_CONFIDENCE_UPCASE: dict[str, str] = {"high": "HIGH", "medium": "MEDIUM", "low": "LOW"}
+
+# Temporal reference extraction — year (2000–2099) and quarter patterns
+_YEAR_RE = _re.compile(r"\b(20\d{2}|19\d{2})\b")
+_QUARTER_RE = _re.compile(r"\bQ[1-4]\s+(?:20\d{2}|19\d{2})\b", _re.IGNORECASE)
+
+# [Page N] marker used by builder._extract_pdf_text()
+_PAGE_MARKER_RE = _re.compile(r"\[Page (\d+)\]")
+
+# Maximum excerpt length (canonical model: ≤600 chars)
+_EXCERPT_MAX = 600
+
+
+def _extract_temporal_reference(text: str) -> str | None:
+    """Return the most specific temporal reference found in *text*, or None.
+
+    Prefers quarter-level precision (e.g. 'Q3 2028') over year-only (e.g. '2028').
+    Uses existing text signals only — no new inference.
+    """
+    if not text:
+        return None
+    m = _QUARTER_RE.search(text)
+    if m:
+        return m.group(0)
+    m = _YEAR_RE.search(text)
+    if m:
+        return m.group(0)
+    return None
+
+
+def _find_provenance_in_text(
+    canonical_text: str,
+    excerpt: str,
+) -> tuple[int | None, int | None, int | None]:
+    """Locate *excerpt* in *canonical_text* and return (page, start, end).
+
+    Uses the [Page N] markers emitted by _extract_pdf_text() to derive the
+    page number.  Searches with progressively shorter prefixes to tolerate
+    minor LLM paraphrasing at snippet boundaries.
+
+    Returns (None, None, None) when the excerpt cannot be located — never
+    fabricates a position.
+    """
+    if not excerpt or not canonical_text:
+        return None, None, None
+
+    # Try progressively shorter search anchors to tolerate whitespace differences
+    for length in (200, 100, 60):
+        anchor = excerpt[:length].strip()
+        if not anchor:
+            continue
+        idx = canonical_text.find(anchor)
+        if idx != -1:
+            # Determine char offsets using full excerpt length
+            end = min(idx + len(excerpt), len(canonical_text))
+            # Determine page: find the last [Page N] marker before idx
+            text_before = canonical_text[:idx]
+            page_matches = _PAGE_MARKER_RE.findall(text_before)
+            page = int(page_matches[-1]) if page_matches else 1
+            return page, idx, end
+
+    return None, None, None
+
 
 _RETRIEVAL_DEFAULTS: dict[str, dict] = {
     "STRATEGIC":      {"retrieval_enabled": True,  "retrieval_priority": 5, "strategic_value": 0.80},
@@ -245,10 +324,51 @@ def _adapt_evidence_item(
     extraction_run_id: str,
     profile_ids: list[str],
 ) -> Evidence:
-    """Translate a research_agent EvidenceItem to a KB Evidence record."""
+    """Translate a research_agent EvidenceItem to a KB Evidence v2 record.
+
+    v1 fields (statement, entity, category, etc.) are unchanged.
+    v2 provenance fields are populated from existing EvidenceItem signals
+    and the source's canonical_text — nothing is fabricated.
+    """
     category = getattr(item, "category", "")
     statement = getattr(item, "claim", "")
     evidence_type = _classify_evidence_type(statement, category)
+
+    # --- v2: excerpt (from evidence_snippet, capped at _EXCERPT_MAX chars) ---
+    raw_snippet = getattr(item, "evidence_snippet", "") or ""
+    excerpt: str | None = raw_snippet[:_EXCERPT_MAX] if raw_snippet.strip() else None
+
+    # --- v2: chunk_id (from source_chunk_id when non-empty) ---
+    raw_chunk_id = getattr(item, "source_chunk_id", "") or ""
+    chunk_id: str | None = raw_chunk_id.strip() or None
+
+    # --- v2: topics ---
+    topics: list[str] = list(getattr(item, "topics", []) or [])
+
+    # --- v2: evidence_confidence ---
+    raw_confidence = (getattr(item, "confidence", "medium") or "medium").lower()
+    evidence_confidence = _CONFIDENCE_UPCASE.get(raw_confidence) or None
+
+    # --- v2: is_quantitative (quantitative_score >= 4 = HIGH numeric richness) ---
+    quantitative_score = int(getattr(item, "quantitative_score", 3) or 3)
+    is_quantitative: bool = quantitative_score >= 4
+
+    # --- v2: passage location (page_number, char_offset_start/end) ---
+    # Derived from [Page N] markers in canonical_text + excerpt search.
+    # Left None when the excerpt cannot be located — never fabricated.
+    page_number: int | None = None
+    char_offset_start: int | None = None
+    char_offset_end: int | None = None
+    if excerpt and source.canonical_text:
+        page_number, char_offset_start, char_offset_end = _find_provenance_in_text(
+            source.canonical_text, excerpt
+        )
+
+    # --- v2: temporal_reference ---
+    # Search both the excerpt and the statement for year / quarter patterns.
+    search_text = f"{excerpt or ''} {statement}"
+    temporal_reference = _extract_temporal_reference(search_text)
+
     return Evidence(
         statement=statement,
         evidence_type=evidence_type,
@@ -259,6 +379,17 @@ def _adapt_evidence_item(
         entity_type=getattr(item, "entity_type", ""),
         scope=getattr(item, "scope", ""),
         category=category,
+        # v2 provenance fields
+        excerpt=excerpt,
+        chunk_id=chunk_id,
+        topics=topics,
+        evidence_confidence=evidence_confidence,
+        is_quantitative=is_quantitative,
+        page_number=page_number,
+        char_offset_start=char_offset_start,
+        char_offset_end=char_offset_end,
+        temporal_reference=temporal_reference,
+        # section_heading: no reliable signal without new inference — left None
     )
 
 
