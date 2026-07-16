@@ -14,11 +14,25 @@ import hashlib
 import json
 import logging
 import pathlib
+from enum import Enum
 from typing import Any
 
 LOGGER = logging.getLogger(__name__)
 
 _DEFAULT_CACHE_DIR = pathlib.Path(".cache/planning")
+
+
+class CachePolicy(str, Enum):
+    """Execution policy for planning-layer cache operations (PH4.1a).
+
+    normal    — read if present, generate on miss, write on miss (production default)
+    refresh   — skip read, always generate, write result (force regeneration)
+    transient — skip read, always generate, skip write (ephemeral / experimental)
+    """
+
+    NORMAL = "normal"
+    REFRESH = "refresh"
+    TRANSIENT = "transient"
 
 
 class PlanningCache:
@@ -32,10 +46,18 @@ class PlanningCache:
     cache_dir:
         Directory to store cache files. Defaults to ``.cache/planning``
         relative to the current working directory. Created on demand.
+    policy:
+        Execution policy controlling read/write behaviour. Settable at
+        runtime so callers can switch modes without recreating the cache.
     """
 
-    def __init__(self, cache_dir: str | pathlib.Path = _DEFAULT_CACHE_DIR) -> None:
+    def __init__(
+        self,
+        cache_dir: str | pathlib.Path = _DEFAULT_CACHE_DIR,
+        policy: CachePolicy | str = CachePolicy.NORMAL,
+    ) -> None:
         self._dir = pathlib.Path(cache_dir)
+        self.policy = CachePolicy(policy)
 
     def _cache_key(self, operation: str, inputs: dict[str, Any]) -> str:
         raw = operation + "|" + json.dumps(inputs, sort_keys=True, ensure_ascii=False)
@@ -48,7 +70,10 @@ class PlanningCache:
         self._dir.mkdir(parents=True, exist_ok=True)
 
     def get(self, operation: str, inputs: dict[str, Any]) -> dict[str, Any] | None:
-        """Return the cached payload dict, or ``None`` on a miss."""
+        """Return the cached payload dict, or ``None`` on a miss or when policy skips reads."""
+        if self.policy in (CachePolicy.REFRESH, CachePolicy.TRANSIENT):
+            LOGGER.debug("planning_cache: skip read  op=%s  policy=%s", operation, self.policy)
+            return None
         key = self._cache_key(operation, inputs)
         path = self._path_for(key)
         if not path.exists():
@@ -62,7 +87,10 @@ class PlanningCache:
             return None
 
     def put(self, operation: str, inputs: dict[str, Any], payload: dict[str, Any]) -> None:
-        """Persist *payload* for the given operation + inputs. Silently ignores write errors."""
+        """Persist *payload* for the given operation + inputs. No-op when policy skips writes."""
+        if self.policy == CachePolicy.TRANSIENT:
+            LOGGER.debug("planning_cache: skip write  op=%s  policy=%s", operation, self.policy)
+            return
         key = self._cache_key(operation, inputs)
         try:
             self._ensure_dir()

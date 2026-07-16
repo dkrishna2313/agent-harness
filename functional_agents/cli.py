@@ -1421,6 +1421,10 @@ def debug_problem_framing_cmd(
         bool,
         typer.Option("--mock", help="Use deterministic mock client instead of Claude."),
     ] = False,
+    cache: Annotated[
+        str,
+        typer.Option("--cache", help="Cache execution policy: normal | refresh | transient. Default: normal."),
+    ] = "normal",
     log_level: Annotated[
         str | None,
         typer.Option("--log-level", help="Logging level."),
@@ -1431,9 +1435,13 @@ def debug_problem_framing_cmd(
     Writes engagement.json, prompt.txt, raw_response.json, decision_model.json,
     and trace.json to the output directory.  No downstream agents execute.
 
+    Cache modes: normal (default) reads cache and writes on miss; refresh always
+    regenerates and updates the cache; transient always regenerates without writing.
+
     Example:
         python3 -m functional_agents.cli debug problem-framing \\
             --engagement engagements/my_engagement.yaml \\
+            --cache refresh \\
             --out outputs/problem_framing/
     """
     import hashlib
@@ -1442,6 +1450,11 @@ def debug_problem_framing_cmd(
     from datetime import datetime, timezone
 
     _configure_logging(verbose=False, log_level=log_level or "PROGRESS")
+
+    _VALID_CACHE_MODES = ("normal", "refresh", "transient")
+    if cache not in _VALID_CACHE_MODES:
+        typer.echo(f"Error: --cache must be one of: {', '.join(_VALID_CACHE_MODES)}", err=True)
+        raise typer.Exit(code=1)
 
     # ---- Load engagement spec -----------------------------------------------
     from .engagement_spec import load_engagement_spec, EngagementError
@@ -1463,10 +1476,16 @@ def debug_problem_framing_cmd(
 
     client = _build_client(mock=mock, model=model)
 
+    # Apply cache execution policy.
+    if hasattr(client, "_planning_cache"):
+        from research_agent.planning_cache import CachePolicy as _CachePolicy
+        client._planning_cache.policy = _CachePolicy(cache)
+
     # ---- Artifact capture state ---------------------------------------------
     _raw_captures: dict[str, object] = {}
     _prompt_captures: dict[str, str] = {}
-    _cache_hits: list[str] = []  # operations served from PlanningCache (no LLM call)
+    _cache_hits: list[str] = []    # operations served from PlanningCache (no LLM call)
+    _cache_written: list[str] = [] # operations that wrote a new entry to PlanningCache
 
     # Wrap real client to capture raw Anthropic API responses (pre-validation).
     _has_anthropic_client = hasattr(client, "_client") and hasattr(
@@ -1506,6 +1525,9 @@ def debug_problem_framing_cmd(
             )
             if _has_anthropic_client:
                 _cache_hits.append("problem_framing")
+        else:
+            if _has_anthropic_client and cache != "transient":
+                _cache_written.append("problem_framing")
         return result
 
     client.frame_problem = _wrapped_frame_problem  # type: ignore[method-assign]
@@ -1526,6 +1548,9 @@ def debug_problem_framing_cmd(
                 )
                 if _has_anthropic_client:
                     _cache_hits.append("executive_framing")
+            else:
+                if _has_anthropic_client and cache != "transient":
+                    _cache_written.append("executive_framing")
             return result
 
         client.frame_executive_decision = _wrapped_frame_exec  # type: ignore[method-assign]
@@ -1621,7 +1646,9 @@ def debug_problem_framing_cmd(
         "profiles": profile_names,
         "engagement_file": str(engagement),
         "llm_calls": _trace_calls,
+        "cache_mode": cache,
         "planning_cache_hits": _cache_hits,
+        "planning_cache_written": _cache_written,
         "decision_model_fingerprint": _fingerprint,
     }
     (out / "trace.json").write_text(
@@ -1667,6 +1694,10 @@ def debug_research_strategy_cmd(
         bool,
         typer.Option("--mock", help="Use deterministic mock client instead of Claude."),
     ] = False,
+    cache: Annotated[
+        str,
+        typer.Option("--cache", help="Cache execution policy: normal | refresh | transient. Default: normal."),
+    ] = "normal",
     log_level: Annotated[
         str | None,
         typer.Option("--log-level", help="Logging level."),
@@ -1678,9 +1709,13 @@ def debug_research_strategy_cmd(
     research_strategy.json, and trace.json to the output directory.
     No downstream agents execute.
 
+    Cache modes: normal (default) reads cache and writes on miss; refresh always
+    regenerates and updates the cache; transient always regenerates without writing.
+
     Example:
         python3 -m functional_agents.cli debug research-strategy \\
             --decision-model outputs/ENG-001_run1/decision_model.json \\
+            --cache refresh \\
             --out outputs/research_strategy/
     """
     import hashlib
@@ -1688,6 +1723,11 @@ def debug_research_strategy_cmd(
     from datetime import datetime, timezone
 
     _configure_logging(verbose=False, log_level=log_level or "PROGRESS")
+
+    _VALID_CACHE_MODES = ("normal", "refresh", "transient")
+    if cache not in _VALID_CACHE_MODES:
+        typer.echo(f"Error: --cache must be one of: {', '.join(_VALID_CACHE_MODES)}", err=True)
+        raise typer.Exit(code=1)
 
     # ---- Load frozen Decision Model -----------------------------------------
     if not decision_model.exists():
@@ -1711,10 +1751,16 @@ def debug_research_strategy_cmd(
 
     client = _build_client(mock=mock, model=model)
 
+    # Apply cache execution policy.
+    if hasattr(client, "_planning_cache"):
+        from research_agent.planning_cache import CachePolicy as _CachePolicy
+        client._planning_cache.policy = _CachePolicy(cache)
+
     # ---- Artifact capture state ---------------------------------------------
     _raw_captures: dict[str, object] = {}
     _prompt_captures: dict[str, str] = {}
-    _cache_hits: list[str] = []
+    _cache_hits: list[str] = []    # operations served from PlanningCache (no LLM call)
+    _cache_written: list[str] = [] # operations that wrote a new entry to PlanningCache
 
     # Wrap real client to capture raw Anthropic API responses (pre-validation).
     _has_anthropic_client = hasattr(client, "_client") and hasattr(
@@ -1752,6 +1798,9 @@ def debug_research_strategy_cmd(
                 )
                 if _has_anthropic_client:
                     _cache_hits.append("generate_research_strategy")
+            else:
+                if _has_anthropic_client and cache != "transient":
+                    _cache_written.append("generate_research_strategy")
             return result
 
         client.generate_research_strategy = _wrapped_generate  # type: ignore[method-assign]
@@ -1840,7 +1889,9 @@ def debug_research_strategy_cmd(
         "profiles": profile_names,
         "decision_model_input": str(decision_model),
         "llm_calls": _trace_calls,
+        "cache_mode": cache,
         "planning_cache_hits": _cache_hits,
+        "planning_cache_written": _cache_written,
         "research_strategy_fingerprint": _fingerprint,
     }
     (out / "trace.json").write_text(
