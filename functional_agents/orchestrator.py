@@ -989,7 +989,8 @@ class Orchestrator:
         # run itself (this is diagnostic tooling, not pipeline output).
         try:
             from .pipeline_trace import write_canonical_trace
-            trace_path = write_canonical_trace(result_ctx, Path(self._out_path).parent)
+            from .trace_paths import CANONICAL_PIPELINE_TRACE
+            trace_path = write_canonical_trace(result_ctx, CANONICAL_PIPELINE_TRACE.parent)
             print(f"Pipeline trace → {trace_path}")
         except Exception as exc:
             LOGGER.warning("[Orchestrator] canonical pipeline trace write failed: %s", exc)
