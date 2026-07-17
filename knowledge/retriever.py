@@ -22,7 +22,7 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from .models import Evidence, EvidenceType, KnowledgeMetadata, Source
+from .models import Evidence, EvidenceType, KnowledgeMetadata, RetrievalProvenance, Source
 from .store import KnowledgeStore
 
 if TYPE_CHECKING:
@@ -161,6 +161,8 @@ class RetrievedEvidence:
     # J11.4 — track which knowledge-store domain this item came from so
     # profile attribution can use domain-match as the primary signal.
     source_domain: str = field(default="", repr=False)
+    # PH5.5c — metadata quality multiplier used in scoring (stored for provenance tracing)
+    metadata_factor: float | None = field(default=None, repr=False)
 
     def load_source(self, store: KnowledgeStore) -> Source | None:
         """Lazy-load the primary Source for this evidence item."""
@@ -468,6 +470,7 @@ class EvidenceRetriever:
                 lexical_score=round(lex_rel, 4),
                 semantic_score=round(sem, 4),
                 source_domain=domain_map.get(ev.evidence_id, ""),
+                metadata_factor=EvidenceRetriever._metadata_factor(meta),  # PH5.5c
             )
             if load_sources:
                 item.load_source(self.store)
@@ -568,3 +571,70 @@ class EvidenceRetriever:
         if rel == 0.0:
             return 0.0
         return round(rel * EvidenceRetriever._metadata_factor(meta), 4)
+
+
+# ---------------------------------------------------------------------------
+# PH5.5c — Retrieval provenance factory
+# ---------------------------------------------------------------------------
+
+
+def build_retrieval_provenance(
+    candidate: RetrievedEvidence,
+    result: RetrievalResult,
+    *,
+    retrieval_query: str | None = None,
+    reranked: bool = False,
+    rerank_score: float | None = None,
+    rerank_rationale: str | None = None,
+    reranker_type: str = "passthrough",
+    reranker_model: str | None = None,
+    retrieved_candidate_count: int = 0,
+    retrieval_timestamp: str | None = None,
+) -> RetrievalProvenance:
+    """Build a RetrievalProvenance record from retrieval-layer data.
+
+    Parameters
+    ----------
+    candidate:
+        The RetrievedEvidence item to build provenance for.
+    result:
+        The RetrievalResult from the primary retrieval call (provides mode,
+        semantic_model, matched_candidates as defaults).
+    retrieval_query:
+        The query that originally retrieved this candidate. Defaults to
+        result.query when omitted (e.g. for subquestion-expanded items).
+    reranked:
+        True when LLM reranking produced the final ordering for this item.
+    rerank_score:
+        The reranker relevance score for this item (None when not reranked).
+    rerank_rationale:
+        The reranker rationale text (None when not reranked).
+    reranker_type:
+        "passthrough" (no reranker or fallback) or "llm".
+    reranker_model:
+        Parsed model name from RerankResult.reranker (e.g.
+        "claude-haiku-4-5-20251001"). None when passthrough.
+    retrieved_candidate_count:
+        Number of candidates matched in the retrieval pass (defaults to
+        result.matched_candidates).
+    retrieval_timestamp:
+        ISO 8601 timestamp string for when provenance was captured.
+    """
+    return RetrievalProvenance(
+        evidence_id=candidate.evidence.evidence_id,
+        retrieval_query=retrieval_query or result.query,
+        retrieval_mode=result.mode,
+        retrieval_model_version=result.semantic_model,
+        retrieval_rank=candidate.rank,
+        hybrid_score=candidate.score,
+        lexical_score=candidate.lexical_score,
+        semantic_score=candidate.semantic_score,
+        metadata_factor=candidate.metadata_factor,
+        retrieval_timestamp=retrieval_timestamp,
+        retrieved_candidate_count=retrieved_candidate_count or result.matched_candidates,
+        reranked=reranked,
+        reranker=reranker_type,
+        rerank_score=rerank_score,
+        rerank_rationale=rerank_rationale,
+        reranker_model=reranker_model,
+    )

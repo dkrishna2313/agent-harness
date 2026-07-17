@@ -438,11 +438,11 @@ class TestMockPipelineRegression:
             cwd=".",
         )
         assert result.returncode == 0, f"CLI failed: {result.stderr[-500:]}"
-        # Trace should be written to outputs/
-        trace_path = "outputs/pipeline.trace.json"
+        # Trace should be written to the canonical output location.
         import os
-        assert os.path.exists(trace_path)
-        trace = json.load(open(trace_path))
+        from functional_agents.trace_paths import CANONICAL_PIPELINE_TRACE
+        assert os.path.exists(CANONICAL_PIPELINE_TRACE)
+        trace = json.load(open(CANONICAL_PIPELINE_TRACE))
         from functional_agents.pipeline_trace import is_canonical_trace
         assert is_canonical_trace(trace), "Trace is not canonical after PH4.2 changes"
 

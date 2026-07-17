@@ -13,6 +13,7 @@ from typing import Annotated
 import typer
 
 from research_agent.cli import _configure_logging
+from .trace_paths import CANONICAL_PIPELINE_TRACE
 
 app = typer.Typer(add_completion=False, no_args_is_help=True)
 
@@ -111,7 +112,7 @@ def _print_run_summary(
     trace_path = (getattr(ctx, "artifacts", None) or {}).get("trace_path")
     if trace_path:
         typer.echo(f"  [OK] Agent trace        {trace_path}")
-    canonical_trace = out_dir / "pipeline.trace.json"
+    canonical_trace = CANONICAL_PIPELINE_TRACE
     if canonical_trace.exists():
         typer.echo(f"  [OK] Pipeline trace     {canonical_trace}")
     if is_run_dir:

@@ -22,6 +22,11 @@ from pathlib import Path
 # centralizing it here (PH3.4a) is a pure refactor, not a filename change.
 CANONICAL_PIPELINE_TRACE_FILENAME = "pipeline.trace.json"
 
+# The canonical pipeline trace location — single source of truth (HH2).
+# All CLI, pipeline, and test code must reference this constant rather than
+# hard-coding the path string.
+CANONICAL_PIPELINE_TRACE = Path("outputs") / CANONICAL_PIPELINE_TRACE_FILENAME
+
 # Any basename ending in this suffix is also reserved: a run-specific prefix
 # (e.g. "ph34_pipeline.trace.json") still reads as "the pipeline trace for
 # this run" to a human, so it's just as misleading coming out of run_agent.py.

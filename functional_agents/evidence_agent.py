@@ -465,7 +465,11 @@ class EvidenceAgent(FunctionalAgent):
         import time as _time
         import types
         from research_agent.log import PROGRESS
-        from knowledge.retriever import RETRIEVAL_MODE_HYBRID, RETRIEVAL_MODE_LEXICAL
+        from knowledge.retriever import (
+            RETRIEVAL_MODE_HYBRID,
+            RETRIEVAL_MODE_LEXICAL,
+            build_retrieval_provenance,
+        )
 
         _tracker = context.trace.get("_perf_tracker")
 
@@ -493,6 +497,8 @@ class EvidenceAgent(FunctionalAgent):
             top_k=fetch_k,
         )
         candidates = result.items
+        # PH5.5c — track which query originally retrieved each candidate
+        query_map: dict[str, str] = {c.evidence.evidence_id: primary_query for c in candidates}
         _retrieval_ms = (_time.monotonic() - _t_retrieval) * 1000
 
         LOGGER.log(
@@ -526,6 +532,7 @@ class EvidenceAgent(FunctionalAgent):
                     seen_ids.add(eid)
                     candidates.append(item)
                     sq_added += 1
+                    query_map[eid] = sq  # PH5.5c — subquestion query attribution
         _sq_ms = (_time.monotonic() - _t_sq) * 1000
 
         if sq_added:
@@ -546,6 +553,10 @@ class EvidenceAgent(FunctionalAgent):
 
         pre_rerank_count = len(candidates)
 
+        # PH5.5c — provenance capture (populated inside the reranker block when used)
+        _prov_rerank_result: Any = None
+        _prov_reranker_used: bool = False
+
         # Optional LLM reranking
         _rerank_ms = 0.0
         if self._use_reranker and candidates:
@@ -554,6 +565,8 @@ class EvidenceAgent(FunctionalAgent):
             rerank_result = reranker.rerank(primary_query, candidates, top_k=self._top_evidence)
             reranked = [r.candidate for r in rerank_result.items]
             _rerank_ms = rerank_result.latency_ms
+            _prov_rerank_result = rerank_result  # PH5.5c
+            _prov_reranker_used = bool(reranked)  # PH5.5c
             # PH1 — surface LLM-output normalization diagnostics into the trace.
             # PH1a — accumulate as a list so multiple LLM boundaries can report.
             if getattr(rerank_result, "normalization", None):
@@ -588,6 +601,37 @@ class EvidenceAgent(FunctionalAgent):
                 candidates_in=pre_rerank_count,
                 candidates_out=len(candidates),
             )
+
+        # PH5.5c — build retrieval provenance records for the final candidate set.
+        # Purely additive: no retrieval or ranking behavior changes.
+        _prov_ts = _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime())
+        _prov_rerank_map: dict[str, Any] = {}
+        _prov_reranker_type: str = "passthrough"
+        _prov_reranker_model: str | None = None
+        if _prov_rerank_result is not None and _prov_reranker_used:
+            _rr_str: str = _prov_rerank_result.reranker  # "passthrough" | "llm-<model>"
+            if _rr_str.startswith("llm-"):
+                _prov_reranker_type = "llm"
+                _prov_reranker_model = _rr_str[4:]
+            for _ri in _prov_rerank_result.items:
+                _prov_rerank_map[_ri.candidate.evidence.evidence_id] = _ri
+        _provenance_records = []
+        for _c in candidates:
+            _eid = _c.evidence.evidence_id
+            _ri = _prov_rerank_map.get(_eid)
+            _provenance_records.append(build_retrieval_provenance(
+                _c,
+                result,
+                retrieval_query=query_map.get(_eid, primary_query),
+                reranked=_prov_reranker_used,
+                rerank_score=_ri.relevance_score if _ri else None,
+                rerank_rationale=_ri.rationale if _ri else None,
+                reranker_type=_prov_reranker_type,
+                reranker_model=_prov_reranker_model,
+                retrieved_candidate_count=result.matched_candidates,
+                retrieval_timestamp=_prov_ts,
+            ))
+        context.trace["_retrieval_provenance"] = [_rp.model_dump() for _rp in _provenance_records]
 
         LOGGER.log(
             PROGRESS,
@@ -668,6 +712,58 @@ class EvidenceAgent(FunctionalAgent):
                 areas_covered=mapped_areas,
                 areas_total=len(investigation_areas),
             )
+
+        # PH5.5d — assembly completeness assessment
+        # Purely additive: uses existing mapping data, no retrieval or schema changes.
+        from knowledge.assembly import assess_assembly_completeness as _assess_completeness
+        _completeness = _assess_completeness(
+            question=primary_query,
+            subquestions=subquestions,
+            evidence_by_subquestion=evidence_by_subquestion,
+            investigation_areas=investigation_areas,
+            evidence_by_area=evidence_by_area,
+            validated_contradictions=[],  # KB path: contradiction detection is a future phase
+            total_retrieved=len(candidates),
+        )
+        context.trace["_assembly_completeness"] = _completeness.model_dump()
+
+        # PH5.5e — ground evidence items against subquestions, areas, and strength.
+        # Uses existing mapping data and completeness scores — no new retrieval or inference.
+        from knowledge.grounding import ground_evidence as _ground_evidence
+
+        # Inverse index: evidence_id → subquestion texts (skip "_unmapped" bucket)
+        _ev_to_sqs: dict[str, list[str]] = {}
+        for _sq_text, _sq_ids in evidence_by_subquestion.items():
+            if _sq_text == "_unmapped":
+                continue
+            for _sq_eid in _sq_ids:
+                _ev_to_sqs.setdefault(_sq_eid, []).append(_sq_text)
+
+        # Inverse index: evidence_id → investigation area names
+        _ev_to_areas: dict[str, list[str]] = {}
+        for _area_name, _area_ids in (evidence_by_area or {}).items():
+            for _area_eid in _area_ids:
+                _ev_to_areas.setdefault(_area_eid, []).append(_area_name)
+
+        # Subquestion text → evidence count (from completeness assessments)
+        _sq_counts: dict[str, int] = {
+            _sq_a.subquestion_text: _sq_a.evidence_count
+            for _sq_a in _completeness.subquestion_assessments
+        }
+
+        # Build grounded evidence and store serialised copies in the trace.
+        _grounded_evidence: list[dict] = []
+        for _g_cand in candidates:
+            _g_eid = _g_cand.evidence.evidence_id
+            _grounded = _ground_evidence(
+                _g_cand.evidence,
+                hybrid_score=_g_cand.score,
+                subquestion_assignments=_ev_to_sqs.get(_g_eid, []),
+                area_assignments=_ev_to_areas.get(_g_eid, []),
+                evidence_counts=_sq_counts,
+            )
+            _grounded_evidence.append(_grounded.model_dump())
+        context.trace["_grounded_evidence"] = _grounded_evidence
 
         # Profile attribution
         _t_assembly = _time.monotonic()

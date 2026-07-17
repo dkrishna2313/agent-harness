@@ -66,8 +66,8 @@ The PH4 fingerprint methodology (SHA-256 over canonical JSON of output fields, v
 | ProblemFramingAgent | Validated (PH4.1) | Fingerprint confirmed across 5 archetypes |
 | ResearchStrategyAgent | Validated (PH4.2) | Fingerprint confirmed for ENG-002 frozen Decision Model |
 | PlannerAgent | Validated (PH4.3) | Fingerprint confirmed for ENG-002 frozen Research Strategy |
-| ResearchGapAgent | **Not yet validated** | No LLM; pure heuristic — fingerprint methodology applies directly |
-| IterationPlanAgent | **Not yet validated** | No LLM; pure heuristic — fingerprint methodology applies directly |
+| ResearchGapAgent | Validated (PH5.1) | Fingerprint 3ccbd120… confirmed across 5 runs for ENG-002 frozen planner |
+| IterationPlanAgent | Validated (PH5.1) | Fingerprint a4e28499… confirmed across 5 runs for ENG-002 frozen context |
 
 ### 2. Which agents require a different validation methodology?
 
@@ -87,11 +87,8 @@ The PH4 fingerprint methodology (SHA-256 over canonical JSON of output fields, v
 
 ### 3. Which agent should be investigated next?
 
-**ResearchGapAgent.**
+**EvidenceAgent (Knowledge Layer).**
 
-Rationale:
-- It is the first unvalidated **YES** agent (no LLM, pure heuristic).
-- It is additive and observational — it does not modify upstream artifacts — so its validation is self-contained.
-- Its fingerprint can be established with the same PH4 methodology (SHA-256 over `research_gap_analysis` canonical JSON) without any PlanningCache dependency.
-- Its position in the pipeline (after HypothesisAgent, before StrategicSynthesisAgent) makes it the natural next boundary after the three planning-layer agents already confirmed.
-- Validating ResearchGapAgent completes the full determinism guarantee for all rule-based agents in the pipeline.
+All YES-deterministic agents are now validated (PH5.1). The next investigation target is the EvidenceAgent, which is the entry point to the Knowledge Layer. Unlike the Planning Layer and the pure heuristic agents, EvidenceAgent interacts with external retrieval systems and requires a different validation methodology: retrieval completeness audit, provenance audit, and ranking stability — as specified in KNOWLEDGE_LAYER_ARCHITECTURAL_CONTRACT.md.
+
+This investigation defines PH5.x (Knowledge Layer validation).

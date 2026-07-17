@@ -1,7 +1,10 @@
-"""Canonical knowledge models — frozen J8.0 ontology.
+"""Canonical knowledge models — J8.0 ontology, v2 schema (PH5.5a).
 
-These models are the stable foundation for all Knowledge Base implementation.
-Do not modify the field set without raising an explicit architecture review.
+Evidence v2 adds passage-level provenance, content signals, grounding, and
+relationship fields to the Evidence record (PH5.5a schema foundation).
+All new fields are optional or defaulted — v1 payloads deserialize unchanged.
+
+RetrievalProvenance is a new first-class type for runtime scoring traceability.
 """
 
 from __future__ import annotations
@@ -45,6 +48,20 @@ EvidenceType = Literal[
     "PROVENANCE",     # Authorship, publication info — stored but excluded from normal retrieval
     "ADMINISTRATIVE", # Document IDs, revisions, trademarks, boilerplate — excluded from retrieval
 ]
+
+# ---------------------------------------------------------------------------
+# v2 Evidence literals (PH5.5a)
+# ---------------------------------------------------------------------------
+
+EvidenceConfidence = Literal["HIGH", "MEDIUM", "LOW"]
+
+GroundingStrength = Literal["STRONG", "MODERATE", "WEAK"]
+
+RetrievalMode = Literal["lexical", "semantic", "hybrid"]
+
+RerankerType = Literal["passthrough", "llm", "none"]
+
+CompletenessStatus = Literal["COMPLETE", "PARTIAL", "INCOMPLETE", "UNKNOWN"]
 
 SourceType = Literal[
     "PDF",
@@ -131,12 +148,50 @@ class Evidence(BaseModel):
     superseded_by: str | None = None
     contradiction_ids: list[str] = Field(default_factory=list)
 
+    # --- v2: Schema identity (PH5.5a) ---
+    schema_version: str = "1.0"
+    corpus_version: str | None = None
+
+    # --- v2: Passage-level provenance (PH5.5a; populated by PH5.5b extraction) ---
+    excerpt: str | None = None
+    page_number: int | None = None
+    section_heading: str | None = None
+    chunk_id: str | None = None
+    char_offset_start: int | None = None
+    char_offset_end: int | None = None
+
+    # --- v2: Content signals (PH5.5a; populated by PH5.5b extraction) ---
+    topics: list[str] = Field(default_factory=list)
+    temporal_reference: str | None = None
+    is_quantitative: bool = False
+
+    # --- v2: Extraction quality (PH5.5a; populated by PH5.5b extraction) ---
+    evidence_confidence: EvidenceConfidence | None = None
+
+    # --- v2: Grounding (PH5.5a; populated by PH5.5e assembly) ---
+    subquestion_assignments: list[str] = Field(default_factory=list)
+    investigation_area_assignments: list[str] = Field(default_factory=list)
+    grounding_strength: GroundingStrength | None = None
+    coverage_contribution: GroundingStrength | None = None
+
+    # --- v2: Relationships (PH5.5a; populated by downstream agents) ---
+    corroborates: list[str] = Field(default_factory=list)
+    informed_hypotheses: list[str] = Field(default_factory=list)
+    informed_recommendations: list[str] = Field(default_factory=list)
+
     @computed_field
     @property
     def statement_fingerprint(self) -> str:
-        """SHA-256 of normalised statement — used for deduplication."""
+        """SHA-256[:16] of normalised statement — short deduplication key (v1 compat)."""
         normalised = " ".join(self.statement.lower().split())
         return hashlib.sha256(normalised.encode("utf-8")).hexdigest()[:16]
+
+    @computed_field
+    @property
+    def content_fingerprint(self) -> str:
+        """Full SHA-256 of normalised statement — canonical v2 content identity."""
+        normalised = " ".join(self.statement.lower().split())
+        return hashlib.sha256(normalised.encode("utf-8")).hexdigest()
 
 
 # ---------------------------------------------------------------------------
@@ -243,6 +298,42 @@ class EvidenceProfile(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# RetrievalProvenance — runtime scoring record (v2, PH5.5a)
+# ---------------------------------------------------------------------------
+
+
+class RetrievalProvenance(BaseModel):
+    """Runtime retrieval provenance for one evidence item returned by a query.
+
+    Not persisted to the Evidence JSONL — stored per query alongside the
+    assembled evidence set. Enables full scoring traceability for grounding
+    and reproducibility auditing without polluting the Evidence corpus with
+    query-specific state.
+
+    PH5.5c adds: retrieval_timestamp, retrieved_candidate_count, reranked,
+    reranker_model — all describing the retrieval process, never influencing it.
+    """
+
+    evidence_id: str
+    retrieval_query: str
+    retrieval_mode: RetrievalMode
+    retrieval_model_version: str | None = None
+    retrieval_rank: int
+    hybrid_score: float
+    lexical_score: float = 0.0
+    semantic_score: float = 0.0
+    metadata_factor: float | None = None
+    reranker: RerankerType = "passthrough"
+    rerank_score: float | None = None
+    rerank_rationale: str | None = None
+    # PH5.5c — process provenance fields
+    retrieval_timestamp: str | None = None          # ISO 8601, when provenance was captured
+    retrieved_candidate_count: int = 0              # matched_candidates from the retrieval pass
+    reranked: bool = False                          # True when LLM reranker produced the final order
+    reranker_model: str | None = None               # e.g. "claude-haiku-4-5-20251001"
+
+
+# ---------------------------------------------------------------------------
 # SourceManifestEntry — tracks what has been indexed per source
 # ---------------------------------------------------------------------------
 
@@ -262,3 +353,60 @@ class SourceManifestEntry(BaseModel):
     metadata_ids: list[str] = Field(default_factory=list)
     last_built: datetime = Field(default_factory=datetime.utcnow)
     extraction_run_id: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Assembly Completeness — per-subquestion and overall assessments (PH5.5d)
+# ---------------------------------------------------------------------------
+
+
+class SubquestionCompleteness(BaseModel):
+    """Deterministic completeness assessment for one subquestion (PH5.5d).
+
+    All fields are derived from existing evidence and mapping data —
+    nothing is inferred or fabricated.  When a value cannot be determined
+    the corresponding field is left at its default (0 / None / []).
+
+    supporting_evidence_count reflects all assigned evidence items until
+    contradiction detection is available (a future phase).
+    contradicting_evidence_count reflects validated contradictions only.
+    missing_area_count is always 0 at the subquestion level; investigation
+    area gaps are reported at AssemblyCompleteness level.
+    """
+
+    research_question_id: str | None = None
+    subquestion_id: str | None = None
+    subquestion_text: str
+    evidence_count: int = 0
+    supporting_evidence_count: int = 0
+    contradicting_evidence_count: int = 0
+    missing_area_count: int = 0
+    coverage_fraction: float = 0.0
+    completeness_score: float = 0.0
+    completeness_status: CompletenessStatus = "UNKNOWN"
+    gap_notes: list[str] = Field(default_factory=list)
+    evidence_ids: list[str] = Field(default_factory=list)
+
+
+class AssemblyCompleteness(BaseModel):
+    """Assembly-level completeness roll-up for one research question (PH5.5d).
+
+    Aggregates SubquestionCompleteness records and surfaces top-level gap
+    information to downstream reasoning agents.
+
+    overall_completeness_status is the weakest status across all subquestions:
+    COMPLETE only if every subquestion is COMPLETE; PARTIAL if any subquestion
+    has any coverage; INCOMPLETE if all subquestions have zero evidence;
+    UNKNOWN if no subquestions were defined.
+    """
+
+    question: str
+    research_question_id: str | None = None
+    total_subquestions: int = 0
+    covered_subquestions: int = 0
+    total_evidence_count: int = 0
+    missing_area_count: int = 0
+    overall_completeness_score: float = 0.0
+    overall_completeness_status: CompletenessStatus = "UNKNOWN"
+    subquestion_assessments: list[SubquestionCompleteness] = Field(default_factory=list)
+    gap_summary: list[str] = Field(default_factory=list)
