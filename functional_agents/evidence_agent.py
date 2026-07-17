@@ -727,6 +727,44 @@ class EvidenceAgent(FunctionalAgent):
         )
         context.trace["_assembly_completeness"] = _completeness.model_dump()
 
+        # PH5.5e — ground evidence items against subquestions, areas, and strength.
+        # Uses existing mapping data and completeness scores — no new retrieval or inference.
+        from knowledge.grounding import ground_evidence as _ground_evidence
+
+        # Inverse index: evidence_id → subquestion texts (skip "_unmapped" bucket)
+        _ev_to_sqs: dict[str, list[str]] = {}
+        for _sq_text, _sq_ids in evidence_by_subquestion.items():
+            if _sq_text == "_unmapped":
+                continue
+            for _sq_eid in _sq_ids:
+                _ev_to_sqs.setdefault(_sq_eid, []).append(_sq_text)
+
+        # Inverse index: evidence_id → investigation area names
+        _ev_to_areas: dict[str, list[str]] = {}
+        for _area_name, _area_ids in (evidence_by_area or {}).items():
+            for _area_eid in _area_ids:
+                _ev_to_areas.setdefault(_area_eid, []).append(_area_name)
+
+        # Subquestion text → evidence count (from completeness assessments)
+        _sq_counts: dict[str, int] = {
+            _sq_a.subquestion_text: _sq_a.evidence_count
+            for _sq_a in _completeness.subquestion_assessments
+        }
+
+        # Build grounded evidence and store serialised copies in the trace.
+        _grounded_evidence: list[dict] = []
+        for _g_cand in candidates:
+            _g_eid = _g_cand.evidence.evidence_id
+            _grounded = _ground_evidence(
+                _g_cand.evidence,
+                hybrid_score=_g_cand.score,
+                subquestion_assignments=_ev_to_sqs.get(_g_eid, []),
+                area_assignments=_ev_to_areas.get(_g_eid, []),
+                evidence_counts=_sq_counts,
+            )
+            _grounded_evidence.append(_grounded.model_dump())
+        context.trace["_grounded_evidence"] = _grounded_evidence
+
         # Profile attribution
         _t_assembly = _time.monotonic()
         profile_coverage_by_profile = _attribute_evidence_profiles(
