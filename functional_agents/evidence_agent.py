@@ -713,6 +713,20 @@ class EvidenceAgent(FunctionalAgent):
                 areas_total=len(investigation_areas),
             )
 
+        # PH5.5d — assembly completeness assessment
+        # Purely additive: uses existing mapping data, no retrieval or schema changes.
+        from knowledge.assembly import assess_assembly_completeness as _assess_completeness
+        _completeness = _assess_completeness(
+            question=primary_query,
+            subquestions=subquestions,
+            evidence_by_subquestion=evidence_by_subquestion,
+            investigation_areas=investigation_areas,
+            evidence_by_area=evidence_by_area,
+            validated_contradictions=[],  # KB path: contradiction detection is a future phase
+            total_retrieved=len(candidates),
+        )
+        context.trace["_assembly_completeness"] = _completeness.model_dump()
+
         # Profile attribution
         _t_assembly = _time.monotonic()
         profile_coverage_by_profile = _attribute_evidence_profiles(

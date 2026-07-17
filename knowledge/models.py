@@ -61,6 +61,8 @@ RetrievalMode = Literal["lexical", "semantic", "hybrid"]
 
 RerankerType = Literal["passthrough", "llm", "none"]
 
+CompletenessStatus = Literal["COMPLETE", "PARTIAL", "INCOMPLETE", "UNKNOWN"]
+
 SourceType = Literal[
     "PDF",
     "HTML",
@@ -351,3 +353,60 @@ class SourceManifestEntry(BaseModel):
     metadata_ids: list[str] = Field(default_factory=list)
     last_built: datetime = Field(default_factory=datetime.utcnow)
     extraction_run_id: str = ""
+
+
+# ---------------------------------------------------------------------------
+# Assembly Completeness — per-subquestion and overall assessments (PH5.5d)
+# ---------------------------------------------------------------------------
+
+
+class SubquestionCompleteness(BaseModel):
+    """Deterministic completeness assessment for one subquestion (PH5.5d).
+
+    All fields are derived from existing evidence and mapping data —
+    nothing is inferred or fabricated.  When a value cannot be determined
+    the corresponding field is left at its default (0 / None / []).
+
+    supporting_evidence_count reflects all assigned evidence items until
+    contradiction detection is available (a future phase).
+    contradicting_evidence_count reflects validated contradictions only.
+    missing_area_count is always 0 at the subquestion level; investigation
+    area gaps are reported at AssemblyCompleteness level.
+    """
+
+    research_question_id: str | None = None
+    subquestion_id: str | None = None
+    subquestion_text: str
+    evidence_count: int = 0
+    supporting_evidence_count: int = 0
+    contradicting_evidence_count: int = 0
+    missing_area_count: int = 0
+    coverage_fraction: float = 0.0
+    completeness_score: float = 0.0
+    completeness_status: CompletenessStatus = "UNKNOWN"
+    gap_notes: list[str] = Field(default_factory=list)
+    evidence_ids: list[str] = Field(default_factory=list)
+
+
+class AssemblyCompleteness(BaseModel):
+    """Assembly-level completeness roll-up for one research question (PH5.5d).
+
+    Aggregates SubquestionCompleteness records and surfaces top-level gap
+    information to downstream reasoning agents.
+
+    overall_completeness_status is the weakest status across all subquestions:
+    COMPLETE only if every subquestion is COMPLETE; PARTIAL if any subquestion
+    has any coverage; INCOMPLETE if all subquestions have zero evidence;
+    UNKNOWN if no subquestions were defined.
+    """
+
+    question: str
+    research_question_id: str | None = None
+    total_subquestions: int = 0
+    covered_subquestions: int = 0
+    total_evidence_count: int = 0
+    missing_area_count: int = 0
+    overall_completeness_score: float = 0.0
+    overall_completeness_status: CompletenessStatus = "UNKNOWN"
+    subquestion_assessments: list[SubquestionCompleteness] = Field(default_factory=list)
+    gap_summary: list[str] = Field(default_factory=list)
