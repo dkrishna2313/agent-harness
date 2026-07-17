@@ -307,6 +307,9 @@ class RetrievalProvenance(BaseModel):
     assembled evidence set. Enables full scoring traceability for grounding
     and reproducibility auditing without polluting the Evidence corpus with
     query-specific state.
+
+    PH5.5c adds: retrieval_timestamp, retrieved_candidate_count, reranked,
+    reranker_model — all describing the retrieval process, never influencing it.
     """
 
     evidence_id: str
@@ -321,6 +324,11 @@ class RetrievalProvenance(BaseModel):
     reranker: RerankerType = "passthrough"
     rerank_score: float | None = None
     rerank_rationale: str | None = None
+    # PH5.5c — process provenance fields
+    retrieval_timestamp: str | None = None          # ISO 8601, when provenance was captured
+    retrieved_candidate_count: int = 0              # matched_candidates from the retrieval pass
+    reranked: bool = False                          # True when LLM reranker produced the final order
+    reranker_model: str | None = None               # e.g. "claude-haiku-4-5-20251001"
 
 
 # ---------------------------------------------------------------------------

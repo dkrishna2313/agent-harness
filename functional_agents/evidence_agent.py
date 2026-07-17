@@ -465,7 +465,11 @@ class EvidenceAgent(FunctionalAgent):
         import time as _time
         import types
         from research_agent.log import PROGRESS
-        from knowledge.retriever import RETRIEVAL_MODE_HYBRID, RETRIEVAL_MODE_LEXICAL
+        from knowledge.retriever import (
+            RETRIEVAL_MODE_HYBRID,
+            RETRIEVAL_MODE_LEXICAL,
+            build_retrieval_provenance,
+        )
 
         _tracker = context.trace.get("_perf_tracker")
 
@@ -493,6 +497,8 @@ class EvidenceAgent(FunctionalAgent):
             top_k=fetch_k,
         )
         candidates = result.items
+        # PH5.5c — track which query originally retrieved each candidate
+        query_map: dict[str, str] = {c.evidence.evidence_id: primary_query for c in candidates}
         _retrieval_ms = (_time.monotonic() - _t_retrieval) * 1000
 
         LOGGER.log(
@@ -526,6 +532,7 @@ class EvidenceAgent(FunctionalAgent):
                     seen_ids.add(eid)
                     candidates.append(item)
                     sq_added += 1
+                    query_map[eid] = sq  # PH5.5c — subquestion query attribution
         _sq_ms = (_time.monotonic() - _t_sq) * 1000
 
         if sq_added:
@@ -546,6 +553,10 @@ class EvidenceAgent(FunctionalAgent):
 
         pre_rerank_count = len(candidates)
 
+        # PH5.5c — provenance capture (populated inside the reranker block when used)
+        _prov_rerank_result: Any = None
+        _prov_reranker_used: bool = False
+
         # Optional LLM reranking
         _rerank_ms = 0.0
         if self._use_reranker and candidates:
@@ -554,6 +565,8 @@ class EvidenceAgent(FunctionalAgent):
             rerank_result = reranker.rerank(primary_query, candidates, top_k=self._top_evidence)
             reranked = [r.candidate for r in rerank_result.items]
             _rerank_ms = rerank_result.latency_ms
+            _prov_rerank_result = rerank_result  # PH5.5c
+            _prov_reranker_used = bool(reranked)  # PH5.5c
             # PH1 — surface LLM-output normalization diagnostics into the trace.
             # PH1a — accumulate as a list so multiple LLM boundaries can report.
             if getattr(rerank_result, "normalization", None):
@@ -588,6 +601,37 @@ class EvidenceAgent(FunctionalAgent):
                 candidates_in=pre_rerank_count,
                 candidates_out=len(candidates),
             )
+
+        # PH5.5c — build retrieval provenance records for the final candidate set.
+        # Purely additive: no retrieval or ranking behavior changes.
+        _prov_ts = _time.strftime("%Y-%m-%dT%H:%M:%SZ", _time.gmtime())
+        _prov_rerank_map: dict[str, Any] = {}
+        _prov_reranker_type: str = "passthrough"
+        _prov_reranker_model: str | None = None
+        if _prov_rerank_result is not None and _prov_reranker_used:
+            _rr_str: str = _prov_rerank_result.reranker  # "passthrough" | "llm-<model>"
+            if _rr_str.startswith("llm-"):
+                _prov_reranker_type = "llm"
+                _prov_reranker_model = _rr_str[4:]
+            for _ri in _prov_rerank_result.items:
+                _prov_rerank_map[_ri.candidate.evidence.evidence_id] = _ri
+        _provenance_records = []
+        for _c in candidates:
+            _eid = _c.evidence.evidence_id
+            _ri = _prov_rerank_map.get(_eid)
+            _provenance_records.append(build_retrieval_provenance(
+                _c,
+                result,
+                retrieval_query=query_map.get(_eid, primary_query),
+                reranked=_prov_reranker_used,
+                rerank_score=_ri.relevance_score if _ri else None,
+                rerank_rationale=_ri.rationale if _ri else None,
+                reranker_type=_prov_reranker_type,
+                reranker_model=_prov_reranker_model,
+                retrieved_candidate_count=result.matched_candidates,
+                retrieval_timestamp=_prov_ts,
+            ))
+        context.trace["_retrieval_provenance"] = [_rp.model_dump() for _rp in _provenance_records]
 
         LOGGER.log(
             PROGRESS,
