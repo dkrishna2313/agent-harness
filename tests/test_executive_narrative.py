@@ -743,10 +743,13 @@ def test_composer_decision_story_traces_executive_summary():
 def test_composer_risk_story_traces_key_risks():
     ctx = _full_ctx()
     narrative = ExecutiveNarrativeBuilder().build(ctx)
-    # All risk_ids in key_risks must appear in risk_story
+    # Risk statements (not IDs) must appear in risk_story — PH5.x: IDs are stripped from prose
     for r in narrative.key_risks:
-        assert r["risk_id"] in narrative.risk_story, \
-            f"{r['risk_id']} not found in risk_story"
+        stmt = r.get("statement", "")
+        assert stmt in narrative.risk_story, \
+            f"statement {stmt!r} not found in risk_story"
+        assert r["risk_id"] not in narrative.risk_story, \
+            f"risk_id {r['risk_id']!r} must not appear in risk_story (PH5.x)"
 
 
 def test_composer_confidence_story_traces_executive_confidence():

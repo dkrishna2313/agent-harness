@@ -227,7 +227,8 @@ def test_section1_contains_executive_summary():
     # Section 1 now leads with the recommendation from narrative
     assert "**Recommendation:** Aggressive Expansion" in section_1
     # Rationale from narrative.why_this_option appears as "Why this option wins"
-    assert "OPT-A wins on strategic fit" in section_1
+    # PH5.x: option_id is stripped; only the reasoning phrase survives
+    assert "wins on strategic fit" in section_1
 
 
 def test_section1_contains_recommended_title():
