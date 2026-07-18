@@ -1598,7 +1598,7 @@ def _build_j7_recommendation_rationale_section(
         _opt_titles = {o.get("option_id", ""): o.get("title", "") for o in options}
         for entry in matrix:
             eid = entry.get("option_id", "")
-            opt_label = f"{eid}: {_opt_titles.get(eid, '')}" if _opt_titles.get(eid) else eid
+            opt_label = _opt_titles.get(eid) or eid
             if eid == recommended_id:
                 opt_label += " ✓"
             scores = " | ".join(entry.get(k, "—") for k, _ in _SCORE_COLS)
@@ -1609,7 +1609,7 @@ def _build_j7_recommendation_rationale_section(
             strengths = entry.get("strengths") or []
             weaknesses = entry.get("weaknesses") or []
             if strengths or weaknesses:
-                lines += [f"**{eid} — Strengths & Weaknesses**", ""]
+                lines += [f"**{_opt_titles.get(eid, eid)} — Strengths & Weaknesses**", ""]
                 if strengths:
                     lines.append("**Strengths:**")
                     lines.extend(f"- {s}" for s in strengths)

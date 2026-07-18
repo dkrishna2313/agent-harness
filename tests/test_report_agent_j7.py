@@ -310,14 +310,16 @@ def test_section9_decision_matrix_column_headers():
 
 
 def test_section4_decision_matrix_rows_per_option():
-    """Decision matrix is now in Section 4 (Recommendation Rationale)."""
+    """Decision matrix rows in §4 use option titles, not raw IDs (PH5.x)."""
     ctx = _make_context()
     report = _build_j7_executive_report(ctx)
     section_4_start = report.index("## 4. Recommendation Rationale")
     section_5_start = report.index("## 5. Decision Readiness")
     rationale_section = report[section_4_start:section_5_start]
-    assert "OPT-A" in rationale_section
-    assert "OPT-B" in rationale_section
+    assert "Aggressive Expansion" in rationale_section
+    assert "Cautious Partnership" in rationale_section
+    assert "OPT-A" not in rationale_section
+    assert "OPT-B" not in rationale_section
 
 
 def test_section10_tradeoffs():
