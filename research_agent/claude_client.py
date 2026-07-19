@@ -1397,9 +1397,9 @@ class MockClaudeClient:
                 confidence="High",
                 recommended=True,
                 rationale=(
-                    "Preferred over OPT-A because it manages the key risks identified while still "
-                    "capturing the primary opportunities. Preferred over OPT-C because it commits "
-                    "meaningfully rather than hedging across all vectors."
+                    "Preferred over the aggressive option because it manages the key risks identified "
+                    "while still capturing the primary opportunities. Preferred over the conservative "
+                    "option because it commits meaningfully rather than hedging across all vectors."
                 ),
             ),
             StrategicOptionItem(
@@ -1482,10 +1482,12 @@ class MockClaudeClient:
         matrix = [_row(o) for o in strategic_options]
         rankings = [rec_id] + [oid for oid in opt_ids if oid != rec_id]
 
-        # Build assumption-sensitivity references
-        a_ids = [a.get("assumption_id", "") for a in assumptions if a.get("assumption_id")]
-        sens_ref = f"If {a_ids[0]} fails" if a_ids else "If the primary assumption fails"
-        sens_ref2 = f"If {a_ids[1]} proves optimistic" if len(a_ids) > 1 else "If market timing shifts"
+        # Build assumption-sensitivity references using substance, not IDs
+        a_stmts = [a.get("statement", "") for a in assumptions if a.get("statement")]
+        _s0 = (a_stmts[0][:60].rstrip(".") if a_stmts else "the primary assumption")
+        _s1 = (a_stmts[1][:60].rstrip(".") if len(a_stmts) > 1 else "market timing")
+        sens_ref = f"If the assumption that '{_s0}' does not hold"
+        sens_ref2 = f"If '{_s1}' proves optimistic"
 
         analysis = DecisionAnalysisItem(
             analysis_id="DA-001",
@@ -1526,7 +1528,7 @@ class MockClaudeClient:
                 "timeline assumptions carry the most uncertainty."
             ),
             rationale=(
-                f"The recommended option ({rec_id}) wins over alternatives because it achieves the "
+                "The recommended option wins over alternatives because it achieves the "
                 "highest overall score on the decision matrix, particularly on strategic fit and "
                 "opportunity capture, while maintaining manageable risk exposure. Unlike the aggressive "
                 "option, it does not require all assumptions to hold simultaneously. Unlike the "
@@ -1607,9 +1609,8 @@ class MockClaudeClient:
             readiness = "Needs Additional Validation"
             board_rec = "Proceed with Conditions"
 
-        a_ids = [a.get("assumption_id", "") for a in assumptions if a.get("assumption_id")]
         crit_a = [a for a in assumptions if a.get("importance") == "Critical"]
-        crit_ids = [a.get("assumption_id", "") for a in crit_a]
+        crit_stmts = [a.get("statement", "") for a in crit_a if a.get("statement")]
 
         drivers = [
             f"Decision analysis confidence: {da_conf}",
@@ -1630,7 +1631,7 @@ class MockClaudeClient:
         if not limiters:
             limiters.append("Evidence base relies primarily on vendor-sourced material")
 
-        unknowns = [f"Resolution of {aid}" for aid in crit_ids[:3]] if crit_ids else [
+        unknowns = [f"Whether {s[:70].rstrip('.')}" for s in crit_stmts[:3]] if crit_stmts else [
             "Primary assumption validation",
             "Independent evidence verification",
         ]
@@ -1650,9 +1651,9 @@ class MockClaudeClient:
         ) if crit_a else "High confidence — core assumptions are well-supported."
 
         if_fail = (
-            f"Low confidence — if Critical assumption(s) ({', '.join(crit_ids[:2])}) fail, "
+            "Low confidence — if the critical assumptions underpinning the recommended path fail, "
             "the strategy's risk-return profile shifts materially and the preferred option may no longer dominate."
-        ) if crit_ids else "Medium confidence — strategy remains viable under partial assumption failure."
+        ) if crit_stmts else "Medium confidence — strategy remains viable under partial assumption failure."
 
         item = ExecutiveConfidenceItem(
             confidence_id="EC-001",
@@ -3254,13 +3255,23 @@ For each option:
 13. Rate capital_intensity: Low | Medium | High
 14. Rate confidence: High | Medium | Low
 15. Set recommended: true for EXACTLY ONE option
-16. Write a rationale (2-3 sentences) comparing this option against the others
+16. Write a rationale (2-3 sentences) comparing this option against the others, in natural
+    language — describe the assumptions and risks by their substance, not by ID.
 
 SELECTION RULES:
 - Exactly one option must have recommended=True
 - The recommended option rationale must explicitly compare it against the alternatives
 - Non-recommended options must still be complete and analytically sound
-- Use exact IDs when referencing assumptions, risks, opportunities, and recommendations
+- IDs (A-001, RSK-001, OPT-A, etc.) belong ONLY in the linkage arrays
+  (supporting_assumption_ids, associated_risk_ids, associated_opportunity_ids,
+  supporting_recommendation_ids). Do NOT include IDs in any prose field — title,
+  description, strategic_objective, rationale, or expected_outcomes.
+
+EXECUTIVE PROSE RULE:
+Write all text fields in natural language only. If you need to refer to an assumption,
+say "the capital-flow assumption" or "the regulatory-timeline assumption", not "A-001".
+If you need to refer to another option, say "the aggressive option" or "the
+conservative option", not "OPT-A" or "OPT-C".
 
 Return structured JSON matching the strategic_option_generation schema.
 """
@@ -3756,16 +3767,22 @@ Produce a DecisionAnalysis object that:
 3. IDENTIFIES 3-4 explicit tradeoffs of the form "Higher X → Lower Y".
    Derive ONLY from the existing graph. Do NOT invent new tradeoffs.
 
-4. EXPLAINS sensitivity: which specific assumption_ids, if they fail, would change the preferred option.
-   Reference assumption_ids by name. Do NOT generate new scenarios.
+4. EXPLAINS sensitivity: which assumptions, if they fail, would change the preferred option.
+   Describe assumptions by their substance (e.g. "if the grid-connection timeline assumption fails"),
+   NOT by ID (not "if A-001 fails"). Do NOT generate new scenarios.
 
 5. JUSTIFIES the preferred option against each alternative in 2-3 sentences total.
+   Refer to alternatives by title or posture (e.g. "the aggressive option", "the conservative option"),
+   NOT by option_id (not "OPT-A").
 
 CONSTRAINTS
 - Do NOT generate new options, evidence, or scenarios.
 - Everything must derive from the existing graph above.
 - Exactly one recommended_option_id (must match an existing option_id).
-- Be specific: name assumption IDs, risk IDs, opportunity IDs where relevant.
+- Write all prose fields in natural language only. Do NOT include internal IDs
+  (A-*, RSK-*, OPP-*, REC-*, OPT-*) in rationale, sensitivity_analysis,
+  key_uncertainties, confidence_summary, or executive_summary.
+  IDs belong only in structured linkage fields (option_rankings, decision_matrix).
 
 Return structured JSON matching the decision_analysis_generation schema.
 """
@@ -3896,8 +3913,9 @@ Produce an ExecutiveConfidence object that:
 
 4. IDENTIFIES 3-4 critical_unknowns — specific items that must resolve before deciding.
 
-5. PRODUCES validation_priorities — 3-5 concrete due-diligence actions. Reference assumption_ids
-   and risk_ids by name. Be specific (e.g. "Validate A-001 cost assumption via independent estimate").
+5. PRODUCES validation_priorities — 3-5 concrete due-diligence actions. Describe what needs
+   validation by substance, not by ID (e.g. "Validate the capital-cost estimate via independent
+   analysis" not "Validate A-001"). Write in natural language.
 
 6. PROVIDES conditional analysis:
    - confidence_if_assumptions_hold: confidence if Critical assumptions are confirmed
@@ -3906,7 +3924,10 @@ Produce an ExecutiveConfidence object that:
 CONSTRAINTS
 - Do NOT generate new strategic reasoning, options, or evidence.
 - Everything must derive from the decision graph provided above.
-- Reference assumption IDs and risk IDs specifically.
+- Write all prose fields in natural language. Do NOT include internal IDs
+  (A-*, RSK-*, OPP-*, REC-*, OPT-*) in critical_unknowns, validation_priorities,
+  confidence_rationale, confidence_if_assumptions_hold, or confidence_if_assumptions_fail.
+  Describe assumptions and risks by their substance, not their ID.
 
 Return structured JSON matching the executive_confidence_generation schema.
 """

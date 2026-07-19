@@ -495,6 +495,7 @@ class EvidenceAgent(FunctionalAgent):
             primary_query,
             mode=mode,
             top_k=fetch_k,
+            profile=context.execution_profile,
         )
         candidates = result.items
         # PH5.5c — track which query originally retrieved each candidate
@@ -525,7 +526,7 @@ class EvidenceAgent(FunctionalAgent):
         for sq in subquestions:
             if len(candidates) >= self._top_evidence * 3:
                 break
-            sq_result = self._retriever.retrieve(sq, mode=mode, top_k=10)
+            sq_result = self._retriever.retrieve(sq, mode=mode, top_k=10, profile=context.execution_profile)
             for item in sq_result.items:
                 eid = item.evidence.evidence_id
                 if eid not in seen_ids:

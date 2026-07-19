@@ -183,11 +183,12 @@ def test_section1_recommended_option_title_from_narrative():
 # ---------------------------------------------------------------------------
 
 def test_section3_uses_narrative_recommended_option_fields():
-    """§3 renders option_id, title, and description from narrative.recommended_option."""
+    """§3 renders title and description from narrative.recommended_option (no option_id in prose — PH5.x)."""
     ctx = _make_narrative_context()
     report = _build_j7_executive_report(ctx)
     section_3 = report.split("## 3.")[1].split("## 4.")[0]
-    assert "OPT-A: Phased Deployment" in section_3
+    assert "Phased Deployment" in section_3
+    assert "OPT-A" not in section_3
     assert "Deploy in stages to preserve optionality." in section_3
 
 
@@ -204,11 +205,14 @@ def test_section3_time_horizon_from_narrative():
 # ---------------------------------------------------------------------------
 
 def test_section4_why_this_option_from_narrative():
-    """§4 rationale comes from narrative.why_this_option (sourced from da.rationale)."""
+    """§4 rationale comes from narrative.why_this_option (sourced from da.rationale).
+
+    PH5.x: the option_id is stripped from prose; only the reasoning phrase survives.
+    """
     ctx = _make_narrative_context()
     report = _build_j7_executive_report(ctx)
     section_4 = report.split("## 4.")[1].split("## 5.")[0]
-    assert "OPT-A wins on strategic fit." in section_4
+    assert "wins on strategic fit." in section_4
 
 
 def test_section4_why_enriched_with_recommended_option_advantages():
@@ -221,13 +225,14 @@ def test_section4_why_enriched_with_recommended_option_advantages():
 
 
 def test_section4_option_rankings_from_narrative():
-    """§4 option rankings come from narrative.option_rankings."""
+    """§4 option rankings resolve option_ids to titles (PH5.x — no IDs in prose)."""
     ctx = _make_narrative_context()
     report = _build_j7_executive_report(ctx)
     section_4 = report.split("## 4.")[1].split("## 5.")[0]
     assert "Option Rankings" in section_4
-    assert "OPT-A" in section_4
-    assert "OPT-B" in section_4
+    # Rankings must show titles, not raw option_ids
+    assert "Phased Deployment" in section_4
+    assert "Aggressive Build" in section_4
 
 
 # ---------------------------------------------------------------------------

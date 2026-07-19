@@ -38,7 +38,25 @@ Design invariants
 
 from __future__ import annotations
 
+import re
+
 from .executive_narrative import ExecutiveNarrative
+
+# Identifiers that must not appear in executive prose — mirrors _GRAPH_ID_PATTERN
+# in report_agent.py but kept local to avoid a circular import.
+_ID_PATTERN = re.compile(r"\b(?:A|RSK|OPP|REC|OPT|EC|DA|SC)-[A-Z0-9]+\b")
+
+
+def _strip_ids(text: str) -> str:
+    """Remove internal graph identifiers from a prose string."""
+    if not text:
+        return text
+    text = _ID_PATTERN.sub("", text)
+    text = re.sub(r"\(\s*,?\s*\)", "", text)   # empty parens: "(, )" → ""
+    text = re.sub(r"\[\s*,?\s*\]", "", text)   # empty brackets
+    text = re.sub(r"  +", " ", text).strip()
+    text = re.sub(r"\.\s*\.", ".", text)
+    return text
 
 
 class ExecutiveNarrativeComposer:
@@ -60,6 +78,10 @@ class ExecutiveNarrativeComposer:
         narrative.decision_story = self._compose_decision_story(narrative)
         narrative.risk_story = self._compose_risk_story(narrative)
         narrative.confidence_story = self._compose_confidence_story(narrative)
+        # Strip any internal graph identifiers that leaked into prose — PH5.x
+        narrative.decision_story = _strip_ids(narrative.decision_story)
+        narrative.risk_story = _strip_ids(narrative.risk_story)
+        narrative.confidence_story = _strip_ids(narrative.confidence_story)
         return narrative
 
     # ------------------------------------------------------------------
@@ -121,9 +143,9 @@ class ExecutiveNarrativeComposer:
 
         # Q3: Which option wins?
         rec = n.recommended_option or {}
-        if rec.get("option_id") and rec.get("title"):
+        if rec.get("title"):
             horizon = (rec.get("estimated_time_horizon") or "").replace("_", " ")
-            rec_line = f"Recommended: {rec['option_id']} — {rec['title']}"
+            rec_line = f"Recommended: {rec['title']}"
             if horizon:
                 rec_line += f" ({horizon})"
             parts.append(f"{rec_line}.")
@@ -179,11 +201,10 @@ class ExecutiveNarrativeComposer:
 
         # Top 3 risk details with mitigations
         for r in risks[:3]:
-            rid = r.get("risk_id", "")
             stmt = r.get("statement", "")
             sev = r.get("severity", "")
             mitigation = r.get("mitigation", "")
-            line = f"{rid}: {stmt} (severity: {sev})"
+            line = f"{stmt} (severity: {sev})"
             if mitigation:
                 line += f"; mitigation: {mitigation}"
             parts.append(f"{line}.")

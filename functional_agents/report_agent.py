@@ -1294,12 +1294,31 @@ _COMPLETE_ENDINGS = (
 )
 
 
+_GRAPH_ID_PATTERN = re.compile(
+    r"\b(?:A|RSK|OPP|REC|OPT|EC|DA|SC)-[A-Z0-9]+\b"
+)
+
+
 def _clean_internal_language(text: str) -> str:
-    """Replace machine-generated internal language with executive prose."""
+    """Replace machine-generated internal language with executive prose.
+
+    Also strips bare internal graph identifiers (A-001, RSK-003, OPP-004,
+    REC-002, OPT-B, etc.) that must never appear in executive-facing prose.
+    Traceability is preserved in the underlying structured model fields.
+    """
     if not text:
         return text
     for src, dst in _MACHINE_PHRASE_SUBS:
         text = text.replace(src, dst)
+    # Strip internal graph identifiers — PH5.x
+    text = _GRAPH_ID_PATTERN.sub("", text)
+    # Clean up artefacts left by identifier removal: empty parens/brackets,
+    # dangling commas/colons, and runs of whitespace.
+    text = re.sub(r"\(\s*,?\s*\)", "", text)   # empty parens: "(, )" → ""
+    text = re.sub(r"\[\s*,?\s*\]", "", text)   # empty brackets
+    text = re.sub(r"\s+,", ",", text)           # " ," → ","
+    text = re.sub(r",\s*\)", ")", text)          # ",)" → ")"
+    text = re.sub(r":\s*\.", ".", text)          # ": ." → "."
     text = re.sub(r"  +", " ", text).strip()
     text = re.sub(r"\.\s*\.", ".", text)
     return text
@@ -1447,13 +1466,10 @@ def _build_j7_executive_summary_section(
     eng = context.engagement or {}
     nec = narrative.executive_confidence
 
-    # Recommendation — option title + ID
+    # Recommendation — option title only (no ID in executive prose — PH5.x)
     _rec = narrative.recommended_option
     if _rec.get("title"):
-        _opt_label = _rec["title"]
-        if _rec.get("option_id"):
-            _opt_label += f" ({_rec['option_id']})"
-        lines += [f"**Recommendation:** {_opt_label}", ""]
+        lines += [f"**Recommendation:** {_rec['title']}", ""]
 
     # Decision readiness and board stance
     if nec:
@@ -1527,18 +1543,19 @@ def _build_j7_recommendation_rationale_section(
         lines += [_clean_internal_language(narrative.why_this_option), ""]
 
     # Compact option comparison — one line per option
+    opt_title_by_id = {o.get("option_id", ""): o.get("title", "") for o in options}
     if options:
         lines.append("**Compared Against Alternatives:**")
         for opt in options:
             oid = opt.get("option_id", "")
             t = opt.get("title", "")
-            rat = (
+            rat = _clean_internal_language((
                 opt.get("rationale")
                 or opt.get("strategic_logic")
                 or opt.get("description")
                 or ""
-            ).split(".")[0].strip()
-            label = f"- **{oid}: {t}**"
+            ).split(".")[0].strip())
+            label = f"- **{t}**"
             if oid == recommended_id:
                 label += " *(Recommended)*"
             if rat:
@@ -1553,7 +1570,10 @@ def _build_j7_recommendation_rationale_section(
 
     if narrative.option_rankings:
         lines.append("**Option Rankings (best → least preferred):**")
-        lines.extend(f"{i + 1}. {r}" for i, r in enumerate(narrative.option_rankings))
+        lines.extend(
+            f"{i + 1}. {opt_title_by_id.get(r, r)}"
+            for i, r in enumerate(narrative.option_rankings)
+        )
         lines.append("")
 
     # Decision matrix — visual separator before the table block
@@ -1578,7 +1598,7 @@ def _build_j7_recommendation_rationale_section(
         _opt_titles = {o.get("option_id", ""): o.get("title", "") for o in options}
         for entry in matrix:
             eid = entry.get("option_id", "")
-            opt_label = f"{eid}: {_opt_titles.get(eid, '')}" if _opt_titles.get(eid) else eid
+            opt_label = _opt_titles.get(eid) or eid
             if eid == recommended_id:
                 opt_label += " ✓"
             scores = " | ".join(entry.get(k, "—") for k, _ in _SCORE_COLS)
@@ -1589,7 +1609,7 @@ def _build_j7_recommendation_rationale_section(
             strengths = entry.get("strengths") or []
             weaknesses = entry.get("weaknesses") or []
             if strengths or weaknesses:
-                lines += [f"**{eid} — Strengths & Weaknesses**", ""]
+                lines += [f"**{_opt_titles.get(eid, eid)} — Strengths & Weaknesses**", ""]
                 if strengths:
                     lines.append("**Strengths:**")
                     lines.extend(f"- {s}" for s in strengths)
@@ -1641,7 +1661,7 @@ def _build_j7_decision_readiness_section(
 
     # Confidence rationale from executive_confidence; da.confidence_summary as supplement
     ec_rat = _clean_internal_language(nec.get("confidence_rationale", "") or "")
-    da_conf_summary = da.get("confidence_summary") or ""
+    da_conf_summary = _clean_internal_language(da.get("confidence_summary") or "")
     if ec_rat:
         lines += [f"*{ec_rat}*", ""]
     if da_conf_summary and da_conf_summary != ec_rat:
@@ -1672,7 +1692,7 @@ def _build_j7_decision_readiness_section(
 
     if narrative.critical_unknowns:
         lines.append("**Critical Unknowns:**")
-        lines.extend(f"- {u}" for u in narrative.critical_unknowns)
+        lines.extend(f"- {_clean_internal_language(u)}" for u in narrative.critical_unknowns)
         lines.append("")
 
     # Conditional assessment and decision horizon
@@ -1682,9 +1702,9 @@ def _build_j7_decision_readiness_section(
     if if_hold or if_fail:
         lines.append("**Conditional Assessment:**")
         if if_hold:
-            lines += [f"- *If assumptions hold:* {if_hold}", ""]
+            lines += [f"- *If assumptions hold:* {_clean_internal_language(if_hold)}", ""]
         if if_fail:
-            lines += [f"- *If assumptions fail:* {if_fail}", ""]
+            lines += [f"- *If assumptions fail:* {_clean_internal_language(if_fail)}", ""]
 
     horizon = ec_raw.get("decision_horizon", "")
     if horizon:
@@ -1694,7 +1714,7 @@ def _build_j7_decision_readiness_section(
     uncertainties = da.get("key_uncertainties") or []
     if uncertainties:
         lines.append("**Key Uncertainties:**")
-        lines.extend(f"- {u}" for u in uncertainties)
+        lines.extend(f"- {_clean_internal_language(u)}" for u in uncertainties)
         lines.append("")
 
     return lines
@@ -1844,7 +1864,7 @@ def _build_j7_appendix(
         lines += [heading, ""]
         opt_rationale = opt.get("rationale") or opt.get("strategic_logic") or ""
         if opt_rationale:
-            lines += [opt_rationale, ""]
+            lines += [_clean_internal_language(opt_rationale), ""]
         horizon = opt.get("time_horizon", "").replace("_", " ")
         posture = opt.get("posture", "").replace("_", " ").title()
         meta_parts = []
@@ -1944,7 +1964,7 @@ def _build_j7_appendix(
     lines += ["### Appendix E — Detailed Confidence Analysis", ""]
     sensitivity = da.get("sensitivity_analysis") or ""
     if sensitivity:
-        lines += ["**Sensitivity Analysis:**", "", sensitivity, ""]
+        lines += ["**Sensitivity Analysis:**", "", _clean_internal_language(sensitivity), ""]
     conf_level = da.get("confidence") or ""
     conf_summary = da.get("confidence_summary") or ""
     uncertainties = da.get("key_uncertainties") or []
@@ -2111,7 +2131,7 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
 
         # Decision summary table
         _summary_rows: list[tuple[str, str]] = [
-            ("Recommended Option", f"{_oid}: {_title}" if _oid and _title else _title or _oid),
+            ("Recommended Option", _title or _oid),
         ]
         if _horizon:
             _summary_rows.append(("Time Horizon", _horizon))
@@ -2202,13 +2222,12 @@ def _build_j7_executive_report(context: "AgentContext") -> str:
                 continue
             display = _TIMEFRAME_DISPLAY.get(tf, tf)
             lines += [f"### {display}", ""]
-            lines += ["| ID | Priority | Action | Details |", "|---|---|---|---|"]
+            lines += ["| Priority | Action | Details |", "|---|---|---|"]
             for rec in tf_recs:
-                rid = rec.get("recommendation_id", "")
                 rtitle = rec.get("title", "").replace("|", "\\|")
                 rbody = (rec.get("summary") or rec.get("rationale") or rec.get("description") or "").replace("|", "\\|")[:100]
                 rpri = (rec.get("priority", "") or "").title()
-                lines.append(f"| {rid} | {rpri} | {rtitle} | {rbody} |")
+                lines.append(f"| {rpri} | {rtitle} | {rbody} |")
             lines.append("")
     else:
         lines += ["*No recommendations recorded.*", ""]
