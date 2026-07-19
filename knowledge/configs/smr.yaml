@@ -1,0 +1,7 @@
+name: smr
+
+profiles:
+  - smr
+
+sources:
+  - smr_sources

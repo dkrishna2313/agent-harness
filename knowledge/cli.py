@@ -8,6 +8,9 @@ Usage:
         --workers 2 \\
         --log-level INFO
 
+    python3 -m knowledge.builder build \\
+        --config knowledge/configs/sports.yaml
+
 This CLI is additive — it does not replace or modify any existing CLI commands.
 """
 
@@ -60,6 +63,57 @@ app = typer.Typer(
 )
 
 
+def _load_build_config(config_path: Path) -> tuple[list[Path], list[str]]:
+    """Load and validate a YAML build configuration file.
+
+    Returns (sources, profiles).  Raises FileNotFoundError or ValueError on
+    any problem so the caller can emit a consistent error and exit.
+
+    Path resolution order for each source entry:
+      1. Expand environment variables.
+      2. Expand ``~``.
+      3. If absolute, use as-is.
+      4. Otherwise resolve relative to CWD (NOT relative to the YAML file).
+    """
+    import yaml  # already a project dependency (pyyaml>=6.0)
+
+    if not config_path.exists():
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+
+    try:
+        raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as exc:
+        raise ValueError(f"Invalid YAML in {config_path}: {exc}") from exc
+
+    if not isinstance(raw, dict):
+        raise ValueError(f"Config must be a YAML mapping, got {type(raw).__name__!r}")
+
+    for field in ("name", "profiles", "sources"):
+        if field not in raw:
+            raise ValueError(f"Config missing required field: '{field}'")
+
+    profiles = raw["profiles"]
+    if not isinstance(profiles, list) or not profiles:
+        raise ValueError("Config 'profiles' must be a non-empty list")
+
+    raw_sources = raw["sources"]
+    if not isinstance(raw_sources, list) or not raw_sources:
+        raise ValueError("Config 'sources' must be a non-empty list")
+
+    cwd = Path.cwd()
+    sources: list[Path] = []
+    for s in raw_sources:
+        expanded = os.path.expandvars(os.path.expanduser(str(s)))
+        p = Path(expanded)
+        if not p.is_absolute():
+            p = cwd / p
+        if not p.exists():
+            raise FileNotFoundError(f"Source directory does not exist: {p}")
+        sources.append(p.resolve())
+
+    return sources, [str(pr) for pr in profiles]
+
+
 def _setup_logging(level: str) -> None:
     numeric = getattr(logging, level.upper(), logging.INFO)
     logging.basicConfig(
@@ -71,10 +125,22 @@ def _setup_logging(level: str) -> None:
 
 @app.command("build")
 def build(
+    config: Optional[Path] = typer.Option(
+        None,
+        "--config",
+        help=(
+            "Path to a YAML build configuration file. "
+            "Mutually exclusive with --sources and --profiles. "
+            "Example: knowledge/configs/sports.yaml"
+        ),
+    ),
     sources: Optional[list[Path]] = typer.Option(
         None,
         "--sources",
-        help="Source directories to ingest. Defaults to smr_sources/ sources/ if not specified.",
+        help=(
+            "Source directories to ingest. Defaults to smr_sources/ sources/ if not specified. "
+            "Mutually exclusive with --config."
+        ),
     ),
     domain: Optional[str] = typer.Option(
         None,
@@ -85,7 +151,10 @@ def build(
     profiles: Optional[list[str]] = typer.Option(
         None,
         "--profiles",
-        help="Profile IDs to tag all produced evidence with.",
+        help=(
+            "Profile IDs to tag all produced evidence with. "
+            "Mutually exclusive with --config (specify profiles in the YAML file instead)."
+        ),
     ),
     incremental: bool = typer.Option(
         True,
@@ -125,8 +194,44 @@ def build(
         help="Logging level (DEBUG, INFO, WARNING, ERROR).",
     ),
 ) -> None:
-    """Build or update the Knowledge Base from source directories."""
+    """Build or update the Knowledge Base from source directories.
+
+    Sources can be supplied in two ways:
+
+    \b
+    1. Declarative YAML config (recommended):
+         python3 -m knowledge build --config knowledge/configs/sports.yaml
+
+    \b
+    2. Inline flags (backwards-compatible):
+         python3 -m knowledge build --sources sports_sources/ --profiles sports
+    """
     _setup_logging(log_level)
+
+    # --- Mutual-exclusion guards ---
+    if config and sources:
+        typer.echo(
+            "Error: --config and --sources are mutually exclusive. "
+            "Specify sources in the YAML file or use --sources alone.",
+            err=True,
+        )
+        raise typer.Exit(1)
+    if config and profiles:
+        typer.echo(
+            "Error: --config and --profiles are mutually exclusive. "
+            "Specify profiles in the YAML file or use --profiles alone.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    # --- Config-file path ---
+    if config:
+        try:
+            sources, profiles = _load_build_config(config)
+        except (FileNotFoundError, ValueError) as exc:
+            typer.echo(f"Error: {exc}", err=True)
+            raise typer.Exit(1)
+        typer.echo(f"Loaded config: {config.name}  profiles={profiles}")
 
     # Default source directories if none given
     if not sources:
