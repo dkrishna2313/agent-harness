@@ -2364,5 +2364,50 @@ def debug_research_gap_cmd(
     typer.echo(f"  trace.json")
 
 
+@app.command("export-docx")
+def export_docx_cmd(
+    input_path: Annotated[
+        Path,
+        typer.Argument(help="Markdown report to convert."),
+    ] = Path("outputs/sports_strategy.md"),
+    out: Annotated[
+        Path | None,
+        typer.Option("--out", "-o", help="Output DOCX path. Defaults to same base name as input with .docx extension."),
+    ] = None,
+) -> None:
+    """Convert a Markdown report to a styled Word document (.docx).
+
+    The DOCX is generated from the markdown file as the single source of truth —
+    no agent calls, no re-generation.  All headings, tables, blockquotes, lists,
+    and inline formatting are preserved with a clean Calibri styling baseline.
+
+    Example:
+
+        python3 -m functional_agents.cli export-docx outputs/sports_strategy.md
+
+        python3 -m functional_agents.cli export-docx \\
+            outputs/sports_strategy.md --out outputs/client_report.docx
+    """
+    from .docx_export import convert
+
+    if not input_path.exists():
+        typer.echo(f"Error: input file not found: {input_path}", err=True)
+        raise typer.Exit(code=1)
+
+    docx_path = out if out is not None else input_path.with_suffix(".docx")
+
+    try:
+        convert(input_path, docx_path)
+    except ImportError:
+        typer.echo(
+            "Error: python-docx is required for DOCX export.  "
+            "Install it with:  pip install python-docx",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    typer.echo(f"DOCX written to: {docx_path}")
+
+
 if __name__ == "__main__":
     app()
