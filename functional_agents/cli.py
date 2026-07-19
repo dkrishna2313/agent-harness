@@ -2364,6 +2364,121 @@ def debug_research_gap_cmd(
     typer.echo(f"  trace.json")
 
 
+@app.command("presentation")
+def presentation_cmd(
+    session: Annotated[
+        Path | None,
+        typer.Option(
+            "--session",
+            help="Session file (.json) produced by a pipeline run. Preferred input.",
+        ),
+    ] = None,
+    engagement: Annotated[
+        Path | None,
+        typer.Option(
+            "--engagement",
+            help=(
+                "Strategic Engagement file (.yaml/.json). "
+                "The most recent session in outputs/sessions/ is used; "
+                "override with --session for a specific run."
+            ),
+        ),
+    ] = None,
+    research_object: Annotated[
+        Path | None,
+        typer.Option(
+            "--research-object",
+            help="Research-object JSON file (R-YYYYMMDD-*.json). Alternative to --session.",
+        ),
+    ] = None,
+    out: Annotated[
+        Path,
+        typer.Option("--out", "-o", help="Output path for the Markdown presentation."),
+    ] = Path("outputs/presentation.md"),
+    log_level: Annotated[
+        str | None,
+        typer.Option("--log-level", help="Logging level."),
+    ] = None,
+) -> None:
+    """Generate an executive presentation from an existing pipeline run.
+
+    Reads strategic options, decision analysis, risks, assumptions, and
+    confidence from a session or research-object file.  No agents are
+    re-run; the markdown is the canonical source and the output format.
+
+    Input resolution order:
+
+    \b
+      1. --session SESSION_FILE   (explicit session JSON)
+      2. --research-object RO_FILE (research-object JSON)
+      3. --engagement YAML        (finds most recent session in outputs/sessions/)
+      4. Most recent session in outputs/sessions/ (no flags required)
+
+    Example:
+
+    \b
+        python3 -m functional_agents.cli presentation \\
+            --session outputs/sessions/SS-20260719-024610-74dbc5.json \\
+            --out outputs/sports_strategy_presentation.md
+
+        python3 -m functional_agents.cli presentation \\
+            --engagement engagements/sports_strategy.yaml \\
+            --out outputs/sports_strategy_presentation.md
+    """
+    from .executive_presentation import (
+        ExecutivePresentationGenerator,
+        context_from_session,
+        context_from_research_object,
+        render_markdown,
+        _latest_session,
+    )
+
+    _configure_logging(verbose=False, log_level=log_level or "WARNING")
+
+    # ── Resolve input ────────────────────────────────────────────────────────
+    context = None
+
+    if session is not None:
+        if not session.exists():
+            typer.echo(f"Error: session file not found: {session}", err=True)
+            raise typer.Exit(code=1)
+        typer.echo(f"Loading from session: {session}")
+        context = context_from_session(session)
+
+    elif research_object is not None:
+        if not research_object.exists():
+            typer.echo(f"Error: research-object not found: {research_object}", err=True)
+            raise typer.Exit(code=1)
+        typer.echo(f"Loading from research object: {research_object}")
+        context = context_from_research_object(research_object)
+
+    else:
+        # Fall back to most recent session
+        sessions_dir = Path("outputs/sessions")
+        latest = _latest_session(sessions_dir) if sessions_dir.exists() else None
+        if latest is None:
+            typer.echo(
+                "Error: no session found.  Run the pipeline first, then pass "
+                "--session SESSION_FILE or --research-object RO_FILE.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        if engagement is not None:
+            typer.echo(f"Engagement: {engagement}  (using most recent session)")
+        typer.echo(f"Loading from session: {latest}")
+        context = context_from_session(latest)
+
+    # ── Generate ─────────────────────────────────────────────────────────────
+    pres = ExecutivePresentationGenerator().generate(context)
+    md   = render_markdown(pres)
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(md, encoding="utf-8")
+
+    slide_count = len(pres.slides)
+    typer.echo(f"Presentation written to: {out}  ({slide_count} slides)")
+
+
 @app.command("export-docx")
 def export_docx_cmd(
     input_path: Annotated[
