@@ -1,0 +1,7 @@
+name: sports
+
+profiles:
+  - sports
+
+sources:
+  - sports_sources
