@@ -282,47 +282,109 @@ def build(
         raise typer.Exit(1)
 
 
+def _evidence_counts_for_profile(store: "KnowledgeStore", profile: str) -> tuple[int, set[str]]:
+    """Return (evidence_count, source_id_set) for evidence tagged with *profile*."""
+    count = 0
+    source_ids: set[str] = set()
+    for domain in store.available_domains():
+        for ev in store.iter_evidence(domain):
+            if profile in ev.profile_ids:
+                count += 1
+                source_ids.update(ev.supporting_source_ids)
+    return count, source_ids
+
+
 @app.command("status")
 def status(
+    profile: Optional[str] = typer.Option(
+        None,
+        "--profile",
+        help="Filter statistics to a specific profile (e.g. sports, smr).",
+    ),
     store_dir: Path = typer.Option(Path("knowledge_store"), "--store"),
     log_level: str = typer.Option("WARNING", "--log-level"),
 ) -> None:
-    """Show current Knowledge Base statistics."""
+    """Show current Knowledge Base statistics.
+
+    With --profile, shows counts scoped to evidence tagged with that profile.
+
+    Examples:
+
+        python3 -m knowledge status
+        python3 -m knowledge status --profile sports
+        python3 -m knowledge status --profile smr
+    """
     _setup_logging(log_level)
     store = KnowledgeStore(store_dir)
     stats = store.read_stats()
     manifest = store.load_manifest()
 
     print(f"\nKnowledge Base at: {store_dir.resolve()}")
-    print(f"Sources indexed:   {len(manifest)}")
 
-    domains: dict[str, int] = {}
-    for entry in manifest.values():
-        domains[entry.domain] = domains.get(entry.domain, 0) + 1
-    for dom, count in sorted(domains.items()):
-        print(f"  {dom}: {count} sources")
+    if profile:
+        ev_count, source_ids = _evidence_counts_for_profile(store, profile)
+        print(f"Profile:           {profile}")
+        print(f"Evidence objects:  {ev_count}")
+        print(f"Sources with hits: {len(source_ids)}")
 
-    if stats:
-        print(f"\nLast build:        {stats.get('last_build', 'unknown')}")
-        print(f"Evidence objects:  {stats.get('evidence_objects', 0)}")
-        print(f"Cache hit ratio:   {stats.get('cache_hit_ratio', 0):.1%}")
-        print(f"ExtractionRun ID:  {stats.get('extraction_run_id', 'unknown')}")
+        # Break down by domain
+        domains: dict[str, int] = {}
+        for sid in source_ids:
+            entry = manifest.get(sid)
+            if entry:
+                domains[entry.domain] = domains.get(entry.domain, 0) + 1
+        if domains:
+            print("Domains:")
+            for dom, count in sorted(domains.items()):
+                print(f"  {dom}: {count} sources")
     else:
-        print("\nNo build has run yet.")
+        print(f"Sources indexed:   {len(manifest)}")
+        domains_all: dict[str, int] = {}
+        for entry in manifest.values():
+            domains_all[entry.domain] = domains_all.get(entry.domain, 0) + 1
+        for dom, count in sorted(domains_all.items()):
+            print(f"  {dom}: {count} sources")
+
+        if stats:
+            print(f"\nLast build:        {stats.get('last_build', 'unknown')}")
+            print(f"Evidence objects:  {stats.get('evidence_objects', 0)}")
+            print(f"Cache hit ratio:   {stats.get('cache_hit_ratio', 0):.1%}")
+            print(f"ExtractionRun ID:  {stats.get('extraction_run_id', 'unknown')}")
+        else:
+            print("\nNo build has run yet.")
 
 
 @app.command("list-sources")
 def list_sources(
     store_dir: Path = typer.Option(Path("knowledge_store"), "--store"),
     domain: Optional[str] = typer.Option(None, "--domain"),
+    profile: Optional[str] = typer.Option(
+        None,
+        "--profile",
+        help="Filter to sources that have at least one evidence item tagged with this profile.",
+    ),
 ) -> None:
-    """List all indexed sources."""
+    """List all indexed sources.
+
+    With --profile, only sources that contain evidence tagged with that profile
+    are shown.  --domain and --profile can be combined.
+
+    Examples:
+
+        python3 -m knowledge list-sources
+        python3 -m knowledge list-sources --profile sports
+        python3 -m knowledge list-sources --domain smr --profile smr
+    """
     store = KnowledgeStore(store_dir)
     manifest = store.load_manifest()
 
     entries = list(manifest.values())
     if domain:
         entries = [e for e in entries if e.domain == domain]
+
+    if profile:
+        _, profile_source_ids = _evidence_counts_for_profile(store, profile)
+        entries = [e for e in entries if e.source_id in profile_source_ids]
 
     if not entries:
         print("No sources indexed.")
