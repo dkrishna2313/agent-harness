@@ -995,7 +995,7 @@ class Orchestrator:
         except Exception as exc:
             LOGGER.warning("[Orchestrator] canonical pipeline trace write failed: %s", exc)
 
-        # PH6.2a — build and persist EditorialBrief after pipeline completes.
+        # PH6.2a/PH6.3 — build and persist EditorialBrief + EditorialManuscript.
         # Best-effort: a failure must never block post-run diagnostics or the caller.
         try:
             from .editorial import EditorialCoordinator
@@ -1003,8 +1003,11 @@ class Orchestrator:
             _eb = _eb_coord.build(result_ctx)
             _eb_path = _eb_coord.persist(_eb)
             print(f"Editorial brief → {_eb_path}")
+            _em = _eb_coord.build_manuscript(_eb)
+            _em_path = _eb_coord.persist_manuscript(_em)
+            print(f"Editorial manuscript → {_em_path}")
         except Exception as exc:
-            LOGGER.warning("[Orchestrator] editorial brief build/persist failed: %s", exc)
+            LOGGER.warning("[Orchestrator] editorial build/persist failed: %s", exc)
 
         # PH4.1-H3 — raise after writing diagnostics when the pipeline error-terminated.
         if result_ctx.workflow_state == WorkflowState.ERROR:
