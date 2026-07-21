@@ -104,7 +104,8 @@ def _render(doc, text: str) -> None:
             while i < n:
                 l = lines[i]
                 if l.startswith(">"):
-                    bq.append("" if l == ">" else l[1:].lstrip())
+                    # bare ">" is a paragraph separator, same as a blank line between blocks
+                    bq.append(None if l == ">" else l[1:].lstrip())
                     i += 1
                 elif l == "" and i + 1 < n and lines[i + 1].startswith(">"):
                     bq.append(None)  # inter-paragraph blank inside block quote
