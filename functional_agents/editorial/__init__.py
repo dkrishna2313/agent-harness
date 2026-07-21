@@ -1,4 +1,4 @@
-"""Editorial Platform (PH6.10) — complete.
+"""Editorial Platform (PH7) — complete.
 
 Provides the canonical chain between executive reasoning and editorial artifacts:
 
@@ -14,9 +14,10 @@ Provides the canonical chain between executive reasoning and editorial artifacts
     OpportunityWriter           -- populates EditorialManuscript.strategic_opportunities (PH6.8)
     ConfidenceWriter            -- populates EditorialManuscript.executive_confidence (PH6.9)
     AppendixWriter              -- populates EditorialManuscript.appendix (PH6.10)
+    MarkdownRenderer            -- EditorialManuscript → Markdown report string (PH7)
 
-The editorial package never mutates AgentContext reasoning fields and never
-produces rendered markdown, DOCX, or PPTX.
+The editorial package never mutates AgentContext reasoning fields.
+MarkdownRenderer is the sole authoritative source of Markdown output when PH7 is active.
 """
 
 from __future__ import annotations
@@ -63,6 +64,7 @@ from .risk_writer import RiskWriter
 from .opportunity_writer import OpportunityWriter
 from .confidence_writer import ConfidenceWriter
 from .appendix_writer import AppendixWriter
+from .markdown_renderer import MarkdownRenderer
 
 __all__ = [
     # Brief
@@ -109,4 +111,6 @@ __all__ = [
     "OpportunityWriter",
     "ConfidenceWriter",
     "AppendixWriter",
+    # Renderer (PH7)
+    "MarkdownRenderer",
 ]

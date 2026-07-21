@@ -1009,6 +1009,9 @@ class Orchestrator:
             _eb_coord.run_writers(_eb, _em, client=_client)
             _em_path = _eb_coord.persist_manuscript(_em)
             print(f"Editorial manuscript → {_em_path}")
+            # PH7 — make manuscript and brief available to MarkdownRenderer
+            result_ctx.trace["_editorial_manuscript"] = _em
+            result_ctx.trace["_editorial_brief"] = _eb
         except Exception as exc:
             LOGGER.warning("[Orchestrator] editorial build/persist failed: %s", exc)
 

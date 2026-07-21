@@ -1,16 +1,20 @@
-"""MarkdownReportGenerator — the first concrete DeliverableGenerator (J11.0).
+"""MarkdownReportGenerator — PH7 (upgraded from J11.0).
 
-This generator changes nothing about *what* markdown gets produced. It calls
-``report_agent.build_markdown_report_content()`` — the exact J7.6b/legacy
-section-assembly logic that used to run inline inside ``ReportAgent._execute``
-— and then writes it to disk with the same ``write_markdown()`` helper
-ReportAgent always used. Behaviour is byte-for-byte identical to pre-J11.0.
+When an EditorialManuscript is available in the trace (placed there by the
+orchestrator's editorial hook), uses MarkdownRenderer to produce the report
+from editorial prose — making the Editorial Platform the authoritative source
+of all rendered Markdown output.
+
+Falls back to the legacy ``build_markdown_report_content()`` path when no
+manuscript is in the trace, preserving backward compatibility with runs that
+pre-date PH7 or where the editorial hook failed.
 
 Invokes no Functional Agent, calls no LLM, and mutates no reasoning field.
 """
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -20,6 +24,8 @@ from .base import DeliverableGenerator
 if TYPE_CHECKING:
     from ..context import AgentContext
 
+LOGGER = logging.getLogger(__name__)
+
 
 class MarkdownReportGenerator(DeliverableGenerator):
     deliverable_type = "markdown"
@@ -27,10 +33,28 @@ class MarkdownReportGenerator(DeliverableGenerator):
     def generate(self, context: "AgentContext", output_path: Path) -> DeliverableArtifact:
         from research_agent.markdown import write_markdown
 
-        from ..report_agent import build_markdown_report_content
+        manuscript = context.trace.get("_editorial_manuscript")
+        brief = context.trace.get("_editorial_brief")
 
-        memo = context.trace.get("_report_memo", {})
-        report_content = build_markdown_report_content(context, memo)
+        if manuscript is not None:
+            # PH7 path — use editorial prose
+            try:
+                from ..editorial.markdown_renderer import MarkdownRenderer
+                report_content = MarkdownRenderer().render(manuscript, brief=brief)
+                LOGGER.debug("[MarkdownReportGenerator] rendered via MarkdownRenderer (PH7)")
+            except Exception as exc:
+                LOGGER.warning(
+                    "[MarkdownReportGenerator] MarkdownRenderer failed (%s: %s) — falling back to legacy",
+                    type(exc).__name__, exc,
+                )
+                manuscript = None  # trigger fallback below
+
+        if manuscript is None:
+            # Legacy fallback path
+            from ..report_agent import build_markdown_report_content
+            memo = context.trace.get("_report_memo", {})
+            report_content = build_markdown_report_content(context, memo)
+            LOGGER.debug("[MarkdownReportGenerator] rendered via legacy build_markdown_report_content")
 
         written_path = write_markdown(report_content, output_path)
 
