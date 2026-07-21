@@ -445,6 +445,34 @@ class EditorialCoordinator:
             ),
         )
 
+    def run_writers(
+        self,
+        brief: EditorialBrief,
+        manuscript: EditorialManuscript,
+        client: Any | None = None,
+    ) -> EditorialManuscript:
+        """Run the ordered writer registry against brief and manuscript.
+
+        Writers are invoked in registration order. Each writer populates
+        exactly one manuscript section. Future writers are added here.
+        """
+        from .executive_summary_writer import ExecutiveSummaryWriter
+        from .decision_analysis_writer import DecisionAnalysisWriter
+        from .recommendation_writer import RecommendationWriter
+        from .risk_writer import RiskWriter
+        from .opportunity_writer import OpportunityWriter
+
+        _registry = [
+            ExecutiveSummaryWriter(client=client),
+            DecisionAnalysisWriter(client=client),
+            RecommendationWriter(client=client),
+            RiskWriter(client=client),
+            OpportunityWriter(client=client),
+        ]
+        for writer in _registry:
+            writer.write(brief, manuscript)
+        return manuscript
+
     def persist_manuscript(
         self,
         manuscript: EditorialManuscript,

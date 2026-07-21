@@ -773,6 +773,60 @@ class DecisionAnalysisProsePayload(BaseModel):
     )
 
 
+class RecommendationProsePayload(BaseModel):
+    """Recommendation section prose for the EditorialManuscript (PH6.6)."""
+
+    paragraphs: list[str] = Field(
+        default_factory=list,
+        description=(
+            "3-4 prose paragraphs: (1) recommended course of action overview, "
+            "(2) near-term priorities and sequencing, "
+            "(3) medium/longer-horizon actions, "
+            "(4) expected outcomes."
+        ),
+    )
+    bullet_groups: list[list[str]] = Field(
+        default_factory=list,
+        description="2 bullet groups: high-priority actions, then supporting actions.",
+    )
+
+
+class RiskProsePayload(BaseModel):
+    """Risk section prose for the EditorialManuscript (PH6.7)."""
+
+    paragraphs: list[str] = Field(
+        default_factory=list,
+        description=(
+            "3-4 prose paragraphs: (1) risk profile overview, "
+            "(2) principal risks and business impact, "
+            "(3) mitigation approach, "
+            "(4) residual uncertainty."
+        ),
+    )
+    bullet_groups: list[list[str]] = Field(
+        default_factory=list,
+        description="2 bullet groups: high-severity risks, then key mitigations.",
+    )
+
+
+class OpportunityProsePayload(BaseModel):
+    """Opportunity section prose for the EditorialManuscript (PH6.8)."""
+
+    paragraphs: list[str] = Field(
+        default_factory=list,
+        description=(
+            "3-4 prose paragraphs: (1) opportunity landscape overview, "
+            "(2) highest-impact opportunities, "
+            "(3) enabling conditions and timing, "
+            "(4) strategic upside summary."
+        ),
+    )
+    bullet_groups: list[list[str]] = Field(
+        default_factory=list,
+        description="2 bullet groups: high-impact opportunities, then enabling conditions.",
+    )
+
+
 _SCHEMA_ADAPTERS = {
     "research_plan": TypeAdapter(ResearchPlan),
     "research_planning": TypeAdapter(ResearchPlanningPayload),
@@ -796,6 +850,9 @@ _SCHEMA_ADAPTERS = {
     "memo_synthesis": TypeAdapter(MemoSynthesisPayload),
     "executive_summary_prose": TypeAdapter(ExecutiveSummaryProsePayload),  # PH6.4
     "decision_analysis_prose": TypeAdapter(DecisionAnalysisProsePayload),  # PH6.5
+    "recommendation_prose": TypeAdapter(RecommendationProsePayload),       # PH6.6
+    "risk_prose": TypeAdapter(RiskProsePayload),                           # PH6.7
+    "opportunity_prose": TypeAdapter(OpportunityProsePayload),             # PH6.8
 }
 
 
@@ -1821,6 +1878,110 @@ class MockClaudeClient:
             bullet_groups=[tradeoff_bullets, uncertainty_bullets],
         )
 
+    def generate_recommendation_prose(
+        self,
+        *,
+        question: str,
+        recommendations: list[dict],
+    ) -> "RecommendationProsePayload":
+        """Generate recommendation section prose (PH6.6) — mock version."""
+        high = [r for r in recommendations if r.get("priority", "").lower() in ("high", "critical")]
+        other = [r for r in recommendations if r not in high]
+        near = [r for r in recommendations if "near" in r.get("time_horizon", "").lower() or "immediate" in r.get("time_horizon", "").lower() or "short" in r.get("time_horizon", "").lower()]
+        high_bullets = [f"{r.get('title', '')}: {r.get('summary', '')[:80]}" for r in high[:5]] or ["Initiate recommended course of action."]
+        other_bullets = [f"{r.get('title', '')}: {r.get('summary', '')[:80]}" for r in other[:5]] or ["Supporting actions to follow priority items."]
+        near_titles = ", ".join(r.get("title", "") for r in near[:3]) if near else "near-term actions"
+        return RecommendationProsePayload(
+            paragraphs=[
+                (
+                    f"{len(recommendations)} recommendation(s) address the strategic question: {question}. "
+                    f"Implementation is organised around {len(high)} high-priority action(s) and {len(other)} supporting measure(s)."
+                ),
+                (
+                    f"Near-term priorities focus on {near_titles}. "
+                    "These actions should be initiated first to establish the conditions for longer-horizon success."
+                ),
+                (
+                    f"Supporting recommendations provide the operational and strategic foundation for sustained progress. "
+                    "Sequencing these actions correctly reduces execution risk and preserves optionality."
+                ),
+                (
+                    "Together, these recommendations represent a coherent implementation plan. "
+                    "Expected outcomes are conditional on the critical assumptions identified in the decision analysis."
+                ),
+            ],
+            bullet_groups=[high_bullets, other_bullets],
+        )
+
+    def generate_risk_prose(
+        self,
+        *,
+        question: str,
+        risks: list[dict],
+        top_risk_statement: str,
+    ) -> "RiskProsePayload":
+        """Generate risk section prose (PH6.7) — mock version."""
+        high = [r for r in risks if r.get("severity", "").lower() == "high"]
+        mitigations = [r.get("mitigation_notes", "") for r in risks if r.get("mitigation_notes")]
+        high_bullets = [f"{r.get('statement', '')[:100]} (Severity: {r.get('severity')}, Likelihood: {r.get('likelihood')})" for r in high[:6]] or ["High-severity risks require mitigation before commitment."]
+        mit_bullets = [m[:100] for m in mitigations[:5]] or ["Standard risk mitigation protocols apply."]
+        return RiskProsePayload(
+            paragraphs=[
+                (
+                    f"{len(risks)} risk(s) have been identified for: {question}. "
+                    f"{len(high)} are classified as High-severity and require attention before commitment."
+                ),
+                (
+                    f"The principal risk is: {top_risk_statement[:150]}. "
+                    "This risk has the greatest potential to affect the viability of the recommended direction."
+                ),
+                (
+                    f"Mitigation strategies exist for {len(mitigations)} of {len(risks)} identified risk(s). "
+                    "Executing these mitigations will reduce residual exposure and strengthen the strategic case."
+                ),
+                (
+                    "Residual uncertainty remains. "
+                    "Risk exposure should be monitored against the critical assumptions identified in the decision analysis."
+                ),
+            ],
+            bullet_groups=[high_bullets, mit_bullets],
+        )
+
+    def generate_opportunity_prose(
+        self,
+        *,
+        question: str,
+        opportunities: list[dict],
+    ) -> "OpportunityProsePayload":
+        """Generate opportunity section prose (PH6.8) — mock version."""
+        high_impact = [o for o in opportunities if o.get("impact", "").lower() == "high"]
+        categories = list({o.get("category", "") for o in opportunities if o.get("category")})
+        top_opp = high_impact[0] if high_impact else (opportunities[0] if opportunities else {})
+        opp_bullets = [f"{o.get('statement', '')[:100]} (Likelihood: {o.get('likelihood')}, Impact: {o.get('impact')})" for o in high_impact[:5]] or ["Strategic opportunity identified."]
+        enabling = [f"Category: {c}" for c in categories[:5]] or ["Enabling conditions to be established."]
+        return OpportunityProsePayload(
+            paragraphs=[
+                (
+                    f"{len(opportunities)} strategic opportunity(ies) have been identified across "
+                    f"{len(categories)} category(ies) for: {question}."
+                ),
+                (
+                    f"The highest-impact opportunity is: {top_opp.get('statement', '')[:150]}. "
+                    f"This opportunity has {top_opp.get('likelihood', 'uncertain').lower()} likelihood "
+                    f"and {top_opp.get('impact', 'uncertain').lower()} expected impact."
+                ),
+                (
+                    "Realising these opportunities requires establishing the conditions identified in the recommendation register. "
+                    f"Timing is material — {len(high_impact)} opportunity(ies) are time-sensitive given market dynamics."
+                ),
+                (
+                    "Captured together, these opportunities represent meaningful strategic upside. "
+                    "The recommended course of action is designed to position Deloitte to capture this value."
+                ),
+            ],
+            bullet_groups=[opp_bullets, enabling],
+        )
+
 
 class ClaudeClient:
     """Thin Anthropic SDK wrapper for structured research calls."""
@@ -2461,6 +2622,52 @@ class ClaudeClient:
             max_tokens=3000,
         )
         return DecisionAnalysisProsePayload.model_validate(payload)
+
+    def generate_recommendation_prose(
+        self,
+        *,
+        question: str,
+        recommendations: list[dict],
+    ) -> RecommendationProsePayload:
+        """Generate recommendation section prose (PH6.6)."""
+        payload = self._call_json(
+            operation="generate_recommendation_prose",
+            schema_name="recommendation_prose",
+            prompt=_recommendation_prose_prompt(question=question, recommendations=recommendations),
+            max_tokens=2500,
+        )
+        return RecommendationProsePayload.model_validate(payload)
+
+    def generate_risk_prose(
+        self,
+        *,
+        question: str,
+        risks: list[dict],
+        top_risk_statement: str,
+    ) -> RiskProsePayload:
+        """Generate risk section prose (PH6.7)."""
+        payload = self._call_json(
+            operation="generate_risk_prose",
+            schema_name="risk_prose",
+            prompt=_risk_prose_prompt(question=question, risks=risks, top_risk_statement=top_risk_statement),
+            max_tokens=2500,
+        )
+        return RiskProsePayload.model_validate(payload)
+
+    def generate_opportunity_prose(
+        self,
+        *,
+        question: str,
+        opportunities: list[dict],
+    ) -> OpportunityProsePayload:
+        """Generate opportunity section prose (PH6.8)."""
+        payload = self._call_json(
+            operation="generate_opportunity_prose",
+            schema_name="opportunity_prose",
+            prompt=_opportunity_prose_prompt(question=question, opportunities=opportunities),
+            max_tokens=2500,
+        )
+        return OpportunityProsePayload.model_validate(payload)
 
     def _call_json(
         self,
@@ -4303,4 +4510,187 @@ Style rules:
 - Do not include internal IDs (OPT-*, DA-*, A-*) in any prose or bullets.
 
 Return structured JSON matching the decision_analysis_prose schema.
+"""
+
+
+def _recommendation_prose_prompt(*, question: str, recommendations: list[dict]) -> str:
+    def _fmt_recs(recs: list[dict]) -> str:
+        if not recs:
+            return "  (none)"
+        lines = []
+        for r in recs:
+            lines.append(f"  - [{r.get('priority','').upper()}] {r.get('title','')} ({r.get('time_horizon','')}): {r.get('summary','')}")
+        return "\n".join(lines)
+
+    near = [r for r in recommendations if any(w in r.get("time_horizon","").lower() for w in ("near","immediate","short"))]
+    medium = [r for r in recommendations if any(w in r.get("time_horizon","").lower() for w in ("medium","long","3"))]
+    high = [r for r in recommendations if r.get("priority","").lower() in ("high","critical")]
+    other = [r for r in recommendations if r not in high]
+
+    return f"""\
+You are an executive communications writer producing the Recommendations section
+of a board-level strategy document.
+
+Your role is communication, not reasoning. The recommendations, priorities, and
+sequencing are fixed — you communicate them with clarity and authority. Do not
+invent new recommendations, change priorities, or alter sequencing.
+
+## Strategic Context
+
+Question: {question}
+Total Recommendations: {len(recommendations)}
+
+## All Recommendations (in priority order)
+
+{_fmt_recs(recommendations)}
+
+## Writing Instructions
+
+Write 4 paragraphs followed by 2 bullet groups.
+
+Paragraph 1 — Overview (2-3 sentences): State the number of recommendations and
+the overall course of action. Identify the high-priority cluster.
+
+Paragraph 2 — Near-term priorities (2-3 sentences): Describe the near-term
+actions and why they come first. Be specific to the recommendation titles.
+
+Paragraph 3 — Sequencing and supporting actions (2-3 sentences): Explain how
+the remaining recommendations build on near-term actions. Describe the sequencing logic.
+
+Paragraph 4 — Expected outcomes (2 sentences): Summarise the expected outcomes
+if recommendations are executed as planned.
+
+Bullet Group 1: High-priority recommendations as concise action bullets.
+Bullet Group 2: Supporting / medium-horizon recommendations as concise bullets.
+
+Style rules:
+- No passive voice where avoidable.
+- No consulting clichés (leverage, synergy, robust, seamless, holistic).
+- No internal IDs (REC-*, A-*, RSK-*) in any prose or bullets.
+- No repetitive paragraph openings.
+- Target 60-100 words per paragraph. Bullets 10-20 words each.
+
+Return structured JSON matching the recommendation_prose schema.
+"""
+
+
+def _risk_prose_prompt(*, question: str, risks: list[dict], top_risk_statement: str) -> str:
+    def _fmt_risks(risks: list[dict]) -> str:
+        if not risks:
+            return "  (none identified)"
+        lines = []
+        for r in risks:
+            mit = f" Mitigation: {r.get('mitigation_notes','')[:80]}" if r.get("mitigation_notes") else ""
+            lines.append(f"  - [{r.get('severity','')}/{r.get('likelihood','')}] {r.get('statement','')[:120]}{mit}")
+        return "\n".join(lines)
+
+    high = [r for r in risks if r.get("severity","").lower() == "high"]
+
+    return f"""\
+You are an executive communications writer producing the Key Risks section
+of a board-level strategy document.
+
+Your role is communication, not reasoning. The risks, severities, and mitigations
+are fixed — you communicate them with clarity. Do not invent risks, change severity
+ratings, or omit material risks.
+
+## Strategic Context
+
+Question: {question}
+Total Risks: {len(risks)}
+High-Severity: {len(high)}
+Principal Risk: {top_risk_statement}
+
+## All Identified Risks
+
+{_fmt_risks(risks)}
+
+## Writing Instructions
+
+Write 4 paragraphs followed by 2 bullet groups.
+
+Paragraph 1 — Risk profile (2-3 sentences): State the total number of risks and
+the high-severity count. Frame the overall risk profile.
+
+Paragraph 2 — Principal risks and business impact (3-4 sentences): Describe the
+highest-severity risks and their potential business impact. Be specific.
+
+Paragraph 3 — Mitigation approach (2-3 sentences): Summarise the mitigation
+strategies for the material risks. Explain how mitigations reduce exposure.
+
+Paragraph 4 — Residual uncertainty (2 sentences): State what risk remains after
+mitigation and what must be monitored.
+
+Bullet Group 1: High-severity risks as concise bullets (statement + severity/likelihood).
+Bullet Group 2: Key mitigation actions as concise bullets.
+
+Style rules:
+- No passive voice where avoidable.
+- No consulting clichés.
+- No internal IDs (RSK-*, A-*, REC-*) in prose or bullets.
+- No repetitive paragraph openings.
+- Target 60-100 words per paragraph. Bullets 10-20 words each.
+
+Return structured JSON matching the risk_prose schema.
+"""
+
+
+def _opportunity_prose_prompt(*, question: str, opportunities: list[dict]) -> str:
+    def _fmt_opps(opps: list[dict]) -> str:
+        if not opps:
+            return "  (none identified)"
+        lines = []
+        for o in opps:
+            lines.append(f"  - [{o.get('category','')}] [{o.get('likelihood','')}/{o.get('impact','')}] {o.get('statement','')[:120]}")
+        return "\n".join(lines)
+
+    high_impact = [o for o in opportunities if o.get("impact","").lower() == "high"]
+    categories = list({o.get("category","") for o in opportunities if o.get("category")})
+
+    return f"""\
+You are an executive communications writer producing the Strategic Opportunities section
+of a board-level strategy document.
+
+Your role is communication, not reasoning. The opportunities, categories, and impact
+ratings are fixed — you communicate them with clarity. Do not invent opportunities,
+change impact ratings, or alter prioritization.
+
+## Strategic Context
+
+Question: {question}
+Total Opportunities: {len(opportunities)}
+High-Impact: {len(high_impact)}
+Categories: {', '.join(categories) if categories else 'not specified'}
+
+## All Identified Opportunities
+
+{_fmt_opps(opportunities)}
+
+## Writing Instructions
+
+Write 4 paragraphs followed by 2 bullet groups.
+
+Paragraph 1 — Opportunity landscape (2-3 sentences): State the number of
+opportunities and category spread. Frame the overall opportunity profile.
+
+Paragraph 2 — Highest-impact opportunities (3-4 sentences): Describe the
+high-impact opportunities and their expected value. Be specific to the statements.
+
+Paragraph 3 — Enabling conditions and timing (2-3 sentences): Explain what
+conditions must be in place to realise these opportunities. Address timing sensitivity.
+
+Paragraph 4 — Strategic upside summary (2 sentences): Summarise the aggregate
+strategic upside if the opportunities are captured.
+
+Bullet Group 1: High-impact opportunities as concise bullets (statement + likelihood/impact).
+Bullet Group 2: Key enabling conditions or categories as concise bullets.
+
+Style rules:
+- No passive voice where avoidable.
+- No consulting clichés.
+- No internal IDs (OPP-*, A-*, REC-*) in prose or bullets.
+- No repetitive paragraph openings.
+- Target 60-100 words per paragraph. Bullets 10-20 words each.
+
+Return structured JSON matching the opportunity_prose schema.
 """
