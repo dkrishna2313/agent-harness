@@ -726,6 +726,30 @@ class StrategicSynthesisPayload(BaseModel):
     )
 
 
+class ExecutiveSummaryProsePayload(BaseModel):
+    """Executive summary prose for the EditorialManuscript (PH6.4).
+
+    Populated by the ExecutiveSummaryWriter via an LLM call.
+    Contains no structural metadata — only the written text.
+    """
+
+    paragraphs: list[str] = Field(
+        default_factory=list,
+        description=(
+            "4 prose paragraphs in order: (1) recommended direction and board verdict, "
+            "(2) rationale and key tradeoffs, (3) principal conditions, "
+            "(4) decision readiness and next steps."
+        ),
+    )
+    bullet_groups: list[list[str]] = Field(
+        default_factory=list,
+        description=(
+            "2 bullet groups: first is key conditions (one per bullet), "
+            "second is critical unknowns (one per bullet)."
+        ),
+    )
+
+
 _SCHEMA_ADAPTERS = {
     "research_plan": TypeAdapter(ResearchPlan),
     "research_planning": TypeAdapter(ResearchPlanningPayload),
@@ -747,6 +771,7 @@ _SCHEMA_ADAPTERS = {
     # Used for response validation (lenient — items validated per-item in extract_evidence).
     "evidence_extraction_raw": TypeAdapter(_RawEvidencePayload),
     "memo_synthesis": TypeAdapter(MemoSynthesisPayload),
+    "executive_summary_prose": TypeAdapter(ExecutiveSummaryProsePayload),  # PH6.4
 }
 
 
@@ -1676,6 +1701,53 @@ class MockClaudeClient:
         )
         return ExecutiveConfidencePayload(confidence=item)
 
+    def generate_executive_summary_prose(
+        self,
+        *,
+        question: str,
+        recommended_option_title: str,
+        board_recommendation: str,
+        decision_readiness: str,
+        overall_confidence: str,
+        option_description: str,
+        strategic_objective: str,
+        key_tradeoffs: list[str],
+        key_conditions: list[str],
+        critical_unknowns: list[str],
+    ) -> "ExecutiveSummaryProsePayload":
+        """Generate executive summary prose (PH6.4) — mock version."""
+        cond_bullets = [c[:120] for c in key_conditions[:6]] or [
+            "Validate core market assumptions before commitment."
+        ]
+        unknown_bullets = [u[:120] for u in critical_unknowns[:6]] or [
+            "Independent evidence verification remains outstanding."
+        ]
+        tradeoffs_text = "; ".join(key_tradeoffs[:3]) if key_tradeoffs else "No tradeoffs specified."
+        return ExecutiveSummaryProsePayload(
+            paragraphs=[
+                (
+                    f"The analysis recommends {recommended_option_title}. "
+                    f"The board-level assessment is: {board_recommendation}."
+                ),
+                (
+                    f"This direction is preferred because it best advances the strategic objective of {strategic_objective}. "
+                    f"{option_description[:200].rstrip('.')}. "
+                    f"The decisive tradeoffs are: {tradeoffs_text}."
+                ),
+                (
+                    f"The recommendation holds under {len(key_conditions)} principal condition(s). "
+                    "These conditions define the boundaries within which the preferred direction "
+                    "maintains its risk-adjusted advantage over alternatives."
+                ),
+                (
+                    f"Decision readiness is assessed as {decision_readiness} with {overall_confidence} overall confidence. "
+                    f"{len(critical_unknowns)} critical unknown(s) remain unresolved. "
+                    "These must be addressed through the validation priorities before a final commitment is made."
+                ),
+            ],
+            bullet_groups=[cond_bullets, unknown_bullets],
+        )
+
 
 class ClaudeClient:
     """Thin Anthropic SDK wrapper for structured research calls."""
@@ -2256,6 +2328,40 @@ class ClaudeClient:
             source_notes=list(evidence_items),
             evidence=list(evidence_items),
         )
+
+    def generate_executive_summary_prose(
+        self,
+        *,
+        question: str,
+        recommended_option_title: str,
+        board_recommendation: str,
+        decision_readiness: str,
+        overall_confidence: str,
+        option_description: str,
+        strategic_objective: str,
+        key_tradeoffs: list[str],
+        key_conditions: list[str],
+        critical_unknowns: list[str],
+    ) -> ExecutiveSummaryProsePayload:
+        """Generate board-level executive summary prose (PH6.4)."""
+        payload = self._call_json(
+            operation="generate_executive_summary_prose",
+            schema_name="executive_summary_prose",
+            prompt=_executive_summary_prose_prompt(
+                question=question,
+                recommended_option_title=recommended_option_title,
+                board_recommendation=board_recommendation,
+                decision_readiness=decision_readiness,
+                overall_confidence=overall_confidence,
+                option_description=option_description,
+                strategic_objective=strategic_objective,
+                key_tradeoffs=key_tradeoffs,
+                key_conditions=key_conditions,
+                critical_unknowns=critical_unknowns,
+            ),
+            max_tokens=3000,
+        )
+        return ExecutiveSummaryProsePayload.model_validate(payload)
 
     def _call_json(
         self,
@@ -3930,4 +4036,87 @@ CONSTRAINTS
   Describe assumptions and risks by their substance, not their ID.
 
 Return structured JSON matching the executive_confidence_generation schema.
+"""
+
+
+def _executive_summary_prose_prompt(
+    *,
+    question: str,
+    recommended_option_title: str,
+    board_recommendation: str,
+    decision_readiness: str,
+    overall_confidence: str,
+    option_description: str,
+    strategic_objective: str,
+    key_tradeoffs: list[str],
+    key_conditions: list[str],
+    critical_unknowns: list[str],
+) -> str:
+    def _bullets(items: list[str]) -> str:
+        if not items:
+            return "  (none specified)"
+        return "\n".join(f"  - {item}" for item in items)
+
+    return f"""\
+You are an executive communications writer producing the board-level Executive Summary
+section of a strategic advisory document.
+
+Your role is communication, not reasoning. Produce clear, authoritative prose from
+the structured inputs below. Do not invent new facts, risks, opportunities, or conclusions.
+Every claim must be traceable to the structured inputs.
+
+## Strategic Context
+
+Question: {question}
+Recommended Direction: {recommended_option_title}
+Board Recommendation: {board_recommendation}
+Decision Readiness: {decision_readiness}
+Overall Confidence: {overall_confidence}
+
+## Recommended Option
+
+Title: {recommended_option_title}
+Description: {option_description}
+Strategic Objective: {strategic_objective}
+
+## Key Tradeoffs vs Alternatives
+
+{_bullets(key_tradeoffs)}
+
+## Principal Conditions (must hold for recommendation to succeed)
+
+{_bullets(key_conditions)}
+
+## Critical Unknowns
+
+{_bullets(critical_unknowns)}
+
+## Writing Instructions
+
+Write exactly 4 paragraphs followed by 2 bullet groups.
+
+Paragraph 1 — Opening (2-3 sentences): State the recommended strategic direction and
+the board-level recommendation. Be direct. Avoid "This report recommends..." openings.
+
+Paragraph 2 — Rationale (3-4 sentences): Explain why this direction is preferred over
+alternatives. Reference the strategic objective and the decisive tradeoffs. Be specific.
+
+Paragraph 3 — Conditions (2-3 sentences): State the principal conditions that must hold
+for the recommendation to succeed. Be concrete. Do not list IDs.
+
+Paragraph 4 — Decision Readiness (2-3 sentences): Summarise the critical unknowns and
+the decision readiness assessment. State clearly what must happen before final commitment.
+
+Bullet Group 1: The key conditions as concise bullets (one condition per bullet, plain language).
+Bullet Group 2: The critical unknowns as concise bullets (one unknown per bullet, plain language).
+
+Style rules:
+- Write with authority and precision.
+- Avoid passive voice where possible.
+- No consulting clichés (leverage, synergy, robust, seamless, cutting-edge, holistic).
+- No repetitive sentence openings — each paragraph must begin with a different word.
+- Target 70-120 words per paragraph.
+- Bullets should be 10-20 words each.
+
+Return structured JSON matching the executive_summary_prose schema.
 """
