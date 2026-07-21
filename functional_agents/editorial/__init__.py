@@ -15,6 +15,7 @@ from __future__ import annotations
 from .editorial_brief import (
     EditorialBrief,
     BriefMetadata,
+    SectionProvenance,
     ExecutiveSummarySection,
     DecisionAnalysisSection,
     StrategicOptionsSection,
@@ -36,6 +37,7 @@ from .editorial_coordinator import EditorialCoordinator
 __all__ = [
     "EditorialBrief",
     "BriefMetadata",
+    "SectionProvenance",
     "ExecutiveSummarySection",
     "DecisionAnalysisSection",
     "StrategicOptionsSection",
