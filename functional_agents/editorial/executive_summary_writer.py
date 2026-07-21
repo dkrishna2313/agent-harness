@@ -17,11 +17,12 @@ from typing import Any
 
 from .editorial_brief import EditorialBrief
 from .editorial_manuscript import EditorialManuscript
+from .editorial_writer import EditorialWriter
 
 LOGGER = logging.getLogger(__name__)
 
 
-class ExecutiveSummaryWriter:
+class ExecutiveSummaryWriter(EditorialWriter):
     """Writer for EditorialManuscript.executive_summary.
 
     Call write(brief, manuscript) → populated EditorialManuscript.

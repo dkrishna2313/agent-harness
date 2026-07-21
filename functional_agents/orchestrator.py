@@ -995,20 +995,21 @@ class Orchestrator:
         except Exception as exc:
             LOGGER.warning("[Orchestrator] canonical pipeline trace write failed: %s", exc)
 
-        # PH6.2a/PH6.3/PH6.4 — build EditorialBrief, scaffold EditorialManuscript,
-        # and run the ExecutiveSummaryWriter to populate the first section.
+        # PH6.2a/PH6.3/PH6.4/PH6.5 — build EditorialBrief, scaffold EditorialManuscript,
+        # run writers to populate sections in sequence.
         # Best-effort: a failure must never block post-run diagnostics or the caller.
         try:
-            from .editorial import EditorialCoordinator, ExecutiveSummaryWriter
+            from .editorial import EditorialCoordinator, ExecutiveSummaryWriter, DecisionAnalysisWriter
             _eb_coord = EditorialCoordinator()
             _eb = _eb_coord.build(result_ctx)
             _eb_path = _eb_coord.persist(_eb)
             print(f"Editorial brief → {_eb_path}")
             _em = _eb_coord.build_manuscript(_eb)
-            # PH6.4 — write the Executive Summary section via LLM.
             _client = result_ctx.trace.get("_client")
-            _writer = ExecutiveSummaryWriter(client=_client)
-            _em = _writer.write(_eb, _em)
+            # PH6.4 — Executive Summary
+            ExecutiveSummaryWriter(client=_client).write(_eb, _em)
+            # PH6.5 — Decision Analysis
+            DecisionAnalysisWriter(client=_client).write(_eb, _em)
             _em_path = _eb_coord.persist_manuscript(_em)
             print(f"Editorial manuscript → {_em_path}")
         except Exception as exc:

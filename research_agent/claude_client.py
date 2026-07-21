@@ -750,6 +750,29 @@ class ExecutiveSummaryProsePayload(BaseModel):
     )
 
 
+class DecisionAnalysisProsePayload(BaseModel):
+    """Decision analysis prose for the EditorialManuscript (PH6.5).
+
+    Populated by the DecisionAnalysisWriter via an LLM call.
+    """
+
+    paragraphs: list[str] = Field(
+        default_factory=list,
+        description=(
+            "4-5 prose paragraphs: (1) recommended option and ranking, "
+            "(2) why preferred over alternatives, (3) principal tradeoffs, "
+            "(4) key uncertainties and sensitivities, (5) confidence in the analysis."
+        ),
+    )
+    bullet_groups: list[list[str]] = Field(
+        default_factory=list,
+        description=(
+            "2 bullet groups: first is key tradeoffs (one per bullet), "
+            "second is key uncertainties (one per bullet)."
+        ),
+    )
+
+
 _SCHEMA_ADAPTERS = {
     "research_plan": TypeAdapter(ResearchPlan),
     "research_planning": TypeAdapter(ResearchPlanningPayload),
@@ -772,6 +795,7 @@ _SCHEMA_ADAPTERS = {
     "evidence_extraction_raw": TypeAdapter(_RawEvidencePayload),
     "memo_synthesis": TypeAdapter(MemoSynthesisPayload),
     "executive_summary_prose": TypeAdapter(ExecutiveSummaryProsePayload),  # PH6.4
+    "decision_analysis_prose": TypeAdapter(DecisionAnalysisProsePayload),  # PH6.5
 }
 
 
@@ -1748,6 +1772,55 @@ class MockClaudeClient:
             bullet_groups=[cond_bullets, unknown_bullets],
         )
 
+    def generate_decision_analysis_prose(
+        self,
+        *,
+        question: str,
+        recommended_option_title: str,
+        ranked_option_titles: list[str],
+        comparison_dimensions: list[str],
+        key_tradeoffs: list[str],
+        key_uncertainties: list[str],
+    ) -> "DecisionAnalysisProsePayload":
+        """Generate decision analysis prose (PH6.5) — mock version."""
+        tradeoff_bullets = [t[:120] for t in key_tradeoffs[:6]] or [
+            "No comparative tradeoffs recorded."
+        ]
+        uncertainty_bullets = [u[:120] for u in key_uncertainties[:6]] or [
+            "Key uncertainties unspecified."
+        ]
+        alt_titles = [t for t in ranked_option_titles if t != recommended_option_title]
+        alt_text = ", ".join(alt_titles[:2]) if alt_titles else "the alternatives considered"
+        dims_text = ", ".join(comparison_dimensions[:4]) if comparison_dimensions else "the evaluation dimensions"
+        return DecisionAnalysisProsePayload(
+            paragraphs=[
+                (
+                    f"{recommended_option_title} ranks first among the {len(ranked_option_titles)} "
+                    f"option(s) evaluated for: {question}."
+                ),
+                (
+                    f"Compared to {alt_text}, this option achieves a stronger risk-adjusted position "
+                    f"across {dims_text}. "
+                    "The comparison reflects the full set of strategic, financial, and execution dimensions."
+                ),
+                (
+                    f"The analysis identifies {len(key_tradeoffs)} decisive tradeoff(s). "
+                    "These tradeoffs define where the recommended option accepts short-term costs "
+                    "to secure long-term strategic advantage."
+                ),
+                (
+                    f"{len(key_uncertainties)} key uncertainty(ies) affect the robustness of this ranking. "
+                    "If the primary uncertainties resolve unfavourably, the sensitivity of the recommendation "
+                    "should be reassessed before commitment."
+                ),
+                (
+                    "The analysis is based on structured comparison across the evaluation dimensions. "
+                    "Confidence in the ranking is conditional on the assumptions underpinning the recommended path."
+                ),
+            ],
+            bullet_groups=[tradeoff_bullets, uncertainty_bullets],
+        )
+
 
 class ClaudeClient:
     """Thin Anthropic SDK wrapper for structured research calls."""
@@ -2362,6 +2435,32 @@ class ClaudeClient:
             max_tokens=3000,
         )
         return ExecutiveSummaryProsePayload.model_validate(payload)
+
+    def generate_decision_analysis_prose(
+        self,
+        *,
+        question: str,
+        recommended_option_title: str,
+        ranked_option_titles: list[str],
+        comparison_dimensions: list[str],
+        key_tradeoffs: list[str],
+        key_uncertainties: list[str],
+    ) -> DecisionAnalysisProsePayload:
+        """Generate decision analysis executive prose (PH6.5)."""
+        payload = self._call_json(
+            operation="generate_decision_analysis_prose",
+            schema_name="decision_analysis_prose",
+            prompt=_decision_analysis_prose_prompt(
+                question=question,
+                recommended_option_title=recommended_option_title,
+                ranked_option_titles=ranked_option_titles,
+                comparison_dimensions=comparison_dimensions,
+                key_tradeoffs=key_tradeoffs,
+                key_uncertainties=key_uncertainties,
+            ),
+            max_tokens=3000,
+        )
+        return DecisionAnalysisProsePayload.model_validate(payload)
 
     def _call_json(
         self,
@@ -4119,4 +4218,89 @@ Style rules:
 - Bullets should be 10-20 words each.
 
 Return structured JSON matching the executive_summary_prose schema.
+"""
+
+
+def _decision_analysis_prose_prompt(
+    *,
+    question: str,
+    recommended_option_title: str,
+    ranked_option_titles: list[str],
+    comparison_dimensions: list[str],
+    key_tradeoffs: list[str],
+    key_uncertainties: list[str],
+) -> str:
+    def _bullets(items: list[str]) -> str:
+        if not items:
+            return "  (none specified)"
+        return "\n".join(f"  - {item}" for item in items)
+
+    def _ranked(titles: list[str]) -> str:
+        if not titles:
+            return "  (no ranking available)"
+        return "\n".join(f"  {i+1}. {t}" for i, t in enumerate(titles))
+
+    return f"""\
+You are an executive communications writer producing the Strategic Analysis section
+of a board-level strategy document.
+
+Your role is communication, not reasoning. The ranking, tradeoffs, and uncertainties
+are fixed — you communicate them with clarity and authority. Do not invent new facts,
+change rankings, or introduce new options or risks.
+
+## Strategic Context
+
+Question: {question}
+Recommended Option: {recommended_option_title}
+
+## Option Rankings (most to least preferred)
+
+{_ranked(ranked_option_titles)}
+
+## Comparison Dimensions
+
+{_bullets(comparison_dimensions)}
+
+## Key Tradeoffs
+
+{_bullets(key_tradeoffs)}
+
+## Key Uncertainties
+
+{_bullets(key_uncertainties)}
+
+## Writing Instructions
+
+Write exactly 5 paragraphs followed by 2 bullet groups.
+
+Paragraph 1 — Opening (2 sentences): State the recommended option and its position
+in the ranking. Be direct.
+
+Paragraph 2 — Why preferred (3-4 sentences): Explain why the recommended option
+outperforms the alternatives across the comparison dimensions. Reference specific
+dimensions. Do not repeat the ranking — explain the reasoning.
+
+Paragraph 3 — Tradeoffs (2-3 sentences): State the principal tradeoffs the
+recommended option accepts versus alternatives. Be concrete.
+
+Paragraph 4 — Uncertainties and sensitivity (2-3 sentences): Explain the key
+uncertainties and their effect on the robustness of the recommendation. State
+what would need to change for the ranking to shift.
+
+Paragraph 5 — Confidence (2 sentences): Summarise confidence in the analysis
+and what it is conditional on.
+
+Bullet Group 1: The key tradeoffs as concise bullets (one per bullet, plain language).
+Bullet Group 2: The key uncertainties as concise bullets (one per bullet, plain language).
+
+Style rules:
+- Write with authority and precision.
+- Avoid passive voice where possible.
+- No consulting clichés (leverage, synergy, robust, seamless, holistic, cutting-edge).
+- No repetitive paragraph openings — each paragraph must begin with a different word.
+- Target 60-100 words per paragraph.
+- Bullets should be 10-20 words each.
+- Do not include internal IDs (OPT-*, DA-*, A-*) in any prose or bullets.
+
+Return structured JSON matching the decision_analysis_prose schema.
 """
