@@ -171,11 +171,12 @@ def test_section1_executive_summary_from_narrative():
 
 
 def test_section1_recommended_option_title_from_narrative():
-    """§1 recommendation line uses narrative.recommended_option title (P1.1)."""
+    """§1 recommendation line uses narrative.recommended_option title (PH6.0 prose format)."""
     ctx = _make_narrative_context()
     report = _build_j7_executive_report(ctx)
     section_1 = report.split("## 2.")[0]
-    assert "**Recommendation:** Phased Deployment" in section_1
+    # PH6.0: no "**Recommendation:**" label — plain prose opener "Pursue {title}"
+    assert "Phased Deployment" in section_1
 
 
 # ---------------------------------------------------------------------------

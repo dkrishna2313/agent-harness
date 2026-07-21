@@ -845,7 +845,7 @@ def _build_executive_summary(
     uncovered = ev_summary.get("subquestions_without_evidence", 0)
     confidence = qa.get("confidence_assessment", {}).get("overall_confidence", "MEDIUM")
 
-    # Para 1: scope
+    # Para 1: context — lead with what was examined, not with "This inquiry..."
     n_sq = len(subquestions)
     type_label = {
         "FACT_LOOKUP": "factual",
@@ -854,30 +854,29 @@ def _build_executive_summary(
         "RESEARCH": "in-depth research",
     }.get(research_type, "research")
     p1 = (
-        f"This {type_label} inquiry examined: \"{question}\". "
-        f"The analysis was structured around {n_sq} sub-question{'' if n_sq == 1 else 's'}, "
-        f"drawing on {total_ev} evidence item{'' if total_ev == 1 else 's'} "
-        f"across multiple sources."
+        f"\"{question}\" — a {type_label} examination across "
+        f"{n_sq} dimension{'' if n_sq == 1 else 's'}, "
+        f"drawing on {total_ev} evidence item{'' if total_ev == 1 else 's'}."
     )
 
-    # Para 2: what the evidence shows
+    # Para 2: what the evidence shows — lead with the strongest finding
     finding_strs = [f["finding"] for f in findings[:3]]
     if finding_strs:
-        bullets = "; ".join(finding_strs)
-        p2 = f"Key findings indicate: {bullets}."
+        first = finding_strs[0].split("[")[0].strip().rstrip(".")
+        rest = "; ".join(finding_strs[1:]) if len(finding_strs) > 1 else ""
+        p2 = f"{first}." + (f" Additional findings: {rest}." if rest else "")
     else:
         p2 = "The available evidence did not yield strongly supported conclusions."
 
     # Para 3: coverage / gaps
     if uncovered == 0:
         p3 = (
-            f"Evidence coverage was comprehensive: all {covered} sub-question{'' if covered == 1 else 's'} "
-            f"received supporting evidence."
+            f"All {covered} dimension{'' if covered == 1 else 's'} received supporting evidence."
         )
     else:
         p3 = (
-            f"Coverage was partial: {covered} of {n_sq} sub-question{'' if n_sq == 1 else 's'} "
-            f"received evidence support, while {uncovered} remain{'' if uncovered == 1 else 's'} "
+            f"{covered} of {n_sq} dimension{'' if n_sq == 1 else 's'} "
+            f"received evidence support; {uncovered} remain{'' if uncovered == 1 else 's'} "
             f"without direct evidence."
         )
 
@@ -885,11 +884,13 @@ def _build_executive_summary(
     high_risks = [r for r in risks if r.get("severity") == "HIGH"]
     risk_str = ""
     if high_risks:
-        risk_labels = "; ".join(r["risk"] for r in high_risks[:2])
-        risk_str = f" Key risks identified: {risk_labels}."
+        top_risk = high_risks[0]["risk"].rstrip(".")
+        risk_str = f" {top_risk}."
+        if len(high_risks) > 1:
+            risk_str += f" ({len(high_risks) - 1} additional high-severity risk{'s' if len(high_risks) > 2 else ''} identified.)"
     p4 = (
-        f"Overall analytical confidence is assessed as {confidence}.{risk_str} "
-        f"Readers should weigh findings against the identified gaps before drawing conclusions."
+        f"Confidence: {confidence}.{risk_str} "
+        f"Weigh findings against identified gaps before acting."
     )
 
     return "\n\n".join([p1, p2, p3, p4])
@@ -1254,6 +1255,23 @@ def _replace_supporting_evidence_uuids(
 
 
 # ---------------------------------------------------------------------------
+# PH6.0 — Board recommendation → natural prose (used in executive summary
+# and decision readiness sections; keeps prose out of data model).
+# ---------------------------------------------------------------------------
+
+_BOARD_PROSE: dict[str, str] = {
+    "Proceed with Conditions": "proceed — with the conditions outlined below.",
+    "Proceed with conditions": "proceed — with the conditions outlined below.",
+    "Proceed": "proceed. The investment case is supported.",
+    "Do Not Proceed": "not proceed at this stage.",
+    "Do Not Proceed Yet": "defer this decision. The evidence base is not yet strong enough to commit.",
+    "Defer": "defer pending additional validation.",
+    "Reject": "not pursue this option. The evidence does not support the investment case.",
+    "Needs Additional Validation": "validate before committing capital.",
+}
+
+
+# ---------------------------------------------------------------------------
 # P1.1 / P1.2 — Executive Narrative Polish helpers
 # ---------------------------------------------------------------------------
 
@@ -1458,28 +1476,37 @@ def _build_j7_executive_summary_section(
 ) -> list[str]:
     """Render Section 1 (Executive Summary) as a recommendation-led executive block.
 
+    PH6.0: Conclusion-first prose. No label:value format. Every line is a
+    complete natural-language statement. Board/CEO audience.
+
     Structure:
-      Recommendation → Decision Readiness → Why this matters →
-      Why this option wins → Confidence (with top limiters) → Immediate next step
+      Recommendation statement → Decision stance → Why it matters →
+      Why this option wins → Confidence → Next step
     """
     lines: list[str] = []
     eng = context.engagement or {}
     nec = narrative.executive_confidence
 
-    # Recommendation — option title only (no ID in executive prose — PH5.x)
     _rec = narrative.recommended_option
-    if _rec.get("title"):
-        lines += [f"**Recommendation:** {_rec['title']}", ""]
+    _title = (_rec.get("title") or "").strip()
+    _board = ((nec or {}).get("board_recommendation") or "").strip() if nec else ""
+    _readiness = ((nec or {}).get("decision_readiness") or "").strip() if nec else ""
 
-    # Decision readiness and board stance
-    if nec:
-        _readiness = (nec.get("decision_readiness") or "").strip()
-        _board = (nec.get("board_recommendation") or "").strip()
-        if _readiness or _board:
-            _parts = [p for p in [_readiness, _board] if p]
-            lines += [f"**Decision Readiness:** {' — '.join(_parts)}", ""]
+    # --- Lead with the recommendation (plain statement, no label) ---
+    if _title:
+        _board_prose = _BOARD_PROSE.get(_board, "")
+        if not _board_prose and _board:
+            _board_prose = f"{_board[0].lower()}{_board[1:]}."
+        if _board_prose:
+            lines += [f"Pursue {_title}. {_board_prose[0].upper()}{_board_prose[1:]}", ""]
+        else:
+            lines += [f"Pursue {_title}.", ""]
 
-    # Why this matters — first engagement objective or opening of current_situation
+    # --- Decision readiness as a concise statement ---
+    if _readiness and _readiness not in (_board,):
+        lines += [f"Decision readiness: {_readiness}.", ""]
+
+    # --- Why this matters — first engagement objective or current situation ---
     _why_matters = ""
     _objectives = eng.get("objectives") or []
     if _objectives:
@@ -1489,9 +1516,9 @@ def _build_j7_executive_summary_section(
         _first = _cs.split(".")[0].strip()
         _why_matters = (_first + ".") if _first and not _first.endswith(".") else _first
     if _why_matters:
-        lines += [f"**Why this matters:** {_why_matters}", ""]
+        lines += [_why_matters, ""]
 
-    # Why this option wins — first two sentences of the rationale, cleaned
+    # --- Why this option wins — first two sentences of the rationale, cleaned ---
     _why_wins = _clean_internal_language((narrative.why_this_option or "").strip())
     if _why_wins:
         _sents = _why_wins.split(". ")
@@ -1499,23 +1526,23 @@ def _build_j7_executive_summary_section(
         if _short and not _short.endswith("."):
             _short += "."
         if _short:
-            lines += [f"**Why this option wins:** {_short}", ""]
+            lines += [_short, ""]
 
-    # Confidence — natural-language sentence (P1.2)
+    # --- Confidence — natural-language sentence (P1.2) ---
     if nec:
         _conf = (nec.get("overall_confidence") or "").strip()
         _limiters = list(nec.get("confidence_limiters") or [])[:2]
         if _conf:
             _conf_text = _format_confidence_sentence(_conf, _limiters)
             if _conf_text:
-                lines += [f"**Confidence:** {_conf_text}", ""]
+                lines += [_conf_text, ""]
 
-    # Immediate next step — cleaned, non-truncated validation text (P1.2)
+    # --- Immediate next step — action verb, no trailing fragment (P1.2) ---
     _prios = list(narrative.validation_priorities or [])
     if _prios:
         _next = _clean_validation_text(_prios[0], list(narrative.critical_assumptions or []))
         if _next:
-            lines += [f"**Immediate next step:** {_next}", ""]
+            lines += [f"**Next step:** {_next}", ""]
 
     return lines
 
@@ -1649,6 +1676,14 @@ def _build_j7_decision_readiness_section(
     ec_conf = nec.get("overall_confidence", "")
     ec_ready = nec.get("decision_readiness", "")
     ec_board = nec.get("board_recommendation", "")
+
+    # PH6.0: Open with "Leadership should..." (style guide: confidence section opener)
+    _board_prose = _BOARD_PROSE.get(ec_board, "")
+    if not _board_prose and ec_board:
+        _board_prose = f"{ec_board[0].lower()}{ec_board[1:]}."
+    if _board_prose:
+        lines += [f"Leadership should {_board_prose}", ""]
+
     if ec_conf:
         lines += [f"**Overall Confidence:** {ec_conf}", ""]
     if ec_ready:
@@ -1751,8 +1786,24 @@ def _build_j7_critical_assumptions_section(
             if _aid not in _risk_impact:
                 _risk_impact[_aid] = _r.get("statement", "").replace("|", "\\|")[:100]
 
+    # PH6.0: Lead with dependency statement (style guide: "This recommendation depends on...")
+    _n_critical = sum(1 for a in exec_assumptions if a.get("importance") == "Critical")
+    _n_total = len(exec_assumptions)
+    if _n_critical > 1:
+        _dep_intro = (
+            f"This recommendation depends on {_n_critical} critical assumptions. "
+            "If either fails, the investment case changes materially."
+        )
+    elif _n_critical == 1:
+        _dep_intro = (
+            "This recommendation depends on one critical assumption. "
+            "If it fails, the investment case changes materially."
+        )
+    else:
+        _dep_intro = f"This recommendation rests on {_n_total} important assumption{'s' if _n_total != 1 else ''}."
+
     lines: list[str] = [
-        "*Critical and important assumptions underpinning the recommended path.*",
+        _dep_intro,
         "",
         "| Assumption | Importance | Impact if Invalid |",
         "|---|---|---|",
@@ -1784,8 +1835,16 @@ def _build_j7_key_risks_section(risks: list[dict[str, Any]]) -> list[str]:
     med_risks = [r for r in sorted_risks if r.get("severity") == "Medium"]
     exec_risks = high_risks + med_risks[:max(0, 5 - len(high_risks))]
 
+    # PH6.0: Lead with the most significant risk (style guide: "lead with what could prevent success")
+    if high_risks:
+        _top_stmt = high_risks[0].get("statement", high_risks[0].get("title", high_risks[0].get("description", ""))).strip().rstrip(".")
+        _top_stmt = _top_stmt[:140] if len(_top_stmt) > 140 else _top_stmt
+        _risk_intro = f"{_top_stmt}. This is the primary execution risk."
+    else:
+        _risk_intro = "No high-severity risks identified. Medium-severity risks are listed below."
+
     lines: list[str] = [
-        "*High and medium-severity risks ordered by business impact, with available mitigations.*",
+        _risk_intro,
         "",
         "| Risk | Likelihood | Business Impact | Mitigation |",
         "|---|---|---|---|",
@@ -1817,8 +1876,13 @@ def _build_j7_strategic_opportunities_section(
     )
     exec_opps = sorted_opps[:5]
 
+    # PH6.0: Lead with the highest-impact opportunity (style guide: lead with the upside)
+    _top_opp_stmt = exec_opps[0].get("statement", exec_opps[0].get("title", exec_opps[0].get("description", ""))).strip().rstrip(".")
+    _top_opp_stmt = _top_opp_stmt[:140] if len(_top_opp_stmt) > 140 else _top_opp_stmt
+    _opp_intro = f"{_top_opp_stmt}." if _top_opp_stmt else "Top opportunities by expected impact are listed below."
+
     lines: list[str] = [
-        "*Top opportunities ranked by expected benefit and likelihood.*",
+        _opp_intro,
         "",
         "| Opportunity | Category | Expected Benefit | Likelihood |",
         "|---|---|---|---|",
