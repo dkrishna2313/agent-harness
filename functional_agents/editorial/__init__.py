@@ -1,10 +1,10 @@
-"""Editorial Platform (PH6.2a).
+"""Editorial Platform (PH6.3).
 
-Provides the canonical handoff boundary between executive reasoning and
-executive communication:
+Provides the canonical chain between executive reasoning and editorial artifacts:
 
     EditorialBrief          -- structured executive knowledge, no formatting
-    EditorialCoordinator    -- maps AgentContext → EditorialBrief + persistence
+    EditorialManuscript     -- editorial scaffold; writers populate in PH6.4+
+    EditorialCoordinator    -- AgentContext → EditorialBrief → EditorialManuscript
 
 The editorial package never calls an LLM, never mutates AgentContext reasoning
 fields, and never produces rendered prose or markdown.
@@ -32,9 +32,23 @@ from .editorial_brief import (
     ValidationPrioritiesSection,
     AppendixSection,
 )
+from .editorial_manuscript import (
+    EditorialManuscript,
+    ManuscriptMetadata,
+    ManuscriptProvenance,
+    ManuscriptSection,
+    ExecutiveSummaryManuscriptSection,
+    DecisionAnalysisManuscriptSection,
+    RecommendationManuscriptSection,
+    RiskManuscriptSection,
+    OpportunityManuscriptSection,
+    ConfidenceManuscriptSection,
+    AppendixManuscriptSection,
+)
 from .editorial_coordinator import EditorialCoordinator
 
 __all__ = [
+    # Brief
     "EditorialBrief",
     "BriefMetadata",
     "SectionProvenance",
@@ -53,5 +67,18 @@ __all__ = [
     "ConfidenceSection",
     "ValidationPrioritiesSection",
     "AppendixSection",
+    # Manuscript
+    "EditorialManuscript",
+    "ManuscriptMetadata",
+    "ManuscriptProvenance",
+    "ManuscriptSection",
+    "ExecutiveSummaryManuscriptSection",
+    "DecisionAnalysisManuscriptSection",
+    "RecommendationManuscriptSection",
+    "RiskManuscriptSection",
+    "OpportunityManuscriptSection",
+    "ConfidenceManuscriptSection",
+    "AppendixManuscriptSection",
+    # Coordinator
     "EditorialCoordinator",
 ]

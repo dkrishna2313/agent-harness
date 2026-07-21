@@ -1,9 +1,10 @@
-"""EditorialCoordinator — maps AgentContext → EditorialBrief (PH6.2b).
+"""EditorialCoordinator — maps AgentContext → EditorialBrief → EditorialManuscript (PH6.3).
 
 Responsibilities:
   - Consume AgentContext after the reasoning pipeline completes
   - Produce an EditorialBrief containing structured executive knowledge
-  - Persist latest_editorial_brief.json alongside decision_model and research_object
+  - Produce an EditorialManuscript scaffold from the EditorialBrief
+  - Persist latest_editorial_brief.json and latest_editorial_manuscript.json
 
 Rules:
   - No summarisation, no prose generation, no LLM calls
@@ -41,12 +42,26 @@ from .editorial_brief import (
     ValidationPrioritiesSection,
 )
 
+from .editorial_manuscript import (
+    AppendixManuscriptSection,
+    ConfidenceManuscriptSection,
+    DecisionAnalysisManuscriptSection,
+    EditorialManuscript,
+    ExecutiveSummaryManuscriptSection,
+    ManuscriptMetadata,
+    ManuscriptProvenance,
+    OpportunityManuscriptSection,
+    RecommendationManuscriptSection,
+    RiskManuscriptSection,
+)
+
 if TYPE_CHECKING:
     from ..context import AgentContext
 
 LOGGER = logging.getLogger(__name__)
 
-_LATEST_PATH = Path("outputs/latest_editorial_brief.json")
+_LATEST_BRIEF_PATH = Path("outputs/latest_editorial_brief.json")
+_LATEST_MANUSCRIPT_PATH = Path("outputs/latest_editorial_manuscript.json")
 
 
 class EditorialCoordinator:
@@ -358,4 +373,119 @@ class EditorialCoordinator:
                 research_object_id=ro.get("research_id", ""),
                 decision_model_id=(ctx.decision_model or {}).get("decision_model_id", ""),
             ),
+        )
+
+    # ------------------------------------------------------------------
+    # Manuscript scaffold (PH6.3)
+    # ------------------------------------------------------------------
+
+    def build_manuscript(self, brief: EditorialBrief) -> EditorialManuscript:
+        """Produce an empty EditorialManuscript scaffold from an EditorialBrief.
+
+        Does not generate prose. Content fields (paragraphs, bullet_groups,
+        tables, figures) are all empty — writer agents populate them in PH6.4+.
+        """
+        meta = brief.metadata
+        created_at = datetime.now(timezone.utc).isoformat()
+        manuscript_id = f"EM-{created_at[:10].replace('-', '')}-{(meta.pipeline_run_id or 'unknown')[:8]}"
+
+        return EditorialManuscript(
+            metadata=ManuscriptMetadata(
+                manuscript_id=manuscript_id,
+                created_at=created_at,
+                brief_id=meta.brief_id,
+                pipeline_run_id=meta.pipeline_run_id,
+                decision_model_id=meta.decision_model_id,
+                research_object_id=brief.appendix.research_object_id,
+                question=meta.question,
+                profiles=list(meta.profiles),
+                execution_profile=meta.execution_profile,
+            ),
+            executive_summary=ExecutiveSummaryManuscriptSection(
+                title="Executive Summary",
+                subtitle="",
+                source_section_ids=["executive_summary"],
+                provenance=self._manuscript_provenance(brief, "executive_summary"),
+            ),
+            decision_analysis=DecisionAnalysisManuscriptSection(
+                title="Strategic Analysis",
+                subtitle="",
+                source_section_ids=["decision_analysis", "strategic_options"],
+                provenance=self._manuscript_provenance(brief, "decision_analysis"),
+            ),
+            recommendations=RecommendationManuscriptSection(
+                title="Immediate Actions",
+                subtitle="",
+                source_section_ids=["recommendations"],
+                provenance=self._manuscript_provenance(brief, "recommendations"),
+            ),
+            strategic_risks=RiskManuscriptSection(
+                title="Key Risks",
+                subtitle="",
+                source_section_ids=["strategic_risks"],
+                provenance=self._manuscript_provenance(brief, "strategic_risks"),
+            ),
+            strategic_opportunities=OpportunityManuscriptSection(
+                title="Strategic Opportunities",
+                subtitle="",
+                source_section_ids=["strategic_opportunities"],
+                provenance=self._manuscript_provenance(brief, "strategic_opportunities"),
+            ),
+            executive_confidence=ConfidenceManuscriptSection(
+                title="Decision Readiness",
+                subtitle="",
+                source_section_ids=["executive_confidence", "validation_priorities"],
+                provenance=self._manuscript_provenance(brief, "executive_confidence"),
+            ),
+            appendix=AppendixManuscriptSection(
+                title="Supporting Evidence",
+                subtitle="",
+                source_section_ids=["appendix"],
+                provenance=self._manuscript_provenance(brief, "appendix"),
+            ),
+        )
+
+    def persist_manuscript(
+        self,
+        manuscript: EditorialManuscript,
+        base: Path = Path("outputs"),
+        *,
+        write_latest: bool = True,
+    ) -> Path:
+        """Persist the EditorialManuscript to disk.
+
+        Writes to outputs/editorial_manuscripts/{manuscript_id}.json.
+        When write_latest=True (default), also updates latest_editorial_manuscript.json.
+        Returns the path of the versioned file.
+        """
+        ms_dir = base / "editorial_manuscripts"
+        ms_dir.mkdir(parents=True, exist_ok=True)
+
+        data = manuscript.to_dict()
+        path = ms_dir / f"{manuscript.metadata.manuscript_id}.json"
+        path.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
+
+        if write_latest:
+            latest = base / "latest_editorial_manuscript.json"
+            latest.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
+
+        return path
+
+    def _manuscript_provenance(self, brief: EditorialBrief, section_key: str) -> ManuscriptProvenance:
+        """Build a ManuscriptProvenance from the corresponding brief section's provenance."""
+        section = getattr(brief, section_key, None)
+        bp = getattr(section, "provenance", None) if section else None
+
+        return ManuscriptProvenance(
+            brief_id=brief.metadata.brief_id,
+            brief_section_key=section_key,
+            decision_model_id=brief.metadata.decision_model_id or (bp.decision_model_id if bp else ""),
+            research_object_id=brief.appendix.research_object_id,
+            analysis_id=getattr(bp, "analysis_id", "") if bp else "",
+            confidence_id=getattr(bp, "confidence_id", "") if bp else "",
+            risk_ids=list(getattr(bp, "risk_ids", [])) if bp else [],
+            opportunity_ids=list(getattr(bp, "opportunity_ids", [])) if bp else [],
+            recommendation_ids=list(getattr(bp, "recommendation_ids", [])) if bp else [],
+            assumption_ids=list(getattr(bp, "assumption_ids", [])) if bp else [],
+            option_ids=list(getattr(bp, "option_ids", [])) if bp else [],
         )
