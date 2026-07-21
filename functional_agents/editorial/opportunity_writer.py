@@ -22,6 +22,8 @@ _LIKE_ORDER = {"high": 0, "medium": 1, "low": 2}
 class OpportunityWriter(EditorialWriter):
     """Writer for EditorialManuscript.strategic_opportunities."""
 
+    section_name = "strategic_opportunities"
+
     def __init__(self, client: Any | None = None) -> None:
         self._client = client
 

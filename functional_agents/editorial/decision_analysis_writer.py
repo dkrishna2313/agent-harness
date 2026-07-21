@@ -30,6 +30,8 @@ class DecisionAnalysisWriter(EditorialWriter):
     When client is None or mock, a deterministic fallback is used.
     """
 
+    section_name = "decision_analysis"
+
     def __init__(self, client: Any | None = None) -> None:
         self._client = client
 

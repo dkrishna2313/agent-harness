@@ -827,6 +827,41 @@ class OpportunityProsePayload(BaseModel):
     )
 
 
+class ConfidenceProsePayload(BaseModel):
+    """Confidence / Decision Readiness section prose for the EditorialManuscript (PH6.9)."""
+
+    paragraphs: list[str] = Field(
+        default_factory=list,
+        description=(
+            "4 prose paragraphs: (1) decision readiness and board recommendation, "
+            "(2) confidence drivers (what supports the view), "
+            "(3) confidence limiters (what holds it back), "
+            "(4) path to higher confidence via validation priorities."
+        ),
+    )
+    bullet_groups: list[list[str]] = Field(
+        default_factory=list,
+        description="2 bullet groups: validation priorities (actions), then critical unknowns.",
+    )
+
+
+class AppendixProsePayload(BaseModel):
+    """Appendix / Supporting Evidence section prose for the EditorialManuscript (PH6.10)."""
+
+    paragraphs: list[str] = Field(
+        default_factory=list,
+        description=(
+            "2-3 prose paragraphs: (1) evidence base and methodology summary, "
+            "(2) profile and topic coverage, "
+            "(3) citation notes if citations are present."
+        ),
+    )
+    bullet_groups: list[list[str]] = Field(
+        default_factory=list,
+        description="1 bullet group: selected citations or evidence sources (if any).",
+    )
+
+
 _SCHEMA_ADAPTERS = {
     "research_plan": TypeAdapter(ResearchPlan),
     "research_planning": TypeAdapter(ResearchPlanningPayload),
@@ -853,6 +888,8 @@ _SCHEMA_ADAPTERS = {
     "recommendation_prose": TypeAdapter(RecommendationProsePayload),       # PH6.6
     "risk_prose": TypeAdapter(RiskProsePayload),                           # PH6.7
     "opportunity_prose": TypeAdapter(OpportunityProsePayload),             # PH6.8
+    "confidence_prose": TypeAdapter(ConfidenceProsePayload),               # PH6.9
+    "appendix_prose": TypeAdapter(AppendixProsePayload),                   # PH6.10
 }
 
 
@@ -1976,10 +2013,98 @@ class MockClaudeClient:
                 ),
                 (
                     "Captured together, these opportunities represent meaningful strategic upside. "
-                    "The recommended course of action is designed to position Deloitte to capture this value."
+                    "The recommended course of action is designed to position the organisation to capture this value."
                 ),
             ],
             bullet_groups=[opp_bullets, enabling],
+        )
+
+    def generate_confidence_prose(
+        self,
+        *,
+        question: str,
+        overall_confidence: str,
+        decision_readiness: str,
+        board_recommendation: str,
+        confidence_drivers: list[str],
+        confidence_limiters: list[str],
+        critical_unknowns: list[str],
+        validation_priorities: list[str],
+        confidence_if_assumptions_hold: str,
+        confidence_if_assumptions_fail: str,
+    ) -> "ConfidenceProsePayload":
+        """Generate confidence / decision readiness prose (PH6.9) — mock version."""
+        driver_bullets = [d[:100] for d in confidence_drivers[:5]] or ["Structured evidence base supports the direction."]
+        limiter_bullets = [l[:100] for l in confidence_limiters[:5]] or ["Evidence quality constrains confidence."]
+        priority_bullets = [p[:100] for p in validation_priorities[:6]] or ["Complete outstanding due diligence items."]
+        unknown_bullets = [u[:100] for u in critical_unknowns[:5]] or ["Critical unknowns remain unresolved."]
+        hold_fail = (
+            f" If assumptions hold, confidence improves to {confidence_if_assumptions_hold}."
+            if confidence_if_assumptions_hold else ""
+        )
+        return ConfidenceProsePayload(
+            paragraphs=[
+                (
+                    f"Decision readiness is assessed as {decision_readiness}. "
+                    f"The board recommendation is: {board_recommendation}. "
+                    f"Overall analytical confidence is {overall_confidence}."
+                ),
+                (
+                    f"{len(confidence_drivers)} factor(s) support this confidence assessment for: {question}. "
+                    "These drivers reflect the quality and consistency of the underlying evidence base."
+                ),
+                (
+                    f"{len(confidence_limiters)} factor(s) constrain confidence below its potential ceiling.{hold_fail} "
+                    f"Confidence would decline to {confidence_if_assumptions_fail} if key assumptions fail."
+                    if confidence_if_assumptions_fail else
+                    f"{len(confidence_limiters)} factor(s) constrain confidence below its potential ceiling. "
+                    "These limitations must be addressed before a final commitment can be made."
+                ),
+                (
+                    f"{len(validation_priorities)} validation priority(ies) have been identified. "
+                    "Completing these priorities is the primary mechanism for increasing decision readiness "
+                    f"and resolving the {len(critical_unknowns)} critical unknown(s) that remain."
+                ),
+            ],
+            bullet_groups=[priority_bullets, unknown_bullets],
+        )
+
+    def generate_appendix_prose(
+        self,
+        *,
+        question: str,
+        research_object_id: str,
+        total_evidence_items: int,
+        citation_count: int,
+        profiles: list[str],
+        evidence_topics: dict,
+        citations: list[str],
+    ) -> "AppendixProsePayload":
+        """Generate appendix / supporting evidence prose (PH6.10) — mock version."""
+        n_topics = len(evidence_topics)
+        top_topics = sorted(evidence_topics.items(), key=lambda x: x[1], reverse=True)[:5]
+        topic_summary = ", ".join(f"{t} ({n})" for t, n in top_topics) if top_topics else "general research"
+        profile_str = ", ".join(profiles) if profiles else "default"
+        cite_bullets = [c[:120] for c in citations[:10]] or []
+        paragraphs = [
+            (
+                f"This analysis draws on {total_evidence_items} evidence item(s) "
+                f"with {citation_count} citation(s) sourced via the {profile_str} knowledge profile(s)."
+            ),
+            (
+                f"Evidence spans {n_topics} topic area(s): {topic_summary}. "
+                "Coverage was assessed as part of the research gap analysis; "
+                "areas with limited evidence are flagged in the confidence assessment."
+            ),
+        ]
+        if citations:
+            paragraphs.append(
+                f"{len(citations)} primary reference(s) are listed below. "
+                "These citations were extracted and validated during the evidence pipeline."
+            )
+        return AppendixProsePayload(
+            paragraphs=paragraphs,
+            bullet_groups=[cite_bullets] if cite_bullets else [],
         )
 
 
@@ -2668,6 +2793,68 @@ class ClaudeClient:
             max_tokens=2500,
         )
         return OpportunityProsePayload.model_validate(payload)
+
+    def generate_confidence_prose(
+        self,
+        *,
+        question: str,
+        overall_confidence: str,
+        decision_readiness: str,
+        board_recommendation: str,
+        confidence_drivers: list[str],
+        confidence_limiters: list[str],
+        critical_unknowns: list[str],
+        validation_priorities: list[str],
+        confidence_if_assumptions_hold: str,
+        confidence_if_assumptions_fail: str,
+    ) -> ConfidenceProsePayload:
+        """Generate confidence / decision readiness prose (PH6.9)."""
+        payload = self._call_json(
+            operation="generate_confidence_prose",
+            schema_name="confidence_prose",
+            prompt=_confidence_prose_prompt(
+                question=question,
+                overall_confidence=overall_confidence,
+                decision_readiness=decision_readiness,
+                board_recommendation=board_recommendation,
+                confidence_drivers=confidence_drivers,
+                confidence_limiters=confidence_limiters,
+                critical_unknowns=critical_unknowns,
+                validation_priorities=validation_priorities,
+                confidence_if_assumptions_hold=confidence_if_assumptions_hold,
+                confidence_if_assumptions_fail=confidence_if_assumptions_fail,
+            ),
+            max_tokens=2500,
+        )
+        return ConfidenceProsePayload.model_validate(payload)
+
+    def generate_appendix_prose(
+        self,
+        *,
+        question: str,
+        research_object_id: str,
+        total_evidence_items: int,
+        citation_count: int,
+        profiles: list[str],
+        evidence_topics: dict,
+        citations: list[str],
+    ) -> AppendixProsePayload:
+        """Generate appendix / supporting evidence prose (PH6.10)."""
+        payload = self._call_json(
+            operation="generate_appendix_prose",
+            schema_name="appendix_prose",
+            prompt=_appendix_prose_prompt(
+                question=question,
+                research_object_id=research_object_id,
+                total_evidence_items=total_evidence_items,
+                citation_count=citation_count,
+                profiles=profiles,
+                evidence_topics=evidence_topics,
+                citations=citations,
+            ),
+            max_tokens=2000,
+        )
+        return AppendixProsePayload.model_validate(payload)
 
     def _call_json(
         self,
@@ -4693,4 +4880,152 @@ Style rules:
 - Target 60-100 words per paragraph. Bullets 10-20 words each.
 
 Return structured JSON matching the opportunity_prose schema.
+"""
+
+
+def _confidence_prose_prompt(
+    *,
+    question: str,
+    overall_confidence: str,
+    decision_readiness: str,
+    board_recommendation: str,
+    confidence_drivers: list[str],
+    confidence_limiters: list[str],
+    critical_unknowns: list[str],
+    validation_priorities: list[str],
+    confidence_if_assumptions_hold: str,
+    confidence_if_assumptions_fail: str,
+) -> str:
+    def _fmt_list(items: list[str]) -> str:
+        return "\n".join(f"  - {i}" for i in items) if items else "  (none identified)"
+
+    return f"""\
+You are an executive communications writer producing the Decision Readiness section
+of a board-level strategy document.
+
+Your role is communication, not reasoning. The confidence ratings, drivers, limiters,
+and validation priorities are fixed — you communicate them with clarity and precision.
+Do not invent confidence factors, change ratings, or alter the validation sequence.
+
+## Decision Context
+
+Question: {question}
+Overall Confidence: {overall_confidence}
+Decision Readiness: {decision_readiness}
+Board Recommendation: {board_recommendation}
+Confidence if Assumptions Hold: {confidence_if_assumptions_hold or 'not assessed'}
+Confidence if Assumptions Fail: {confidence_if_assumptions_fail or 'not assessed'}
+
+## Confidence Drivers
+
+{_fmt_list(confidence_drivers)}
+
+## Confidence Limiters
+
+{_fmt_list(confidence_limiters)}
+
+## Critical Unknowns
+
+{_fmt_list(critical_unknowns)}
+
+## Validation Priorities
+
+{_fmt_list(validation_priorities)}
+
+## Writing Instructions
+
+Write 4 paragraphs followed by 2 bullet groups.
+
+Paragraph 1 — Decision readiness and board recommendation (2-3 sentences): State the
+readiness level, the board recommendation, and the overall confidence rating. Be direct.
+
+Paragraph 2 — Confidence drivers (2-3 sentences): Describe what supports the current
+confidence level. Reference specific drivers without listing them mechanically.
+
+Paragraph 3 — Confidence limiters (2-3 sentences): Describe what constrains confidence.
+Include the sensitivity of the rating to assumption outcomes if data is available.
+
+Paragraph 4 — Path to higher confidence (2-3 sentences): Describe how completing the
+validation priorities resolves the critical unknowns and improves decision readiness.
+
+Bullet Group 1: Validation priorities as concise action bullets.
+Bullet Group 2: Critical unknowns as concise question bullets.
+
+Style rules:
+- No passive voice where avoidable.
+- No consulting clichés (leverage, synergy, robust, holistic).
+- No internal IDs (EC-*, A-*, RSK-*, REC-*) in any prose or bullets.
+- No repetitive paragraph openings.
+- Target 60-90 words per paragraph. Bullets 10-20 words each.
+
+Return structured JSON matching the confidence_prose schema.
+"""
+
+
+def _appendix_prose_prompt(
+    *,
+    question: str,
+    research_object_id: str,
+    total_evidence_items: int,
+    citation_count: int,
+    profiles: list[str],
+    evidence_topics: dict,
+    citations: list[str],
+) -> str:
+    top_topics = sorted(evidence_topics.items(), key=lambda x: x[1], reverse=True)[:8]
+
+    def _fmt_topics(topics: list[tuple]) -> str:
+        return "\n".join(f"  - {t}: {n} item(s)" for t, n in topics) if topics else "  (not categorised)"
+
+    def _fmt_citations(cits: list[str]) -> str:
+        return "\n".join(f"  {i+1}. {c[:120]}" for i, c in enumerate(cits[:12])) if cits else "  (none)"
+
+    return f"""\
+You are an executive communications writer producing the Supporting Evidence appendix
+of a board-level strategy document.
+
+Your role is factual summary, not narrative expansion. The evidence counts, topics,
+profiles, and citations are fixed — communicate them accurately and concisely.
+Do not invent sources, change citation text, or add interpretation.
+
+## Evidence Base
+
+Question: {question}
+Research Object: {research_object_id}
+Total Evidence Items: {total_evidence_items}
+Citations: {citation_count}
+Profiles: {', '.join(profiles) if profiles else 'default'}
+
+## Evidence Topics
+
+{_fmt_topics(top_topics)}
+
+## Citations (sample)
+
+{_fmt_citations(citations)}
+
+## Writing Instructions
+
+Write 2-3 short paragraphs followed by 1 bullet group (if citations are present).
+
+Paragraph 1 — Evidence base summary (2 sentences): State the total evidence items,
+citation count, and knowledge profiles used. Be factual and specific.
+
+Paragraph 2 — Topic coverage (2 sentences): Describe the topic distribution.
+Note any areas of strong or limited coverage.
+
+Paragraph 3 — Citation note (1-2 sentences, only if citations exist): Briefly describe
+the nature of the cited sources.
+
+Bullet Group 1 (if citations): Selected citations as brief reference bullets. Truncate
+to first 15 citations. Keep each bullet to the citation text only — no commentary.
+
+Style rules:
+- No narrative expansion or interpretation.
+- No internal IDs in prose.
+- No consulting clichés.
+- Factual, reference-section tone.
+- Target 40-60 words per paragraph.
+
+Return structured JSON matching the appendix_prose schema.
 """
