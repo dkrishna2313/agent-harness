@@ -1,16 +1,19 @@
-"""Editorial Platform (PH6.8).
+"""Editorial Platform (PH6.10) — complete.
 
 Provides the canonical chain between executive reasoning and editorial artifacts:
 
     EditorialBrief              -- structured executive knowledge, no formatting
     EditorialManuscript         -- editorial scaffold populated by writers
     EditorialCoordinator        -- AgentContext → EditorialBrief → EditorialManuscript
+    EditorialValidationError    -- raised when registry completeness contract is violated
     EditorialWriter             -- abstract base class for all writers (PH6.5)
     ExecutiveSummaryWriter      -- populates EditorialManuscript.executive_summary (PH6.4)
     DecisionAnalysisWriter      -- populates EditorialManuscript.decision_analysis (PH6.5)
     RecommendationWriter        -- populates EditorialManuscript.recommendations (PH6.6)
     RiskWriter                  -- populates EditorialManuscript.strategic_risks (PH6.7)
     OpportunityWriter           -- populates EditorialManuscript.strategic_opportunities (PH6.8)
+    ConfidenceWriter            -- populates EditorialManuscript.executive_confidence (PH6.9)
+    AppendixWriter              -- populates EditorialManuscript.appendix (PH6.10)
 
 The editorial package never mutates AgentContext reasoning fields and never
 produces rendered markdown, DOCX, or PPTX.
@@ -51,13 +54,15 @@ from .editorial_manuscript import (
     ConfidenceManuscriptSection,
     AppendixManuscriptSection,
 )
-from .editorial_coordinator import EditorialCoordinator
+from .editorial_coordinator import EditorialCoordinator, EditorialValidationError
 from .editorial_writer import EditorialWriter
 from .executive_summary_writer import ExecutiveSummaryWriter
 from .decision_analysis_writer import DecisionAnalysisWriter
 from .recommendation_writer import RecommendationWriter
 from .risk_writer import RiskWriter
 from .opportunity_writer import OpportunityWriter
+from .confidence_writer import ConfidenceWriter
+from .appendix_writer import AppendixWriter
 
 __all__ = [
     # Brief
@@ -91,14 +96,17 @@ __all__ = [
     "OpportunityManuscriptSection",
     "ConfidenceManuscriptSection",
     "AppendixManuscriptSection",
-    # Coordinator
+    # Coordinator + validation
     "EditorialCoordinator",
+    "EditorialValidationError",
     # Abstract base
     "EditorialWriter",
-    # Writers (PH6.4+)
+    # Writers (PH6.4–PH6.10)
     "ExecutiveSummaryWriter",
     "DecisionAnalysisWriter",
     "RecommendationWriter",
     "RiskWriter",
     "OpportunityWriter",
+    "ConfidenceWriter",
+    "AppendixWriter",
 ]

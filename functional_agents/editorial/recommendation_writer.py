@@ -24,6 +24,8 @@ _PRIORITY_ORDER = {"high": 0, "critical": 0, "medium": 1, "low": 2}
 class RecommendationWriter(EditorialWriter):
     """Writer for EditorialManuscript.recommendations."""
 
+    section_name = "recommendations"
+
     def __init__(self, client: Any | None = None) -> None:
         self._client = client
 

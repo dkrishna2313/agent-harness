@@ -1,9 +1,10 @@
-"""EditorialCoordinator — maps AgentContext → EditorialBrief → EditorialManuscript (PH6.3).
+"""EditorialCoordinator — maps AgentContext → EditorialBrief → EditorialManuscript (PH6.3+).
 
 Responsibilities:
   - Consume AgentContext after the reasoning pipeline completes
   - Produce an EditorialBrief containing structured executive knowledge
   - Produce an EditorialManuscript scaffold from the EditorialBrief
+  - Run the authoritative writer registry (run_writers) with completeness validation
   - Persist latest_editorial_brief.json and latest_editorial_manuscript.json
 
 Rules:
@@ -62,6 +63,28 @@ LOGGER = logging.getLogger(__name__)
 
 _LATEST_BRIEF_PATH = Path("outputs/latest_editorial_brief.json")
 _LATEST_MANUSCRIPT_PATH = Path("outputs/latest_editorial_manuscript.json")
+
+# All manuscript section attribute names — defines the completeness contract.
+_ALL_MANUSCRIPT_SECTIONS = [
+    "executive_summary",
+    "decision_analysis",
+    "recommendations",
+    "strategic_risks",
+    "strategic_opportunities",
+    "executive_confidence",
+    "appendix",
+]
+
+
+class EditorialValidationError(Exception):
+    """Raised when the writer registry violates the manuscript completeness contract."""
+
+
+def _section_populated(section: Any) -> bool:
+    """Return True if a ManuscriptSection has non-empty paragraphs or tables."""
+    if section is None:
+        return False
+    return bool(getattr(section, "paragraphs", None) or getattr(section, "tables", None))
 
 
 class EditorialCoordinator:
@@ -453,14 +476,21 @@ class EditorialCoordinator:
     ) -> EditorialManuscript:
         """Run the ordered writer registry against brief and manuscript.
 
-        Writers are invoked in registration order. Each writer populates
-        exactly one manuscript section. Future writers are added here.
+        Writers execute in registration order. After all writers run, the
+        coordinator validates the completeness contract:
+          - No duplicate section_name across the registry.
+          - Every registered section is populated (paragraphs or tables non-empty).
+          - No populated section lacks a registered owner.
+
+        Raises EditorialValidationError on any violation.
         """
         from .executive_summary_writer import ExecutiveSummaryWriter
         from .decision_analysis_writer import DecisionAnalysisWriter
         from .recommendation_writer import RecommendationWriter
         from .risk_writer import RiskWriter
         from .opportunity_writer import OpportunityWriter
+        from .confidence_writer import ConfidenceWriter
+        from .appendix_writer import AppendixWriter
 
         _registry = [
             ExecutiveSummaryWriter(client=client),
@@ -468,9 +498,52 @@ class EditorialCoordinator:
             RecommendationWriter(client=client),
             RiskWriter(client=client),
             OpportunityWriter(client=client),
+            ConfidenceWriter(client=client),
+            AppendixWriter(client=client),
         ]
+
+        # Pre-flight: verify no duplicate section_names and all writers declare one.
+        seen: dict[str, str] = {}  # section_name → writer class name
+        for writer in _registry:
+            sn = getattr(writer, "section_name", None)
+            if not sn:
+                raise EditorialValidationError(
+                    f"{type(writer).__name__} does not declare section_name"
+                )
+            if sn in seen:
+                raise EditorialValidationError(
+                    f"Section '{sn}' claimed by both {seen[sn]} and {type(writer).__name__}"
+                )
+            if not hasattr(manuscript, sn):
+                raise EditorialValidationError(
+                    f"{type(writer).__name__}.section_name='{sn}' has no matching manuscript attribute"
+                )
+            seen[sn] = type(writer).__name__
+
+        # Execute writers in order.
         for writer in _registry:
             writer.write(brief, manuscript)
+
+        # Post-flight: verify every registered section is populated.
+        unpopulated = [
+            sn for sn in seen
+            if not _section_populated(getattr(manuscript, sn))
+        ]
+        if unpopulated:
+            raise EditorialValidationError(
+                f"Sections not populated after writers ran: {unpopulated}"
+            )
+
+        # Post-flight: verify no populated section lacks a registered owner.
+        ownerless = [
+            attr for attr in _ALL_MANUSCRIPT_SECTIONS
+            if attr not in seen and _section_populated(getattr(manuscript, attr, None))
+        ]
+        if ownerless:
+            raise EditorialValidationError(
+                f"Sections populated without a registered writer: {ownerless}"
+            )
+
         return manuscript
 
     def persist_manuscript(

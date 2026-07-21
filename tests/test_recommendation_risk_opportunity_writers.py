@@ -262,14 +262,14 @@ def test_run_writers_populates_all_five_sections(ms_all):
     assert ms_all.strategic_opportunities.paragraphs != []
 
 
-def test_run_writers_leaves_confidence_empty(ms_all):
-    assert ms_all.executive_confidence.paragraphs == []
-    assert ms_all.executive_confidence.tables == []
+def test_run_writers_populates_confidence(ms_all):
+    # PH6.9 added ConfidenceWriter — section is now populated by run_writers
+    assert ms_all.executive_confidence.paragraphs != []
 
 
-def test_run_writers_leaves_appendix_empty(ms_all):
-    assert ms_all.appendix.paragraphs == []
-    assert ms_all.appendix.tables == []
+def test_run_writers_populates_appendix(ms_all):
+    # PH6.10 added AppendixWriter — section is now populated by run_writers
+    assert ms_all.appendix.paragraphs != []
 
 
 # ---------------------------------------------------------------------------
