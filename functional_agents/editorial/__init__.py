@@ -1,4 +1,4 @@
-"""Editorial Platform (PH6.5).
+"""Editorial Platform (PH6.8).
 
 Provides the canonical chain between executive reasoning and editorial artifacts:
 
@@ -8,6 +8,9 @@ Provides the canonical chain between executive reasoning and editorial artifacts
     EditorialWriter             -- abstract base class for all writers (PH6.5)
     ExecutiveSummaryWriter      -- populates EditorialManuscript.executive_summary (PH6.4)
     DecisionAnalysisWriter      -- populates EditorialManuscript.decision_analysis (PH6.5)
+    RecommendationWriter        -- populates EditorialManuscript.recommendations (PH6.6)
+    RiskWriter                  -- populates EditorialManuscript.strategic_risks (PH6.7)
+    OpportunityWriter           -- populates EditorialManuscript.strategic_opportunities (PH6.8)
 
 The editorial package never mutates AgentContext reasoning fields and never
 produces rendered markdown, DOCX, or PPTX.
@@ -52,6 +55,9 @@ from .editorial_coordinator import EditorialCoordinator
 from .editorial_writer import EditorialWriter
 from .executive_summary_writer import ExecutiveSummaryWriter
 from .decision_analysis_writer import DecisionAnalysisWriter
+from .recommendation_writer import RecommendationWriter
+from .risk_writer import RiskWriter
+from .opportunity_writer import OpportunityWriter
 
 __all__ = [
     # Brief
@@ -92,4 +98,7 @@ __all__ = [
     # Writers (PH6.4+)
     "ExecutiveSummaryWriter",
     "DecisionAnalysisWriter",
+    "RecommendationWriter",
+    "RiskWriter",
+    "OpportunityWriter",
 ]
