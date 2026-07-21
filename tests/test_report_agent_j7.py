@@ -220,13 +220,13 @@ def test_all_10_sections_present():
 
 
 def test_section1_contains_executive_summary():
-    """§1 is recommendation-led; shows option title and rationale (P1.1)."""
+    """§1 is recommendation-led; shows option title and rationale (PH6.0 prose format)."""
     ctx = _make_context()
     report = _build_j7_executive_report(ctx)
     section_1 = report.split("## 2.")[0]
-    # Section 1 now leads with the recommendation from narrative
-    assert "**Recommendation:** Aggressive Expansion" in section_1
-    # Rationale from narrative.why_this_option appears as "Why this option wins"
+    # PH6.0: no "**Recommendation:**" label — plain prose opener "Pursue {title}"
+    assert "Aggressive Expansion" in section_1
+    # Rationale from narrative.why_this_option appears in prose
     # PH5.x: option_id is stripped; only the reasoning phrase survives
     assert "wins on strategic fit" in section_1
 
