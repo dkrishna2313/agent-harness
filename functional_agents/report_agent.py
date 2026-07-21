@@ -1265,7 +1265,9 @@ _BOARD_PROSE: dict[str, str] = {
     "Proceed": "proceed. The investment case is supported.",
     "Do Not Proceed": "not proceed at this stage.",
     "Do Not Proceed Yet": "defer this decision. The evidence base is not yet strong enough to commit.",
-    "Defer": "defer pending additional validation.",
+    "Defer": "defer a final decision until the validation priorities are complete.",
+    "Delay Pending Evidence": "delay a final decision until the validation priorities are complete.",
+    "Delay": "delay a final decision until the validation priorities are complete.",
     "Reject": "not pursue this option. The evidence does not support the investment case.",
     "Needs Additional Validation": "validate before committing capital.",
 }
@@ -1792,7 +1794,7 @@ def _build_j7_critical_assumptions_section(
     if _n_critical > 1:
         _dep_intro = (
             f"This recommendation depends on {_n_critical} critical assumptions. "
-            "If either fails, the investment case changes materially."
+            "If any of these fails, the investment case changes materially."
         )
     elif _n_critical == 1:
         _dep_intro = (
@@ -1838,7 +1840,6 @@ def _build_j7_key_risks_section(risks: list[dict[str, Any]]) -> list[str]:
     # PH6.0: Lead with the most significant risk (style guide: "lead with what could prevent success")
     if high_risks:
         _top_stmt = high_risks[0].get("statement", high_risks[0].get("title", high_risks[0].get("description", ""))).strip().rstrip(".")
-        _top_stmt = _top_stmt[:140] if len(_top_stmt) > 140 else _top_stmt
         _risk_intro = f"{_top_stmt}. This is the primary execution risk."
     else:
         _risk_intro = "No high-severity risks identified. Medium-severity risks are listed below."
@@ -1878,7 +1879,6 @@ def _build_j7_strategic_opportunities_section(
 
     # PH6.0: Lead with the highest-impact opportunity (style guide: lead with the upside)
     _top_opp_stmt = exec_opps[0].get("statement", exec_opps[0].get("title", exec_opps[0].get("description", ""))).strip().rstrip(".")
-    _top_opp_stmt = _top_opp_stmt[:140] if len(_top_opp_stmt) > 140 else _top_opp_stmt
     _opp_intro = f"{_top_opp_stmt}." if _top_opp_stmt else "Top opportunities by expected impact are listed below."
 
     lines: list[str] = [
