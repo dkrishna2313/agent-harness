@@ -321,8 +321,8 @@ class MarkdownRenderer:
             "",
         ]
 
-        if sec.paragraphs:
-            lines.append(sec.paragraphs[0])
+        for para in (sec.paragraphs or []):
+            lines.append(para)
             lines.append("")
 
         if brief and brief.strategic_risks.risks:
@@ -370,8 +370,8 @@ class MarkdownRenderer:
             "",
         ]
 
-        if sec.paragraphs:
-            lines.append(sec.paragraphs[0])
+        for para in (sec.paragraphs or []):
+            lines.append(para)
             lines.append("")
 
         if brief and brief.strategic_opportunities.opportunities:
@@ -418,8 +418,8 @@ class MarkdownRenderer:
             "",
         ]
 
-        if sec.paragraphs:
-            lines.append(sec.paragraphs[0])
+        for para in (sec.paragraphs or []):
+            lines.append(para)
             lines.append("")
 
         if brief and brief.recommendations.recommendations:
