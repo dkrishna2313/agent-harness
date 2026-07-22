@@ -4,4 +4,8 @@ profiles:
   - sports
 
 sources:
-  - sports_sources
+  - knowledge_sources/deloitte/internal/sports/marketing
+  - knowledge_sources/deloitte/internal/sports/market-sizing
+  - knowledge_sources/deloitte/internal/sports/decks
+  - knowledge_sources/deloitte/internal/sports/strategy/choice_cascade
+  - knowledge_sources/sports

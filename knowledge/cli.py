@@ -233,6 +233,23 @@ def build(
             raise typer.Exit(1)
         typer.echo(f"Loaded config: {config.name}  profiles={profiles}")
 
+    # Auto-load profile config when --profiles given but no sources/config specified
+    if profiles and not sources and not config:
+        for profile_name in profiles:
+            for config_candidate in (
+                Path(f"knowledge/configs/{profile_name}.yaml"),
+                Path(f"knowledge_sources/configs/{profile_name}.yaml"),
+            ):
+                if config_candidate.exists():
+                    try:
+                        sources, profiles = _load_build_config(config_candidate)
+                        typer.echo(f"Auto-loaded profile config: {config_candidate}  profiles={profiles}")
+                    except (FileNotFoundError, ValueError) as exc:
+                        typer.echo(f"Warning: could not load auto-detected config {config_candidate}: {exc}", err=True)
+                    break
+            if sources:
+                break
+
     # Default source directories if none given
     if not sources:
         defaults = [
