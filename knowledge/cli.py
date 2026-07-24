@@ -452,6 +452,45 @@ def list_profiles(
         print(f"{pid:<20} {ev_counts[pid]:>9} {src_count:>8}")
 
 
+@app.command("retag")
+def retag(
+    profile: str = typer.Argument(..., help="Profile ID to add to existing evidence (e.g. ai_data_centers)."),
+    domain: Optional[str] = typer.Option(
+        None,
+        "--domain",
+        help="Restrict retagging to a specific domain. Default: all domains.",
+    ),
+    store_dir: Path = typer.Option(Path("knowledge_store"), "--store"),
+    log_level: str = typer.Option("WARNING", "--log-level"),
+) -> None:
+    """Add a profile tag to existing evidence without re-extracting.
+
+    Use this when sources were ingested without --profiles and you want to
+    assign them to a profile retroactively.
+
+    Examples:
+
+        python3 -m knowledge retag ai_data_centers
+        python3 -m knowledge retag ai_data_centers --domain ai_data_centers
+        python3 -m knowledge retag ai_data_centers --domain knowledge_sources
+    """
+    _setup_logging(log_level)
+    store = KnowledgeStore(store_dir)
+
+    domains = [domain] if domain else store.available_domains()
+    total_updated = 0
+
+    for dom in domains:
+        updated = store.add_profile_to_evidence(dom, profile)
+        if updated:
+            typer.echo(f"  {dom}: tagged {updated} evidence items")
+            total_updated += updated
+        else:
+            typer.echo(f"  {dom}: no changes (already tagged or no evidence)")
+
+    typer.echo(f"\nDone. Total items tagged: {total_updated}")
+
+
 @app.command("retrieve")
 def retrieve(
     query: str = typer.Argument(..., help="Natural-language retrieval query."),

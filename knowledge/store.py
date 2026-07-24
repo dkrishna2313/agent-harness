@@ -235,6 +235,41 @@ class KnowledgeStore:
     def evidence_count(self, domain: str) -> int:
         return len(self._load_evidence_index(domain))
 
+    def add_profile_to_evidence(self, domain: str, profile_id: str) -> int:
+        """Add profile_id to every evidence item in domain that lacks it.
+
+        Rewrites the JSONL atomically. Returns the number of items updated.
+        """
+        path = self._evidence_path(domain)
+        if not path.exists():
+            return 0
+
+        items = list(self.iter_evidence(domain))
+        updated = 0
+        for ev in items:
+            if profile_id not in ev.profile_ids:
+                ev.profile_ids.append(profile_id)
+                updated += 1
+
+        if not updated:
+            return 0
+
+        import tempfile
+        fd, tmp = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                for ev in items:
+                    f.write(json.dumps(ev.model_dump(), ensure_ascii=False, default=str) + "\n")
+            os.replace(tmp, path)
+        except Exception:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
+
+        return updated
+
     def get_statement_fingerprints(self, domain: str) -> set[str]:
         """Return the set of statement_fingerprint values for deduplication."""
         return {ev.statement_fingerprint for ev in self.iter_evidence(domain)}
