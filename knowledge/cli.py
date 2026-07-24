@@ -415,6 +415,43 @@ def list_sources(
         print(f"{entry.source_id:34} {entry.domain:20} {ev_count:>8}  ...{uri}")
 
 
+@app.command("list-profiles")
+def list_profiles(
+    store_dir: Path = typer.Option(Path("knowledge_store"), "--store"),
+    log_level: str = typer.Option("WARNING", "--log-level"),
+) -> None:
+    """List all profiles present in the Knowledge Base with evidence and source counts.
+
+    Examples:
+
+        python3 -m knowledge list-profiles
+        python3 -m knowledge list-profiles --store knowledge_store
+    """
+    _setup_logging(log_level)
+    store = KnowledgeStore(store_dir)
+    manifest = store.load_manifest()
+
+    # Accumulate per-profile stats in a single pass over all evidence
+    ev_counts: dict[str, int] = {}
+    source_ids_by_profile: dict[str, set[str]] = {}
+
+    for domain in store.available_domains():
+        for ev in store.iter_evidence(domain):
+            for pid in ev.profile_ids:
+                ev_counts[pid] = ev_counts.get(pid, 0) + 1
+                source_ids_by_profile.setdefault(pid, set()).update(ev.supporting_source_ids)
+
+    if not ev_counts:
+        print("No profiles found. Run 'build --profiles <name>' to tag evidence with a profile.")
+        return
+
+    print(f"\n{'Profile':<20} {'Evidence':>9} {'Sources':>8}")
+    print("-" * 40)
+    for pid in sorted(ev_counts):
+        src_count = len(source_ids_by_profile.get(pid, set()))
+        print(f"{pid:<20} {ev_counts[pid]:>9} {src_count:>8}")
+
+
 @app.command("retrieve")
 def retrieve(
     query: str = typer.Argument(..., help="Natural-language retrieval query."),
