@@ -133,6 +133,19 @@ def build_canonical_trace(context: Any) -> dict[str, Any]:
         if en else None
     )
 
+    # PH8 — Strategy Layer diagnostics. Additive — not in _REQUIRED_TOP_LEVEL_KEYS.
+    _sp_raw = trace.get("_strategic_position")
+    if _sp_raw is not None and hasattr(_sp_raw, "position_id"):
+        strategy_entry: dict[str, Any] | None = {
+            "generated": True,
+            "position_id": _sp_raw.position_id,
+            "created_at": _sp_raw.created_at,
+            "recommended_option_id": _sp_raw.theory_of_winning.recommended_option_id,
+            "overall_confidence": _sp_raw.recommendation.overall_confidence,
+        }
+    else:
+        strategy_entry = None
+
     contracts = {
         "functional_agent_contract": "FunctionalAgent.run(context: AgentContext) -> AgentResult",
         "agents_conforming": sorted(agents.keys()),
@@ -169,6 +182,7 @@ def build_canonical_trace(context: Any) -> dict[str, Any]:
         "deliverables": deliverables,
         "deliverable_bundle": deliverable_bundle,
         "executive_narrative": executive_narrative_entry,
+        "strategy": strategy_entry,
         "contracts": contracts,
         "summary": {
             "agents_run": len(agents),

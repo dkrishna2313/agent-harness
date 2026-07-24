@@ -1,7 +1,7 @@
-"""EditorialCoordinator — maps AgentContext → EditorialBrief → EditorialManuscript (PH6.3+).
+"""EditorialCoordinator — maps StrategicPosition → EditorialBrief → EditorialManuscript (PH8).
 
 Responsibilities:
-  - Consume AgentContext after the reasoning pipeline completes
+  - Consume a StrategicPosition produced by the Strategy Layer
   - Produce an EditorialBrief containing structured executive knowledge
   - Produce an EditorialManuscript scaffold from the EditorialBrief
   - Run the authoritative writer registry (run_writers) with completeness validation
@@ -11,7 +11,12 @@ Rules:
   - No summarisation, no prose generation, no LLM calls
   - No markdown, no report generation, no presentation generation
   - All strings stored at full length; no truncation
-  - Never mutates AgentContext
+  - Never mutates the input object
+  - Communication Layer reads from StrategicPosition, not AgentContext
+
+PH8 backward compatibility: build() accepts AgentContext as a fallback.
+When AgentContext is passed, StrategyCoordinator converts it to a
+StrategicPosition first, then the normal path runs.
 """
 
 from __future__ import annotations
@@ -58,6 +63,7 @@ from .editorial_manuscript import (
 
 if TYPE_CHECKING:
     from ..context import AgentContext
+    from ..strategy import StrategicPosition
 
 LOGGER = logging.getLogger(__name__)
 
@@ -88,25 +94,34 @@ def _section_populated(section: Any) -> bool:
 
 
 class EditorialCoordinator:
-    """Maps a completed AgentContext to an EditorialBrief and persists it."""
+    """Maps a StrategicPosition to an EditorialBrief and persists it (PH8)."""
 
-    def build(self, ctx: "AgentContext") -> EditorialBrief:
-        """Produce an EditorialBrief from a completed AgentContext.
+    def build(self, position: "StrategicPosition | AgentContext") -> EditorialBrief:
+        """Produce an EditorialBrief from a StrategicPosition.
 
-        Does not mutate ctx. Does not call an LLM. Does not generate prose.
+        PH8 canonical path: accepts StrategicPosition.
+        Backward-compatible path: accepts AgentContext, converts via
+        StrategyCoordinator first so all code follows the same path.
+
+        Does not mutate the input. Does not call an LLM. Does not generate prose.
         """
+        from ..strategy import StrategyCoordinator, StrategicPosition as _SP
+        if not isinstance(position, _SP):
+            # Backward compat — AgentContext passed directly (tests, legacy callers)
+            position = StrategyCoordinator().build(position)  # type: ignore[arg-type]
+
         return EditorialBrief(
-            metadata=self._build_metadata(ctx),
-            executive_summary=self._build_executive_summary(ctx),
-            decision_analysis=self._build_decision_analysis(ctx),
-            strategic_options=self._build_strategic_options(ctx),
-            recommendations=self._build_recommendations(ctx),
-            strategic_assumptions=self._build_assumptions(ctx),
-            strategic_risks=self._build_risks(ctx),
-            strategic_opportunities=self._build_opportunities(ctx),
-            executive_confidence=self._build_confidence(ctx),
-            validation_priorities=self._build_validation_priorities(ctx),
-            appendix=self._build_appendix(ctx),
+            metadata=self._build_metadata(position),
+            executive_summary=self._build_executive_summary(position),
+            decision_analysis=self._build_decision_analysis(position),
+            strategic_options=self._build_strategic_options(position),
+            recommendations=self._build_recommendations(position),
+            strategic_assumptions=self._build_assumptions(position),
+            strategic_risks=self._build_risks(position),
+            strategic_opportunities=self._build_opportunities(position),
+            executive_confidence=self._build_confidence(position),
+            validation_priorities=self._build_validation_priorities(position),
+            appendix=self._build_appendix(position),
         )
 
     def persist(
@@ -139,26 +154,26 @@ class EditorialCoordinator:
     # Section builders
     # ------------------------------------------------------------------
 
-    def _build_metadata(self, ctx: "AgentContext") -> BriefMetadata:
-        dm = ctx.decision_model or {}
-        engagement = ctx.engagement or {}
+    def _build_metadata(self, position: "StrategicPosition") -> BriefMetadata:
+        dm = position.decision_model or {}
+        engagement = position.engagement or {}
         created_at = datetime.now(timezone.utc).isoformat()
-        brief_id = f"EB-{created_at[:10].replace('-', '')}-{(ctx.run_id or 'unknown')[:8]}"
+        brief_id = f"EB-{created_at[:10].replace('-', '')}-{(position.run_id or 'unknown')[:8]}"
         return BriefMetadata(
             brief_id=brief_id,
             created_at=created_at,
-            pipeline_run_id=ctx.run_id or "",
+            pipeline_run_id=position.run_id or "",
             decision_model_id=dm.get("decision_model_id", ""),
             engagement_id=engagement.get("engagement_id", ""),
-            question=ctx.question or "",
-            profiles=list(ctx.profiles or []),
-            execution_profile=ctx.execution_profile or "",
+            question=position.question or "",
+            profiles=list(position.profiles or []),
+            execution_profile=position.execution_profile or "",
         )
 
-    def _build_executive_summary(self, ctx: "AgentContext") -> ExecutiveSummarySection:
-        da = ctx.decision_analysis or {}
-        ec = ctx.executive_confidence or {}
-        preferred = ctx.preferred_option or {}
+    def _build_executive_summary(self, position: "StrategicPosition") -> ExecutiveSummarySection:
+        da = position.decision_analysis or {}
+        ec = position.executive_confidence or {}
+        preferred = position.preferred_option or {}
 
         recommended_id = (
             preferred.get("option_id")
@@ -167,12 +182,12 @@ class EditorialCoordinator:
         )
         recommended_title = preferred.get("title", "")
         if not recommended_title:
-            for opt in (ctx.strategic_options or []):
+            for opt in (position.strategic_options or []):
                 if opt.get("option_id") == recommended_id:
                     recommended_title = opt.get("title", "")
                     break
 
-        rec_ids = [r.get("recommendation_id", "") for r in (ctx.recommendations or [])]
+        rec_ids = [r.get("recommendation_id", "") for r in (position.recommendations or [])]
 
         return ExecutiveSummarySection(
             recommended_option_id=recommended_id,
@@ -184,7 +199,7 @@ class EditorialCoordinator:
             critical_unknowns=list(ec.get("critical_unknowns", [])),
             supporting_recommendation_ids=rec_ids,
             provenance=SectionProvenance(
-                decision_model_id=(ctx.decision_model or {}).get("decision_model_id", ""),
+                decision_model_id=(position.decision_model or {}).get("decision_model_id", ""),
                 analysis_id=da.get("analysis_id", ""),
                 confidence_id=ec.get("confidence_id", ""),
                 recommendation_ids=rec_ids,
@@ -192,9 +207,9 @@ class EditorialCoordinator:
             ),
         )
 
-    def _build_decision_analysis(self, ctx: "AgentContext") -> DecisionAnalysisSection:
-        da = ctx.decision_analysis or {}
-        option_ids = [o.get("option_id", "") for o in (ctx.strategic_options or [])]
+    def _build_decision_analysis(self, position: "StrategicPosition") -> DecisionAnalysisSection:
+        da = position.decision_analysis or {}
+        option_ids = [o.get("option_id", "") for o in (position.strategic_options or [])]
         return DecisionAnalysisSection(
             analysis_id=da.get("analysis_id", ""),
             recommended_option_id=da.get("recommended_option_id", ""),
@@ -204,14 +219,14 @@ class EditorialCoordinator:
             key_uncertainties=list(da.get("key_uncertainties", [])),
             decision_matrix=list(da.get("decision_matrix", [])),
             provenance=SectionProvenance(
-                decision_model_id=(ctx.decision_model or {}).get("decision_model_id", ""),
+                decision_model_id=(position.decision_model or {}).get("decision_model_id", ""),
                 analysis_id=da.get("analysis_id", ""),
                 option_ids=option_ids,
             ),
         )
 
-    def _build_strategic_options(self, ctx: "AgentContext") -> StrategicOptionsSection:
-        option_ids = [o.get("option_id", "") for o in (ctx.strategic_options or [])]
+    def _build_strategic_options(self, position: "StrategicPosition") -> StrategicOptionsSection:
+        option_ids = [o.get("option_id", "") for o in (position.strategic_options or [])]
         entries = [
             StrategicOptionEntry(
                 option_id=opt.get("option_id", ""),
@@ -231,21 +246,21 @@ class EditorialCoordinator:
                 associated_opportunity_ids=list(opt.get("associated_opportunity_ids", [])),
                 supporting_recommendation_ids=list(opt.get("supporting_recommendation_ids", [])),
             )
-            for opt in (ctx.strategic_options or [])
+            for opt in (position.strategic_options or [])
         ]
         return StrategicOptionsSection(
             options=entries,
             provenance=SectionProvenance(
-                decision_model_id=(ctx.decision_model or {}).get("decision_model_id", ""),
+                decision_model_id=(position.decision_model or {}).get("decision_model_id", ""),
                 option_ids=option_ids,
-                assumption_ids=[a.get("assumption_id", "") for a in (ctx.assumptions or [])],
-                risk_ids=[r.get("risk_id", "") for r in (ctx.risks or [])],
-                opportunity_ids=[o.get("opportunity_id", "") for o in (ctx.opportunities or [])],
+                assumption_ids=[a.get("assumption_id", "") for a in (position.assumptions or [])],
+                risk_ids=[r.get("risk_id", "") for r in (position.risks or [])],
+                opportunity_ids=[o.get("opportunity_id", "") for o in (position.opportunities or [])],
             ),
         )
 
-    def _build_recommendations(self, ctx: "AgentContext") -> RecommendationsSection:
-        rec_ids = [r.get("recommendation_id", "") for r in (ctx.recommendations or [])]
+    def _build_recommendations(self, position: "StrategicPosition") -> RecommendationsSection:
+        rec_ids = [r.get("recommendation_id", "") for r in (position.recommendations or [])]
         entries = [
             RecommendationEntry(
                 recommendation_id=rec.get("recommendation_id", ""),
@@ -256,20 +271,20 @@ class EditorialCoordinator:
                 supported_assumption_ids=list(rec.get("supported_assumption_ids", [])),
                 affected_risk_ids=list(rec.get("affected_risk_ids", [])),
             )
-            for rec in (ctx.recommendations or [])
+            for rec in (position.recommendations or [])
         ]
         return RecommendationsSection(
             recommendations=entries,
             provenance=SectionProvenance(
-                decision_model_id=(ctx.decision_model or {}).get("decision_model_id", ""),
+                decision_model_id=(position.decision_model or {}).get("decision_model_id", ""),
                 recommendation_ids=rec_ids,
-                assumption_ids=[a.get("assumption_id", "") for a in (ctx.assumptions or [])],
-                risk_ids=[r.get("risk_id", "") for r in (ctx.risks or [])],
+                assumption_ids=[a.get("assumption_id", "") for a in (position.assumptions or [])],
+                risk_ids=[r.get("risk_id", "") for r in (position.risks or [])],
             ),
         )
 
-    def _build_assumptions(self, ctx: "AgentContext") -> AssumptionsSection:
-        assumption_ids = [a.get("assumption_id", "") for a in (ctx.assumptions or [])]
+    def _build_assumptions(self, position: "StrategicPosition") -> AssumptionsSection:
+        assumption_ids = [a.get("assumption_id", "") for a in (position.assumptions or [])]
         entries = [
             AssumptionEntry(
                 assumption_id=a.get("assumption_id", ""),
@@ -279,22 +294,22 @@ class EditorialCoordinator:
                 evidence_support=a.get("evidence_support", ""),
                 supported_recommendation_ids=list(a.get("supported_recommendation_ids", [])),
             )
-            for a in (ctx.assumptions or [])
+            for a in (position.assumptions or [])
         ]
         critical_count = sum(1 for e in entries if e.importance == "Critical")
         return AssumptionsSection(
             assumptions=entries,
             critical_count=critical_count,
             provenance=SectionProvenance(
-                decision_model_id=(ctx.decision_model or {}).get("decision_model_id", ""),
+                decision_model_id=(position.decision_model or {}).get("decision_model_id", ""),
                 assumption_ids=assumption_ids,
-                recommendation_ids=[r.get("recommendation_id", "") for r in (ctx.recommendations or [])],
+                recommendation_ids=[r.get("recommendation_id", "") for r in (position.recommendations or [])],
             ),
         )
 
-    def _build_risks(self, ctx: "AgentContext") -> RisksSection:
+    def _build_risks(self, position: "StrategicPosition") -> RisksSection:
         _severity_order = {"High": 0, "Medium": 1, "Low": 2}
-        risk_ids = [r.get("risk_id", "") for r in (ctx.risks or [])]
+        risk_ids = [r.get("risk_id", "") for r in (position.risks or [])]
         entries = [
             RiskEntry(
                 risk_id=r.get("risk_id", ""),
@@ -305,7 +320,7 @@ class EditorialCoordinator:
                 related_assumption_ids=list(r.get("related_assumption_ids", [])),
                 affected_recommendation_ids=list(r.get("affected_recommendation_ids", [])),
             )
-            for r in (ctx.risks or [])
+            for r in (position.risks or [])
         ]
         top_risk_id = ""
         if entries:
@@ -315,15 +330,15 @@ class EditorialCoordinator:
             risks=entries,
             top_risk_id=top_risk_id,
             provenance=SectionProvenance(
-                decision_model_id=(ctx.decision_model or {}).get("decision_model_id", ""),
+                decision_model_id=(position.decision_model or {}).get("decision_model_id", ""),
                 risk_ids=risk_ids,
-                assumption_ids=[a.get("assumption_id", "") for a in (ctx.assumptions or [])],
-                recommendation_ids=[r.get("recommendation_id", "") for r in (ctx.recommendations or [])],
+                assumption_ids=[a.get("assumption_id", "") for a in (position.assumptions or [])],
+                recommendation_ids=[r.get("recommendation_id", "") for r in (position.recommendations or [])],
             ),
         )
 
-    def _build_opportunities(self, ctx: "AgentContext") -> OpportunitiesSection:
-        opp_ids = [o.get("opportunity_id", "") for o in (ctx.opportunities or [])]
+    def _build_opportunities(self, position: "StrategicPosition") -> OpportunitiesSection:
+        opp_ids = [o.get("opportunity_id", "") for o in (position.opportunities or [])]
         entries = [
             OpportunityEntry(
                 opportunity_id=o.get("opportunity_id", ""),
@@ -334,20 +349,20 @@ class EditorialCoordinator:
                 related_assumption_ids=list(o.get("related_assumption_ids", [])),
                 enabled_recommendation_ids=list(o.get("enabled_recommendation_ids", [])),
             )
-            for o in (ctx.opportunities or [])
+            for o in (position.opportunities or [])
         ]
         return OpportunitiesSection(
             opportunities=entries,
             provenance=SectionProvenance(
-                decision_model_id=(ctx.decision_model or {}).get("decision_model_id", ""),
+                decision_model_id=(position.decision_model or {}).get("decision_model_id", ""),
                 opportunity_ids=opp_ids,
-                assumption_ids=[a.get("assumption_id", "") for a in (ctx.assumptions or [])],
-                recommendation_ids=[r.get("recommendation_id", "") for r in (ctx.recommendations or [])],
+                assumption_ids=[a.get("assumption_id", "") for a in (position.assumptions or [])],
+                recommendation_ids=[r.get("recommendation_id", "") for r in (position.recommendations or [])],
             ),
         )
 
-    def _build_confidence(self, ctx: "AgentContext") -> ConfidenceSection:
-        ec = ctx.executive_confidence or {}
+    def _build_confidence(self, position: "StrategicPosition") -> ConfidenceSection:
+        ec = position.executive_confidence or {}
         return ConfidenceSection(
             confidence_id=ec.get("confidence_id", ""),
             overall_confidence=ec.get("overall_confidence", ""),
@@ -360,25 +375,25 @@ class EditorialCoordinator:
             confidence_if_assumptions_fail=ec.get("confidence_if_assumptions_fail", ""),
             decision_horizon=ec.get("decision_horizon", ""),
             provenance=SectionProvenance(
-                decision_model_id=(ctx.decision_model or {}).get("decision_model_id", ""),
+                decision_model_id=(position.decision_model or {}).get("decision_model_id", ""),
                 confidence_id=ec.get("confidence_id", ""),
-                assumption_ids=[a.get("assumption_id", "") for a in (ctx.assumptions or [])],
-                risk_ids=[r.get("risk_id", "") for r in (ctx.risks or [])],
+                assumption_ids=[a.get("assumption_id", "") for a in (position.assumptions or [])],
+                risk_ids=[r.get("risk_id", "") for r in (position.risks or [])],
             ),
         )
 
-    def _build_validation_priorities(self, ctx: "AgentContext") -> ValidationPrioritiesSection:
-        ec = ctx.executive_confidence or {}
+    def _build_validation_priorities(self, position: "StrategicPosition") -> ValidationPrioritiesSection:
+        ec = position.executive_confidence or {}
         return ValidationPrioritiesSection(
             priorities=list(ec.get("validation_priorities", [])),
             provenance=SectionProvenance(
                 confidence_id=ec.get("confidence_id", ""),
-                decision_model_id=(ctx.decision_model or {}).get("decision_model_id", ""),
+                decision_model_id=(position.decision_model or {}).get("decision_model_id", ""),
             ),
         )
 
-    def _build_appendix(self, ctx: "AgentContext") -> AppendixSection:
-        ro = ctx.research_object or {}
+    def _build_appendix(self, position: "StrategicPosition") -> AppendixSection:
+        ro = position.research_object or {}
         ev_summary = ro.get("evidence_summary", {}) or {}
         citations_raw: list[Any] = ro.get("citations", []) or []
         citations: list[str] = [
@@ -389,12 +404,12 @@ class EditorialCoordinator:
             research_object_id=ro.get("research_id", ""),
             total_evidence_items=int(ev_summary.get("total_evidence_items", 0)),
             citation_count=int(ev_summary.get("citation_count", len(citations))),
-            profiles=list(ctx.profiles or []),
+            profiles=list(position.profiles or []),
             evidence_topics=dict(ro.get("evidence_topics", {})),
             citations=citations,
             provenance=SectionProvenance(
                 research_object_id=ro.get("research_id", ""),
-                decision_model_id=(ctx.decision_model or {}).get("decision_model_id", ""),
+                decision_model_id=(position.decision_model or {}).get("decision_model_id", ""),
             ),
         )
 

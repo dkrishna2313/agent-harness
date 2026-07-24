@@ -983,6 +983,21 @@ class Orchestrator:
                 perf_summary["totals"]["llm_call_count"],
             )
 
+        # PH8 — build StrategicPosition from completed AgentContext.
+        # Runs before the canonical pipeline trace so _strategic_position is
+        # available to write_canonical_trace for the strategy diagnostics section.
+        # Best-effort: a failure must never block canonical trace or editorial.
+        _sp = None
+        try:
+            from .strategy import StrategyCoordinator
+            _sc = StrategyCoordinator()
+            _sp = _sc.build(result_ctx)
+            _sp_path = _sc.persist(_sp)
+            print(f"Strategic position → {_sp_path}")
+            result_ctx.trace["_strategic_position"] = _sp
+        except Exception as exc:
+            LOGGER.warning("[Orchestrator] strategy build failed: %s", exc)
+
         # PH3.4 – write the one authoritative canonical pipeline trace,
         # consolidating boundaries/performance/prompt-slices already computed
         # above. Best-effort: a write failure must never fail the pipeline
@@ -1001,7 +1016,7 @@ class Orchestrator:
         try:
             from .editorial import EditorialCoordinator
             _eb_coord = EditorialCoordinator()
-            _eb = _eb_coord.build(result_ctx)
+            _eb = _eb_coord.build(_sp if _sp is not None else result_ctx)
             _eb_path = _eb_coord.persist(_eb)
             print(f"Editorial brief → {_eb_path}")
             _em = _eb_coord.build_manuscript(_eb)
