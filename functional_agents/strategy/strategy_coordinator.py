@@ -36,6 +36,7 @@ from .strategic_position import (
     StrategicRecommendation,
     TheoryOfWinning,
 )
+from .configuration_resolver import ConfigurationResolver
 from .strategy_config import StrategyConfig
 
 if TYPE_CHECKING:
@@ -47,14 +48,16 @@ LOGGER = logging.getLogger(__name__)
 class StrategyCoordinator:
     """Maps a completed AgentContext to a StrategicPosition.
 
-    PH9.0: Accepts an optional StrategyConfig at construction time.
-    If not supplied, a default StrategyConfig is used. Behavior is
-    identical in both cases — config is not yet applied to generation
-    or evaluation (those belong to later PH9 milestones).
+    PH9.0: Accepts an optional StrategyConfig.
+    PH9.1: Routes the config through ConfigurationResolver before use.
+    The resolved config is stored internally; the caller's object is
+    never mutated. Behavior is unchanged — the resolved config is not
+    yet applied to generation or evaluation (later PH9 milestones).
     """
 
     def __init__(self, config: StrategyConfig | None = None) -> None:
-        self._config = config if config is not None else StrategyConfig()
+        raw = config if config is not None else StrategyConfig()
+        self._config = ConfigurationResolver().resolve(raw)
 
     def build(self, ctx: "AgentContext") -> StrategicPosition:
         """Produce a StrategicPosition from a completed AgentContext.

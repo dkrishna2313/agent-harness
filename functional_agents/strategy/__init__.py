@@ -17,6 +17,7 @@ Strategy Layer. StrategyCoordinator accepts it optionally; if omitted, a default
 instance is constructed. Behavior is unchanged.
 """
 
+from .configuration_resolver import ConfigurationResolver
 from .strategic_position import (
     StrategicExecution,
     StrategicJustification,
@@ -37,6 +38,7 @@ from .strategy_config import (
 from .strategy_coordinator import StrategyCoordinator
 
 __all__ = [
+    "ConfigurationResolver",
     "StrategicExecution",
     "StrategicJustification",
     "StrategicPosition",
