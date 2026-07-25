@@ -1,8 +1,10 @@
-"""ConfigurationResolver — canonical entry point into the Strategy Layer (PH9.1).
+"""ConfigurationResolver — canonical entry point into the Strategy Layer (PH9.1/PH9.2).
 
 Sits between an incoming StrategyConfig and the StrategyCoordinator:
 
-    StrategyConfig
+    Framework Defaults
+            +
+    Input StrategyConfig
             │
             ▼
     ConfigurationResolver.resolve()
@@ -13,13 +15,12 @@ Sits between an incoming StrategyConfig and the StrategyCoordinator:
             ▼
     StrategyCoordinator
 
-PH9.1 scope: pass-through with defensive validation.
-The resolver establishes the architectural seam for future milestones that
-will add framework defaults, engagement overrides, and dimension population
-between the raw config and the resolved config.
+PH9.1: defensive validation and immutable copy.
+PH9.2: merge with framework defaults before returning. Merge rule: if the caller's
+field value differs from the zero-opinion baseline (StrategyConfig()), keep the
+caller's value; otherwise use the framework default. Neither input is mutated.
 
-Not in scope for PH9.1:
-  - Framework defaults
+Not in scope:
   - YAML loading
   - Engagement overrides
   - StrategyPlan production
@@ -29,7 +30,9 @@ Not in scope for PH9.1:
 from __future__ import annotations
 
 import logging
+from typing import Any
 
+from .framework_defaults import FrameworkDefaults
 from .strategy_config import StrategyConfig
 
 LOGGER = logging.getLogger(__name__)
@@ -38,14 +41,18 @@ LOGGER = logging.getLogger(__name__)
 class ConfigurationResolver:
     """Produces a validated, resolved StrategyConfig.
 
-    PH9.1: pass-through. The resolver validates the input, then returns a
-    fresh immutable copy — the caller's object is never mutated. Future
-    milestones will add framework defaults and engagement overrides inside
-    this class without changing its interface.
+    PH9.2: merges framework defaults with the caller's config.
+    For each top-level field, the caller's value wins if it differs from the
+    zero-opinion baseline (``StrategyConfig()``); otherwise the framework
+    default is used. The caller's object and the defaults object are never
+    mutated.
+
+    If the caller specifies an unknown framework, a warning is logged and the
+    caller's config is used as-is (no defaults applied).
     """
 
     def resolve(self, config: StrategyConfig) -> StrategyConfig:
-        """Validate config and return a resolved copy.
+        """Validate and merge config with framework defaults.
 
         The returned instance is always a new object — callers that hold a
         reference to the original will not observe any change.
@@ -55,10 +62,17 @@ class ConfigurationResolver:
         """
         self._validate(config)
 
-        # Round-trip through dict to produce a fully independent copy.
-        # model_validate re-runs Pydantic validation, so the result is
-        # guaranteed to satisfy all field-level constraints.
-        resolved = StrategyConfig.from_dict(config.to_dict())
+        if FrameworkDefaults.is_known(config.framework):
+            defaults = FrameworkDefaults.get(config.framework)
+            merged_dict = self._merge(defaults, config)
+        else:
+            LOGGER.warning(
+                "[ConfigurationResolver] unknown framework %r — no defaults applied",
+                config.framework,
+            )
+            merged_dict = config.to_dict()
+
+        resolved = StrategyConfig.from_dict(merged_dict)
 
         LOGGER.debug(
             "[ConfigurationResolver] resolved: framework=%r version=%r",
@@ -69,8 +83,34 @@ class ConfigurationResolver:
         return resolved
 
     # ------------------------------------------------------------------
-    # Internal validation
+    # Internal helpers
     # ------------------------------------------------------------------
+
+    def _merge(self, defaults: StrategyConfig, caller: StrategyConfig) -> dict[str, Any]:
+        """Merge caller config over framework defaults.
+
+        For each top-level field: if the caller's serialized value differs
+        from the zero-opinion baseline (``StrategyConfig()``), keep the
+        caller's value. Otherwise use the framework default value.
+
+        Does not mutate either input.
+        """
+        baseline_d = StrategyConfig().to_dict()
+        defaults_d = defaults.to_dict()
+        caller_d = caller.to_dict()
+
+        merged: dict[str, Any] = {}
+        for key in defaults_d:
+            caller_val = caller_d.get(key)
+            baseline_val = baseline_d.get(key)
+            if caller_val != baseline_val:
+                # caller explicitly set this field — preserve it
+                merged[key] = caller_val
+            else:
+                # caller left it at baseline — use framework default
+                merged[key] = defaults_d[key]
+
+        return merged
 
     def _validate(self, config: StrategyConfig) -> None:
         """Enforce hard invariants that Pydantic field types do not cover."""

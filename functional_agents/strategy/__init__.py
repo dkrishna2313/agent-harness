@@ -18,6 +18,7 @@ instance is constructed. Behavior is unchanged.
 """
 
 from .configuration_resolver import ConfigurationResolver
+from .framework_defaults import FrameworkDefaults
 from .strategic_position import (
     StrategicExecution,
     StrategicJustification,
@@ -39,6 +40,7 @@ from .strategy_coordinator import StrategyCoordinator
 
 __all__ = [
     "ConfigurationResolver",
+    "FrameworkDefaults",
     "StrategicExecution",
     "StrategicJustification",
     "StrategicPosition",
