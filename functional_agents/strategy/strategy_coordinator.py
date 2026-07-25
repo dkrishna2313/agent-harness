@@ -1,7 +1,8 @@
-"""StrategyCoordinator — maps AgentContext → StrategicPosition (PH8).
+"""StrategyCoordinator — maps AgentContext → StrategicPosition (PH8/PH9).
 
 Responsibilities:
   - Consume AgentContext after the reasoning pipeline completes
+  - Consume optional StrategyConfig (PH9.0)
   - Produce a StrategicPosition containing the selected strategy
   - Persist the position for diagnostics
 
@@ -13,9 +14,11 @@ Rules:
   - Pure extraction and structuring of existing reasoning outputs
 
 PH8: StrategyCoordinator is a pass-through — it structures AgentContext
-reasoning outputs into the canonical StrategicPosition. Future phases
-will add strategy planning agents (StrategyPlan, TheoryGenerator,
-TheoryEvaluator) between ResearchObject and StrategicPosition.
+reasoning outputs into the canonical StrategicPosition.
+PH9.0: Accepts an optional StrategyConfig. If omitted, a default instance
+is constructed. Behavior is unchanged — config is carried but not yet applied.
+Future phases will use the config to drive StrategyPlan, TheoryGenerator,
+and TheoryEvaluator.
 """
 
 from __future__ import annotations
@@ -33,6 +36,7 @@ from .strategic_position import (
     StrategicRecommendation,
     TheoryOfWinning,
 )
+from .strategy_config import StrategyConfig
 
 if TYPE_CHECKING:
     from ..context import AgentContext
@@ -41,12 +45,22 @@ LOGGER = logging.getLogger(__name__)
 
 
 class StrategyCoordinator:
-    """Maps a completed AgentContext to a StrategicPosition."""
+    """Maps a completed AgentContext to a StrategicPosition.
+
+    PH9.0: Accepts an optional StrategyConfig at construction time.
+    If not supplied, a default StrategyConfig is used. Behavior is
+    identical in both cases — config is not yet applied to generation
+    or evaluation (those belong to later PH9 milestones).
+    """
+
+    def __init__(self, config: StrategyConfig | None = None) -> None:
+        self._config = config if config is not None else StrategyConfig()
 
     def build(self, ctx: "AgentContext") -> StrategicPosition:
         """Produce a StrategicPosition from a completed AgentContext.
 
         Does not mutate ctx. Does not call an LLM. Does not generate prose.
+        StrategyConfig is accepted and stored but not yet applied.
         """
         created_at = datetime.now(timezone.utc).isoformat()
         position_id = f"SP-{created_at[:10].replace('-', '')}-{(ctx.run_id or 'unknown')[:8]}"
