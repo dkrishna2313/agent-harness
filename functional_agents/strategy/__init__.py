@@ -20,6 +20,7 @@ instance is constructed. Behavior is unchanged.
 from .configuration_resolver import ConfigurationResolver
 from .framework_defaults import FrameworkDefaults
 from .strategic_choice import StrategicChoice
+from .strategic_choice_generator import StrategicChoiceGenerator
 from .strategic_choice_set import StrategicChoiceSet
 from .strategy_plan import (
     EvaluationModel,
@@ -53,6 +54,7 @@ __all__ = [
     "EvaluationModel",
     "FrameworkDefaults",
     "StrategicChoice",
+    "StrategicChoiceGenerator",
     "StrategicChoiceSet",
     "GenerationPolicy",
     "SearchBudget",

@@ -37,6 +37,7 @@ from .strategic_position import (
     TheoryOfWinning,
 )
 from .configuration_resolver import ConfigurationResolver
+from .strategic_choice_generator import StrategicChoiceGenerator
 from .strategy_config import StrategyConfig
 from .strategy_planner import StrategyPlanner
 
@@ -52,22 +53,32 @@ class StrategyCoordinator:
     PH9.0: Accepts an optional StrategyConfig.
     PH9.1: Routes the config through ConfigurationResolver.
     PH9.3: Passes the resolved config through StrategyPlanner to produce
-    a StrategyPlan. The coordinator now holds _plan (the executable plan)
-    in addition to _config (the resolved configuration). Behavior is
-    unchanged — neither is yet applied to the extraction logic in build().
+    a StrategyPlan.
+    PH10.1: Invokes StrategicChoiceGenerator to produce a StrategicChoiceSet
+    as the canonical intermediate object between StrategyPlan and
+    StrategicPosition. The set is stored as _choice_set but does not yet
+    influence StrategicPosition construction.
     """
 
     def __init__(self, config: StrategyConfig | None = None) -> None:
         raw = config if config is not None else StrategyConfig()
         self._config = ConfigurationResolver().resolve(raw)
         self._plan = StrategyPlanner().build(self._config)
+        self._choice_set = None  # set in build(); None until first call
 
     def build(self, ctx: "AgentContext") -> StrategicPosition:
         """Produce a StrategicPosition from a completed AgentContext.
 
+        PH10.1 runtime:
+          StrategyPlan → StrategicChoiceGenerator → StrategicChoiceSet
+          → (existing StrategicPosition construction, unchanged)
+
         Does not mutate ctx. Does not call an LLM. Does not generate prose.
-        StrategyConfig is accepted and stored but not yet applied.
+        StrategicChoiceSet is stored as _choice_set but does not yet
+        influence the returned StrategicPosition.
         """
+        # PH10.1: generate the canonical intermediate StrategicChoiceSet
+        self._choice_set = StrategicChoiceGenerator().build(self._plan, ctx)
         created_at = datetime.now(timezone.utc).isoformat()
         position_id = f"SP-{created_at[:10].replace('-', '')}-{(ctx.run_id or 'unknown')[:8]}"
 
