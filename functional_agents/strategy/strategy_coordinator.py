@@ -38,6 +38,7 @@ from .strategic_position import (
 )
 from .configuration_resolver import ConfigurationResolver
 from .strategy_config import StrategyConfig
+from .strategy_planner import StrategyPlanner
 
 if TYPE_CHECKING:
     from ..context import AgentContext
@@ -49,15 +50,17 @@ class StrategyCoordinator:
     """Maps a completed AgentContext to a StrategicPosition.
 
     PH9.0: Accepts an optional StrategyConfig.
-    PH9.1: Routes the config through ConfigurationResolver before use.
-    The resolved config is stored internally; the caller's object is
-    never mutated. Behavior is unchanged — the resolved config is not
-    yet applied to generation or evaluation (later PH9 milestones).
+    PH9.1: Routes the config through ConfigurationResolver.
+    PH9.3: Passes the resolved config through StrategyPlanner to produce
+    a StrategyPlan. The coordinator now holds _plan (the executable plan)
+    in addition to _config (the resolved configuration). Behavior is
+    unchanged — neither is yet applied to the extraction logic in build().
     """
 
     def __init__(self, config: StrategyConfig | None = None) -> None:
         raw = config if config is not None else StrategyConfig()
         self._config = ConfigurationResolver().resolve(raw)
+        self._plan = StrategyPlanner().build(self._config)
 
     def build(self, ctx: "AgentContext") -> StrategicPosition:
         """Produce a StrategicPosition from a completed AgentContext.

@@ -19,6 +19,14 @@ instance is constructed. Behavior is unchanged.
 
 from .configuration_resolver import ConfigurationResolver
 from .framework_defaults import FrameworkDefaults
+from .strategy_plan import (
+    EvaluationModel,
+    GenerationPolicy,
+    SearchBudget,
+    StrategyPlan,
+    ValidationPolicy,
+)
+from .strategy_planner import StrategyPlanner
 from .strategic_position import (
     StrategicExecution,
     StrategicJustification,
@@ -40,7 +48,13 @@ from .strategy_coordinator import StrategyCoordinator
 
 __all__ = [
     "ConfigurationResolver",
+    "EvaluationModel",
     "FrameworkDefaults",
+    "GenerationPolicy",
+    "SearchBudget",
+    "StrategyPlan",
+    "StrategyPlanner",
+    "ValidationPolicy",
     "StrategicExecution",
     "StrategicJustification",
     "StrategicPosition",
