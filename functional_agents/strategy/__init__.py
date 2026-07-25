@@ -19,6 +19,8 @@ instance is constructed. Behavior is unchanged.
 
 from .configuration_resolver import ConfigurationResolver
 from .framework_defaults import FrameworkDefaults
+from .strategic_choice import StrategicChoice
+from .strategic_choice_set import StrategicChoiceSet
 from .strategy_plan import (
     EvaluationModel,
     GenerationPolicy,
@@ -50,6 +52,8 @@ __all__ = [
     "ConfigurationResolver",
     "EvaluationModel",
     "FrameworkDefaults",
+    "StrategicChoice",
+    "StrategicChoiceSet",
     "GenerationPolicy",
     "SearchBudget",
     "StrategyPlan",
