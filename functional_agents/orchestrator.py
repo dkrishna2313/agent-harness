@@ -995,6 +995,7 @@ class Orchestrator:
             _sp_path = _sc.persist(_sp)
             print(f"Strategic position → {_sp_path}")
             result_ctx.trace["_strategic_position"] = _sp
+            result_ctx.trace["_strategy_trace"] = _sc._trace  # PH11.0
         except Exception as exc:
             LOGGER.warning("[Orchestrator] strategy build failed: %s", exc)
 

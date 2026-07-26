@@ -42,6 +42,7 @@ from .strategic_choice_generator import StrategicChoiceGenerator
 from .strategy_config import StrategyConfig
 from .strategy_planner import StrategyPlanner
 from .strategy_selector import StrategySelection, StrategySelector
+from .strategy_trace import StrategyTrace
 from .theory_evaluator import TheoryEvaluator
 from .theory_generator import TheoryGenerator
 
@@ -78,6 +79,7 @@ class StrategyCoordinator:
         self._evaluations: list = []                   # set in build()
         self._selected_theory: TheoryOfWinning | None = None   # set in build()
         self._selection: StrategySelection | None = None        # set in build()
+        self._trace: StrategyTrace | None = None               # set in build()
 
     def build(self, ctx: "AgentContext") -> StrategicPosition:
         """Produce a StrategicPosition from a completed AgentContext.
@@ -132,7 +134,7 @@ class StrategyCoordinator:
             validation_priorities=list(ec.get("validation_priorities", [])),
         )
 
-        return StrategicPosition(
+        position = StrategicPosition(
             position_id=position_id,
             created_at=created_at,
 
@@ -161,6 +163,21 @@ class StrategyCoordinator:
             justification=justification,
             execution=execution,
         )
+
+        # PH11.0 — build the StrategyTrace artifact capturing the full chain
+        self._trace = StrategyTrace(
+            trace_id=f"STRAT-{self._plan.plan_id}",
+            created_at=created_at,
+            plan=self._plan,
+            choice_sets=list(self._choice_sets),
+            theories=list(self._theories),
+            evaluations=list(self._evaluations),
+            selection=self._selection,
+            strategic_position=position,
+            metadata={},
+        )
+
+        return position
 
     def persist(
         self,

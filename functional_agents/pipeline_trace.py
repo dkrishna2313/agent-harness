@@ -146,6 +146,14 @@ def build_canonical_trace(context: Any) -> dict[str, Any]:
     else:
         strategy_entry = None
 
+    # PH11.0 — Full StrategyTrace artifact. Additive — not in _REQUIRED_TOP_LEVEL_KEYS.
+    _st_raw = trace.get("_strategy_trace")
+    strategy_trace_entry: dict[str, Any] | None = (
+        _st_raw.model_dump(mode="json")
+        if _st_raw is not None and hasattr(_st_raw, "trace_id")
+        else None
+    )
+
     contracts = {
         "functional_agent_contract": "FunctionalAgent.run(context: AgentContext) -> AgentResult",
         "agents_conforming": sorted(agents.keys()),
@@ -183,6 +191,7 @@ def build_canonical_trace(context: Any) -> dict[str, Any]:
         "deliverable_bundle": deliverable_bundle,
         "executive_narrative": executive_narrative_entry,
         "strategy": strategy_entry,
+        "strategy_trace": strategy_trace_entry,
         "contracts": contracts,
         "summary": {
             "agents_run": len(agents),

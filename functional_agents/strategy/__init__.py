@@ -52,6 +52,7 @@ from .strategy_config import (
     StrategyValidation,
 )
 from .strategy_coordinator import StrategyCoordinator
+from .strategy_trace import StrategyTrace
 
 __all__ = [
     "ConfigurationResolver",
@@ -85,4 +86,5 @@ __all__ = [
     "TheoryEvaluator",
     "TheoryGenerator",
     "TheoryOfWinning",
+    "StrategyTrace",
 ]
