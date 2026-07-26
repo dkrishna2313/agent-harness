@@ -17,8 +17,9 @@ PH8: StrategyCoordinator is a pass-through — it structures AgentContext
 reasoning outputs into the canonical StrategicPosition.
 PH9.0: Accepts an optional StrategyConfig. If omitted, a default instance
 is constructed. Behavior is unchanged — config is carried but not yet applied.
-Future phases will use the config to drive StrategyPlan, TheoryGenerator,
-and TheoryEvaluator.
+PH10.6: StrategySelector selects the winning TheoryOfWinning from evaluated
+theories. StrategicPosition.theory_of_winning now comes from the selected
+theory rather than the legacy _build_theory_of_winning() path.
 """
 
 from __future__ import annotations
@@ -40,6 +41,7 @@ from .configuration_resolver import ConfigurationResolver
 from .strategic_choice_generator import StrategicChoiceGenerator
 from .strategy_config import StrategyConfig
 from .strategy_planner import StrategyPlanner
+from .strategy_selector import StrategySelection, StrategySelector
 from .theory_evaluator import TheoryEvaluator
 from .theory_generator import TheoryGenerator
 
@@ -61,30 +63,33 @@ class StrategyCoordinator:
     PH10.3: Invokes TheoryGenerator for each choice set to produce three
     TheoryOfWinning objects. Stored as _theories.
     PH10.5: Invokes TheoryEvaluator for each theory to produce three
-    TheoryEvaluation objects. Stored as _evaluations. None of _choice_sets,
-    _theories, or _evaluations yet influence StrategicPosition construction.
+    TheoryEvaluation objects. Stored as _evaluations.
+    PH10.6: Invokes StrategySelector to pick the winning TheoryOfWinning.
+    Stored as _selected_theory. StrategicPosition.theory_of_winning now
+    reflects the selected theory rather than the legacy extraction path.
     """
 
     def __init__(self, config: StrategyConfig | None = None) -> None:
         raw = config if config is not None else StrategyConfig()
         self._config = ConfigurationResolver().resolve(raw)
         self._plan = StrategyPlanner().build(self._config)
-        self._choice_sets: list = []   # set in build(); empty until first call
-        self._theories: list = []      # set in build(); empty until first call
-        self._evaluations: list = []   # set in build(); empty until first call
+        self._choice_sets: list = []                   # set in build()
+        self._theories: list = []                      # set in build()
+        self._evaluations: list = []                   # set in build()
+        self._selected_theory: TheoryOfWinning | None = None   # set in build()
+        self._selection: StrategySelection | None = None        # set in build()
 
     def build(self, ctx: "AgentContext") -> StrategicPosition:
         """Produce a StrategicPosition from a completed AgentContext.
 
-        PH10.5 runtime:
+        PH10.6 runtime:
           StrategyPlan → StrategicChoiceGenerator → list[StrategicChoiceSet]
           → TheoryGenerator (one per set) → list[TheoryOfWinning]
           → TheoryEvaluator (one per theory) → list[TheoryEvaluation]
-          → (existing StrategicPosition construction, unchanged)
+          → StrategySelector → selected TheoryOfWinning
+          → StrategicPosition (theory_of_winning from selected theory)
 
         Does not mutate ctx. Does not call an LLM. Does not generate prose.
-        _choice_sets, _theories, and _evaluations are stored but do not
-        yet influence the returned StrategicPosition.
         """
         # PH10.2: generate three diverse StrategicChoiceSets (one per posture)
         self._choice_sets = StrategicChoiceGenerator().build(self._plan, ctx)
@@ -96,30 +101,24 @@ class StrategyCoordinator:
         self._evaluations = [
             evaluator.build(t, self._plan, ctx) for t in self._theories
         ]
+        # PH10.6: select the winning theory
+        selector = StrategySelector()
+        self._selected_theory = selector.select(
+            self._theories, self._evaluations, self._plan
+        )
+        self._selection = selector._last_selection
+
         created_at = datetime.now(timezone.utc).isoformat()
         position_id = f"SP-{created_at[:10].replace('-', '')}-{(ctx.run_id or 'unknown')[:8]}"
 
         ec = ctx.executive_confidence or {}
         da = ctx.decision_analysis or {}
-        preferred = ctx.preferred_option or {}
 
-        recommended_id = (
-            preferred.get("option_id")
-            or da.get("recommended_option_id")
-            or ""
-        )
-        recommended_title = preferred.get("title", "")
-        if not recommended_title:
-            for opt in (ctx.strategic_options or []):
-                if opt.get("option_id") == recommended_id:
-                    recommended_title = opt.get("title", "")
-                    break
-
-        theory = self._build_theory_of_winning(
-            ctx, recommended_id, recommended_title, ec, da
-        )
+        # PH10.6: recommendation aligned with the selected theory
         recommendation = self._build_recommendation(
-            recommended_id, recommended_title, ec
+            self._selected_theory.recommended_option_id,
+            self._selected_theory.recommended_option_title,
+            ec,
         )
         justification = StrategicJustification(
             decision_analysis=da,
@@ -156,8 +155,8 @@ class StrategyCoordinator:
             opportunities=list(ctx.opportunities or []),
             recommendations=list(ctx.recommendations or []),
 
-            # Canonical spec structure
-            theory_of_winning=theory,
+            # Canonical spec structure — theory_of_winning from selector (PH10.6)
+            theory_of_winning=self._selected_theory,
             recommendation=recommendation,
             justification=justification,
             execution=execution,
