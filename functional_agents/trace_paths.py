@@ -27,6 +27,10 @@ CANONICAL_PIPELINE_TRACE_FILENAME = "pipeline.trace.json"
 # hard-coding the path string.
 CANONICAL_PIPELINE_TRACE = Path("outputs") / CANONICAL_PIPELINE_TRACE_FILENAME
 
+# PH11.1 — StrategyTrace standalone artifact filename and default path.
+STRATEGY_TRACE_FILENAME = "strategy.trace.json"
+STRATEGY_TRACE = Path("outputs") / STRATEGY_TRACE_FILENAME
+
 # Any basename ending in this suffix is also reserved: a run-specific prefix
 # (e.g. "ph34_pipeline.trace.json") still reads as "the pipeline trace for
 # this run" to a human, so it's just as misleading coming out of run_agent.py.

@@ -15,6 +15,8 @@ Consumed by: pipeline_trace.build_canonical_trace() (exposed as "strategy_trace"
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
@@ -152,3 +154,26 @@ class StrategyTrace(BaseModel):
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "StrategyTrace":
         return cls.model_validate(data)
+
+
+# ---------------------------------------------------------------------------
+# Persistence helper (PH11.1)
+# ---------------------------------------------------------------------------
+
+def write_strategy_trace(trace: "StrategyTrace", out_dir: str | Path) -> Path:
+    """Write the StrategyTrace as ``strategy.trace.json`` in *out_dir*.
+
+    Uses the same formatting conventions as the canonical pipeline trace:
+    ``json.dumps(data, indent=2, default=str)`` with UTF-8 encoding.
+
+    The file is written only after ``model_dump(mode="json")`` succeeds,
+    so a serialization failure raises before touching the filesystem.
+    The directory is created when it does not already exist.
+
+    Returns the path written.
+    """
+    out_path = Path(out_dir) / "strategy.trace.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    data = trace.model_dump(mode="json")           # serialise before touching disk
+    out_path.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
+    return out_path

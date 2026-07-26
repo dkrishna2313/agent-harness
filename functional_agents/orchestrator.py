@@ -1011,6 +1011,28 @@ class Orchestrator:
         except Exception as exc:
             LOGGER.warning("[Orchestrator] canonical pipeline trace write failed: %s", exc)
 
+        # PH11.1 — persist the StrategyTrace standalone artifact.
+        # Best-effort: a write failure must never block pipeline output.
+        # Written only when _strategy_trace was successfully built in the PH8 block above.
+        _st_raw = result_ctx.trace.get("_strategy_trace")
+        if _st_raw is not None:
+            try:
+                from .strategy.strategy_trace import write_strategy_trace
+                from .trace_paths import CANONICAL_PIPELINE_TRACE
+                from .deliverables.artifact import DeliverableArtifact
+                _st_path = write_strategy_trace(_st_raw, CANONICAL_PIPELINE_TRACE.parent)
+                print(f"Strategy trace  → {_st_path}")
+                result_ctx.deliverables.append(DeliverableArtifact(
+                    type="strategy_trace",
+                    path=str(_st_path),
+                    mime_type="application/json",
+                    metadata={"trace_id": _st_raw.trace_id},
+                ).to_dict())
+            except Exception as exc:
+                LOGGER.warning("[Orchestrator] strategy trace persist failed: %s", exc)
+        else:
+            LOGGER.debug("[Orchestrator] no strategy trace available — skipping persist")
+
         # PH6.2a/PH6.3/PH6.4–PH6.8 — build EditorialBrief, scaffold EditorialManuscript,
         # run the ordered writer registry.
         # Best-effort: a failure must never block post-run diagnostics or the caller.
