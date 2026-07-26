@@ -1,4 +1,4 @@
-"""TheoryEvaluator — evaluates a single TheoryOfWinning (PH10.5).
+"""TheoryEvaluator — evaluates a single TheoryOfWinning (PH10.5 / PH10.5a).
 
 Public interface:
     build(theory, plan, research) -> TheoryEvaluation
@@ -6,10 +6,36 @@ Public interface:
 One TheoryEvaluation is produced per TheoryOfWinning. Theories are
 evaluated independently; no comparison or winner selection is performed.
 
-Criteria are generic (no Executive or framework-specific names hard-coded).
-Default criterion weights can be overridden via plan.evaluation_model.weights.
-plan.validation_policy drives whether certain criteria are scored strictly (0.0)
-when their evidence is absent.
+--- Criterion-selection algorithm ---
+
+The set of criteria that appear in the resulting TheoryEvaluation is
+determined by plan.evaluation_model.weights:
+
+  CONFIGURED mode (plan.evaluation_model.weights is non-empty):
+    The key set of plan.evaluation_model.weights defines the COMPLETE
+    criterion set. No built-in criteria are added automatically.
+    For each key:
+      - Recognised names (present in _CRITERION_META): scored by the
+        registered deterministic scorer with the configured weight.
+      - Unrecognised names (not in _CRITERION_META): scored by the
+        documented deterministic fallback (_FALLBACK_SCORE = 0.5,
+        rationale = _FALLBACK_RATIONALE) with the configured weight.
+
+  DEFAULT mode (plan.evaluation_model.weights is empty):
+    All seven built-in criteria from _CRITERION_META are evaluated with
+    their registered default weights.
+
+plan.validation_policy drives strict-zero scoring for recognised criteria
+when evidence or assumptions are absent and required.
+
+--- Evidence rationale tiers ---
+
+For criteria with partial-score states (evidence_quality, assumption_coverage,
+choice_completeness, risk_awareness) the rationale distinguishes:
+
+  score == 1.0  (sufficient)  → high_rationale + detail
+  0 < score < 1  (partial)   → detail string (accurate description of state)
+  score == 0.0  (none / fail) → low_rationale
 
 No LLM calls, no search, no optimisation.
 
@@ -24,7 +50,7 @@ import logging
 from typing import Any
 
 from .strategic_position import TheoryOfWinning
-from .strategy_plan import StrategyPlan
+from .strategy_plan import StrategyPlan, ValidationPolicy
 from .theory_evaluation import CriterionScore, TheoryEvaluation
 
 LOGGER = logging.getLogger(__name__)
@@ -32,12 +58,10 @@ LOGGER = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Criterion registry
 # ---------------------------------------------------------------------------
-# Each entry: criterion_name -> (high_rationale, low_rationale, default_weight)
-# high_rationale is used when score >= 0.75 (strength candidate)
-# low_rationale  is used when score <  0.50 (weakness candidate)
-# The criterion names are deliberately generic — callers may configure weights
-# for them via plan.evaluation_model.weights without needing to know their
-# internal semantics.
+# (high_rationale, low_rationale, default_weight)
+# high_rationale: score >= _STRENGTH_THRESHOLD
+# low_rationale:  score == 0.0
+# partial score:  the detail string is used directly (see _make_score)
 
 _CRITERION_META: dict[str, tuple[str, str, float]] = {
     "option_identified": (
@@ -79,12 +103,26 @@ _CRITERION_META: dict[str, tuple[str, str, float]] = {
 
 # Score at or above this threshold → strength candidate
 _STRENGTH_THRESHOLD = 0.75
-# Score below this threshold → weakness candidate
+# Score strictly below this threshold → weakness candidate
 _WEAKNESS_THRESHOLD = 0.50
+
+# Fallback for unrecognised configured criteria
+_FALLBACK_SCORE = 0.5
+_FALLBACK_RATIONALE = (
+    "Criterion not recognized by this evaluator; neutral score assigned."
+)
 
 
 class TheoryEvaluator:
-    """Evaluates a single TheoryOfWinning against generic plan-driven criteria.
+    """Evaluates a single TheoryOfWinning against plan-driven criteria.
+
+    Criterion-selection algorithm
+    ─────────────────────────────
+    • CONFIGURED mode  (plan.evaluation_model.weights non-empty):
+        Only the criteria named in weights are evaluated.
+        Unrecognised names receive the deterministic neutral fallback.
+    • DEFAULT mode  (plan.evaluation_model.weights empty):
+        All seven built-in criteria are evaluated at their default weights.
 
     Evaluation is independent per theory. No comparison, no ranking,
     no winner selection.
@@ -103,11 +141,11 @@ class TheoryEvaluator:
         theory:
             The TheoryOfWinning to evaluate.
         plan:
-            The resolved StrategyPlan; provides evaluation weights and
-            validation policy.
+            The resolved StrategyPlan; provides the criterion weight map
+            (evaluation_model.weights) and validation policy.
         research:
             Available research output (AgentContext in PH10.x). Reserved
-            for future use; currently accessed for structural completeness.
+            for future use; currently a structural parameter.
 
         Returns
         -------
@@ -141,13 +179,16 @@ class TheoryEvaluator:
             },
         )
         LOGGER.debug(
-            "[TheoryEvaluator] theory_id=%s overall_score=%.3f confidence=%s",
+            "[TheoryEvaluator] theory_id=%s overall_score=%.3f confidence=%s "
+            "mode=%s n_criteria=%d",
             theory_id, overall_score, confidence,
+            "configured" if plan.evaluation_model.weights else "default",
+            len(criteria_scores),
         )
         return evaluation
 
     # ------------------------------------------------------------------
-    # Scoring
+    # Criterion selection and scoring
     # ------------------------------------------------------------------
 
     def _score_criteria(
@@ -155,96 +196,138 @@ class TheoryEvaluator:
         theory: TheoryOfWinning,
         plan: StrategyPlan,
     ) -> dict[str, CriterionScore]:
-        """Compute a CriterionScore for each entry in _CRITERION_META."""
+        """Return one CriterionScore per criterion in the active criterion set.
+
+        CONFIGURED mode: key set of plan.evaluation_model.weights (non-empty).
+        DEFAULT mode:    all entries in _CRITERION_META (empty weights).
+        """
         plan_weights = plan.evaluation_model.weights
         vp = plan.validation_policy
         n_dims = len(plan.active_dimensions)
 
-        scores: dict[str, CriterionScore] = {}
-
-        # ---- option_identified ----
-        score_oi = 1.0 if theory.recommended_option_id else 0.0
-        scores["option_identified"] = self._make_score(
-            "option_identified", score_oi, plan_weights,
-            theory.recommended_option_id or None,
-        )
-
-        # ---- position_articulated ----
-        score_pa = 1.0 if theory.winning_position else 0.0
-        scores["position_articulated"] = self._make_score(
-            "position_articulated", score_pa, plan_weights,
-            theory.winning_position or None,
-        )
-
-        # ---- mechanism_defined ----
-        score_md = 1.0 if theory.winning_mechanism else 0.0
-        scores["mechanism_defined"] = self._make_score(
-            "mechanism_defined", score_md, plan_weights,
-            theory.winning_mechanism or None,
-        )
-
-        # ---- choice_completeness ----
-        n_choices = len(theory.strategic_choices)
-        if n_dims == 0:
-            score_cc = 1.0  # vacuously complete when no dimensions required
+        if plan_weights:
+            # CONFIGURED mode — criterion set is exactly the plan's weight keys
+            return {
+                name: self._score_one(name, weight, theory, vp, n_dims)
+                for name, weight in plan_weights.items()
+            }
         else:
-            score_cc = min(float(n_choices) / float(n_dims), 1.0)
-        scores["choice_completeness"] = self._make_score(
-            "choice_completeness", score_cc, plan_weights,
-            f"{n_choices} of {n_dims} dimension(s) covered" if n_dims > 0 else "no dimensions required",
-        )
+            # DEFAULT mode — all built-in criteria at registered default weights
+            return {
+                name: self._score_one(name, meta[2], theory, vp, n_dims)
+                for name, meta in _CRITERION_META.items()
+            }
 
-        # ---- evidence_quality ----
-        n_evidence = len(theory.evidence)
-        if vp.require_evidence and n_evidence == 0:
-            score_eq = 0.0
-        else:
-            score_eq = min(float(n_evidence) / 3.0, 1.0)
-        scores["evidence_quality"] = self._make_score(
-            "evidence_quality", score_eq, plan_weights,
-            f"{n_evidence} evidence item(s) cited" if n_evidence > 0 else None,
-        )
+    @staticmethod
+    def _score_one(
+        name: str,
+        weight: float,
+        theory: TheoryOfWinning,
+        vp: ValidationPolicy,
+        n_dims: int,
+    ) -> CriterionScore:
+        """Score a single criterion by name.
 
-        # ---- assumption_coverage ----
-        n_assumptions = len(theory.assumptions)
-        if vp.require_assumptions and n_assumptions == 0:
-            score_ac = 0.0
-        else:
-            score_ac = min(float(n_assumptions) / 2.0, 1.0)
-        scores["assumption_coverage"] = self._make_score(
-            "assumption_coverage", score_ac, plan_weights,
-            f"{n_assumptions} assumption(s) documented" if n_assumptions > 0 else None,
-        )
+        Unrecognised names receive the deterministic neutral fallback
+        (_FALLBACK_SCORE, _FALLBACK_RATIONALE) with the configured weight.
+        """
+        if name not in _CRITERION_META:
+            return CriterionScore(
+                score=_FALLBACK_SCORE,
+                rationale=_FALLBACK_RATIONALE,
+                weight=weight,
+            )
+        score, detail = TheoryEvaluator._raw_score(name, theory, vp, n_dims)
+        return TheoryEvaluator._make_score(name, score, weight, detail)
 
-        # ---- risk_awareness ----
-        n_failure_modes = len(theory.failure_modes)
-        score_ra = 1.0 if n_failure_modes > 0 else 0.5
-        scores["risk_awareness"] = self._make_score(
-            "risk_awareness", score_ra, plan_weights,
-            f"{n_failure_modes} failure mode(s) identified" if n_failure_modes > 0 else None,
-        )
+    @staticmethod
+    def _raw_score(
+        name: str,
+        theory: TheoryOfWinning,
+        vp: ValidationPolicy,
+        n_dims: int,
+    ) -> tuple[float, str | None]:
+        """Return (score, detail) for a recognised criterion.
 
-        return scores
+        detail is a short descriptive string used as the rationale when the
+        score is in the partial range (0 < score < _STRENGTH_THRESHOLD).
+        detail is None when no meaningful partial description exists.
+        """
+        if name == "option_identified":
+            sc = 1.0 if theory.recommended_option_id else 0.0
+            return sc, theory.recommended_option_id or None
+
+        if name == "position_articulated":
+            sc = 1.0 if theory.winning_position else 0.0
+            return sc, theory.winning_position or None
+
+        if name == "mechanism_defined":
+            sc = 1.0 if theory.winning_mechanism else 0.0
+            return sc, theory.winning_mechanism or None
+
+        if name == "choice_completeness":
+            n = len(theory.strategic_choices)
+            if n_dims == 0:
+                return 1.0, "no dimensions required"
+            sc = min(float(n) / float(n_dims), 1.0)
+            return sc, f"{n} of {n_dims} dimension(s) covered"
+
+        if name == "evidence_quality":
+            n = len(theory.evidence)
+            if vp.require_evidence and n == 0:
+                sc = 0.0
+            else:
+                sc = min(float(n) / 3.0, 1.0)
+            # Always supply a detail so partial scores have accurate rationale
+            detail = f"{n} evidence item(s) cited" if n > 0 else None
+            return sc, detail
+
+        if name == "assumption_coverage":
+            n = len(theory.assumptions)
+            if vp.require_assumptions and n == 0:
+                sc = 0.0
+            else:
+                sc = min(float(n) / 2.0, 1.0)
+            detail = f"{n} assumption(s) documented" if n > 0 else None
+            return sc, detail
+
+        if name == "risk_awareness":
+            n = len(theory.failure_modes)
+            sc = 1.0 if n > 0 else 0.5
+            # Always supply detail — accurately describes the state at any score
+            detail = (
+                f"{n} failure mode(s) identified"
+                if n > 0
+                else "no failure modes identified"
+            )
+            return sc, detail
+
+        # Unreachable: all _CRITERION_META keys are handled above
+        return 0.0, None  # pragma: no cover
 
     @staticmethod
     def _make_score(
-        criterion: str,
+        name: str,
         score: float,
-        plan_weights: dict[str, float],
+        weight: float,
         detail: str | None,
     ) -> CriterionScore:
-        """Build a CriterionScore, substituting the plan-level weight if present."""
-        high_rationale, low_rationale, default_weight = _CRITERION_META[criterion]
-        weight = plan_weights.get(criterion, default_weight)
+        """Build a CriterionScore with a three-tier rationale.
+
+        Tiers:
+          score >= _STRENGTH_THRESHOLD  → high_rationale [+ (detail)]
+          0 < score < _STRENGTH_THRESHOLD → detail (accurate partial state)
+          score == 0.0                  → low_rationale
+        """
+        high_rationale, low_rationale, _ = _CRITERION_META[name]
 
         if score >= _STRENGTH_THRESHOLD:
-            rationale = high_rationale
-            if detail:
-                rationale = f"{high_rationale} ({detail})"
-        else:
+            rationale = f"{high_rationale} ({detail})" if detail else high_rationale
+        elif score == 0.0:
             rationale = low_rationale
-            if detail:
-                rationale = f"{low_rationale} ({detail})"
+        else:
+            # Partial: detail accurately describes what was found
+            rationale = detail if detail else low_rationale
 
         return CriterionScore(score=score, rationale=rationale, weight=weight)
 
@@ -268,7 +351,8 @@ class TheoryEvaluator:
         criteria_scores: dict[str, CriterionScore],
         theory: TheoryOfWinning,
     ) -> list[str]:
-        """Return rationales for criteria that scored at or above the strength threshold."""
+        """Return rationales for criteria scoring >= _STRENGTH_THRESHOLD,
+        plus any success_conditions from the theory."""
         strengths = [
             cs.rationale
             for cs in criteria_scores.values()
@@ -283,7 +367,7 @@ class TheoryEvaluator:
         criteria_scores: dict[str, CriterionScore],
         theory: TheoryOfWinning,
     ) -> list[str]:
-        """Return rationales for criteria that scored below the weakness threshold."""
+        """Return rationales for criteria scoring < _WEAKNESS_THRESHOLD."""
         return [
             cs.rationale
             for cs in criteria_scores.values()
@@ -292,15 +376,10 @@ class TheoryEvaluator:
 
     @staticmethod
     def _derive_confidence(theory: TheoryOfWinning, overall_score: float) -> str:
-        """Derive evaluation confidence from theory confidence and overall_score.
-
-        Uses theory.confidence as the primary signal when available.
-        Falls back to score-based derivation.
-        """
+        """Derive evaluation confidence from theory.confidence then overall_score."""
         theory_conf = (theory.confidence or "").strip().lower()
         if theory_conf in {"high", "medium", "low"}:
             return theory_conf.capitalize()
-        # Score-based fallback
         if overall_score >= 0.75:
             return "High"
         if overall_score >= 0.50:

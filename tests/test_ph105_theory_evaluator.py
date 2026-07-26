@@ -1,4 +1,4 @@
-"""PH10.5 — TheoryEvaluator unit tests.
+"""PH10.5 / PH10.5a — TheoryEvaluator unit tests.
 
 Covers:
 - TheoryEvaluator.build(): return type is TheoryEvaluation
@@ -10,9 +10,17 @@ Covers:
 - weaknesses: criteria with score < 0.50
 - residual_risks: carries theory.failure_modes
 - metadata: plan_id, dimension counts, evidence/assumption counts
-- Plan interaction: evaluation_model.weights overrides default criterion weights
+- PH10.5a criterion-selection algorithm:
+    - DEFAULT mode (empty weights): all 7 built-in criteria evaluated
+    - CONFIGURED mode (non-empty weights): ONLY those named criteria evaluated
+    - Unrecognised configured criteria receive deterministic neutral fallback
+- Plan interaction: evaluation_model.weights defines criterion set in configured mode
 - Plan interaction: validation_policy.require_evidence forces evidence_quality to 0.0
 - Plan interaction: validation_policy.require_assumptions forces assumption_coverage to 0.0
+- PH10.5a three-tier rationale:
+    - score >= 0.75 → high_rationale [+ (detail)]
+    - 0 < score < 0.75 → detail string (accurate partial description)
+    - score == 0.0 → low_rationale
 - choice_completeness: 1.0 when no active dims; proportional when dims present
 - evidence_quality scoring: 0 → 0.0, 1 → 0.33, 3+ → 1.0
 - assumption_coverage scoring: 0 → 0.0, 1 → 0.5, 2+ → 1.0
@@ -427,6 +435,7 @@ class TestRiskAwarenessCriterion:
 
 class TestPlanWeightOverride:
     def test_plan_weight_overrides_default(self):
+        # CONFIGURED mode: exactly these two criteria scored with these weights
         custom_weights = {"option_identified": 10.0, "evidence_quality": 0.1}
         ev = TheoryEvaluator().build(
             _theory(), _plan(weights=custom_weights), None
@@ -434,12 +443,14 @@ class TestPlanWeightOverride:
         assert ev.criteria_scores["option_identified"].weight == 10.0
         assert ev.criteria_scores["evidence_quality"].weight == 0.1
 
-    def test_unspecified_criteria_keep_default_weight(self):
+    def test_configured_mode_excludes_unconfigured_built_ins(self):
+        # PH10.5a: non-empty weights = CONFIGURED mode.
+        # Only "option_identified" is configured → position_articulated is absent.
         ev = TheoryEvaluator().build(
             _theory(), _plan(weights={"option_identified": 5.0}), None
         )
-        # position_articulated default weight is 1.5
-        assert ev.criteria_scores["position_articulated"].weight == 1.5
+        assert "option_identified" in ev.criteria_scores
+        assert "position_articulated" not in ev.criteria_scores
 
     def test_empty_plan_weights_uses_all_defaults(self):
         ev = TheoryEvaluator().build(_theory(), _plan(weights={}), None)
@@ -778,3 +789,209 @@ class TestStrategyPositionUnchangedByEvaluations:
         pos = coord.build(_full_ctx())
         assert not hasattr(pos, "evaluations")
         assert not hasattr(pos, "_evaluations")
+
+
+# ---------------------------------------------------------------------------
+# PH10.5a — Configured mode criterion selection (Issue 1)
+# ---------------------------------------------------------------------------
+
+class TestConfiguredModeSelection:
+    """Criterion-selection algorithm: non-empty weights define the complete set."""
+
+    def test_configured_mode_only_shows_configured_criteria(self):
+        # Two custom criteria → exactly those two in result
+        weights = {"option_identified": 1.0, "evidence_quality": 1.0}
+        ev = TheoryEvaluator().build(_theory(), _plan(weights=weights), None)
+        assert set(ev.criteria_scores.keys()) == {"option_identified", "evidence_quality"}
+
+    def test_configured_mode_excludes_all_other_built_ins(self):
+        # Configuring one criterion must not auto-add the other six
+        ev = TheoryEvaluator().build(
+            _theory(), _plan(weights={"mechanism_defined": 2.0}), None
+        )
+        built_ins = {
+            "option_identified", "position_articulated", "choice_completeness",
+            "evidence_quality", "assumption_coverage", "risk_awareness",
+        }
+        for name in built_ins:
+            assert name not in ev.criteria_scores
+
+    def test_default_mode_still_produces_seven_criteria(self):
+        # Empty weights → DEFAULT mode → all 7
+        ev = TheoryEvaluator().build(_theory(), _plan(weights={}), None)
+        expected = {
+            "option_identified", "position_articulated", "mechanism_defined",
+            "choice_completeness", "evidence_quality", "assumption_coverage",
+            "risk_awareness",
+        }
+        assert set(ev.criteria_scores.keys()) == expected
+
+    def test_unknown_configured_criterion_gets_fallback_score(self):
+        # Unrecognised name → _FALLBACK_SCORE = 0.5
+        ev = TheoryEvaluator().build(
+            _theory(), _plan(weights={"custom_alignment_score": 1.0}), None
+        )
+        assert ev.criteria_scores["custom_alignment_score"].score == 0.5
+
+    def test_unknown_configured_criterion_gets_fallback_rationale(self):
+        # Unrecognised name → rationale = "Criterion not recognized..."
+        ev = TheoryEvaluator().build(
+            _theory(), _plan(weights={"custom_alignment_score": 1.0}), None
+        )
+        rationale = ev.criteria_scores["custom_alignment_score"].rationale
+        assert "not recognized" in rationale.lower()
+
+    def test_unknown_configured_criterion_uses_configured_weight(self):
+        # The weight from the plan must be honoured even for unknown criteria
+        ev = TheoryEvaluator().build(
+            _theory(), _plan(weights={"custom_alignment_score": 3.5}), None
+        )
+        assert ev.criteria_scores["custom_alignment_score"].weight == 3.5
+
+    def test_mixed_known_and_unknown_criteria(self):
+        # Known criterion scores normally; unknown gets fallback
+        weights = {"option_identified": 2.0, "bespoke_dimension": 1.0}
+        ev = TheoryEvaluator().build(_theory(), _plan(weights=weights), None)
+        assert set(ev.criteria_scores.keys()) == {"option_identified", "bespoke_dimension"}
+        assert ev.criteria_scores["option_identified"].score == 1.0  # OPT-A present
+        assert ev.criteria_scores["bespoke_dimension"].score == 0.5  # fallback
+
+    def test_configured_mode_weight_is_honored_for_known_criterion(self):
+        # Custom weight for a recognised criterion is stored correctly
+        ev = TheoryEvaluator().build(
+            _theory(), _plan(weights={"risk_awareness": 9.9}), None
+        )
+        assert ev.criteria_scores["risk_awareness"].weight == 9.9
+
+    def test_configured_mode_unknown_criterion_is_neutral_in_overall_score(self):
+        # Unknown criterion at 0.5 contributes proportionally; overall between 0 and 1
+        ev = TheoryEvaluator().build(
+            _theory(), _plan(weights={"mystery": 1.0}), None
+        )
+        assert ev.overall_score == 0.5
+
+
+# ---------------------------------------------------------------------------
+# PH10.5a — Three-tier rationale (Issue 2)
+# ---------------------------------------------------------------------------
+
+class TestRationaleTiers:
+    """Rationale distinguishes high (>=0.75), partial (0<score<0.75), zero (0.0)."""
+
+    # --- evidence_quality ---
+
+    def test_evidence_rationale_high_tier(self):
+        # 3 evidence items → score=1.0 → high tier: "Supporting evidence is cited. (…)"
+        ev = TheoryEvaluator().build(_theory(evidence=["E1", "E2", "E3"]), _plan(), None)
+        rationale = ev.criteria_scores["evidence_quality"].rationale
+        assert rationale.startswith("Supporting evidence is cited.")
+        assert "3 evidence item(s) cited" in rationale
+
+    def test_evidence_rationale_partial_tier(self):
+        # 1 evidence item → score≈0.33 → partial tier: detail string directly
+        ev = TheoryEvaluator().build(_theory(evidence=["E1"]), _plan(), None)
+        rationale = ev.criteria_scores["evidence_quality"].rationale
+        # Must NOT start with the low_rationale "No supporting evidence is cited."
+        assert not rationale.startswith("No supporting evidence is cited.")
+        # Must be the detail string
+        assert "1 evidence item(s) cited" in rationale
+
+    def test_evidence_rationale_low_tier(self):
+        # 0 evidence items → score=0.0 → low tier: low_rationale, no detail
+        ev = TheoryEvaluator().build(_theory(evidence=[]), _plan(), None)
+        rationale = ev.criteria_scores["evidence_quality"].rationale
+        assert rationale == "No supporting evidence is cited."
+
+    def test_evidence_partial_does_not_include_low_rationale_prefix(self):
+        # The bug was: low_rationale + " (1 evidence item(s) cited)"
+        # Fixed: only the detail string
+        ev = TheoryEvaluator().build(_theory(evidence=["E1"]), _plan(), None)
+        rationale = ev.criteria_scores["evidence_quality"].rationale
+        assert "No supporting evidence" not in rationale
+
+    def test_evidence_two_items_partial_tier(self):
+        # 2 evidence items → score≈0.67 → partial tier
+        ev = TheoryEvaluator().build(_theory(evidence=["E1", "E2"]), _plan(), None)
+        rationale = ev.criteria_scores["evidence_quality"].rationale
+        assert "2 evidence item(s) cited" in rationale
+        assert "No supporting evidence" not in rationale
+
+    # --- assumption_coverage ---
+
+    def test_assumption_rationale_high_tier(self):
+        # 2 assumptions → score=1.0 → high tier
+        ev = TheoryEvaluator().build(
+            _theory(assumptions=[{"statement": "A1"}, {"statement": "A2"}]),
+            _plan(), None,
+        )
+        rationale = ev.criteria_scores["assumption_coverage"].rationale
+        assert "Key assumptions are documented." in rationale
+        assert "2 assumption(s) documented" in rationale
+
+    def test_assumption_rationale_partial_tier(self):
+        # 1 assumption → score=0.5 → partial tier: detail string
+        ev = TheoryEvaluator().build(
+            _theory(assumptions=[{"statement": "A1"}]), _plan(), None
+        )
+        rationale = ev.criteria_scores["assumption_coverage"].rationale
+        assert "1 assumption(s) documented" in rationale
+        assert "No assumptions are documented." not in rationale
+
+    def test_assumption_rationale_low_tier(self):
+        # 0 assumptions → score=0.0 → low tier
+        ev = TheoryEvaluator().build(_theory(assumptions=[]), _plan(), None)
+        rationale = ev.criteria_scores["assumption_coverage"].rationale
+        assert rationale == "No assumptions are documented."
+
+    # --- risk_awareness ---
+
+    def test_risk_awareness_rationale_partial_when_no_failure_modes(self):
+        # 0 failure modes → score=0.5 → partial tier: detail = "no failure modes identified"
+        ev = TheoryEvaluator().build(_theory(failure_modes=[]), _plan(), None)
+        rationale = ev.criteria_scores["risk_awareness"].rationale
+        assert "no failure modes identified" in rationale
+        # Must NOT be the low_rationale (which would only appear at score=0.0)
+        assert rationale != "No failure modes have been identified."
+
+    def test_risk_awareness_rationale_high_when_failure_modes_present(self):
+        # 1+ failure modes → score=1.0 → high tier
+        fm = [{"description": "Delay", "severity": "High"}]
+        ev = TheoryEvaluator().build(_theory(failure_modes=fm), _plan(), None)
+        rationale = ev.criteria_scores["risk_awareness"].rationale
+        assert "Failure modes are identified." in rationale
+        assert "1 failure mode(s) identified" in rationale
+
+    # --- choice_completeness ---
+
+    def test_choice_completeness_rationale_partial_tier(self):
+        # 1 choice / 2 dims → score=0.5 → partial tier
+        choices = [{"dimension": "market"}]
+        ev = TheoryEvaluator().build(
+            _theory(strategic_choices=choices),
+            _plan(active_dimensions=["market", "technology"]),
+            None,
+        )
+        rationale = ev.criteria_scores["choice_completeness"].rationale
+        assert "1 of 2 dimension(s) covered" in rationale
+        assert "Active plan dimensions are incompletely covered." not in rationale
+
+    def test_choice_completeness_rationale_high_tier(self):
+        # 2 choices / 2 dims → score=1.0 → high tier
+        choices = [{"dimension": "market"}, {"dimension": "technology"}]
+        ev = TheoryEvaluator().build(
+            _theory(strategic_choices=choices),
+            _plan(active_dimensions=["market", "technology"]),
+            None,
+        )
+        rationale = ev.criteria_scores["choice_completeness"].rationale
+        assert "All active plan dimensions are covered by choices." in rationale
+
+    def test_choice_completeness_rationale_low_tier(self):
+        # 0 choices / 1 dim → score=0.0 → low tier
+        ev = TheoryEvaluator().build(
+            _theory(strategic_choices=[]),
+            _plan(active_dimensions=["market"]),
+            None,
+        )
+        rationale = ev.criteria_scores["choice_completeness"].rationale
+        assert rationale == "Active plan dimensions are incompletely covered."
