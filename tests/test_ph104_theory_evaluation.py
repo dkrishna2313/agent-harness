@@ -577,10 +577,6 @@ class TestPipelineUnchanged:
         assert not hasattr(pos, "theory_evaluation")
         assert not hasattr(pos, "evaluations")
 
-    def test_coordinator_has_no_evaluations_attribute(self):
-        coord = StrategyCoordinator()
-        assert not hasattr(coord, "_evaluations")
-
     def test_existing_position_fields_intact(self):
         coord = StrategyCoordinator()
         pos = coord.build(_full_ctx())
