@@ -224,18 +224,18 @@ class TestChoiceGeneratorWithAddDimensions:
 
     def test_one_choice_per_add_dimension(self):
         plan = self._plan("market", "technology")
-        cs = StrategicChoiceGenerator().build(plan, self._research())
+        cs = StrategicChoiceGenerator().build(plan, self._research())[0]
         assert len(cs.choices) == 2
 
     def test_choice_dimensions_match_add_names(self):
         plan = self._plan("market", "technology")
-        cs = StrategicChoiceGenerator().build(plan, self._research())
+        cs = StrategicChoiceGenerator().build(plan, self._research())[0]
         dims = {c.dimension for c in cs.choices}
         assert dims == {"market", "technology"}
 
     def test_completeness_one_with_add_dimensions(self):
         plan = self._plan("market")
-        cs = StrategicChoiceGenerator().build(plan, self._research())
+        cs = StrategicChoiceGenerator().build(plan, self._research())[0]
         assert cs.completeness == 1.0
 
 
@@ -249,14 +249,14 @@ class TestStrategyCoordinatorWithAddDimensions:
         cfg = StrategyConfig(dimensions=d)
         coord = StrategyCoordinator(config=cfg)
         coord.build(_minimal_ctx())
-        assert len(coord._choice_set.choices) == 2
+        assert all(len(cs.choices) == 2 for cs in coord._choice_sets)
 
     def test_add_dimensions_covered_in_choice_set(self):
         d = _dims("financial", "regulatory")
         cfg = StrategyConfig(dimensions=d)
         coord = StrategyCoordinator(config=cfg)
         coord.build(_minimal_ctx())
-        covered = coord._choice_set.dimensions_covered()
+        covered = coord._choice_sets[0].dimensions_covered()
         assert "financial" in covered
         assert "regulatory" in covered
 
@@ -274,6 +274,6 @@ class TestStrategyCoordinatorWithAddDimensions:
         coord_dict = StrategyCoordinator(config=cfg_dict)
         coord_dict.build(_minimal_ctx())
 
-        assert len(coord_add._choice_set.choices) == len(coord_dict._choice_set.choices)
-        assert set(coord_add._choice_set.dimensions_covered()) == \
-               set(coord_dict._choice_set.dimensions_covered())
+        assert len(coord_add._choice_sets) == len(coord_dict._choice_sets)
+        assert set(coord_add._choice_sets[0].dimensions_covered()) == \
+               set(coord_dict._choice_sets[0].dimensions_covered())

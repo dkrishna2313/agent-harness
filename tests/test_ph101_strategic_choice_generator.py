@@ -129,16 +129,21 @@ def _full_ctx() -> AgentContext:
 # ---------------------------------------------------------------------------
 
 class TestStrategicChoiceGeneratorReturnType:
-    def test_returns_strategic_choice_set(self):
+    def test_returns_list(self):
         gen = StrategicChoiceGenerator()
         result = gen.build(_plan_no_dims(), _research())
-        assert isinstance(result, StrategicChoiceSet)
+        assert isinstance(result, list)
 
-    def test_result_is_frozen(self):
+    def test_returns_strategic_choice_sets(self):
+        gen = StrategicChoiceGenerator()
+        result = gen.build(_plan_no_dims(), _research())
+        assert all(isinstance(cs, StrategicChoiceSet) for cs in result)
+
+    def test_first_set_is_frozen(self):
         gen = StrategicChoiceGenerator()
         result = gen.build(_plan_no_dims(), _research())
         with pytest.raises(Exception):
-            result.id = "mutated"
+            result[0].id = "mutated"
 
 
 # ---------------------------------------------------------------------------
@@ -148,32 +153,32 @@ class TestStrategicChoiceGeneratorReturnType:
 class TestStrategicChoiceGeneratorNoDimensions:
     def test_zero_choices(self):
         gen = StrategicChoiceGenerator()
-        result = gen.build(_plan_no_dims(), _research())
+        result = gen.build(_plan_no_dims(), _research())[0]
         assert result.choices == []
 
     def test_completeness_is_one(self):
         gen = StrategicChoiceGenerator()
-        result = gen.build(_plan_no_dims(), _research())
+        result = gen.build(_plan_no_dims(), _research())[0]
         assert result.completeness == 1.0
 
     def test_no_internal_conflicts(self):
         gen = StrategicChoiceGenerator()
-        result = gen.build(_plan_no_dims(), _research())
+        result = gen.build(_plan_no_dims(), _research())[0]
         assert result.internal_conflicts == []
 
     def test_rationale_populated(self):
         gen = StrategicChoiceGenerator()
-        result = gen.build(_plan_no_dims(), _research())
+        result = gen.build(_plan_no_dims(), _research())[0]
         assert result.rationale != ""
 
     def test_overall_confidence_extracted(self):
         gen = StrategicChoiceGenerator()
-        result = gen.build(_plan_no_dims(), _research(overall_confidence="High"))
+        result = gen.build(_plan_no_dims(), _research(overall_confidence="High"))[0]
         assert result.overall_confidence == "High"
 
     def test_id_set(self):
         gen = StrategicChoiceGenerator()
-        result = gen.build(_plan_no_dims(), _research())
+        result = gen.build(_plan_no_dims(), _research())[0]
         assert result.id.startswith("SCS-")
 
 
@@ -184,34 +189,34 @@ class TestStrategicChoiceGeneratorNoDimensions:
 class TestStrategicChoiceGeneratorWithDimensions:
     def test_one_choice_per_dimension(self):
         gen = StrategicChoiceGenerator()
-        result = gen.build(_plan_with_dims("market", "technology"), _research())
+        result = gen.build(_plan_with_dims("market", "technology"), _research())[0]
         assert len(result.choices) == 2
 
     def test_choice_dimensions_match_plan(self):
         gen = StrategicChoiceGenerator()
-        result = gen.build(_plan_with_dims("market", "technology"), _research())
+        result = gen.build(_plan_with_dims("market", "technology"), _research())[0]
         dims = {c.dimension for c in result.choices}
         assert dims == {"market", "technology"}
 
     def test_completeness_is_one_when_all_covered(self):
         gen = StrategicChoiceGenerator()
-        result = gen.build(_plan_with_dims("market"), _research())
+        result = gen.build(_plan_with_dims("market"), _research())[0]
         assert result.completeness == 1.0
 
     def test_single_dimension(self):
         gen = StrategicChoiceGenerator()
-        result = gen.build(_plan_with_dims("financial"), _research())
+        result = gen.build(_plan_with_dims("financial"), _research())[0]
         assert len(result.choices) == 1
         assert result.choices[0].dimension == "financial"
 
     def test_three_dimensions(self):
         gen = StrategicChoiceGenerator()
-        result = gen.build(_plan_with_dims("a", "b", "c"), _research())
+        result = gen.build(_plan_with_dims("a", "b", "c"), _research())[0]
         assert len(result.choices) == 3
 
     def test_choices_are_strategic_choice_instances(self):
         gen = StrategicChoiceGenerator()
-        result = gen.build(_plan_with_dims("market"), _research())
+        result = gen.build(_plan_with_dims("market"), _research())[0]
         assert all(isinstance(c, StrategicChoice) for c in result.choices)
 
 
@@ -222,10 +227,11 @@ class TestStrategicChoiceGeneratorWithDimensions:
 class TestStrategicChoiceFieldExtraction:
     def test_selected_value_from_decision_analysis(self):
         gen = StrategicChoiceGenerator()
+        # No strategic_options → falls back to da.recommended_option_id
         result = gen.build(
             _plan_with_dims("market"),
             _research(recommended_option_id="OPT-X"),
-        )
+        )[0]
         assert result.choices[0].selected_value == "OPT-X"
 
     def test_confidence_from_executive_confidence(self):
@@ -233,7 +239,7 @@ class TestStrategicChoiceFieldExtraction:
         result = gen.build(
             _plan_with_dims("market"),
             _research(overall_confidence="Medium"),
-        )
+        )[0]
         assert result.choices[0].confidence == "Medium"
 
     def test_rationale_from_decision_analysis(self):
@@ -241,7 +247,7 @@ class TestStrategicChoiceFieldExtraction:
         result = gen.build(
             _plan_with_dims("market"),
             _research(rationale="Strong evidence"),
-        )
+        )[0]
         assert result.choices[0].rationale == "Strong evidence"
 
     def test_supporting_assumptions_extracted(self):
@@ -252,23 +258,23 @@ class TestStrategicChoiceFieldExtraction:
                 {"assumption_id": "A-002", "statement": "Tech proven"},
             ]
         )
-        result = gen.build(_plan_with_dims("market"), research)
+        result = gen.build(_plan_with_dims("market"), research)[0]
         assert "Market stable" in result.choices[0].supporting_assumptions
         assert "Tech proven" in result.choices[0].supporting_assumptions
 
     def test_choice_id_contains_dimension(self):
         gen = StrategicChoiceGenerator()
-        result = gen.build(_plan_with_dims("technology"), _research())
+        result = gen.build(_plan_with_dims("technology"), _research())[0]
         assert "technology" in result.choices[0].id
 
     def test_no_alternatives_considered(self):
         gen = StrategicChoiceGenerator()
-        result = gen.build(_plan_with_dims("market"), _research())
+        result = gen.build(_plan_with_dims("market"), _research())[0]
         assert result.choices[0].alternatives_considered == []
 
     def test_requiredness_is_optional(self):
         gen = StrategicChoiceGenerator()
-        result = gen.build(_plan_with_dims("market"), _research())
+        result = gen.build(_plan_with_dims("market"), _research())[0]
         assert result.choices[0].requiredness == "optional"
 
 
@@ -285,7 +291,7 @@ class TestStrategicChoiceGeneratorEdgeCases:
             preferred_option={},
             assumptions=[],
         )
-        result = gen.build(_plan_with_dims("market"), research)
+        result = gen.build(_plan_with_dims("market"), research)[0]
         assert result.choices[0].confidence == ""
 
     def test_none_executive_confidence_graceful(self):
@@ -297,18 +303,18 @@ class TestStrategicChoiceGeneratorEdgeCases:
             assumptions=None,
         )
         result = gen.build(_plan_with_dims("market"), research)
-        assert isinstance(result, StrategicChoiceSet)
+        assert isinstance(result[0], StrategicChoiceSet)
 
-    def test_preferred_option_selected_value_takes_priority(self):
+    def test_preferred_option_selected_value_takes_priority_no_options(self):
         gen = StrategicChoiceGenerator()
+        # No strategic_options → falls back to preferred/da; preferred wins
         research = types.SimpleNamespace(
             executive_confidence={"overall_confidence": "High"},
             decision_analysis={"recommended_option_id": "OPT-DA"},
             preferred_option={"option_id": "OPT-PREF"},
             assumptions=[],
         )
-        result = gen.build(_plan_with_dims("market"), research)
-        # preferred_option.option_id takes precedence over decision_analysis
+        result = gen.build(_plan_with_dims("market"), research)[0]
         assert result.choices[0].selected_value == "OPT-PREF"
 
     def test_does_not_mutate_plan(self):
@@ -322,41 +328,41 @@ class TestStrategicChoiceGeneratorEdgeCases:
 # StrategyCoordinator — _choice_set wiring
 # ---------------------------------------------------------------------------
 
-class TestStrategyCoordinatorChoiceSet:
-    def test_choice_set_none_before_build(self):
+class TestStrategyCoordinatorChoiceSets:
+    def test_choice_sets_empty_before_build(self):
         coord = StrategyCoordinator()
-        assert coord._choice_set is None
+        assert coord._choice_sets == []
 
-    def test_choice_set_set_after_build(self):
+    def test_choice_sets_populated_after_build(self):
         coord = StrategyCoordinator()
         coord.build(_full_ctx())
-        assert coord._choice_set is not None
+        assert len(coord._choice_sets) > 0
 
-    def test_choice_set_is_strategic_choice_set(self):
+    def test_choice_sets_are_strategic_choice_sets(self):
         coord = StrategyCoordinator()
         coord.build(_full_ctx())
-        assert isinstance(coord._choice_set, StrategicChoiceSet)
+        assert all(isinstance(cs, StrategicChoiceSet) for cs in coord._choice_sets)
 
-    def test_choice_set_completeness_valid(self):
+    def test_each_choice_set_completeness_valid(self):
         coord = StrategyCoordinator()
         coord.build(_full_ctx())
-        cs = coord._choice_set
-        assert 0.0 <= cs.completeness <= 1.0
+        for cs in coord._choice_sets:
+            assert 0.0 <= cs.completeness <= 1.0
 
-    def test_choice_set_no_internal_conflicts(self):
+    def test_each_choice_set_no_internal_conflicts(self):
         coord = StrategyCoordinator()
         coord.build(_full_ctx())
-        assert coord._choice_set.internal_conflicts == []
+        for cs in coord._choice_sets:
+            assert cs.internal_conflicts == []
 
-    def test_multiple_builds_each_set_choice_set(self):
+    def test_multiple_builds_each_update_choice_sets(self):
         coord = StrategyCoordinator()
         coord.build(_full_ctx())
-        first_id = coord._choice_set.id
+        first_ids = [cs.id for cs in coord._choice_sets]
         coord.build(_full_ctx())
-        second_id = coord._choice_set.id
-        # Both are valid StrategicChoiceSet instances (IDs may differ due to timestamp)
-        assert first_id.startswith("SCS-")
-        assert second_id.startswith("SCS-")
+        second_ids = [cs.id for cs in coord._choice_sets]
+        assert all(i.startswith("SCS-") for i in first_ids)
+        assert all(i.startswith("SCS-") for i in second_ids)
 
 
 # ---------------------------------------------------------------------------
@@ -405,11 +411,12 @@ class TestDefaultConfigCompatibility:
         coord = StrategyCoordinator()
         assert coord._plan.active_dimensions == []
 
-    def test_default_config_choice_set_is_vacuously_complete(self):
+    def test_default_config_choice_sets_are_vacuously_complete(self):
         coord = StrategyCoordinator()
         coord.build(_full_ctx())
-        assert coord._choice_set.completeness == 1.0
-        assert coord._choice_set.choices == []
+        for cs in coord._choice_sets:
+            assert cs.completeness == 1.0
+            assert cs.choices == []
 
     def test_custom_config_with_dimensions_produces_choices(self):
         from functional_agents.strategy import StrategyDimensions
@@ -422,7 +429,8 @@ class TestDefaultConfigCompatibility:
         )
         coord = StrategyCoordinator(config=cfg)
         coord.build(_full_ctx())
-        assert len(coord._choice_set.choices) == 2
-        covered = coord._choice_set.dimensions_covered()
+        for cs in coord._choice_sets:
+            assert len(cs.choices) == 2
+        covered = coord._choice_sets[0].dimensions_covered()
         assert "market" in covered
         assert "technology" in covered
