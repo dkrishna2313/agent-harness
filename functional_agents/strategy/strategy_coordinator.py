@@ -233,6 +233,7 @@ class StrategyCoordinator:
         ]
 
         return TheoryOfWinning(
+            theory_id=f"TH-legacy-{recommended_id or 'unknown'}",
             recommended_option_id=recommended_id,
             recommended_option_title=recommended_title,
             winning_position=winning_position,

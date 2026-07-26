@@ -2,7 +2,7 @@
 
 Covers:
 - TheoryEvaluator.build(): return type is TheoryEvaluation
-- theory_id: propagated from theory.theory_id
+- theory_id: propagated from theory.theory_id; theory_id is required and non-empty
 - criteria_scores: seven generic criteria present, all CriterionScore instances
 - overall_score: in [0.0, 1.0], weighted mean of criteria
 - confidence: carried from theory.confidence; falls back to score-based derivation
@@ -226,11 +226,10 @@ class TestTheoryId:
         ev = TheoryEvaluator().build(_theory(theory_id="TH-SCS-BETA"), _plan(), None)
         assert ev.theory_id == "TH-SCS-BETA"
 
-    def test_theory_id_empty_when_theory_id_not_set(self):
-        ev = TheoryEvaluator().build(
-            TheoryOfWinning(theory_id="", recommended_option_id="OPT-B"), _plan(), None
-        )
-        assert ev.theory_id == ""
+    def test_theory_id_construction_without_theory_id_raises(self):
+        from pydantic import ValidationError
+        with pytest.raises(ValidationError):
+            TheoryOfWinning(recommended_option_id="OPT-B")
 
 
 # ---------------------------------------------------------------------------

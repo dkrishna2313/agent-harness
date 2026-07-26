@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ---------------------------------------------------------------------------
@@ -23,7 +23,7 @@ from pydantic import BaseModel, Field
 class TheoryOfWinning(BaseModel):
     """How the organisation wins given what is strategically true."""
 
-    theory_id: str = ""
+    theory_id: str
     recommended_option_id: str = ""
     recommended_option_title: str = ""
     winning_position: str = ""
@@ -36,6 +36,13 @@ class TheoryOfWinning(BaseModel):
     confidence: str = ""
 
     model_config = {"extra": "allow"}
+
+    @field_validator("theory_id")
+    @classmethod
+    def _theory_id_nonempty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("theory_id must be a non-empty, non-whitespace string.")
+        return v
 
 
 # ---------------------------------------------------------------------------

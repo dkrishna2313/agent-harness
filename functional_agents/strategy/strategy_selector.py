@@ -203,17 +203,38 @@ class StrategySelector:
     ) -> list[tuple[TheoryOfWinning, TheoryEvaluation, int]]:
         """Pair each evaluation with its theory by strict theory_id match.
 
-        Raises ValueError for duplicate theory_ids in theories, or for any
-        evaluation whose theory_id has no matching theory.
+        Raises ValueError for:
+        - blank theory_ids in theories (defensive; normally prevented by model)
+        - duplicate theory_ids in theories
+        - blank theory_ids in evaluations
+        - duplicate theory_ids in evaluations
+        - any evaluation whose theory_id has no matching theory
         """
-        seen: set[str] = set()
+        # Theories: blank and duplicate checks
+        seen_theory: set[str] = set()
         for t in theories:
-            if t.theory_id in seen:
+            if not t.theory_id or not t.theory_id.strip():
+                raise ValueError("StrategySelector: theory with blank theory_id found.")
+            if t.theory_id in seen_theory:
                 raise ValueError(
                     f"StrategySelector: duplicate theory_id={t.theory_id!r} in theories."
                 )
-            seen.add(t.theory_id)
+            seen_theory.add(t.theory_id)
 
+        # Evaluations: blank and duplicate checks
+        seen_eval: set[str] = set()
+        for ev in evaluations:
+            if not ev.theory_id or not ev.theory_id.strip():
+                raise ValueError(
+                    "StrategySelector: evaluation with blank theory_id found."
+                )
+            if ev.theory_id in seen_eval:
+                raise ValueError(
+                    f"StrategySelector: duplicate theory_id={ev.theory_id!r} in evaluations."
+                )
+            seen_eval.add(ev.theory_id)
+
+        # Strict ID-based matching
         theory_by_id: dict[str, TheoryOfWinning] = {t.theory_id: t for t in theories}
         pairs: list[tuple[TheoryOfWinning, TheoryEvaluation, int]] = []
         for i, ev in enumerate(evaluations):

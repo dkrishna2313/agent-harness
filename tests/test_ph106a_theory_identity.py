@@ -152,12 +152,13 @@ def _full_ctx() -> AgentContext:
 
 class TestTheoryOfWinningTheoryId:
     def test_theory_of_winning_has_theory_id_field(self):
-        theory = TheoryOfWinning()
+        theory = TheoryOfWinning(theory_id="TH-TEST")
         assert hasattr(theory, "theory_id")
 
-    def test_theory_id_defaults_to_empty_string(self):
-        theory = TheoryOfWinning()
-        assert theory.theory_id == ""
+    def test_theory_id_is_required(self):
+        from pydantic import ValidationError
+        with pytest.raises(ValidationError):
+            TheoryOfWinning()
 
     def test_theory_id_is_distinct_from_recommended_option_id(self):
         theory = TheoryOfWinning(
@@ -237,10 +238,12 @@ class TestTheoryEvaluatorTheoryId:
         assert ev.theory_id == "TH-CUSTOM"
         assert ev.theory_id != theory.recommended_option_id
 
-    def test_evaluator_empty_theory_id_propagated(self):
-        theory = TheoryOfWinning(theory_id="", recommended_option_id="OPT-A")
+    def test_evaluator_theory_id_distinct_from_option_id_with_matching_name(self):
+        # theory_id and recommended_option_id can have different values independently
+        theory = TheoryOfWinning(theory_id="TH-SCS-99", recommended_option_id="OPT-A")
         ev = TheoryEvaluator().build(theory, _plan(), None)
-        assert ev.theory_id == ""
+        assert ev.theory_id == "TH-SCS-99"
+        assert ev.theory_id != theory.recommended_option_id
 
 
 # ---------------------------------------------------------------------------
