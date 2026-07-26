@@ -40,6 +40,7 @@ from .configuration_resolver import ConfigurationResolver
 from .strategic_choice_generator import StrategicChoiceGenerator
 from .strategy_config import StrategyConfig
 from .strategy_planner import StrategyPlanner
+from .theory_generator import TheoryGenerator
 
 if TYPE_CHECKING:
     from ..context import AgentContext
@@ -55,8 +56,10 @@ class StrategyCoordinator:
     PH9.3: Passes the resolved config through StrategyPlanner to produce
     a StrategyPlan.
     PH10.2: Invokes StrategicChoiceGenerator to produce three diverse
-    StrategicChoiceSets (one per posture). These are stored as _choice_sets
-    but do not yet influence StrategicPosition construction.
+    StrategicChoiceSets (one per posture). Stored as _choice_sets.
+    PH10.3: Invokes TheoryGenerator for each choice set to produce three
+    TheoryOfWinning objects. Stored as _theories. Neither _choice_sets nor
+    _theories yet influence StrategicPosition construction.
     """
 
     def __init__(self, config: StrategyConfig | None = None) -> None:
@@ -64,20 +67,25 @@ class StrategyCoordinator:
         self._config = ConfigurationResolver().resolve(raw)
         self._plan = StrategyPlanner().build(self._config)
         self._choice_sets: list = []  # set in build(); empty until first call
+        self._theories: list = []     # set in build(); empty until first call
 
     def build(self, ctx: "AgentContext") -> StrategicPosition:
         """Produce a StrategicPosition from a completed AgentContext.
 
-        PH10.2 runtime:
+        PH10.3 runtime:
           StrategyPlan → StrategicChoiceGenerator → list[StrategicChoiceSet]
+          → TheoryGenerator (one per set) → list[TheoryOfWinning]
           → (existing StrategicPosition construction, unchanged)
 
         Does not mutate ctx. Does not call an LLM. Does not generate prose.
-        StrategicChoiceSets are stored as _choice_sets but do not yet
-        influence the returned StrategicPosition.
+        _choice_sets and _theories are stored but do not yet influence
+        the returned StrategicPosition.
         """
         # PH10.2: generate three diverse StrategicChoiceSets (one per posture)
         self._choice_sets = StrategicChoiceGenerator().build(self._plan, ctx)
+        # PH10.3: generate one TheoryOfWinning per StrategicChoiceSet
+        gen = TheoryGenerator()
+        self._theories = [gen.build(cs, ctx) for cs in self._choice_sets]
         created_at = datetime.now(timezone.utc).isoformat()
         position_id = f"SP-{created_at[:10].replace('-', '')}-{(ctx.run_id or 'unknown')[:8]}"
 
