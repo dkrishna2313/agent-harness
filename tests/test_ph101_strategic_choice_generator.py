@@ -22,6 +22,7 @@ from functional_agents.strategy import (
     StrategicChoiceSet,
     StrategyConfig,
     StrategyCoordinator,
+    StrategyObjectives,
     StrategyPlan,
 )
 
@@ -411,14 +412,14 @@ class TestDefaultConfigCompatibility:
         assert coord._choice_set.choices == []
 
     def test_custom_config_with_dimensions_produces_choices(self):
-        # Use from_dict so extra fields survive Pydantic reconstruction
-        cfg = StrategyConfig.from_dict({
-            "dimensions": {
-                "market": "market entry strategy",
-                "technology": "technology selection",
-            },
-            "objectives": {"primary": ["Win market share"]},
-        })
+        from functional_agents.strategy import StrategyDimensions
+        dims = StrategyDimensions()
+        dims.add("market", "market entry strategy")
+        dims.add("technology", "technology selection")
+        cfg = StrategyConfig(
+            dimensions=dims,
+            objectives=StrategyObjectives(primary=["Win market share"]),
+        )
         coord = StrategyCoordinator(config=cfg)
         coord.build(_full_ctx())
         assert len(coord._choice_set.choices) == 2

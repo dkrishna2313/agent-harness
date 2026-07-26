@@ -38,7 +38,15 @@ class StrategyDimensions(BaseModel):
     model_config = {"extra": "allow"}
 
     def add(self, name: str, descriptor: Any = None) -> None:
-        object.__setattr__(self, name, descriptor)
+        """Add a named dimension, stored in Pydantic's extra field dict.
+
+        Uses __pydantic_extra__ directly so the dimension survives
+        model_dump() / model_validate() round-trips.
+        """
+        if self.__pydantic_extra__ is None:
+            object.__setattr__(self, "__pydantic_extra__", {name: descriptor})
+        else:
+            self.__pydantic_extra__[name] = descriptor
 
 
 class StrategyEvaluation(BaseModel):
