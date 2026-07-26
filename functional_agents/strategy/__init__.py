@@ -22,6 +22,7 @@ from .framework_defaults import FrameworkDefaults
 from .strategic_choice import StrategicChoice
 from .strategic_choice_generator import StrategicChoiceGenerator
 from .strategic_choice_set import StrategicChoiceSet
+from .theory_evaluation import CriterionScore, TheoryEvaluation
 from .theory_generator import TheoryGenerator
 from .strategy_plan import (
     EvaluationModel,
@@ -75,6 +76,8 @@ __all__ = [
     "StrategyMetadata",
     "StrategyObjectives",
     "StrategyValidation",
+    "CriterionScore",
+    "TheoryEvaluation",
     "TheoryGenerator",
     "TheoryOfWinning",
 ]
