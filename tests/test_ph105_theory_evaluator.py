@@ -2,7 +2,7 @@
 
 Covers:
 - TheoryEvaluator.build(): return type is TheoryEvaluation
-- theory_id: derived from theory.recommended_option_id
+- theory_id: propagated from theory.theory_id
 - criteria_scores: seven generic criteria present, all CriterionScore instances
 - overall_score: in [0.0, 1.0], weighted mean of criteria
 - confidence: carried from theory.confidence; falls back to score-based derivation
@@ -77,6 +77,7 @@ def _plan(
 
 def _theory(
     *,
+    theory_id: str = "",
     recommended_option_id: str = "OPT-A",
     recommended_option_title: str = "Alpha",
     winning_position: str = "Posture 0 (recommended): 2 dimension(s) covered.",
@@ -89,6 +90,7 @@ def _theory(
     confidence: str = "High",
 ) -> TheoryOfWinning:
     return TheoryOfWinning(
+        theory_id=theory_id or f"TH-{recommended_option_id}",
         recommended_option_id=recommended_option_id,
         recommended_option_title=recommended_option_title,
         winning_position=winning_position,
@@ -220,12 +222,14 @@ class TestTheoryEvaluatorReturnType:
 # ---------------------------------------------------------------------------
 
 class TestTheoryId:
-    def test_theory_id_from_recommended_option_id(self):
-        ev = TheoryEvaluator().build(_theory(recommended_option_id="OPT-B"), _plan(), None)
-        assert ev.theory_id == "OPT-B"
+    def test_theory_id_propagated_from_theory(self):
+        ev = TheoryEvaluator().build(_theory(theory_id="TH-SCS-BETA"), _plan(), None)
+        assert ev.theory_id == "TH-SCS-BETA"
 
-    def test_theory_id_empty_when_no_recommended_id(self):
-        ev = TheoryEvaluator().build(_theory(recommended_option_id=""), _plan(), None)
+    def test_theory_id_empty_when_theory_id_not_set(self):
+        ev = TheoryEvaluator().build(
+            TheoryOfWinning(theory_id="", recommended_option_id="OPT-B"), _plan(), None
+        )
         assert ev.theory_id == ""
 
 
@@ -691,8 +695,8 @@ class TestIndependentEvaluation:
         t2 = _theory(recommended_option_id="OPT-B", winning_mechanism="")
         ev1 = gen.build(t1, p, None)
         ev2 = gen.build(t2, p, None)
-        assert ev1.theory_id == "OPT-A"
-        assert ev2.theory_id == "OPT-B"
+        assert ev1.theory_id == "TH-OPT-A"
+        assert ev2.theory_id == "TH-OPT-B"
 
     def test_evaluations_differ_when_theories_differ(self):
         gen = TheoryEvaluator()

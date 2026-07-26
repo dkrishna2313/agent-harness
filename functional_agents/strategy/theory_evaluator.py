@@ -159,7 +159,7 @@ class TheoryEvaluator:
         weaknesses = self._extract_weaknesses(criteria_scores, theory)
         residual_risks = list(theory.failure_modes)
         confidence = self._derive_confidence(theory, overall_score)
-        theory_id = theory.recommended_option_id or ""
+        theory_id = theory.theory_id or ""
 
         evaluation = TheoryEvaluation(
             theory_id=theory_id,

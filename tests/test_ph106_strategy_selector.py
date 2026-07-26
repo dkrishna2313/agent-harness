@@ -46,6 +46,7 @@ def _plan() -> StrategyPlan:
 def _theory(
     *,
     option_id: str,
+    theory_id: str = "",
     title: str = "",
     winning_position: str = "A position.",
     winning_mechanism: str = "A mechanism.",
@@ -53,6 +54,7 @@ def _theory(
     confidence: str = "High",
 ) -> TheoryOfWinning:
     return TheoryOfWinning(
+        theory_id=theory_id or option_id,
         recommended_option_id=option_id,
         recommended_option_title=title or option_id,
         winning_position=winning_position,
@@ -528,8 +530,8 @@ class TestStrategyCoordinatorSelectedTheory:
     def test_selection_winner_id_matches_selected_theory(self):
         coord = StrategyCoordinator()
         coord.build(_full_ctx())
-        # winner_theory_id in StrategySelection matches the selected theory
-        assert coord._selection.winner_theory_id == coord._selected_theory.recommended_option_id
+        # winner_theory_id in StrategySelection matches the selected theory's theory_id
+        assert coord._selection.winner_theory_id == coord._selected_theory.theory_id
 
 
 # ---------------------------------------------------------------------------

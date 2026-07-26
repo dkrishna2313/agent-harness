@@ -58,6 +58,7 @@ class TheoryGenerator:
         strategic_choices = [c.to_dict() for c in choice_set.choices]
 
         theory = TheoryOfWinning(
+            theory_id=f"TH-{choice_set.id}",
             recommended_option_id=recommended_id,
             recommended_option_title=recommended_title,
             winning_position=choice_set.rationale,

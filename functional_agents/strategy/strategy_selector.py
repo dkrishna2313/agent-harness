@@ -5,15 +5,14 @@ Public interface:
 
 Selection is fully deterministic — no LLM calls, no randomness.
 
---- Matching ---
+--- Matching (PH10.6a) ---
 
-When all theory IDs are unique, each TheoryEvaluation is matched to its
-TheoryOfWinning by evaluation.theory_id == theory.recommended_option_id.
+Each TheoryEvaluation is matched to its TheoryOfWinning by strict ID:
+    evaluation.theory_id == theory.theory_id
+
+Duplicate theory_ids in the theories list raise ValueError.
 An evaluation whose theory_id cannot be resolved raises ValueError.
-
-When theory IDs are not unique (degenerate case: all postures converge on
-the same option because no active dimensions are configured), positional
-matching is used instead (theories[i] ↔ evaluations[i]).
+No positional fallback is used.
 
 --- Selection algorithm ---
 
@@ -202,38 +201,28 @@ class StrategySelector:
         theories: list[TheoryOfWinning],
         evaluations: list[TheoryEvaluation],
     ) -> list[tuple[TheoryOfWinning, TheoryEvaluation, int]]:
-        """Pair each evaluation with its theory.
+        """Pair each evaluation with its theory by strict theory_id match.
 
-        When all theory recommended_option_ids are unique, ID-based matching
-        is used and an unresolvable evaluation theory_id raises ValueError.
-
-        When theory IDs are not unique (degenerate case: no active
-        dimensions, all postures converge on the same option), positional
-        matching is used (theories[i] ↔ evaluations[i]).
+        Raises ValueError for duplicate theory_ids in theories, or for any
+        evaluation whose theory_id has no matching theory.
         """
-        theory_ids = [t.recommended_option_id for t in theories]
-        ids_are_unique = len(set(theory_ids)) == len(theory_ids)
+        seen: set[str] = set()
+        for t in theories:
+            if t.theory_id in seen:
+                raise ValueError(
+                    f"StrategySelector: duplicate theory_id={t.theory_id!r} in theories."
+                )
+            seen.add(t.theory_id)
 
-        if ids_are_unique:
-            theory_by_id: dict[str, TheoryOfWinning] = {
-                t.recommended_option_id: t for t in theories
-            }
-            pairs: list[tuple[TheoryOfWinning, TheoryEvaluation, int]] = []
-            for i, ev in enumerate(evaluations):
-                theory = theory_by_id.get(ev.theory_id)
-                if theory is None:
-                    raise ValueError(
-                        f"StrategySelector: evaluation.theory_id={ev.theory_id!r} "
-                        f"has no matching theory. "
-                        f"Available theory IDs: {sorted(theory_by_id)}"
-                    )
-                pairs.append((theory, ev, i))
-            return pairs
-        else:
-            # Non-unique IDs — positional fallback
-            LOGGER.debug(
-                "[StrategySelector] Non-unique theory IDs (%s); "
-                "using positional matching.",
-                theory_ids,
-            )
-            return [(theories[i], evaluations[i], i) for i in range(len(theories))]
+        theory_by_id: dict[str, TheoryOfWinning] = {t.theory_id: t for t in theories}
+        pairs: list[tuple[TheoryOfWinning, TheoryEvaluation, int]] = []
+        for i, ev in enumerate(evaluations):
+            theory = theory_by_id.get(ev.theory_id)
+            if theory is None:
+                raise ValueError(
+                    f"StrategySelector: evaluation.theory_id={ev.theory_id!r} "
+                    f"has no matching theory. "
+                    f"Available theory IDs: {sorted(theory_by_id)}"
+                )
+            pairs.append((theory, ev, i))
+        return pairs

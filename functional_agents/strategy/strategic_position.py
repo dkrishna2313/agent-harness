@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 class TheoryOfWinning(BaseModel):
     """How the organisation wins given what is strategically true."""
 
+    theory_id: str = ""
     recommended_option_id: str = ""
     recommended_option_title: str = ""
     winning_position: str = ""
