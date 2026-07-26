@@ -1,9 +1,11 @@
-"""PH11.0 — StrategyTrace Artifact tests.
+"""PH11.0 / PH11.0a — StrategyTrace Artifact tests.
 
 Covers:
 - StrategyTrace model construction and field access
 - trace_id format is STRAT-{plan_id}
 - All 10 validation rules (each violation raises ValueError)
+- PH11.0a: runner-up theory ID validation (rules 11-12)
+- PH11.0a: StrategyTrace.metadata populated with 8 agreed fields
 - StrategyCoordinator._trace is populated after build()
 - StrategyCoordinator._trace.trace_id = STRAT-{plan.plan_id}
 - StrategyTrace serialization round-trip (to_dict / from_dict)
@@ -437,3 +439,168 @@ class TestPipelineTraceIntegration:
         # Backward-compatible "strategy" summary key must still be present
         assert "strategy" in result
         assert result["strategy"] is not None
+
+
+# ---------------------------------------------------------------------------
+# PH11.0a — Runner-up identity validation (rules 11-12)
+# ---------------------------------------------------------------------------
+
+class TestStrategyTraceRunnerUpValidation:
+    """StrategyTrace validates runner_up_theory_id when present."""
+
+    def _base_kwargs(self) -> dict:
+        st = _valid_trace()
+        return {
+            "trace_id": st.trace_id,
+            "created_at": st.created_at,
+            "plan": st.plan,
+            "choice_sets": list(st.choice_sets),
+            "theories": list(st.theories),
+            "evaluations": list(st.evaluations),
+            # winner is TH-SCS-0; set a valid runner-up
+            "selection": _selection("TH-SCS-0", "TH-SCS-1"),
+            "strategic_position": st.strategic_position,
+            "metadata": {},
+        }
+
+    def test_valid_runner_up_accepted(self):
+        kw = self._base_kwargs()
+        # selection already has runner_up="TH-SCS-1" which exists in theories
+        st = StrategyTrace(**kw)
+        assert st.selection.runner_up_theory_id == "TH-SCS-1"
+
+    def test_none_runner_up_accepted(self):
+        kw = self._base_kwargs()
+        kw["selection"] = _selection("TH-SCS-0", None)
+        st = StrategyTrace(**kw)
+        assert st.selection.runner_up_theory_id is None
+
+    def test_unknown_runner_up_raises(self):
+        kw = self._base_kwargs()
+        kw["selection"] = _selection("TH-SCS-0", "TH-GHOST")
+        with pytest.raises(ValidationError, match="runner_up_theory_id='TH-GHOST' not found"):
+            StrategyTrace(**kw)
+
+    def test_runner_up_equal_to_winner_raises(self):
+        kw = self._base_kwargs()
+        kw["selection"] = _selection("TH-SCS-0", "TH-SCS-0")
+        with pytest.raises(ValidationError, match="runner-up theory ID must differ"):
+            StrategyTrace(**kw)
+
+    def test_runner_up_references_last_theory(self):
+        # Runner-up can be any theory except the winner
+        kw = self._base_kwargs()
+        kw["selection"] = _selection("TH-SCS-0", "TH-SCS-2")
+        st = StrategyTrace(**kw)
+        assert st.selection.runner_up_theory_id == "TH-SCS-2"
+
+    def test_runner_up_validation_does_not_affect_winner_check(self):
+        # A valid runner-up still allows rule 9 (winner check) to fire for an invalid winner
+        kw = self._base_kwargs()
+        kw["selection"] = _selection("TH-NONEXISTENT", "TH-SCS-1")
+        with pytest.raises(ValidationError, match="winner_theory_id"):
+            StrategyTrace(**kw)
+
+    def test_single_theory_with_no_runner_up_accepted(self):
+        # Only one theory → runner_up is always None; must not raise
+        t = _theory("TH-ONLY")
+        ev = _eval("TH-ONLY")
+        cs = _choice_set("SCS-ONLY")
+        pos = _position(t)
+        sel = _selection("TH-ONLY", None)
+        st = StrategyTrace(
+            trace_id="STRAT-P-SINGLE",
+            created_at="2026-07-26T00:00:00+00:00",
+            plan=_plan("P-SINGLE"),
+            choice_sets=[cs],
+            theories=[t],
+            evaluations=[ev],
+            selection=sel,
+            strategic_position=pos,
+            metadata={},
+        )
+        assert st.selection.runner_up_theory_id is None
+
+    def test_round_trip_preserves_runner_up(self):
+        kw = self._base_kwargs()
+        kw["selection"] = _selection("TH-SCS-0", "TH-SCS-2")
+        st = StrategyTrace(**kw)
+        d = st.to_dict()
+        restored = StrategyTrace.from_dict(d)
+        assert restored.selection.runner_up_theory_id == "TH-SCS-2"
+
+
+# ---------------------------------------------------------------------------
+# PH11.0a — Metadata population
+# ---------------------------------------------------------------------------
+
+class TestStrategyTraceMetadata:
+    """StrategyTrace.metadata is populated with the 8 agreed summary fields."""
+
+    def test_metadata_contains_all_eight_keys(self):
+        coord = StrategyCoordinator()
+        coord.build(_full_ctx())
+        expected_keys = {
+            "framework", "plan_id", "choice_set_count", "theory_count",
+            "evaluation_count", "selected_theory_id", "score_margin",
+            "tie_breaker_used",
+        }
+        assert expected_keys <= set(coord._trace.metadata.keys())
+
+    def test_metadata_plan_id_matches_plan(self):
+        coord = StrategyCoordinator()
+        coord.build(_full_ctx())
+        assert coord._trace.metadata["plan_id"] == coord._plan.plan_id
+
+    def test_metadata_framework_matches_plan(self):
+        coord = StrategyCoordinator()
+        coord.build(_full_ctx())
+        assert coord._trace.metadata["framework"] == coord._plan.framework
+
+    def test_metadata_counts_match_collections(self):
+        coord = StrategyCoordinator()
+        coord.build(_full_ctx())
+        md = coord._trace.metadata
+        assert md["choice_set_count"] == len(coord._choice_sets)
+        assert md["theory_count"] == len(coord._theories)
+        assert md["evaluation_count"] == len(coord._evaluations)
+
+    def test_metadata_selected_theory_id_matches_winner(self):
+        coord = StrategyCoordinator()
+        coord.build(_full_ctx())
+        assert (
+            coord._trace.metadata["selected_theory_id"]
+            == coord._selection.winner_theory_id
+        )
+
+    def test_metadata_score_margin_matches_selection(self):
+        coord = StrategyCoordinator()
+        coord.build(_full_ctx())
+        assert coord._trace.metadata["score_margin"] == coord._selection.score_margin
+
+    def test_metadata_tie_breaker_matches_selection(self):
+        coord = StrategyCoordinator()
+        coord.build(_full_ctx())
+        assert coord._trace.metadata["tie_breaker_used"] == coord._selection.tie_breaker_used
+
+    def test_metadata_serializes_in_round_trip(self):
+        import json
+        coord = StrategyCoordinator()
+        coord.build(_full_ctx())
+        d = coord._trace.to_dict()
+        # metadata must survive json serialization
+        json.dumps(d["metadata"])
+        restored = StrategyTrace.from_dict(d)
+        assert restored.metadata["plan_id"] == coord._plan.plan_id
+
+    def test_metadata_contains_no_nested_canonical_objects(self):
+        # metadata values must be scalars, not Pydantic models or dicts-of-dicts
+        coord = StrategyCoordinator()
+        coord.build(_full_ctx())
+        for key, val in coord._trace.metadata.items():
+            assert not hasattr(val, "model_dump"), (
+                f"metadata[{key!r}] is a Pydantic model — canonical objects must not appear in metadata"
+            )
+            assert not isinstance(val, list), (
+                f"metadata[{key!r}] is a list — nested collections must not appear in metadata"
+            )

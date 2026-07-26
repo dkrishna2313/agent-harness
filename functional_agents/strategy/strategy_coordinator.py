@@ -174,7 +174,16 @@ class StrategyCoordinator:
             evaluations=list(self._evaluations),
             selection=self._selection,
             strategic_position=position,
-            metadata={},
+            metadata={
+                "framework": self._plan.framework,
+                "plan_id": self._plan.plan_id,
+                "choice_set_count": len(self._choice_sets),
+                "theory_count": len(self._theories),
+                "evaluation_count": len(self._evaluations),
+                "selected_theory_id": self._selection.winner_theory_id,
+                "score_margin": self._selection.score_margin,
+                "tie_breaker_used": self._selection.tie_breaker_used,
+            },
         )
 
         return position

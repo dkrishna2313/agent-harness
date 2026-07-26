@@ -43,6 +43,8 @@ class StrategyTrace(BaseModel):
       8.  every evaluation.theory_id resolves to a theory (full bijection)
       9.  selection.winner_theory_id references a known theory
       10. strategic_position.theory_of_winning.theory_id == winner_theory_id
+      11. selection.runner_up_theory_id, when present, references a known theory
+      12. selection.runner_up_theory_id must differ from winner_theory_id
     """
 
     trace_id: str
@@ -128,6 +130,19 @@ class StrategyTrace(BaseModel):
                 f"{tow.theory_id!r} does not match "
                 f"selection.winner_theory_id={selection.winner_theory_id!r}."
             )
+
+        # Rules 11–12: runner-up identity (only when runner_up_theory_id is present)
+        runner_up = selection.runner_up_theory_id
+        if runner_up:  # None or "" → no runner-up, skip
+            if runner_up not in seen_t:
+                raise ValueError(
+                    f"StrategyTrace: selection.runner_up_theory_id={runner_up!r} "
+                    f"not found in theories. Available: {sorted(seen_t)}"
+                )
+            if runner_up == selection.winner_theory_id:
+                raise ValueError(
+                    "StrategyTrace: runner-up theory ID must differ from winner theory ID."
+                )
 
         return self
 
