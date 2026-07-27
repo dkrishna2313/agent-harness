@@ -629,13 +629,14 @@ class TestStrategyWriter:
         assert "We own the premium segment." in manuscript.strategic_direction.paragraphs
         assert "Via brand loyalty and unit economics." in manuscript.strategic_direction.paragraphs
 
-    def test_write_four_bullet_groups(self):
+    def test_write_five_bullet_groups(self):
         ctx = _full_ctx()
         trace = _trace_with_n_theories(2)
         brief = EditorialCoordinator().build(ctx, strategy_trace=trace)
         manuscript = self._make_manuscript(brief)
         StrategyWriter().write(brief, manuscript)
-        assert len(manuscript.strategic_direction.bullet_groups) == 4
+        # groups: [0] criteria+strengths, [1] assumptions, [2] conditions, [3] failures, [4] choices
+        assert len(manuscript.strategic_direction.bullet_groups) == 5
 
     def test_write_criteria_bullets_in_group_0(self):
         plan = _plan()
@@ -668,7 +669,7 @@ class TestStrategyWriter:
         StrategyWriter().write(brief, manuscript)
         assert len(manuscript.strategic_direction.tables) >= 1
         table = manuscript.strategic_direction.tables[0]
-        assert table["headers"] == ["Option", "Score", "Key Weaknesses"]
+        assert table["headers"] == ["Theory ID", "Option", "Score", "Confidence", "Key Weaknesses"]
 
     def test_write_returns_manuscript(self):
         ctx = _full_ctx()

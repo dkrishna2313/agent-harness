@@ -1041,7 +1041,11 @@ class Orchestrator:
         try:
             from .editorial import EditorialCoordinator
             _eb_coord = EditorialCoordinator()
-            _eb = _eb_coord.build(_sp if _sp is not None else result_ctx)
+            _st_for_brief = result_ctx.trace.get("_strategy_trace")
+            _eb = _eb_coord.build(
+                _sp if _sp is not None else result_ctx,
+                strategy_trace=_st_for_brief,
+            )
             _eb_path = _eb_coord.persist(_eb)
             print(f"Editorial brief → {_eb_path}")
             _em = _eb_coord.build_manuscript(_eb)

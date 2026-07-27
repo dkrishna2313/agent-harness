@@ -246,15 +246,20 @@ class MarkdownRenderer:
         # Header table: winner identity and scores
         if sn is not None:
             lines += ["| Field | Value |", "|---|---|"]
+            lines.append(f"| Selected Theory | {sn.winner_theory_id} |")
             if sn.winner_option_title:
                 lines.append(f"| Recommended Strategy | {sn.winner_option_title} |")
-            lines.append(f"| Winner Score | {sn.winner_score:.2f} |")
+            lines.append(f"| Winner Score | {sn.winner_score:.3f} |")
+            if sn.runner_up_theory_id:
+                lines.append(f"| Runner-up Theory | {sn.runner_up_theory_id} |")
+            if sn.runner_up_score is not None:
+                lines.append(f"| Runner-up Score | {sn.runner_up_score:.3f} |")
+            if sn.score_margin is not None:
+                lines.append(f"| Score Margin | {sn.score_margin:.3f} |")
             if sn.overall_confidence:
                 lines.append(f"| Confidence | {sn.overall_confidence} |")
             if sn.framework:
                 lines.append(f"| Framework | {sn.framework} |")
-            if sn.score_margin is not None:
-                lines.append(f"| Score Margin | {sn.score_margin:.3f} |")
             if sn.tie_breaker_used:
                 lines.append(f"| Tie-breaker Used | {sn.tie_breaker_used} |")
             lines.append("")
@@ -265,19 +270,37 @@ class MarkdownRenderer:
             lines.append(para)
             lines.append("")
 
-        # Why This Strategy Won: evaluation criteria
+        # Why This Strategy Won: evaluation criteria scores + evaluation strengths
         bgs = sec.bullet_groups or []
         if len(bgs) > 0 and bgs[0]:
-            lines += ["### Why This Strategy Won", "", "**Evaluation Criteria Scores:**"]
-            for b in bgs[0]:
-                lines.append(f"- {b}")
-            lines.append("")
+            # Separate criterion lines (no "+" prefix) from strengths lines ("+" prefix)
+            crit_bullets = [b for b in bgs[0] if not b.startswith("+ ")]
+            strength_bullets = [b[2:] for b in bgs[0] if b.startswith("+ ")]
+            if crit_bullets or strength_bullets:
+                lines += ["### Why This Strategy Won", ""]
+            if crit_bullets:
+                lines += ["**Evaluation Criteria Scores:**"]
+                for b in crit_bullets:
+                    lines.append(f"- {b}")
+                lines.append("")
+            if strength_bullets:
+                lines += ["**Evaluation Strengths:**"]
+                for b in strength_bullets:
+                    lines.append(f"- {b}")
+                lines.append("")
 
         # Alternatives Considered
         if sec.tables:
             lines += ["### Alternatives Considered", ""]
             for table in sec.tables:
                 lines += self._render_table(table)
+
+        # Strategic Choices (when present — bullet group 4)
+        if len(bgs) > 4 and bgs[4]:
+            lines += ["**Strategic Choices:**"]
+            for b in bgs[4]:
+                lines.append(f"- {b}")
+            lines.append("")
 
         # Assumptions and Conditions for Success
         has_assumptions = len(bgs) > 1 and bgs[1]

@@ -63,7 +63,7 @@ class StrategyWriter(EditorialWriter):
             )
             return manuscript
 
-        # Paragraphs: narrative description of winning position and mechanism
+        # Paragraphs: winning position and mechanism (authoritative theory prose)
         paragraphs: list[str] = []
         if sn.winning_position:
             paragraphs.append(sn.winning_position)
@@ -75,6 +75,9 @@ class StrategyWriter(EditorialWriter):
         for crit in sn.evaluation_criteria:
             score = sn.criterion_scores.get(crit, 0.0)
             criteria_bullets.append(f"{crit}: {score:.2f}")
+        # Append evaluation strengths to criteria group
+        for s in sn.winner_evaluation_strengths[:4]:
+            criteria_bullets.append(f"+ {s[:180]}")
 
         # Bullet group 1: key assumptions (up to 8)
         assumption_bullets = [a[:200] for a in sn.assumptions[:8]]
@@ -85,29 +88,41 @@ class StrategyWriter(EditorialWriter):
         # Bullet group 3: failure modes (up to 6)
         failure_bullets = [fm[:200] for fm in sn.failure_modes[:6]]
 
+        # Bullet group 4: strategic choices (up to 6), if any
+        choices_bullets = [sc[:200] for sc in sn.winner_strategic_choices[:6]]
+
         bullet_groups: list[list[str]] = [
             criteria_bullets,
             assumption_bullets,
             condition_bullets,
             failure_bullets,
+            choices_bullets,
         ]
 
-        # Table: alternatives considered (non-winner theories)
+        # Table: alternatives considered — no title (renderer heading already labels this)
         tables: list[dict[str, Any]] = []
         if sn.alternatives:
             rows = []
             for alt in sn.alternatives:
                 label = alt.recommended_option_title or alt.theory_id
-                weaknesses = "; ".join(alt.weaknesses[:2]) or "—"
-                rows.append([label, f"{alt.score:.2f}", weaknesses])
+                # Prefer weaknesses; fall back to residual_risks
+                negatives = alt.weaknesses[:2] or alt.residual_risks[:2]
+                negatives_str = "; ".join(negatives) or "—"
+                rows.append([
+                    alt.theory_id,
+                    label,
+                    f"{alt.score:.2f}",
+                    alt.confidence or "—",
+                    negatives_str,
+                ])
             tables.append({
-                "title": "Alternatives Considered",
-                "headers": ["Option", "Score", "Key Weaknesses"],
+                "title": "",  # heading already rendered by _s_strategic_direction
+                "headers": ["Theory ID", "Option", "Score", "Confidence", "Key Weaknesses"],
                 "rows": rows,
                 "notes": "",
             })
 
-        # Score comparison note for subtitle
+        # Subtitle: key selection facts
         parts: list[str] = []
         if sn.winner_option_title:
             parts.append(sn.winner_option_title)

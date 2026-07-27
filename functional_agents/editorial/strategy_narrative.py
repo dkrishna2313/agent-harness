@@ -20,8 +20,10 @@ class StrategyAlternativeSummary(BaseModel):
     theory_id: str
     recommended_option_title: str = ""
     score: float = 0.0
+    confidence: str = ""
     strengths: list[str] = Field(default_factory=list)
     weaknesses: list[str] = Field(default_factory=list)
+    residual_risks: list[str] = Field(default_factory=list)
 
     model_config = {"frozen": True}
 
@@ -58,11 +60,13 @@ class StrategyNarrative(BaseModel):
     # Evaluation criteria and per-criterion scores
     evaluation_criteria: list[str] = Field(default_factory=list)
     criterion_scores: dict[str, float] = Field(default_factory=dict)
+    winner_evaluation_strengths: list[str] = Field(default_factory=list)
 
     # Winner theory content
     assumptions: list[str] = Field(default_factory=list)
     success_conditions: list[str] = Field(default_factory=list)
     failure_modes: list[str] = Field(default_factory=list)
+    winner_strategic_choices: list[str] = Field(default_factory=list)
 
     # Alternatives (non-winner theories, sorted by score descending)
     alternatives: list[StrategyAlternativeSummary] = Field(default_factory=list)
@@ -111,6 +115,21 @@ def build_strategy_narrative(trace: Any) -> StrategyNarrative:
         else:
             failure_modes.append(str(fm))
 
+    # Winner evaluation strengths
+    winner_evaluation_strengths = list(winner_eval.strengths)
+
+    # Extract strategic choices as readable strings (list[dict] on TheoryOfWinning)
+    winner_strategic_choices: list[str] = []
+    for sc in winner_theory.strategic_choices:
+        if isinstance(sc, dict):
+            dim = sc.get("dimension", sc.get("id", ""))
+            val = sc.get("selected_value", "")
+            conf = sc.get("confidence", "")
+            label = f"{dim}: {val}" + (f" ({conf} confidence)" if conf else "")
+            winner_strategic_choices.append(label)
+        else:
+            winner_strategic_choices.append(str(sc))
+
     # Build alternatives (non-winner theories), sorted by score descending
     eval_by_id = {ev.theory_id: ev for ev in trace.evaluations}
     alternatives: list[StrategyAlternativeSummary] = []
@@ -118,13 +137,23 @@ def build_strategy_narrative(trace: Any) -> StrategyNarrative:
         if theory.theory_id == sel.winner_theory_id:
             continue
         ev = eval_by_id.get(theory.theory_id)
+        # Extract residual risk descriptions
+        residual_risk_descs: list[str] = []
+        if ev:
+            for rr in ev.residual_risks:
+                if isinstance(rr, dict):
+                    residual_risk_descs.append(rr.get("description", str(rr)))
+                else:
+                    residual_risk_descs.append(str(rr))
         alternatives.append(
             StrategyAlternativeSummary(
                 theory_id=theory.theory_id,
                 recommended_option_title=theory.recommended_option_title,
                 score=ev.overall_score if ev else 0.0,
+                confidence=ev.confidence if ev else "",
                 strengths=list(ev.strengths) if ev else [],
                 weaknesses=list(ev.weaknesses) if ev else [],
+                residual_risks=residual_risk_descs,
             )
         )
     alternatives.sort(key=lambda a: -a.score)
@@ -147,8 +176,10 @@ def build_strategy_narrative(trace: Any) -> StrategyNarrative:
         tie_breaker_used=sel.tie_breaker_used,
         evaluation_criteria=criteria_names,
         criterion_scores=crit_scores,
+        winner_evaluation_strengths=winner_evaluation_strengths,
         assumptions=assumptions,
         success_conditions=list(winner_theory.success_conditions),
         failure_modes=failure_modes,
+        winner_strategic_choices=winner_strategic_choices,
         alternatives=alternatives,
     )
