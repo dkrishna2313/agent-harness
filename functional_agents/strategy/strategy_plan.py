@@ -17,7 +17,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from .strategy_config import DimensionConfig
+from .strategy_config import AlignmentPolicy, DimensionConfig, ScoringPolicy
 
 
 # ---------------------------------------------------------------------------
@@ -95,6 +95,10 @@ class StrategyPlan(BaseModel):
 
     # PH12.0 — structured dimension configs forwarded from StrategyConfig
     dimension_configs: list[DimensionConfig] = Field(default_factory=list)
+
+    # PH12.1a — forwarded from StrategyConfig
+    alignment_policy: AlignmentPolicy = Field(default_factory=AlignmentPolicy)
+    scoring_policy: ScoringPolicy = Field(default_factory=ScoringPolicy)
 
     model_config = {"extra": "allow"}
 

@@ -1,10 +1,11 @@
-"""StrategyConfig — canonical configuration object for the Strategy Layer (PH9.0/PH12.0).
+"""StrategyConfig — canonical configuration object for the Strategy Layer (PH9.0/PH12.0/PH12.1a).
 
 Defines strategic intent without changing platform code.
 Frameworks provide defaults; engagements can override them in later phases.
 
 PH9.0 scope: canonical Pydantic model with sensible defaults.
 PH12.0 scope: ChoiceConfig, DimensionConfig, dimension_configs field on StrategyConfig.
+PH12.1a scope: AlignmentPolicy, ScoringPolicy — policy blocks for configured evaluation.
 Not in scope: YAML loading, framework plugins.
 """
 
@@ -13,6 +14,37 @@ from __future__ import annotations
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+# Supported mapping confidence levels for AlignmentPolicy validation
+_SUPPORTED_MAPPING_CONFIDENCES: frozenset[str] = frozenset({"High", "Medium", "Low", "None"})
+
+
+# ---------------------------------------------------------------------------
+# PH12.1a — Policy models
+# ---------------------------------------------------------------------------
+
+class AlignmentPolicy(BaseModel):
+    """Policy governing how upstream recommendation and selected theory are aligned."""
+
+    preferred_option_authority: bool = True
+    minimum_challenge_margin: float = 0.05
+    unresolved_on_tie: bool = True
+    # Minimum OptionMapping confidence to proceed to confirmed/refined/challenged
+    # "High" | "Medium" | "Low" | "None"
+    minimum_mapping_confidence: str = "Medium"
+
+    model_config = {"frozen": True, "extra": "allow"}
+
+
+class ScoringPolicy(BaseModel):
+    """Policy governing configured-mode theory scoring penalties and detection."""
+
+    constraint_violation_penalty: float = 0.25
+    partial_constraint_penalty: float = 0.10
+    wait_and_monitor_penalty: float = 0.15
+    saturation_detection: bool = True
+
+    model_config = {"frozen": True, "extra": "allow"}
 
 
 # ---------------------------------------------------------------------------
@@ -155,6 +187,10 @@ class StrategyConfig(BaseModel):
     # PH12.0 — structured dimension definitions with choices
     # When non-empty, supersedes StrategyDimensions.extra for active_dimensions
     dimension_configs: list[DimensionConfig] = Field(default_factory=list)
+
+    # PH12.1a — policy blocks (optional; defaults preserve PH12.1 behavior)
+    alignment_policy: AlignmentPolicy = Field(default_factory=AlignmentPolicy)
+    scoring_policy: ScoringPolicy = Field(default_factory=ScoringPolicy)
 
     model_config = {"extra": "allow"}
 

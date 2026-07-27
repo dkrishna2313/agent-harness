@@ -247,11 +247,12 @@ class TheoryEvaluator:
         plan_weights = plan.evaluation_model.weights
         vp = plan.validation_policy
         n_dims = len(plan.active_dimensions)
+        sp = getattr(plan, "scoring_policy", None)
 
         if plan_weights:
             # CONFIGURED mode — criterion set is exactly the plan's weight keys
             return {
-                name: self._score_one(name, weight, theory, vp, n_dims, constraint_results)
+                name: self._score_one(name, weight, theory, vp, n_dims, constraint_results, sp)
                 for name, weight in plan_weights.items()
             }
         else:
@@ -269,11 +270,13 @@ class TheoryEvaluator:
         vp: ValidationPolicy,
         n_dims: int,
         constraint_results: list["ConstraintResult"] | None = None,
+        scoring_policy: Any = None,
     ) -> CriterionScore:
         """Score a single criterion by name.
 
         When constraint_results are provided and name is a configured-only
         criterion, constraint penalties are applied (PH12.1).
+        When scoring_policy is provided, penalty values come from config (PH12.1a).
         """
         if name not in _ALL_CRITERION_META:
             raise ValueError(
@@ -282,7 +285,7 @@ class TheoryEvaluator:
                 f"Remove {name!r} from the engagement evaluation configuration."
             )
         score, detail = TheoryEvaluator._raw_score(
-            name, theory, vp, n_dims, constraint_results
+            name, theory, vp, n_dims, constraint_results, scoring_policy
         )
         return TheoryEvaluator._make_score(name, score, weight, detail)
 
@@ -293,6 +296,7 @@ class TheoryEvaluator:
         vp: ValidationPolicy,
         n_dims: int,
         constraint_results: list["ConstraintResult"] | None = None,
+        scoring_policy: Any = None,
     ) -> tuple[float, str | None]:
         """Return (score, detail) for a recognised criterion.
 
@@ -358,7 +362,9 @@ class TheoryEvaluator:
             pos = 1.0 if theory.winning_position else 0.0
             mech = 1.0 if theory.winning_mechanism else 0.0
             base = round(0.6 * pos + 0.4 * mech, 6)
-            penalty = 0.25 * n_violated + 0.10 * n_partial
+            v_pen = getattr(scoring_policy, "constraint_violation_penalty", 0.25) if scoring_policy else 0.25
+            p_pen = getattr(scoring_policy, "partial_constraint_penalty", 0.10) if scoring_policy else 0.10
+            penalty = v_pen * n_violated + p_pen * n_partial
             sc = max(0.0, round(base - penalty, 6))
             detail = (
                 f"position={'yes' if pos else 'no'}, "
@@ -411,7 +417,9 @@ class TheoryEvaluator:
                 base = 0.8
             else:
                 base = 1.0
-            penalty = 0.25 * n_violated + 0.10 * n_partial
+            v_pen = getattr(scoring_policy, "constraint_violation_penalty", 0.25) if scoring_policy else 0.25
+            p_pen = getattr(scoring_policy, "partial_constraint_penalty", 0.10) if scoring_policy else 0.10
+            penalty = v_pen * n_violated + p_pen * n_partial
             sc = max(0.0, round(base - penalty, 6))
             detail = (
                 f"{n} failure mode(s); constraint penalty="
@@ -438,7 +446,8 @@ class TheoryEvaluator:
                 for c in theory.strategic_choices
                 if isinstance(c, dict)
             )
-            sc = max(0.0, round(base - (0.15 if has_wait else 0.0), 6))
+            w_pen = getattr(scoring_policy, "wait_and_monitor_penalty", 0.15) if scoring_policy else 0.15
+            sc = max(0.0, round(base - (w_pen if has_wait else 0.0), 6))
             detail = (
                 f"{n} success condition(s)"
                 + ("; wait-and-monitor penalty applied" if has_wait else "")

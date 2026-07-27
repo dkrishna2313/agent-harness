@@ -69,6 +69,12 @@ class StrategyTrace(BaseModel):
     lineage: list[StrategyLineageLink] = Field(default_factory=list)  # PH11.2
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+    # PH12.1a — structured audit fields (backward-compatible optional)
+    theory_option_mappings: list[dict[str, Any]] = Field(default_factory=list)
+    constraint_results: dict[str, list[dict[str, Any]]] = Field(default_factory=dict)
+    alignment: dict[str, Any] = Field(default_factory=dict)
+    saturation: dict[str, Any] = Field(default_factory=dict)
+
     model_config = {"frozen": True, "extra": "allow"}
 
     @model_validator(mode="after")

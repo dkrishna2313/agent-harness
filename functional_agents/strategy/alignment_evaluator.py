@@ -1,12 +1,11 @@
-"""PH12.1 — AlignmentEvaluator.
+"""PH12.1a — AlignmentEvaluator (updated to consume AlignmentPolicy).
 
 Determines the relationship between the upstream preferred option (from research)
 and the theory selected by the Strategy Layer.
 
 Status values:
   confirmed  — selected theory maps to the same option, strong margin
-  refined    — selected theory maps to same option but margin is narrow or
-               confidence is low
+  refined    — selected theory maps to same option but margin is narrow
   challenged — selected theory maps to a different option with significant margin
   unresolved — no preferred option, or tie, or mapping confidence too low
 """
@@ -18,11 +17,15 @@ from typing import Any
 
 from .alignment import AlignmentResult, OptionMapping
 from .strategic_position import TheoryOfWinning
+from .strategy_config import AlignmentPolicy
 from .strategy_selector import StrategySelection
 
 LOGGER = logging.getLogger(__name__)
 
-_MINIMUM_CHALLENGE_MARGIN = 0.05
+_DEFAULT_POLICY = AlignmentPolicy()
+
+# Numeric rank for mapping confidence levels
+_CONF_RANK: dict[str, int] = {"High": 3, "Medium": 2, "Low": 1, "None": 0}
 
 
 class AlignmentEvaluator:
@@ -34,7 +37,7 @@ class AlignmentEvaluator:
         option_mapping: OptionMapping,
         selection: StrategySelection,
         research: Any,
-        minimum_challenge_margin: float = _MINIMUM_CHALLENGE_MARGIN,
+        policy: AlignmentPolicy | None = None,
     ) -> AlignmentResult:
         """Return an AlignmentResult describing the recommendation relationship.
 
@@ -48,10 +51,10 @@ class AlignmentEvaluator:
             The StrategySelection record from the selector.
         research:
             AgentContext; provides the upstream preferred option.
-        minimum_challenge_margin:
-            Score margin above which a disagreement is classified as "challenged"
-            rather than "unresolved".
+        policy:
+            AlignmentPolicy from resolved config; falls back to default policy.
         """
+        ap = policy if policy is not None else _DEFAULT_POLICY
         preferred = self._extract_preferred_option(research)
         preferred_id = preferred.get("option_id", "") or preferred.get("id", "") or ""
 
@@ -71,8 +74,11 @@ class AlignmentEvaluator:
                 rationale="No upstream preferred option available for alignment comparison.",
             )
 
-        # Low mapping confidence → unresolved
-        if conf in ("None", "Low") or mapped_id is None:
+        # Check mapping confidence against configured minimum
+        min_conf_rank = _CONF_RANK.get(ap.minimum_mapping_confidence, 2)
+        actual_conf_rank = _CONF_RANK.get(conf or "None", 0)
+
+        if actual_conf_rank < min_conf_rank or mapped_id is None:
             return AlignmentResult(
                 status="unresolved",
                 preferred_option_id=preferred_id,
@@ -80,13 +86,14 @@ class AlignmentEvaluator:
                 mapped_option_id=mapped_id,
                 score_margin=margin,
                 rationale=(
-                    f"Mapping confidence is {conf!r}; "
+                    f"Mapping confidence {conf!r} is below minimum "
+                    f"{ap.minimum_mapping_confidence!r}; "
                     "alignment cannot be reliably determined."
                 ),
             )
 
-        # Tie → unresolved
-        if margin == 0.0 or (selection.tie_breaker_used is not None):
+        # Tie → unresolved (when configured)
+        if ap.unresolved_on_tie and (margin == 0.0 or (selection.tie_breaker_used is not None)):
             return AlignmentResult(
                 status="unresolved",
                 preferred_option_id=preferred_id,
@@ -97,24 +104,25 @@ class AlignmentEvaluator:
             )
 
         # Agreement vs disagreement
+        min_margin = ap.minimum_challenge_margin
         if mapped_id == preferred_id:
-            status = "confirmed" if margin >= minimum_challenge_margin else "refined"
+            status = "confirmed" if margin >= min_margin else "refined"
             rationale = (
                 f"Selected theory maps to upstream preferred option {preferred_id!r} "
                 f"(margin={margin:.3f})."
             )
         else:
-            if margin >= minimum_challenge_margin:
+            if margin >= min_margin:
                 status = "challenged"
                 rationale = (
                     f"Selected theory maps to {mapped_id!r}, not the upstream preferred "
-                    f"option {preferred_id!r} (margin={margin:.3f} ≥ threshold)."
+                    f"option {preferred_id!r} (margin={margin:.3f} ≥ threshold={min_margin})."
                 )
             else:
                 status = "unresolved"
                 rationale = (
                     f"Selected theory maps to {mapped_id!r} vs upstream preferred "
-                    f"{preferred_id!r}, but margin {margin:.3f} < threshold."
+                    f"{preferred_id!r}, but margin {margin:.3f} < threshold {min_margin}."
                 )
 
         LOGGER.debug(

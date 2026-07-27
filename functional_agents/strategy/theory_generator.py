@@ -181,8 +181,9 @@ class TheoryGenerator:
     def _filter_failure_modes(research: Any, keywords: list[str]) -> list[dict[str, Any]]:
         """Return high-severity risks relevant to the given choice keywords.
 
-        Filters by keyword presence in risk description. Falls back to all
-        high-severity risks when nothing matches.
+        Filters by keyword presence across all risk text fields. Falls back to all
+        high-severity risks when nothing matches. Uses explicit field access rather
+        than str(dict) to avoid raw dict output.
         """
         risks = getattr(research, "risks", None) or []
         high_severity = [
@@ -196,10 +197,13 @@ class TheoryGenerator:
         if not keywords:
             return high_severity
 
-        matching = [
-            r for r in high_severity
-            if any(kw in str(r).lower() for kw in keywords)
-        ]
+        def _risk_text(r: dict) -> str:
+            return " ".join(str(r.get(k, "")) for k in (
+                "statement", "rationale", "mitigation_notes", "mitigation",
+                "category", "id", "risk_id",
+            )).lower()
+
+        matching = [r for r in high_severity if any(kw in _risk_text(r) for kw in keywords)]
         return matching if matching else high_severity
 
     @staticmethod
@@ -246,16 +250,27 @@ class TheoryGenerator:
             if not isinstance(opp, dict):
                 continue
             opp_text = " ".join([
+                str(opp.get("statement", "")),
                 str(opp.get("title", "")),
                 str(opp.get("description", "")),
                 str(opp.get("opportunity", "")),
+                str(opp.get("rationale", "")),
+                str(opp.get("expected_benefit", "")),
             ]).strip()
             if not opp_text:
                 continue
+            display = next(
+                (str(opp.get(k, "")).strip() for k in (
+                    "statement", "title", "description", "opportunity"
+                ) if opp.get(k, "")),
+                opp_text[:120],
+            )
+            if not display:
+                continue
             if keywords and any(kw in opp_text.lower() for kw in keywords):
-                conditions.append(opp_text)
+                conditions.append(display)
             elif not keywords:
-                conditions.append(opp_text)
+                conditions.append(display)
             if len(conditions) - len(ec.get("confidence_drivers", [])) >= _OPPS_PER_THEORY:
                 break
 
