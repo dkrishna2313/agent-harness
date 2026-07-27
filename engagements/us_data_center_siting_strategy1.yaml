@@ -95,12 +95,15 @@ strategy:
         - id: concentrated
           title: Concentrated
           description: Commit capital to one or two top-ranked states for maximum focus and speed.
+          execution_complexity: high
         - id: diversified
           title: Diversified
           description: Spread investment across three or more states to reduce single-state risk.
+          execution_complexity: medium
         - id: staged
           title: Staged Portfolio
           description: Begin concentrated then diversify as market and regulatory conditions confirm.
+          execution_complexity: medium
 
     - id: power_pathway
       title: Power Pathway
@@ -110,12 +113,15 @@ strategy:
         - id: grid_first
           title: Grid First
           description: Rely on utility interconnection as the primary power source; BTM as backup.
+          execution_complexity: high
         - id: btm_first
           title: Behind-the-Meter First
           description: Lead with on-site generation (solar, gas, storage) to reduce interconnection dependency.
+          execution_complexity: medium
         - id: hybrid
           title: Hybrid Grid and BTM
           description: Pursue grid and behind-the-meter capacity in parallel to maximize optionality.
+          execution_complexity: high
 
     - id: market_timing
       title: Market Timing
@@ -125,12 +131,15 @@ strategy:
         - id: accelerate
           title: Accelerate
           description: Move quickly before interconnection queues lengthen further and land costs rise.
+          execution_complexity: high
         - id: milestone_gated
           title: Milestone Gated
           description: Commit capital only after defined regulatory or infrastructure milestones are cleared.
+          execution_complexity: medium
         - id: wait_and_monitor
           title: Wait and Monitor
           description: Delay commitment until grid and policy uncertainty resolves; preserve optionality.
+          execution_complexity: low
 
   evaluation:
     method: multi_criteria

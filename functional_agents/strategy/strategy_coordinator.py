@@ -37,7 +37,11 @@ from .strategic_position import (
     StrategicRecommendation,
     TheoryOfWinning,
 )
+from .alignment_evaluator import AlignmentEvaluator
 from .configuration_resolver import ConfigurationResolver
+from .constraint_evaluator import ConstraintEvaluator
+from .option_mapper import OptionMapper
+from .saturation_detector import SaturationDetector
 from .strategic_choice_generator import StrategicChoiceGenerator
 from .strategy_config import StrategyConfig
 from .strategy_planner import StrategyPlanner
@@ -107,6 +111,7 @@ class StrategyCoordinator:
         self._plan = StrategyPlanner().build(self._config)
         self._choice_sets: list = []                   # set in build()
         self._theories: list = []                      # set in build()
+        self._constraint_results: dict = {}            # set in build() — PH12.1
         self._evaluations: list = []                   # set in build()
         self._selected_theory: TheoryOfWinning | None = None   # set in build()
         self._selection: StrategySelection | None = None        # set in build()
@@ -133,17 +138,30 @@ class StrategyCoordinator:
         # Legacy mode theories are expected to cluster around the preferred option.
         if self._plan.generation_policy.diversity_required and self._plan.dimension_configs:
             _check_theory_diversity(self._theories)
-        # PH10.5: evaluate each theory independently
+        # PH12.1: evaluate constraints per theory before scoring
+        ce = ConstraintEvaluator()
+        self._constraint_results = {
+            t.theory_id: ce.evaluate(t, self._plan) for t in self._theories
+        }
+        # PH10.5: evaluate each theory independently, passing constraint results
         evaluator = TheoryEvaluator()
         self._evaluations = [
-            evaluator.build(t, self._plan, ctx) for t in self._theories
+            evaluator.build(t, self._plan, ctx, self._constraint_results.get(t.theory_id))
+            for t in self._theories
         ]
+        # PH12.1: detect score saturation before selection
+        sat_detected, sat_msg = SaturationDetector().check(self._evaluations)
         # PH10.6: select the winning theory
         selector = StrategySelector()
         self._selected_theory = selector.select(
             self._theories, self._evaluations, self._plan
         )
         self._selection = selector._last_selection
+        # PH12.1: map selected theory to upstream option and evaluate alignment
+        option_mapping = OptionMapper().map(self._selected_theory, ctx)
+        alignment = AlignmentEvaluator().evaluate(
+            self._selected_theory, option_mapping, self._selection, ctx
+        )
 
         created_at = datetime.now(timezone.utc).isoformat()
         position_id = f"SP-{created_at[:10].replace('-', '')}-{(ctx.run_id or 'unknown')[:8]}"
@@ -238,6 +256,12 @@ class StrategyCoordinator:
                 "score_margin": self._selection.score_margin,
                 "tie_breaker_used": self._selection.tie_breaker_used,
                 "research_id": _research_id,
+                # PH12.1 diagnostics
+                "saturation_detected": sat_detected,
+                "saturation_message": sat_msg,
+                "alignment_status": alignment.status,
+                "alignment_rationale": alignment.rationale,
+                "mapped_option_id": alignment.mapped_option_id,
             },
         )
 

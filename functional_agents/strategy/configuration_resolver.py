@@ -262,10 +262,14 @@ class ConfigurationResolver:
                     f"in dimension {dimension_id!r}."
                 )
             seen_ids.add(c_id)
+            extra_kwargs: dict = {}
+            if "execution_complexity" in c_raw:
+                extra_kwargs["execution_complexity"] = str(c_raw["execution_complexity"]).lower()
             choices.append(ChoiceConfig(
                 id=c_id,
                 title=str(c_raw.get("title", c_id)),
                 description=str(c_raw.get("description", "")),
+                **extra_kwargs,
             ))
 
         return choices

@@ -162,6 +162,16 @@ class StrategicChoiceGenerator:
                 # Required validation happens in ConfigurationResolver; skip empty.
                 continue
             chosen = available[posture_idx % len(available)]
+            meta: dict = {
+                "choice_title": chosen.title,
+                "choice_description": chosen.description,
+                "dimension_title": dim.title,
+                "dimension_description": dim.description,
+            }
+            # Propagate execution_complexity when present (PH12.1)
+            ec = getattr(chosen, "execution_complexity", None)
+            if ec:
+                meta["execution_complexity"] = ec
             choices.append(StrategicChoice(
                 id=f"SC-{posture_key}-{dim.id}-{timestamp}",
                 dimension=dim.id,
@@ -169,12 +179,7 @@ class StrategicChoiceGenerator:
                 rationale=dim.description or dim.title,
                 confidence="",
                 requiredness="required" if dim.required else "optional",
-                metadata={
-                    "choice_title": chosen.title,
-                    "choice_description": chosen.description,
-                    "dimension_title": dim.title,
-                    "dimension_description": dim.description,
-                },
+                metadata=meta,
             ))
         return choices
 

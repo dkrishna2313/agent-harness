@@ -698,6 +698,9 @@ class TestTheoryEvaluatorNewCriteria:
         assert ev.criteria_scores["assumption_robustness"].score == 0.0
 
     def test_execution_feasibility_one_when_complete(self):
+        # PH12.1: execution_feasibility now derives from execution_complexity metadata.
+        # Without complexity metadata, score defaults to 0.75 per choice.
+        # 1.0 requires choices with execution_complexity="low".
         from functional_agents.strategy.strategy_plan import EvaluationModel, GenerationPolicy, ValidationPolicy, SearchBudget
         plan = StrategyPlan(
             plan_id="TEST",
@@ -708,9 +711,17 @@ class TestTheoryEvaluatorNewCriteria:
             validation_policy=ValidationPolicy(),
             search_budget=SearchBudget(),
         )
-        theory = self._make_theory(strategic_choices=[{"dimension": "geo", "selected_value": "a"}])
-        ev = TheoryEvaluator().build(theory, plan, None)
-        assert ev.criteria_scores["execution_feasibility"].score == 1.0
+        # Without execution_complexity: defaults to 0.75
+        theory_no_meta = self._make_theory(strategic_choices=[{"dimension": "geo", "selected_value": "a"}])
+        ev_no_meta = TheoryEvaluator().build(theory_no_meta, plan, None)
+        assert ev_no_meta.criteria_scores["execution_feasibility"].score == pytest.approx(0.75, abs=1e-3)
+        # With execution_complexity=low: scores 1.0
+        theory_low = self._make_theory(strategic_choices=[{
+            "dimension": "geo", "selected_value": "a",
+            "metadata": {"execution_complexity": "low"},
+        }])
+        ev_low = TheoryEvaluator().build(theory_low, plan, None)
+        assert ev_low.criteria_scores["execution_feasibility"].score == pytest.approx(1.0, abs=1e-3)
 
     def test_risk_resilience_tiers(self):
         plan = self._make_plan_with_weights({"risk_resilience": 1.5})

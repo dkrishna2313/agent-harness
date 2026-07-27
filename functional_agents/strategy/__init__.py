@@ -17,8 +17,13 @@ Strategy Layer. StrategyCoordinator accepts it optionally; if omitted, a default
 instance is constructed. Behavior is unchanged.
 """
 
+from .alignment import AlignmentResult, ConstraintResult, OptionMapping
+from .alignment_evaluator import AlignmentEvaluator
 from .configuration_resolver import ConfigurationResolver
+from .constraint_evaluator import ConstraintEvaluator
 from .framework_defaults import FrameworkDefaults
+from .option_mapper import OptionMapper
+from .saturation_detector import SaturationDetector
 from .strategic_choice import StrategicChoice
 from .strategic_choice_generator import StrategicChoiceGenerator
 from .strategic_choice_set import StrategicChoiceSet
@@ -59,8 +64,12 @@ from .strategy_lineage import StrategyLineageLink  # PH11.2
 from .strategy_trace import StrategyTrace
 
 __all__ = [
+    "AlignmentEvaluator",
+    "AlignmentResult",
     "ChoiceConfig",
     "ConfigurationResolver",
+    "ConstraintEvaluator",
+    "ConstraintResult",
     "DimensionConfig",
     "StrategyArtifactReader",
     "EvaluationModel",
@@ -88,6 +97,9 @@ __all__ = [
     "StrategyObjectives",
     "StrategyValidation",
     "CriterionScore",
+    "OptionMapper",
+    "OptionMapping",
+    "SaturationDetector",
     "StrategySelection",
     "StrategySelector",
     "TheoryEvaluation",

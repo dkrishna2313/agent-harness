@@ -47,11 +47,14 @@ Consumed by: StrategyCoordinator (stored as _evaluations; not yet wired
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .strategic_position import TheoryOfWinning
 from .strategy_plan import StrategyPlan, ValidationPolicy
 from .theory_evaluation import CriterionScore, TheoryEvaluation
+
+if TYPE_CHECKING:
+    from .alignment import ConstraintResult
 
 LOGGER = logging.getLogger(__name__)
 
@@ -167,6 +170,7 @@ class TheoryEvaluator:
         theory: TheoryOfWinning,
         plan: StrategyPlan,
         research: Any,
+        constraint_results: list["ConstraintResult"] | None = None,
     ) -> TheoryEvaluation:
         """Produce one TheoryEvaluation for a single TheoryOfWinning.
 
@@ -180,6 +184,10 @@ class TheoryEvaluator:
         research:
             Available research output (AgentContext in PH10.x). Reserved
             for future use; currently a structural parameter.
+        constraint_results:
+            Optional list of ConstraintResult from ConstraintEvaluator.
+            When provided, configured-mode criteria use them to apply
+            constraint-based penalties (PH12.1).
 
         Returns
         -------
@@ -187,7 +195,7 @@ class TheoryEvaluator:
             Scores for each criterion, qualitative observations, an
             overall_score, and confidence in the evaluation.
         """
-        criteria_scores = self._score_criteria(theory, plan)
+        criteria_scores = self._score_criteria(theory, plan, constraint_results)
         overall_score = self._compute_overall_score(criteria_scores)
         strengths = self._extract_strengths(criteria_scores, theory)
         weaknesses = self._extract_weaknesses(criteria_scores, theory)
@@ -229,6 +237,7 @@ class TheoryEvaluator:
         self,
         theory: TheoryOfWinning,
         plan: StrategyPlan,
+        constraint_results: list["ConstraintResult"] | None = None,
     ) -> dict[str, CriterionScore]:
         """Return one CriterionScore per criterion in the active criterion set.
 
@@ -242,7 +251,7 @@ class TheoryEvaluator:
         if plan_weights:
             # CONFIGURED mode — criterion set is exactly the plan's weight keys
             return {
-                name: self._score_one(name, weight, theory, vp, n_dims)
+                name: self._score_one(name, weight, theory, vp, n_dims, constraint_results)
                 for name, weight in plan_weights.items()
             }
         else:
@@ -259,11 +268,12 @@ class TheoryEvaluator:
         theory: TheoryOfWinning,
         vp: ValidationPolicy,
         n_dims: int,
+        constraint_results: list["ConstraintResult"] | None = None,
     ) -> CriterionScore:
         """Score a single criterion by name.
 
-        Unrecognised names receive the deterministic neutral fallback
-        (_FALLBACK_SCORE, _FALLBACK_RATIONALE) with the configured weight.
+        When constraint_results are provided and name is a configured-only
+        criterion, constraint penalties are applied (PH12.1).
         """
         if name not in _ALL_CRITERION_META:
             raise ValueError(
@@ -271,7 +281,9 @@ class TheoryEvaluator:
                 f"Supported criteria: {sorted(SUPPORTED_CRITERIA)}. "
                 f"Remove {name!r} from the engagement evaluation configuration."
             )
-        score, detail = TheoryEvaluator._raw_score(name, theory, vp, n_dims)
+        score, detail = TheoryEvaluator._raw_score(
+            name, theory, vp, n_dims, constraint_results
+        )
         return TheoryEvaluator._make_score(name, score, weight, detail)
 
     @staticmethod
@@ -280,6 +292,7 @@ class TheoryEvaluator:
         theory: TheoryOfWinning,
         vp: ValidationPolicy,
         n_dims: int,
+        constraint_results: list["ConstraintResult"] | None = None,
     ) -> tuple[float, str | None]:
         """Return (score, detail) for a recognised criterion.
 
@@ -335,18 +348,22 @@ class TheoryEvaluator:
             )
             return sc, detail
 
-        # PH12.0 criteria -------------------------------------------------
+        # PH12.0/PH12.1 configured-only criteria --------------------------
+
+        cr = constraint_results or []
+        n_violated = sum(1 for r in cr if r.status == "violated")
+        n_partial = sum(1 for r in cr if r.status == "partially_satisfied")
 
         if name == "strategic_fit":
             pos = 1.0 if theory.winning_position else 0.0
             mech = 1.0 if theory.winning_mechanism else 0.0
-            n = len(theory.strategic_choices)
-            comp = min(float(n) / float(n_dims), 1.0) if n_dims > 0 else 1.0
-            sc = round(0.5 * pos + 0.3 * mech + 0.2 * comp, 6)
+            base = round(0.6 * pos + 0.4 * mech, 6)
+            penalty = 0.25 * n_violated + 0.10 * n_partial
+            sc = max(0.0, round(base - penalty, 6))
             detail = (
                 f"position={'yes' if pos else 'no'}, "
                 f"mechanism={'yes' if mech else 'no'}, "
-                f"coverage={n}/{n_dims if n_dims else 'n/a'}"
+                f"violated={n_violated}, partial={n_partial}"
             )
             return sc, detail
 
@@ -355,40 +372,77 @@ class TheoryEvaluator:
             if vp.require_assumptions and n == 0:
                 sc = 0.0
             else:
-                sc = min(float(n) / 2.0, 1.0)
+                sc = min(float(n) / 3.0, 1.0)
             detail = f"{n} assumption(s) documented" if n > 0 else None
             return sc, detail
 
         if name == "execution_feasibility":
-            n = len(theory.strategic_choices)
-            sc = min(float(n) / float(n_dims), 1.0) if n_dims > 0 else 1.0
-            detail = f"{n} of {n_dims} dimension(s) covered"
+            # Use execution_complexity from choice metadata when available.
+            # "high" → 0.5, "medium" → 0.75, "low" → 1.0; missing → 0.75
+            _complexity_score = {"high": 0.5, "medium": 0.75, "low": 1.0}
+            scores: list[float] = []
+            for c in theory.strategic_choices:
+                if isinstance(c, dict):
+                    complexity = str(
+                        c.get("metadata", {}).get("execution_complexity", "")
+                        or c.get("execution_complexity", "")
+                    ).lower().strip()
+                    scores.append(_complexity_score.get(complexity, 0.75))
+            if scores:
+                sc = round(sum(scores) / len(scores), 6)
+                detail = (
+                    f"{len(scores)} choice(s): "
+                    f"avg complexity score={sc:.2f}"
+                )
+            else:
+                # Fallback: coverage-based
+                n = len(theory.strategic_choices)
+                sc = min(float(n) / float(n_dims), 1.0) if n_dims > 0 else 1.0
+                detail = f"{n} of {n_dims} dimension(s) covered"
             return sc, detail
 
         if name == "risk_resilience":
             n = len(theory.failure_modes)
             if n == 0:
-                sc = 0.3
+                base = 0.3
             elif n == 1:
-                sc = 0.6
+                base = 0.6
             elif n == 2:
-                sc = 0.8
+                base = 0.8
             else:
-                sc = 1.0
-            detail = f"{n} failure mode(s) identified"
+                base = 1.0
+            penalty = 0.25 * n_violated + 0.10 * n_partial
+            sc = max(0.0, round(base - penalty, 6))
+            detail = (
+                f"{n} failure mode(s); constraint penalty="
+                f"{penalty:.2f} (violated={n_violated}, partial={n_partial})"
+            )
             return sc, detail
 
         if name == "opportunity_capture":
             n = len(theory.success_conditions)
             if n == 0:
-                sc = 0.3
+                base = 0.3
             elif n == 1:
-                sc = 0.6
+                base = 0.6
             elif n == 2:
-                sc = 0.8
+                base = 0.8
             else:
-                sc = 1.0
-            detail = f"{n} success condition(s) identified"
+                base = 1.0
+            # Penalise wait-and-defer postures that forgo near-term opportunity capture
+            has_wait = any(
+                "wait" in str(c.get("selected_value", "")).lower()
+                or "wait" in str(
+                    (c.get("metadata", {}) or {}).get("choice_title", "")
+                ).lower()
+                for c in theory.strategic_choices
+                if isinstance(c, dict)
+            )
+            sc = max(0.0, round(base - (0.15 if has_wait else 0.0), 6))
+            detail = (
+                f"{n} success condition(s)"
+                + ("; wait-and-monitor penalty applied" if has_wait else "")
+            )
             return sc, detail
 
         # Unreachable: all _CRITERION_META keys are handled above

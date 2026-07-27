@@ -70,6 +70,15 @@ class StrategySelection(BaseModel):
     # "confidence", "residual_risks", "order", or None (scores differed)
     tie_breaker_used: str | None = None
 
+    # PH12.1 — extended selection diagnostics
+    # "selected" | "conditional" | "unresolved" | "degraded"
+    selection_status: str = "selected"
+    selection_rationale: str = ""
+    # "confirmed" | "refined" | "challenged" | "unresolved"
+    alignment_status: str = ""
+    mapped_option_id: str | None = None
+    saturation_detected: bool = False
+
 
 class StrategySelector:
     """Selects the highest-scoring TheoryOfWinning deterministically.

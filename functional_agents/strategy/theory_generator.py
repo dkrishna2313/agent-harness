@@ -22,7 +22,9 @@ from .strategic_position import TheoryOfWinning
 LOGGER = logging.getLogger(__name__)
 
 _MAX_EVIDENCE = 10
-_EVIDENCE_PER_THEORY = 5   # max evidence items per theory in configured mode
+_EVIDENCE_PER_THEORY = 5    # max evidence items per theory in configured mode
+_ASSUMPTIONS_PER_THEORY = 5  # max assumptions per theory in configured mode
+_OPPS_PER_THEORY = 2         # max opportunity-derived success conditions per theory
 
 
 class TheoryGenerator:
@@ -62,12 +64,12 @@ class TheoryGenerator:
         winning_mechanism = self._build_winning_mechanism(choice_set)
 
         ec = self._as_dict(getattr(research, "executive_confidence", None))
-        success_conditions = list(ec.get("confidence_drivers", []))
-        assumptions = list(getattr(research, "assumptions", None) or [])
 
         choice_keywords = self._extract_choice_keywords(choice_set)
         evidence = self._filter_evidence(research, choice_keywords)
         failure_modes = self._filter_failure_modes(research, choice_keywords)
+        assumptions = self._filter_assumptions(research, choice_keywords)
+        success_conditions = self._derive_success_conditions(choice_set, ec, research)
 
         strategic_choices = [c.to_dict() for c in choice_set.choices]
 
@@ -199,6 +201,65 @@ class TheoryGenerator:
             if any(kw in str(r).lower() for kw in keywords)
         ]
         return matching if matching else high_severity
+
+    @staticmethod
+    def _filter_assumptions(research: Any, keywords: list[str]) -> list:
+        """Return assumptions relevant to the theory's strategic choices.
+
+        Algorithm mirrors _filter_evidence: keyword relevance filter with
+        symmetric fallback — all theories get the same leading slice when
+        no keyword matches, so candidate position never determines coverage.
+        """
+        raw = list(getattr(research, "assumptions", None) or [])
+        if not raw:
+            return []
+
+        pool = raw[:_MAX_EVIDENCE]
+
+        if not keywords:
+            return pool[:_ASSUMPTIONS_PER_THEORY]
+
+        matching = [
+            a for a in pool
+            if any(kw in str(a).lower() for kw in keywords)
+        ]
+        return matching[:_ASSUMPTIONS_PER_THEORY] if matching else pool[:_ASSUMPTIONS_PER_THEORY]
+
+    @classmethod
+    def _derive_success_conditions(
+        cls,
+        choice_set: "StrategicChoiceSet",
+        ec: dict,
+        research: Any,
+    ) -> list[str]:
+        """Build theory-specific success conditions from choices, EC drivers, and opportunities.
+
+        1. Confidence drivers from executive_confidence (universal baseline).
+        2. Opportunities from research that match choice keywords (theory-specific).
+        """
+        conditions: list[str] = list(ec.get("confidence_drivers", []))
+
+        opportunities = getattr(research, "opportunities", None) or []
+        keywords = cls._extract_choice_keywords(choice_set)
+
+        for opp in opportunities:
+            if not isinstance(opp, dict):
+                continue
+            opp_text = " ".join([
+                str(opp.get("title", "")),
+                str(opp.get("description", "")),
+                str(opp.get("opportunity", "")),
+            ]).strip()
+            if not opp_text:
+                continue
+            if keywords and any(kw in opp_text.lower() for kw in keywords):
+                conditions.append(opp_text)
+            elif not keywords:
+                conditions.append(opp_text)
+            if len(conditions) - len(ec.get("confidence_drivers", [])) >= _OPPS_PER_THEORY:
+                break
+
+        return conditions
 
     # ------------------------------------------------------------------
     # Legacy mode (PH10.3)
