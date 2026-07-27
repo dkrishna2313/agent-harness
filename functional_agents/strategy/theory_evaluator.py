@@ -100,7 +100,11 @@ _CRITERION_META: dict[str, tuple[str, str, float]] = {
         "No failure modes have been identified.",
         1.0,
     ),
-    # --- PH12.0 engagement-configured criteria ---
+}
+
+# PH12.0 criteria — available in CONFIGURED mode only; not included in
+# DEFAULT mode so the "seven built-in criteria" contract stays intact.
+_CONFIGURED_CRITERION_META: dict[str, tuple[str, str, float]] = {
     "strategic_fit": (
         "Strategic position, mechanism, and choice coverage confirmed.",
         "Strategic fit cannot be assessed — position and mechanism are absent.",
@@ -126,6 +130,13 @@ _CRITERION_META: dict[str, tuple[str, str, float]] = {
         "No success conditions identified; opportunity capture cannot be assessed.",
         1.0,
     ),
+}
+
+# Combined lookup used by _score_one / _make_score — covers both default and
+# configured criteria without polluting the 7-entry DEFAULT mode set.
+_ALL_CRITERION_META: dict[str, tuple[str, str, float]] = {
+    **_CRITERION_META,
+    **_CONFIGURED_CRITERION_META,
 }
 
 # Score at or above this threshold → strength candidate
@@ -258,7 +269,7 @@ class TheoryEvaluator:
         Unrecognised names receive the deterministic neutral fallback
         (_FALLBACK_SCORE, _FALLBACK_RATIONALE) with the configured weight.
         """
-        if name not in _CRITERION_META:
+        if name not in _ALL_CRITERION_META:
             return CriterionScore(
                 score=_FALLBACK_SCORE,
                 rationale=_FALLBACK_RATIONALE,
@@ -401,7 +412,7 @@ class TheoryEvaluator:
           0 < score < _STRENGTH_THRESHOLD → detail (accurate partial state)
           score == 0.0                  → low_rationale
         """
-        high_rationale, low_rationale, _ = _CRITERION_META[name]
+        high_rationale, low_rationale, _ = _ALL_CRITERION_META[name]
 
         if score >= _STRENGTH_THRESHOLD:
             rationale = f"{high_rationale} ({detail})" if detail else high_rationale
