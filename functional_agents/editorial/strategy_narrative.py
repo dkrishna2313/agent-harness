@@ -111,7 +111,23 @@ def build_strategy_narrative(trace: Any) -> StrategyNarrative:
     failure_modes: list[str] = []
     for fm in winner_theory.failure_modes:
         if isinstance(fm, dict):
-            failure_modes.append(fm.get("description", fm.get("mode", str(fm))))
+            text = (
+                fm.get("statement")
+                or fm.get("description")
+                or fm.get("mode")
+                or str(fm)
+            )
+            sev = fm.get("severity", "")
+            lik = fm.get("likelihood", "")
+            mit = fm.get("mitigation_notes") or fm.get("mitigation", "")
+            suffix = ""
+            if sev:
+                suffix += f" [Severity: {sev}]"
+            if lik:
+                suffix += f" [Likelihood: {lik}]"
+            if mit:
+                suffix += f" — Mitigation: {mit}"
+            failure_modes.append(f"{text}{suffix}")
         else:
             failure_modes.append(str(fm))
 
@@ -142,7 +158,12 @@ def build_strategy_narrative(trace: Any) -> StrategyNarrative:
         if ev:
             for rr in ev.residual_risks:
                 if isinstance(rr, dict):
-                    residual_risk_descs.append(rr.get("description", str(rr)))
+                    residual_risk_descs.append(
+                        rr.get("statement")
+                        or rr.get("description")
+                        or rr.get("mode")
+                        or str(rr)
+                    )
                 else:
                     residual_risk_descs.append(str(rr))
         alternatives.append(

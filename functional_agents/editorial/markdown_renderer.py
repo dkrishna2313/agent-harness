@@ -686,9 +686,8 @@ class MarkdownRenderer:
             return lines
         if title:
             lines += ["", f"**{title}:**", ""]
-        sep = "|---|" * len(headers)
         lines.append("| " + " | ".join(str(h) for h in headers) + " |")
-        lines.append("|" + sep)
+        lines.append("| " + " | ".join("---" for _ in headers) + " |")
         for row in rows:
             cells = [str(c).replace("|", "\\|") for c in row]
             lines.append("| " + " | ".join(cells) + " |")

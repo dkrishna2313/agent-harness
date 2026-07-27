@@ -47,8 +47,10 @@ from .strategic_position import (
     TheoryOfWinning,
 )
 from .strategy_config import (
+    AlignmentPolicy,
     ChoiceConfig,
     DimensionConfig,
+    ScoringPolicy,
     StrategyConfig,
     StrategyConstraints,
     StrategyDimensions,
@@ -65,6 +67,7 @@ from .strategy_trace import StrategyTrace
 
 __all__ = [
     "AlignmentEvaluator",
+    "AlignmentPolicy",
     "AlignmentResult",
     "ChoiceConfig",
     "ConfigurationResolver",
@@ -100,6 +103,7 @@ __all__ = [
     "OptionMapper",
     "OptionMapping",
     "SaturationDetector",
+    "ScoringPolicy",
     "StrategySelection",
     "StrategySelector",
     "TheoryEvaluation",

@@ -35,14 +35,17 @@ from typing import Any
 from .framework_defaults import FrameworkDefaults
 from .theory_evaluator import SUPPORTED_CRITERIA
 from .strategy_config import (
+    AlignmentPolicy,
     ChoiceConfig,
     DimensionConfig,
+    ScoringPolicy,
     StrategyConfig,
     StrategyConstraints,
     StrategyEvaluation,
     StrategyGeneration,
     StrategyObjectives,
     StrategyValidation,
+    _SUPPORTED_MAPPING_CONFIDENCES,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -194,6 +197,14 @@ class ConfigurationResolver:
                 required_conditions=list(c_list),
             ).model_dump()
 
+        if "alignment" in raw:
+            al = raw["alignment"] or {}
+            result["alignment_policy"] = self._parse_alignment_policy(al).model_dump()
+
+        if "scoring" in raw:
+            sc = raw["scoring"] or {}
+            result["scoring_policy"] = self._parse_scoring_policy(sc).model_dump()
+
         return result
 
     def _parse_dimensions(self, raw_dims: list[Any]) -> list[DimensionConfig]:
@@ -296,6 +307,46 @@ class ConfigurationResolver:
             method=str(eval_raw.get("method", "multi_criteria")),
             weights=weights,
             min_score_threshold=float(eval_raw.get("min_score_threshold", 0.0)),
+        )
+
+    def _parse_alignment_policy(self, raw: dict[str, Any]) -> AlignmentPolicy:
+        """Parse alignment block into AlignmentPolicy with validation."""
+        min_conf = str(raw.get("minimum_mapping_confidence", "Medium"))
+        if min_conf not in _SUPPORTED_MAPPING_CONFIDENCES:
+            raise ValueError(
+                f"alignment.minimum_mapping_confidence={min_conf!r} is not supported. "
+                f"Supported: {sorted(_SUPPORTED_MAPPING_CONFIDENCES)}."
+            )
+        min_margin = float(raw.get("minimum_challenge_margin", 0.05))
+        if min_margin < 0.0:
+            raise ValueError(
+                f"alignment.minimum_challenge_margin must be >= 0.0, got {min_margin}."
+            )
+        return AlignmentPolicy(
+            preferred_option_authority=bool(raw.get("preferred_option_authority", True)),
+            minimum_challenge_margin=min_margin,
+            unresolved_on_tie=bool(raw.get("unresolved_on_tie", True)),
+            minimum_mapping_confidence=min_conf,
+        )
+
+    def _parse_scoring_policy(self, raw: dict[str, Any]) -> ScoringPolicy:
+        """Parse scoring block into ScoringPolicy with validation."""
+        _fields = {
+            "constraint_violation_penalty": 0.25,
+            "partial_constraint_penalty": 0.10,
+            "wait_and_monitor_penalty": 0.15,
+        }
+        for field, default in _fields.items():
+            v = float(raw.get(field, default))
+            if v < 0.0 or v > 1.0:
+                raise ValueError(
+                    f"scoring.{field} must be in [0.0, 1.0], got {v}."
+                )
+        return ScoringPolicy(
+            constraint_violation_penalty=float(raw.get("constraint_violation_penalty", 0.25)),
+            partial_constraint_penalty=float(raw.get("partial_constraint_penalty", 0.10)),
+            wait_and_monitor_penalty=float(raw.get("wait_and_monitor_penalty", 0.15)),
+            saturation_detection=bool(raw.get("saturation_detection", True)),
         )
 
     def _validate(self, config: StrategyConfig) -> None:

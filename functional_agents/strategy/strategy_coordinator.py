@@ -157,10 +157,34 @@ class StrategyCoordinator:
             self._theories, self._evaluations, self._plan
         )
         self._selection = selector._last_selection
-        # PH12.1: map selected theory to upstream option and evaluate alignment
-        option_mapping = OptionMapper().map(self._selected_theory, ctx)
+        # PH12.1a: map ALL theories then evaluate alignment with policy
+        mapper = OptionMapper()
+        all_mappings = {t.theory_id: mapper.map(t, ctx) for t in self._theories}
+        winner_mapping = all_mappings[self._selection.winner_theory_id]
+
+        ap = getattr(self._plan, "alignment_policy", None)
         alignment = AlignmentEvaluator().evaluate(
-            self._selected_theory, option_mapping, self._selection, ctx
+            self._selected_theory, winner_mapping, self._selection, ctx, policy=ap
+        )
+
+        # Write-back: create new StrategySelection with alignment fields populated
+        _tb = self._selection.tie_breaker_used
+        _rationale = (
+            f"Theory {self._selection.winner_theory_id} selected via "
+            + (f"tie-breaker ({_tb})." if _tb else "highest score.")
+        )
+        self._selection = StrategySelection(
+            winner_theory_id=self._selection.winner_theory_id,
+            winner_score=self._selection.winner_score,
+            runner_up_theory_id=self._selection.runner_up_theory_id,
+            runner_up_score=self._selection.runner_up_score,
+            score_margin=self._selection.score_margin,
+            tie_breaker_used=self._selection.tie_breaker_used,
+            selection_status="selected",
+            selection_rationale=_rationale,
+            alignment_status=alignment.status,
+            mapped_option_id=winner_mapping.mapped_option_id,
+            saturation_detected=sat_detected,
         )
 
         created_at = datetime.now(timezone.utc).isoformat()
@@ -236,6 +260,24 @@ class StrategyCoordinator:
             strategic_position=position,
             trace_id=_trace_id,
         )
+        # PH12.1a — build structured audit blocks for StrategyTrace
+        _theory_option_mappings = [
+            {
+                "theory_id": t.theory_id,
+                "mapped_option_id": all_mappings[t.theory_id].mapped_option_id,
+                "mapping_score": all_mappings[t.theory_id].mapping_score,
+                "mapping_confidence": all_mappings[t.theory_id].mapping_confidence,
+                "mapping_rationale": all_mappings[t.theory_id].mapping_rationale,
+            }
+            for t in self._theories
+        ]
+        _constraint_results_structured = {
+            tid: [cr.model_dump() for cr in crs]
+            for tid, crs in self._constraint_results.items()
+        }
+        _alignment_block = alignment.model_dump()
+        _saturation_block = {"detected": sat_detected, "message": sat_msg}
+
         self._trace = StrategyTrace(
             trace_id=_trace_id,
             created_at=created_at,
@@ -246,6 +288,10 @@ class StrategyCoordinator:
             selection=self._selection,
             strategic_position=position,
             lineage=_lineage,
+            theory_option_mappings=_theory_option_mappings,
+            constraint_results=_constraint_results_structured,
+            alignment=_alignment_block,
+            saturation=_saturation_block,
             metadata={
                 "framework": self._plan.framework,
                 "plan_id": self._plan.plan_id,
@@ -256,7 +302,7 @@ class StrategyCoordinator:
                 "score_margin": self._selection.score_margin,
                 "tie_breaker_used": self._selection.tie_breaker_used,
                 "research_id": _research_id,
-                # PH12.1 diagnostics
+                # PH12.1 diagnostics (kept in metadata for backward compatibility)
                 "saturation_detected": sat_detected,
                 "saturation_message": sat_msg,
                 "alignment_status": alignment.status,
