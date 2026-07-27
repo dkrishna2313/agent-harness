@@ -1,0 +1,163 @@
+engagement:
+  title: US Data Center Siting Strategy
+  client: Hyperscaler / AI Infrastructure Developer
+  industry: AI Infrastructure / Data Centers
+
+  current_situation: >
+    The client must prioritize US states for future AI data center development.
+    The initial assessment should compare California, Texas, Indiana,
+    New Hampshire, and Virginia based on power availability, renewable energy
+    potential, transmission and interconnection constraints, water availability,
+    legal and regulatory risk, incentives, permitting complexity, community
+    opposition, and long-term operating resilience.
+
+  objectives:
+    - Prioritize which of California, Texas, Indiana, New Hampshire, and Virginia should receive immediate investment for AI data center development over the next 3–5 years.
+    - Identify which of these states should be monitored for future development as market, regulatory, and infrastructure conditions evolve.
+    - Identify which of these states should currently be avoided due to infrastructure, regulatory, environmental, or community constraints.
+    - Produce an evidence-backed comparison across all evaluation criteria.
+    - Highlight evidence gaps requiring additional research before final investment decisions.
+
+  constraints:
+    - Sites must support large-load growth and high-density AI infrastructure.
+    - Preference for low-carbon power pathways.
+    - Avoid states or counties with significant legal or moratorium risk.
+    - Avoid water-constrained locations unless dry or hybrid cooling is technically viable.
+    - Prioritize locations with credible grid capacity or behind-the-meter generation opportunities.
+
+  stakeholders:
+    - Chief Infrastructure Officer
+    - Data Center Engineering
+    - Energy Procurement
+    - Real Estate Development
+    - Sustainability Office
+    - Government Affairs
+    - Finance / Capital Planning
+
+  assumptions:
+    - AI data center power density will continue to increase over the planning horizon.
+    - Utility interconnection timelines will remain a major siting constraint.
+    - Access to renewable energy will become an increasingly important competitive advantage.
+    - Water availability will remain an important constraint for liquid-cooled AI facilities.
+    - State policy and incentive programs will materially influence long-term economics.
+
+  success_criteria:
+    - Rank candidate states into priority tiers.
+    - Identify the most attractive states for near-term investment.
+    - Identify states presenting elevated strategic risk despite strong market demand.
+    - Provide evidence-backed rationale for every recommendation.
+    - Clearly distinguish enacted laws from proposed legislation.
+    - Highlight evidence gaps and validation priorities.
+
+  decision_horizon: 2026–2030 initial siting decisions; 10+ year operating horizon
+
+  priorities:
+    - Power availability
+    - Grid capacity and interconnection
+    - Renewable energy availability
+    - Water availability
+    - Regulatory certainty
+    - Incentives
+    - Permitting speed
+    - Community acceptance
+    - Long-term operating resilience
+
+  risks:
+    - Utility interconnection delays
+    - Transmission congestion
+    - Water availability constraints
+    - State or local permitting delays
+    - Moratoriums or restrictive legislation
+    - Community opposition
+    - Incentive program changes
+
+  known_unknowns:
+    - Current interconnection queue position by state and RTO/ISO
+    - Local moratoriums and proposed legislation
+    - Water withdrawal constraints and public water system capacity
+    - Utility willingness to serve very large loads
+    - Community opposition intensity by county or metropolitan area
+
+strategy:
+  framework: executive
+
+  objectives:
+    - Maximize risk-adjusted development value across candidate states
+    - Preserve execution optionality in the face of policy and grid uncertainty
+    - Prioritize credible near-term energization pathways
+
+  dimensions:
+    - id: geographic_portfolio
+      title: Geographic Portfolio
+      description: Choose the geographic concentration and diversification posture across candidate states.
+      required: true
+      choices:
+        - id: concentrated
+          title: Concentrated
+          description: Commit capital to one or two top-ranked states for maximum focus and speed.
+        - id: diversified
+          title: Diversified
+          description: Spread investment across three or more states to reduce single-state risk.
+        - id: staged
+          title: Staged Portfolio
+          description: Begin concentrated then diversify as market and regulatory conditions confirm.
+
+    - id: power_pathway
+      title: Power Pathway
+      description: Choose the primary approach to securing firm, large-load power capacity.
+      required: true
+      choices:
+        - id: grid_first
+          title: Grid First
+          description: Rely on utility interconnection as the primary power source; BTM as backup.
+        - id: btm_first
+          title: Behind-the-Meter First
+          description: Lead with on-site generation (solar, gas, storage) to reduce interconnection dependency.
+        - id: hybrid
+          title: Hybrid Grid and BTM
+          description: Pursue grid and behind-the-meter capacity in parallel to maximize optionality.
+
+    - id: market_timing
+      title: Market Timing
+      description: Choose the capital commitment posture given current market and grid conditions.
+      required: true
+      choices:
+        - id: accelerate
+          title: Accelerate
+          description: Move quickly before interconnection queues lengthen further and land costs rise.
+        - id: milestone_gated
+          title: Milestone Gated
+          description: Commit capital only after defined regulatory or infrastructure milestones are cleared.
+        - id: wait_and_monitor
+          title: Wait and Monitor
+          description: Delay commitment until grid and policy uncertainty resolves; preserve optionality.
+
+  evaluation:
+    method: multi_criteria
+    min_score_threshold: 0.0
+    criteria:
+      strategic_fit:
+        weight: 2.0
+      evidence_quality:
+        weight: 1.5
+      assumption_robustness:
+        weight: 1.5
+      execution_feasibility:
+        weight: 1.5
+      risk_resilience:
+        weight: 1.5
+      opportunity_capture:
+        weight: 1.0
+
+  generation:
+    max_candidates: 3
+    diversity_required: true
+
+  validation:
+    require_evidence: true
+    require_assumptions: true
+    min_confidence: Low
+
+  constraints:
+    - Avoid strategies dependent on unvalidated single-state concentration without a fallback market
+    - Preserve at least one alternative state for contingency development

@@ -17,6 +17,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from .strategy_config import DimensionConfig
+
 
 # ---------------------------------------------------------------------------
 # Plan section models
@@ -90,6 +92,9 @@ class StrategyPlan(BaseModel):
     generation_policy: GenerationPolicy = Field(default_factory=GenerationPolicy)
     validation_policy: ValidationPolicy = Field(default_factory=ValidationPolicy)
     search_budget: SearchBudget = Field(default_factory=SearchBudget)
+
+    # PH12.0 — structured dimension configs forwarded from StrategyConfig
+    dimension_configs: list[DimensionConfig] = Field(default_factory=list)
 
     model_config = {"extra": "allow"}
 

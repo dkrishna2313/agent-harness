@@ -84,6 +84,7 @@ class StrategyPlanner:
             generation_policy=generation_policy,
             validation_policy=validation_policy,
             search_budget=search_budget,
+            dimension_configs=list(config.dimension_configs),
         )
 
         LOGGER.debug(
@@ -102,10 +103,13 @@ class StrategyPlanner:
     def _extract_dimensions(self, config: StrategyConfig) -> list[str]:
         """Derive active dimension names from configured dimensions.
 
-        StrategyDimensions uses extra fields to store named dimensions.
-        An empty StrategyDimensions means dimensions will be derived at
+        PH12.0: if dimension_configs is non-empty, use their IDs (preserving order).
+        Legacy: StrategyDimensions uses extra fields to store named dimensions;
+        an empty StrategyDimensions means dimensions will be derived at
         theory-generation time from the decision model.
         """
+        if config.dimension_configs:
+            return [d.id for d in config.dimension_configs if d.id]
         extra = config.dimensions.model_extra or {}
         return sorted(extra.keys())
 

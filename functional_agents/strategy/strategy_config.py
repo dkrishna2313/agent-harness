@@ -1,11 +1,11 @@
-"""StrategyConfig — canonical configuration object for the Strategy Layer (PH9.0).
+"""StrategyConfig — canonical configuration object for the Strategy Layer (PH9.0/PH12.0).
 
 Defines strategic intent without changing platform code.
 Frameworks provide defaults; engagements can override them in later phases.
 
 PH9.0 scope: canonical Pydantic model with sensible defaults.
-Not in scope: YAML loading, framework plugins, configuration resolver,
-              StrategyPlan, theory generation, theory evaluation.
+PH12.0 scope: ChoiceConfig, DimensionConfig, dimension_configs field on StrategyConfig.
+Not in scope: YAML loading, framework plugins.
 """
 
 from __future__ import annotations
@@ -13,6 +13,35 @@ from __future__ import annotations
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+
+# ---------------------------------------------------------------------------
+# PH12.0 — Engagement dimension models
+# ---------------------------------------------------------------------------
+
+class ChoiceConfig(BaseModel):
+    """A single selectable choice within a strategic dimension."""
+
+    id: str = ""
+    title: str = ""
+    description: str = ""
+
+    model_config = {"frozen": True, "extra": "allow"}
+
+
+class DimensionConfig(BaseModel):
+    """A configured strategic decision dimension with its available choices.
+
+    Each required dimension must be covered exactly once per StrategicChoiceSet.
+    """
+
+    id: str = ""
+    title: str = ""
+    description: str = ""
+    required: bool = True
+    choices: list[ChoiceConfig] = Field(default_factory=list)
+
+    model_config = {"frozen": True, "extra": "allow"}
 
 
 # ---------------------------------------------------------------------------
@@ -122,6 +151,10 @@ class StrategyConfig(BaseModel):
     constraints: StrategyConstraints = Field(default_factory=StrategyConstraints)
     validation: StrategyValidation = Field(default_factory=StrategyValidation)
     metadata: StrategyMetadata = Field(default_factory=StrategyMetadata)
+
+    # PH12.0 — structured dimension definitions with choices
+    # When non-empty, supersedes StrategyDimensions.extra for active_dimensions
+    dimension_configs: list[DimensionConfig] = Field(default_factory=list)
 
     model_config = {"extra": "allow"}
 

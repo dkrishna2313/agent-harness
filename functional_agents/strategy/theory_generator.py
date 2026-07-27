@@ -1,14 +1,14 @@
-"""TheoryGenerator — maps a StrategicChoiceSet to a TheoryOfWinning (PH10.3).
+"""TheoryGenerator — maps a StrategicChoiceSet to a TheoryOfWinning (PH10.3/PH12.0).
 
 Public interface: build(choice_set, research) -> TheoryOfWinning
 
-One TheoryOfWinning is produced per StrategicChoiceSet. All fields are
-derived deterministically from the choice set and available research
-outputs. No LLM calls, no ranking, no optimisation.
+PH10.3: one TheoryOfWinning per StrategicChoiceSet, derived from research context.
+PH12.0: configured mode — derives winning_position, winning_mechanism, recommended ID
+        and title from the actual choice set metadata embedded by StrategicChoiceGenerator.
+        Evidence and failure modes are filtered by relevance to the chosen options.
 
 Produced by: StrategyCoordinator.build() (one per StrategicChoiceSet)
-Consumed by: StrategyCoordinator (stored as _theories; not yet wired
-             into StrategicPosition)
+Consumed by: StrategyCoordinator (stored as _theories)
 """
 
 from __future__ import annotations
@@ -21,29 +21,173 @@ from .strategic_position import TheoryOfWinning
 
 LOGGER = logging.getLogger(__name__)
 
+_MAX_EVIDENCE = 10
+_EVIDENCE_PER_THEORY = 5   # max evidence items per theory in configured mode
+
 
 class TheoryGenerator:
     """Produces a TheoryOfWinning for a given StrategicChoiceSet.
 
-    All fields are extracted deterministically from the choice set and
-    the research object. No LLM calls, no optimisation.
+    PH10.3 (legacy): fields extracted from research context.
+    PH12.0 (configured): fields derived from choice set metadata when present.
     """
 
     def build(self, choice_set: StrategicChoiceSet, research: Any) -> TheoryOfWinning:
-        """Produce one TheoryOfWinning from a StrategicChoiceSet and research data.
+        """Produce one TheoryOfWinning from a StrategicChoiceSet and research data."""
+        if self._is_configured_mode(choice_set):
+            return self._build_configured(choice_set, research)
+        return self._build_legacy(choice_set, research)
 
-        Parameters
-        ----------
-        choice_set:
-            One of the StrategicChoiceSets produced by StrategicChoiceGenerator.
-        research:
-            Available research output (AgentContext in PH10.x).
+    # ------------------------------------------------------------------
+    # Configured mode (PH12.0)
+    # ------------------------------------------------------------------
 
-        Returns
-        -------
-        TheoryOfWinning
-            Populated from choice_set fields and research data.
+    def _is_configured_mode(self, choice_set: StrategicChoiceSet) -> bool:
+        """True when choices carry dimension metadata embedded by configured generator."""
+        return bool(
+            choice_set.choices
+            and choice_set.choices[0].metadata.get("choice_title")
+        )
+
+    def _build_configured(
+        self, choice_set: StrategicChoiceSet, research: Any
+    ) -> TheoryOfWinning:
+        """Build a theory from configured choice metadata."""
+        first_choice = choice_set.choices[0]
+
+        recommended_id = first_choice.selected_value
+        recommended_title = first_choice.metadata.get("choice_title", recommended_id)
+
+        winning_position = self._build_winning_position(choice_set)
+        winning_mechanism = self._build_winning_mechanism(choice_set)
+
+        ec = self._as_dict(getattr(research, "executive_confidence", None))
+        success_conditions = list(ec.get("confidence_drivers", []))
+        assumptions = list(getattr(research, "assumptions", None) or [])
+
+        choice_keywords = self._extract_choice_keywords(choice_set)
+        evidence = self._filter_evidence(research, choice_keywords)
+        failure_modes = self._filter_failure_modes(research, choice_keywords)
+
+        strategic_choices = [c.to_dict() for c in choice_set.choices]
+
+        theory = TheoryOfWinning(
+            theory_id=f"TH-{choice_set.id}",
+            source_choice_set_id=choice_set.id,
+            recommended_option_id=recommended_id,
+            recommended_option_title=recommended_title,
+            winning_position=winning_position,
+            winning_mechanism=winning_mechanism,
+            strategic_choices=strategic_choices,
+            success_conditions=success_conditions,
+            failure_modes=failure_modes,
+            assumptions=assumptions,
+            evidence=evidence,
+            confidence=choice_set.overall_confidence,
+        )
+        LOGGER.debug(
+            "[TheoryGenerator] configured theory %s: option=%s, evidence=%d, failure_modes=%d",
+            theory.theory_id, recommended_id, len(evidence), len(failure_modes),
+        )
+        return theory
+
+    @staticmethod
+    def _build_winning_position(choice_set: StrategicChoiceSet) -> str:
+        """Compose a descriptive winning position from all choices in the set."""
+        parts = []
+        for c in choice_set.choices:
+            dim_title = c.metadata.get("dimension_title", c.dimension)
+            choice_title = c.metadata.get("choice_title", c.selected_value)
+            parts.append(f"{dim_title}: {choice_title}")
+        if parts:
+            return " | ".join(parts)
+        return choice_set.rationale
+
+    @staticmethod
+    def _build_winning_mechanism(choice_set: StrategicChoiceSet) -> str:
+        """Derive a winning mechanism from the first choice's dimension description."""
+        if not choice_set.choices:
+            return ""
+        first = choice_set.choices[0]
+        dim_desc = first.metadata.get("dimension_description", "")
+        choice_title = first.metadata.get("choice_title", first.selected_value)
+        if dim_desc:
+            return f"{choice_title}: {dim_desc}"
+        return choice_title
+
+    @staticmethod
+    def _extract_choice_keywords(choice_set: StrategicChoiceSet) -> list[str]:
+        """Gather keywords from choice and dimension titles for relevance filtering."""
+        keywords: list[str] = []
+        for c in choice_set.choices:
+            for key in ("choice_title", "dimension_title", "choice_description"):
+                val = c.metadata.get(key, "")
+                if val:
+                    keywords.extend(w for w in val.lower().split() if len(w) > 3)
+            if c.selected_value:
+                keywords.append(c.selected_value.lower().replace("_", " "))
+        return list(dict.fromkeys(keywords))  # deduplicated, ordered
+
+    @staticmethod
+    def _filter_evidence(research: Any, keywords: list[str]) -> list[str]:
+        """Return evidence items relevant to the given keywords.
+
+        Filters citations from research_object by keyword presence.
+        Falls back to all citations (up to _MAX_EVIDENCE) when nothing matches.
         """
+        ro = getattr(research, "research_object", None) or {}
+        if isinstance(ro, dict):
+            citations_raw = ro.get("citations", []) or []
+        else:
+            citations_raw = []
+
+        all_citations = [
+            c if isinstance(c, str) else str(c.get("text", c.get("citation", "")))
+            for c in citations_raw[:_MAX_EVIDENCE]
+        ]
+
+        if not all_citations:
+            return []
+
+        if not keywords:
+            return all_citations[:_EVIDENCE_PER_THEORY]
+
+        matching = [
+            c for c in all_citations
+            if any(kw in c.lower() for kw in keywords)
+        ]
+        return matching[:_EVIDENCE_PER_THEORY] if matching else all_citations[:_EVIDENCE_PER_THEORY]
+
+    @staticmethod
+    def _filter_failure_modes(research: Any, keywords: list[str]) -> list[dict[str, Any]]:
+        """Return high-severity risks relevant to the given choice keywords.
+
+        Filters by keyword presence in risk description. Falls back to all
+        high-severity risks when nothing matches.
+        """
+        risks = getattr(research, "risks", None) or []
+        high_severity = [
+            r for r in risks
+            if isinstance(r, dict) and r.get("severity", "").lower() == "high"
+        ]
+
+        if not high_severity:
+            return []
+
+        if not keywords:
+            return high_severity
+
+        matching = [
+            r for r in high_severity
+            if any(kw in str(r).lower() for kw in keywords)
+        ]
+        return matching if matching else high_severity
+
+    # ------------------------------------------------------------------
+    # Legacy mode (PH10.3)
+    # ------------------------------------------------------------------
+
+    def _build_legacy(self, choice_set: StrategicChoiceSet, research: Any) -> TheoryOfWinning:
         ec = self._as_dict(getattr(research, "executive_confidence", None))
         da = self._as_dict(getattr(research, "decision_analysis", None))
         preferred = self._as_dict(getattr(research, "preferred_option", None))
@@ -59,7 +203,7 @@ class TheoryGenerator:
 
         theory = TheoryOfWinning(
             theory_id=f"TH-{choice_set.id}",
-            source_choice_set_id=choice_set.id,  # PH11.2 — explicit provenance
+            source_choice_set_id=choice_set.id,
             recommended_option_id=recommended_id,
             recommended_option_title=recommended_title,
             winning_position=choice_set.rationale,
@@ -78,7 +222,7 @@ class TheoryGenerator:
         return theory
 
     # ------------------------------------------------------------------
-    # Extraction helpers
+    # Legacy extraction helpers
     # ------------------------------------------------------------------
 
     @staticmethod
@@ -87,11 +231,6 @@ class TheoryGenerator:
         da: dict[str, Any],
         preferred: dict[str, Any],
     ) -> str:
-        """Return the recommended option ID for this theory.
-
-        Derived from the first choice's selected_value when choices exist.
-        Falls back to preferred_option.option_id, then da.recommended_option_id.
-        """
         if choice_set.choices:
             return choice_set.choices[0].selected_value or ""
         return (
@@ -102,7 +241,6 @@ class TheoryGenerator:
 
     @staticmethod
     def _extract_recommended_title(recommended_id: str, research: Any) -> str:
-        """Look up the option title for recommended_id in research.strategic_options."""
         for opt in (getattr(research, "strategic_options", None) or []):
             if isinstance(opt, dict) and opt.get("option_id") == recommended_id:
                 return opt.get("title", "")
@@ -110,7 +248,6 @@ class TheoryGenerator:
 
     @staticmethod
     def _extract_winning_mechanism(recommended_id: str, research: Any) -> str:
-        """Return the description of the recommended option."""
         for opt in (getattr(research, "strategic_options", None) or []):
             if isinstance(opt, dict) and opt.get("option_id") == recommended_id:
                 return opt.get("description", "")
@@ -118,7 +255,6 @@ class TheoryGenerator:
 
     @staticmethod
     def _extract_failure_modes(research: Any) -> list[dict[str, Any]]:
-        """Return high-severity risks from research."""
         risks = getattr(research, "risks", None) or []
         return [
             r for r in risks
@@ -127,7 +263,6 @@ class TheoryGenerator:
 
     @staticmethod
     def _extract_evidence(research: Any) -> list[str]:
-        """Return up to 10 citation strings from research_object."""
         ro = getattr(research, "research_object", None) or {}
         if isinstance(ro, dict):
             citations_raw = ro.get("citations", []) or []

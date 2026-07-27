@@ -989,8 +989,14 @@ class Orchestrator:
         # Best-effort: a failure must never block canonical trace or editorial.
         _sp = None
         try:
-            from .strategy import StrategyCoordinator
-            _sc = StrategyCoordinator()
+            from .strategy import StrategyCoordinator, StrategyConfig, ConfigurationResolver
+            _strategy_config = StrategyConfig()
+            _strategy_raw = getattr(engagement_spec, "strategy", None) if engagement_spec is not None else None
+            if _strategy_raw:
+                _strategy_config = ConfigurationResolver().resolve_from_engagement(
+                    _strategy_config, _strategy_raw
+                )
+            _sc = StrategyCoordinator(config=_strategy_config)
             _sp = _sc.build(result_ctx)
             _sp_path = _sc.persist(_sp)
             print(f"Strategic position → {_sp_path}")

@@ -53,6 +53,36 @@ if TYPE_CHECKING:
 LOGGER = logging.getLogger(__name__)
 
 
+def _theory_strategic_signature(theory: "TheoryOfWinning") -> tuple:
+    """Return a strategic deduplication key for a theory.
+
+    Two theories are strategic duplicates when they share the same recommended
+    option and choice pattern — different IDs or posture labels don't count
+    as differentiation.
+    """
+    choice_pattern = tuple(sorted(
+        (str(c.get("dimension", "")), str(c.get("selected_value", "")))
+        for c in theory.strategic_choices
+        if isinstance(c, dict)
+    ))
+    return (theory.recommended_option_id, choice_pattern)
+
+
+def _check_theory_diversity(theories: list) -> None:
+    """Raise ValueError when any two theories share the same strategic signature."""
+    seen: dict[tuple, str] = {}
+    for t in theories:
+        sig = _theory_strategic_signature(t)
+        if sig in seen:
+            raise ValueError(
+                f"[StrategyCoordinator] duplicate theory detected: "
+                f"theory_id={t.theory_id!r} is strategically identical to "
+                f"{seen[sig]!r}. "
+                f"Set diversity_required=False or add more choices to configured dimensions."
+            )
+        seen[sig] = t.theory_id
+
+
 class StrategyCoordinator:
     """Maps a completed AgentContext to a StrategicPosition.
 
@@ -94,11 +124,15 @@ class StrategyCoordinator:
 
         Does not mutate ctx. Does not call an LLM. Does not generate prose.
         """
-        # PH10.2: generate three diverse StrategicChoiceSets (one per posture)
+        # PH10.2/PH12.0: generate StrategicChoiceSets (posture or configured)
         self._choice_sets = StrategicChoiceGenerator().build(self._plan, ctx)
         # PH10.3: generate one TheoryOfWinning per StrategicChoiceSet
         theory_gen = TheoryGenerator()
         self._theories = [theory_gen.build(cs, ctx) for cs in self._choice_sets]
+        # PH12.0: validate theory diversity in configured mode only.
+        # Legacy mode theories are expected to cluster around the preferred option.
+        if self._plan.generation_policy.diversity_required and self._plan.dimension_configs:
+            _check_theory_diversity(self._theories)
         # PH10.5: evaluate each theory independently
         evaluator = TheoryEvaluator()
         self._evaluations = [

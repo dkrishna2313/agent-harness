@@ -64,6 +64,7 @@ LOGGER = logging.getLogger(__name__)
 # partial score:  the detail string is used directly (see _make_score)
 
 _CRITERION_META: dict[str, tuple[str, str, float]] = {
+    # --- PH10.5 built-in criteria ---
     "option_identified": (
         "A recommended option is identified.",
         "No recommended option is identified.",
@@ -97,6 +98,32 @@ _CRITERION_META: dict[str, tuple[str, str, float]] = {
     "risk_awareness": (
         "Failure modes are identified.",
         "No failure modes have been identified.",
+        1.0,
+    ),
+    # --- PH12.0 engagement-configured criteria ---
+    "strategic_fit": (
+        "Strategic position, mechanism, and choice coverage confirmed.",
+        "Strategic fit cannot be assessed — position and mechanism are absent.",
+        2.0,
+    ),
+    "assumption_robustness": (
+        "Key assumptions are documented and support the strategy.",
+        "No assumptions documented; strategic robustness cannot be assessed.",
+        1.5,
+    ),
+    "execution_feasibility": (
+        "Choice set is complete and execution-ready.",
+        "Insufficient choice coverage for execution feasibility.",
+        1.5,
+    ),
+    "risk_resilience": (
+        "Multiple failure modes identified; risk plan is comprehensive.",
+        "Failure modes have not been assessed.",
+        1.5,
+    ),
+    "opportunity_capture": (
+        "Multiple success conditions identified; opportunity capture is structured.",
+        "No success conditions identified; opportunity capture cannot be assessed.",
         1.0,
     ),
 }
@@ -294,12 +321,67 @@ class TheoryEvaluator:
         if name == "risk_awareness":
             n = len(theory.failure_modes)
             sc = 1.0 if n > 0 else 0.5
-            # Always supply detail — accurately describes the state at any score
             detail = (
                 f"{n} failure mode(s) identified"
                 if n > 0
                 else "no failure modes identified"
             )
+            return sc, detail
+
+        # PH12.0 criteria -------------------------------------------------
+
+        if name == "strategic_fit":
+            pos = 1.0 if theory.winning_position else 0.0
+            mech = 1.0 if theory.winning_mechanism else 0.0
+            n = len(theory.strategic_choices)
+            comp = min(float(n) / float(n_dims), 1.0) if n_dims > 0 else 1.0
+            sc = round(0.5 * pos + 0.3 * mech + 0.2 * comp, 6)
+            detail = (
+                f"position={'yes' if pos else 'no'}, "
+                f"mechanism={'yes' if mech else 'no'}, "
+                f"coverage={n}/{n_dims if n_dims else 'n/a'}"
+            )
+            return sc, detail
+
+        if name == "assumption_robustness":
+            n = len(theory.assumptions)
+            if vp.require_assumptions and n == 0:
+                sc = 0.0
+            else:
+                sc = min(float(n) / 2.0, 1.0)
+            detail = f"{n} assumption(s) documented" if n > 0 else None
+            return sc, detail
+
+        if name == "execution_feasibility":
+            n = len(theory.strategic_choices)
+            sc = min(float(n) / float(n_dims), 1.0) if n_dims > 0 else 1.0
+            detail = f"{n} of {n_dims} dimension(s) covered"
+            return sc, detail
+
+        if name == "risk_resilience":
+            n = len(theory.failure_modes)
+            if n == 0:
+                sc = 0.3
+            elif n == 1:
+                sc = 0.6
+            elif n == 2:
+                sc = 0.8
+            else:
+                sc = 1.0
+            detail = f"{n} failure mode(s) identified"
+            return sc, detail
+
+        if name == "opportunity_capture":
+            n = len(theory.success_conditions)
+            if n == 0:
+                sc = 0.3
+            elif n == 1:
+                sc = 0.6
+            elif n == 2:
+                sc = 0.8
+            else:
+                sc = 1.0
+            detail = f"{n} success condition(s) identified"
             return sc, detail
 
         # Unreachable: all _CRITERION_META keys are handled above

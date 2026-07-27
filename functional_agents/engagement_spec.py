@@ -31,6 +31,9 @@ from typing import Any
 
 from pydantic import BaseModel, Field, ValidationError
 
+# Fields that are not part of the core engagement framing brief
+_STRATEGY_FIELD = "strategy"
+
 # Fields that materially shape the research. If absent we surface the gap
 # explicitly (see ``missing_important_fields``) rather than silently inventing it.
 _IMPORTANT_FIELDS = ("title", "current_situation", "objectives")
@@ -65,6 +68,9 @@ class EngagementSpec(BaseModel):
     priorities: list[str] = Field(default_factory=list)
     risks: list[str] = Field(default_factory=list)
     known_unknowns: list[str] = Field(default_factory=list)
+
+    # PH12.0 — optional engagement-level Strategy configuration block
+    strategy: dict[str, Any] | None = None
 
     model_config = {"extra": "forbid"}
 
@@ -172,16 +178,25 @@ class EngagementSpec(BaseModel):
 # ---------------------------------------------------------------------------
 
 def _coerce_payload(raw: Any, *, source: str) -> dict[str, Any]:
-    """Unwrap an optional top-level ``engagement:`` key and validate shape."""
+    """Unwrap an optional top-level ``engagement:`` key and validate shape.
+
+    Supports three layouts:
+      1. ``engagement: {...}``                       — engagement-wrapped
+      2. ``engagement: {...}`` + ``strategy: {...}`` — top-level strategy alongside engagement
+      3. Bare top-level mapping                      — unwrapped
+    """
     if raw is None:
         raise EngagementError(f"Engagement file is empty: {source}")
     if not isinstance(raw, dict):
         raise EngagementError(
             f"Engagement file must contain a mapping, got {type(raw).__name__}: {source}"
         )
-    # Support both `engagement: {...}` wrapping and a bare top-level mapping.
     if "engagement" in raw and isinstance(raw["engagement"], dict):
-        return raw["engagement"]
+        payload = dict(raw["engagement"])
+        # Merge a top-level ``strategy:`` block alongside ``engagement:`` into the payload.
+        if "strategy" in raw and isinstance(raw["strategy"], dict) and "strategy" not in payload:
+            payload["strategy"] = raw["strategy"]
+        return payload
     return raw
 
 

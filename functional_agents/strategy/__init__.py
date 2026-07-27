@@ -42,6 +42,8 @@ from .strategic_position import (
     TheoryOfWinning,
 )
 from .strategy_config import (
+    ChoiceConfig,
+    DimensionConfig,
     StrategyConfig,
     StrategyConstraints,
     StrategyDimensions,
@@ -57,7 +59,9 @@ from .strategy_lineage import StrategyLineageLink  # PH11.2
 from .strategy_trace import StrategyTrace
 
 __all__ = [
+    "ChoiceConfig",
     "ConfigurationResolver",
+    "DimensionConfig",
     "StrategyArtifactReader",
     "EvaluationModel",
     "FrameworkDefaults",
