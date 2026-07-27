@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from .strategic_choice_set import StrategicChoiceSet
 from .strategic_position import StrategicPosition, TheoryOfWinning
+from .strategy_lineage import StrategyLineageLink  # PH11.2
 from .strategy_plan import StrategyPlan
 from .strategy_selector import StrategySelection
 from .theory_evaluation import TheoryEvaluation
@@ -47,6 +48,12 @@ class StrategyTrace(BaseModel):
       10. strategic_position.theory_of_winning.theory_id == winner_theory_id
       11. selection.runner_up_theory_id, when present, references a known theory
       12. selection.runner_up_theory_id must differ from winner_theory_id
+      Rules 13-16 apply only when lineage is non-empty:
+      13. every theory.source_choice_set_id is non-empty
+      14. every theory.source_choice_set_id resolves to a known choice_set
+      15. no duplicate lineage links (by full composite key)
+      16. lineage targets of type theory_of_winning / strategic_choice_set /
+          theory_evaluation resolve to known trace members
     """
 
     trace_id: str
@@ -57,6 +64,7 @@ class StrategyTrace(BaseModel):
     evaluations: list[TheoryEvaluation] = Field(default_factory=list)
     selection: StrategySelection
     strategic_position: StrategicPosition
+    lineage: list[StrategyLineageLink] = Field(default_factory=list)  # PH11.2
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     model_config = {"frozen": True, "extra": "allow"}
@@ -146,6 +154,57 @@ class StrategyTrace(BaseModel):
                     "StrategyTrace: runner-up theory ID must differ from winner theory ID."
                 )
 
+        # Rules 13-16: lineage integrity (applied only when lineage is provided)
+        if self.lineage:
+            cs_ids: set[str] = {cs.id for cs in choice_sets}
+
+            # Rules 13-14: source_choice_set_id must be non-empty and resolve to a choice_set
+            for t in theories:
+                scid = getattr(t, "source_choice_set_id", "")
+                if not scid or not scid.strip():
+                    raise ValueError(
+                        f"StrategyTrace: theory_id={t.theory_id!r} has no "
+                        f"source_choice_set_id (required when lineage is present)."
+                    )
+                if scid not in cs_ids:
+                    raise ValueError(
+                        f"StrategyTrace: theory_id={t.theory_id!r} "
+                        f"source_choice_set_id={scid!r} not found in choice_sets. "
+                        f"Available: {sorted(cs_ids)}"
+                    )
+
+            # Rule 15: no duplicate lineage links
+            seen_links: set[tuple] = set()
+            for link in self.lineage:
+                key = (
+                    link.source_type, link.source_id,
+                    link.target_type, link.target_id,
+                    link.relationship,
+                )
+                if key in seen_links:
+                    raise ValueError(
+                        f"StrategyTrace: duplicate lineage link {key!r}."
+                    )
+                seen_links.add(key)
+
+            # Rule 16: artifact references in lineage resolve to known trace members
+            for link in self.lineage:
+                if link.target_type == "theory_of_winning" and link.target_id not in seen_t:
+                    raise ValueError(
+                        f"StrategyTrace: lineage target theory_of_winning "
+                        f"id={link.target_id!r} not found in theories."
+                    )
+                if link.target_type == "strategic_choice_set" and link.target_id not in cs_ids:
+                    raise ValueError(
+                        f"StrategyTrace: lineage target strategic_choice_set "
+                        f"id={link.target_id!r} not found in choice_sets."
+                    )
+                if link.target_type == "theory_evaluation" and link.target_id not in seen_ev:
+                    raise ValueError(
+                        f"StrategyTrace: lineage target theory_evaluation "
+                        f"id={link.target_id!r} not found in evaluations."
+                    )
+
         return self
 
     def to_dict(self) -> dict[str, Any]:
@@ -177,3 +236,54 @@ def write_strategy_trace(trace: "StrategyTrace", out_dir: str | Path) -> Path:
     data = trace.model_dump(mode="json")           # serialise before touching disk
     out_path.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
     return out_path
+
+
+def write_artifact_index(
+    trace: "StrategyTrace",
+    strategy_trace_path: str | Path,
+    out_dir: str | Path,
+) -> Path:
+    """Write or update ``artifact.index.json`` in *out_dir* with the StrategyTrace entry.
+
+    Merges with any pre-existing index: stale ``strategy_trace`` entries are
+    removed and the fresh entry is appended. The file is always overwritten in
+    full to avoid partial-update corruption.
+
+    Returns the path written (``{out_dir}/artifact.index.json``).
+    """
+    idx_path = Path(out_dir) / "artifact.index.json"
+    idx_path.parent.mkdir(parents=True, exist_ok=True)
+
+    existing_entries: list[dict] = []
+    if idx_path.exists():
+        try:
+            raw = json.loads(idx_path.read_text(encoding="utf-8"))
+            existing_entries = [
+                e for e in raw.get("entries", [])
+                if e.get("artifact_type") != "strategy_trace"
+            ]
+        except Exception:
+            existing_entries = []
+
+    entry: dict = {
+        "artifact_type": "strategy_trace",
+        "artifact_id": trace.trace_id,
+        "trace_id": trace.trace_id,
+        "path": str(strategy_trace_path),
+        "mime_type": "application/json",
+        "framework": trace.metadata.get("framework", ""),
+        "plan_id": trace.metadata.get("plan_id", ""),
+        "selected_theory_id": trace.metadata.get("selected_theory_id", ""),
+        "research_id": trace.metadata.get("research_id", ""),
+        "created_at": trace.created_at,
+        "lineage_count": len(trace.lineage),
+        "status": "generated",
+    }
+
+    index: dict = {
+        "schema_version": "ph11.2-strategy-artifact-index-v1",
+        "updated_at": trace.created_at,
+        "entries": existing_entries + [entry],
+    }
+    idx_path.write_text(json.dumps(index, indent=2, default=str), encoding="utf-8")
+    return idx_path

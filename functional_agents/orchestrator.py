@@ -1017,11 +1017,13 @@ class Orchestrator:
         _st_raw = result_ctx.trace.get("_strategy_trace")
         if _st_raw is not None:
             try:
-                from .strategy.strategy_trace import write_strategy_trace
+                from .strategy.strategy_trace import write_artifact_index, write_strategy_trace
                 from .trace_paths import CANONICAL_PIPELINE_TRACE
                 from .deliverables.artifact import DeliverableArtifact
                 _st_path = write_strategy_trace(_st_raw, CANONICAL_PIPELINE_TRACE.parent)
                 print(f"Strategy trace  → {_st_path}")
+                _idx_path = write_artifact_index(_st_raw, _st_path, CANONICAL_PIPELINE_TRACE.parent)
+                print(f"Artifact index  → {_idx_path}")
                 result_ctx.deliverables.append(DeliverableArtifact(
                     type="strategy_trace",
                     path=str(_st_path),

@@ -59,6 +59,7 @@ class TheoryGenerator:
 
         theory = TheoryOfWinning(
             theory_id=f"TH-{choice_set.id}",
+            source_choice_set_id=choice_set.id,  # PH11.2 — explicit provenance
             recommended_option_id=recommended_id,
             recommended_option_title=recommended_title,
             winning_position=choice_set.rationale,

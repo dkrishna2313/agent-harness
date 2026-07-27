@@ -42,6 +42,7 @@ from .strategic_choice_generator import StrategicChoiceGenerator
 from .strategy_config import StrategyConfig
 from .strategy_planner import StrategyPlanner
 from .strategy_selector import StrategySelection, StrategySelector
+from .strategy_lineage import build_strategy_lineage  # PH11.2
 from .strategy_trace import StrategyTrace
 from .theory_evaluator import TheoryEvaluator
 from .theory_generator import TheoryGenerator
@@ -164,9 +165,22 @@ class StrategyCoordinator:
             execution=execution,
         )
 
-        # PH11.0 — build the StrategyTrace artifact capturing the full chain
+        # PH11.0/PH11.2 — build StrategyTrace with full lineage chain
+        _trace_id = f"STRAT-{self._plan.plan_id}"
+        _ro = ctx.research_object or {}
+        _research_id = _ro.get("id") or _ro.get("research_id") or ctx.run_id or "unknown"
+        _lineage = build_strategy_lineage(
+            research_id=_research_id,
+            plan=self._plan,
+            choice_sets=list(self._choice_sets),
+            theories=list(self._theories),
+            evaluations=list(self._evaluations),
+            selection=self._selection,
+            strategic_position=position,
+            trace_id=_trace_id,
+        )
         self._trace = StrategyTrace(
-            trace_id=f"STRAT-{self._plan.plan_id}",
+            trace_id=_trace_id,
             created_at=created_at,
             plan=self._plan,
             choice_sets=list(self._choice_sets),
@@ -174,6 +188,7 @@ class StrategyCoordinator:
             evaluations=list(self._evaluations),
             selection=self._selection,
             strategic_position=position,
+            lineage=_lineage,
             metadata={
                 "framework": self._plan.framework,
                 "plan_id": self._plan.plan_id,
@@ -183,6 +198,7 @@ class StrategyCoordinator:
                 "selected_theory_id": self._selection.winner_theory_id,
                 "score_margin": self._selection.score_margin,
                 "tie_breaker_used": self._selection.tie_breaker_used,
+                "research_id": _research_id,
             },
         )
 

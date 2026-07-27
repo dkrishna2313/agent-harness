@@ -24,6 +24,7 @@ class TheoryOfWinning(BaseModel):
     """How the organisation wins given what is strategically true."""
 
     theory_id: str
+    source_choice_set_id: str = ""  # PH11.2 — explicit provenance to StrategicChoiceSet
     recommended_option_id: str = ""
     recommended_option_title: str = ""
     winning_position: str = ""
