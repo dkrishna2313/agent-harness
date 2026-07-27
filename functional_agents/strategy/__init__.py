@@ -51,12 +51,14 @@ from .strategy_config import (
     StrategyObjectives,
     StrategyValidation,
 )
+from .strategy_artifact_reader import StrategyArtifactReader  # PH11.3
 from .strategy_coordinator import StrategyCoordinator
 from .strategy_lineage import StrategyLineageLink  # PH11.2
 from .strategy_trace import StrategyTrace
 
 __all__ = [
     "ConfigurationResolver",
+    "StrategyArtifactReader",
     "EvaluationModel",
     "FrameworkDefaults",
     "StrategicChoice",

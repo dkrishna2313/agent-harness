@@ -2524,5 +2524,291 @@ def export_docx_cmd(
     typer.echo(f"DOCX written to: {docx_path}")
 
 
+# ---------------------------------------------------------------------------
+# strategy sub-app (PH11.3) — read-only inspection of Strategy artifacts
+# ---------------------------------------------------------------------------
+
+strategy_app = typer.Typer(
+    no_args_is_help=True,
+    help="Inspect persisted Strategy Layer artifacts (PH11.3).",
+)
+app.add_typer(strategy_app, name="strategy")
+
+
+def _strategy_format_error(fmt: str) -> None:
+    """Exit with code 1 if *fmt* is not a supported output format."""
+    if fmt not in ("text", "json"):
+        typer.echo(f"Error: --format must be 'text' or 'json', got {fmt!r}.", err=True)
+        raise typer.Exit(code=1)
+
+
+def _fmt_optional(value: object, suffix: str = "") -> str:
+    if value is None:
+        return "(none)"
+    if suffix and isinstance(value, float):
+        return f"{value:.3f}{suffix}"
+    return str(value)
+
+
+@strategy_app.command("inspect")
+def strategy_inspect_cmd(
+    trace: Annotated[
+        Path,
+        typer.Option("--trace", help="Path to strategy.trace.json."),
+    ],
+    format: Annotated[
+        str,
+        typer.Option("--format", help="Output format: text or json. Default: text."),
+    ] = "text",
+) -> None:
+    """Print a compact Strategy summary from a strategy.trace.json file.
+
+    Example:
+
+    \b
+        python3 -m functional_agents.cli strategy inspect \\
+            --trace outputs/strategy.trace.json
+    """
+    _strategy_format_error(format)
+
+    from .strategy.strategy_artifact_reader import StrategyArtifactReader
+
+    reader = StrategyArtifactReader()
+    try:
+        st = reader.load_trace(trace)
+    except FileNotFoundError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1)
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1)
+
+    summary = reader.summarize(st)
+
+    if format == "json":
+        typer.echo(json.dumps(summary, indent=2, default=str))
+        return
+
+    typer.echo(f"Trace:              {summary['trace_id']}")
+    typer.echo(f"Created:            {summary['created_at']}")
+    typer.echo(f"Framework:          {summary['framework']}")
+    typer.echo(f"Research ID:        {summary['research_id']}")
+    typer.echo(f"Plan ID:            {summary['plan_id']}")
+    typer.echo(f"Choice Sets:        {summary['choice_set_count']}")
+    typer.echo(f"Theories:           {summary['theory_count']}")
+    typer.echo(f"Evaluations:        {summary['evaluation_count']}")
+    typer.echo(f"Winner Theory:      {summary['winner_theory_id']}")
+    typer.echo(f"Winner Option:      {summary['winner_option_id'] or '(none)'}")
+    typer.echo(f"Runner-up Theory:   {_fmt_optional(summary['runner_up_theory_id'])}")
+    typer.echo(f"Winner Score:       {summary['winner_score']:.3f}")
+    typer.echo(f"Runner-up Score:    {_fmt_optional(summary['runner_up_score'], '')}")
+    typer.echo(f"Score Margin:       {_fmt_optional(summary['score_margin'], '')}")
+    typer.echo(f"Tie-breaker:        {_fmt_optional(summary['tie_breaker_used'])}")
+    typer.echo(f"Strategic Position: {summary['strategic_position_id']}")
+
+
+@strategy_app.command("theory")
+def strategy_theory_cmd(
+    trace: Annotated[
+        Path,
+        typer.Option("--trace", help="Path to strategy.trace.json."),
+    ],
+    theory_id: Annotated[
+        str,
+        typer.Option("--theory-id", help="Theory ID to inspect (e.g. TH-SCS-0)."),
+    ],
+    format: Annotated[
+        str,
+        typer.Option("--format", help="Output format: text or json. Default: text."),
+    ] = "text",
+) -> None:
+    """Print details of a specific theory from a strategy.trace.json file.
+
+    Example:
+
+    \b
+        python3 -m functional_agents.cli strategy theory \\
+            --trace outputs/strategy.trace.json \\
+            --theory-id TH-SCS-0
+    """
+    _strategy_format_error(format)
+
+    from .strategy.strategy_artifact_reader import StrategyArtifactReader
+
+    reader = StrategyArtifactReader()
+    try:
+        st = reader.load_trace(trace)
+    except FileNotFoundError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1)
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1)
+
+    try:
+        theory = reader.find_theory(st, theory_id)
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1)
+
+    if format == "json":
+        typer.echo(json.dumps(theory.model_dump(mode="json"), indent=2, default=str))
+        return
+
+    typer.echo(f"Theory ID:          {theory.theory_id}")
+    typer.echo(f"Source Choice Set:  {theory.source_choice_set_id}")
+    typer.echo(f"Option ID:          {theory.recommended_option_id or '(none)'}")
+    typer.echo(f"Option Title:       {theory.recommended_option_title or '(none)'}")
+    typer.echo(f"Winning Position:   {theory.winning_position or '(none)'}")
+    typer.echo(f"Winning Mechanism:  {theory.winning_mechanism or '(none)'}")
+    typer.echo(f"Confidence:         {theory.confidence or '(none)'}")
+    typer.echo(f"Success Conditions: {len(theory.success_conditions)}")
+    for i, sc in enumerate(theory.success_conditions, 1):
+        typer.echo(f"  [{i}] {sc}")
+    typer.echo(f"Failure Modes:      {len(theory.failure_modes)}")
+    for i, fm in enumerate(theory.failure_modes, 1):
+        desc = fm.get("description", str(fm)) if isinstance(fm, dict) else str(fm)
+        typer.echo(f"  [{i}] {desc}")
+    typer.echo(f"Assumptions:        {len(theory.assumptions)}")
+    for i, a in enumerate(theory.assumptions, 1):
+        desc = a.get("description", a.get("assumption", str(a))) if isinstance(a, dict) else str(a)
+        typer.echo(f"  [{i}] {desc}")
+    typer.echo(f"Evidence Count:     {len(theory.evidence)}")
+
+
+@strategy_app.command("evaluation")
+def strategy_evaluation_cmd(
+    trace: Annotated[
+        Path,
+        typer.Option("--trace", help="Path to strategy.trace.json."),
+    ],
+    theory_id: Annotated[
+        str,
+        typer.Option("--theory-id", help="Theory ID whose evaluation to inspect."),
+    ],
+    format: Annotated[
+        str,
+        typer.Option("--format", help="Output format: text or json. Default: text."),
+    ] = "text",
+) -> None:
+    """Print the evaluation for a specific theory from a strategy.trace.json file.
+
+    Example:
+
+    \b
+        python3 -m functional_agents.cli strategy evaluation \\
+            --trace outputs/strategy.trace.json \\
+            --theory-id TH-SCS-0
+    """
+    _strategy_format_error(format)
+
+    from .strategy.strategy_artifact_reader import StrategyArtifactReader
+
+    reader = StrategyArtifactReader()
+    try:
+        st = reader.load_trace(trace)
+    except FileNotFoundError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1)
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1)
+
+    try:
+        evaluation = reader.find_evaluation(st, theory_id)
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1)
+
+    if format == "json":
+        typer.echo(json.dumps(evaluation.model_dump(mode="json"), indent=2, default=str))
+        return
+
+    typer.echo(f"Theory ID:      {evaluation.theory_id}")
+    typer.echo(f"Overall Score:  {evaluation.overall_score:.3f}")
+    typer.echo(f"Confidence:     {evaluation.confidence or '(none)'}")
+    criteria = evaluation.criteria_scores
+    typer.echo(f"Criteria:       {len(criteria)}")
+    for name, cs in criteria.items():
+        typer.echo(f"  {name}")
+        typer.echo(f"    Score:   {cs.score:.3f}")
+        typer.echo(f"    Weight:  {cs.weight:.3f}")
+        typer.echo(f"    Reason:  {cs.rationale or '(none)'}")
+    typer.echo(f"Strengths:      {len(evaluation.strengths)}")
+    for i, s in enumerate(evaluation.strengths, 1):
+        typer.echo(f"  [{i}] {s}")
+    typer.echo(f"Weaknesses:     {len(evaluation.weaknesses)}")
+    for i, w in enumerate(evaluation.weaknesses, 1):
+        typer.echo(f"  [{i}] {w}")
+    typer.echo(f"Residual Risks: {len(evaluation.residual_risks)}")
+    for i, r in enumerate(evaluation.residual_risks, 1):
+        desc = r.get("description", str(r)) if isinstance(r, dict) else str(r)
+        typer.echo(f"  [{i}] {desc}")
+
+
+@strategy_app.command("artifacts")
+def strategy_artifacts_cmd(
+    index: Annotated[
+        Path,
+        typer.Option("--index", help="Path to artifact.index.json."),
+    ],
+    format: Annotated[
+        str,
+        typer.Option("--format", help="Output format: text or json. Default: text."),
+    ] = "text",
+) -> None:
+    """Print registered Strategy artifacts from an artifact.index.json file.
+
+    Example:
+
+    \b
+        python3 -m functional_agents.cli strategy artifacts \\
+            --index outputs/artifact.index.json
+    """
+    _strategy_format_error(format)
+
+    from .strategy.strategy_artifact_reader import StrategyArtifactReader
+
+    reader = StrategyArtifactReader()
+    try:
+        idx = reader.load_index(index)
+    except FileNotFoundError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1)
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1)
+
+    entries = idx.get("entries")
+    if entries is None or not isinstance(entries, list):
+        typer.echo(
+            f"Error: malformed artifact index {index}: "
+            "'entries' key is missing or not a list.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    if format == "json":
+        typer.echo(json.dumps(idx, indent=2, default=str))
+        return
+
+    schema_version = idx.get("schema_version", "(unknown)")
+    updated_at = idx.get("updated_at", "(unknown)")
+    typer.echo(f"Schema:    {schema_version}")
+    typer.echo(f"Updated:   {updated_at}")
+    typer.echo(f"Entries:   {len(entries)}")
+    typer.echo("")
+    for i, entry in enumerate(entries, 1):
+        typer.echo(f"[{i}] Artifact")
+        typer.echo(f"    Type:              {entry.get('artifact_type', '(none)')}")
+        typer.echo(f"    Artifact ID:       {entry.get('artifact_id', '(none)')}")
+        typer.echo(f"    Trace ID:          {entry.get('trace_id', '(none)')}")
+        typer.echo(f"    Path:              {entry.get('path', '(none)')}")
+        typer.echo(f"    Status:            {entry.get('status', '(none)')}")
+        typer.echo(f"    Research ID:       {entry.get('research_id', '(none)')}")
+        typer.echo(f"    Plan ID:           {entry.get('plan_id', '(none)')}")
+        typer.echo(f"    Selected Theory:   {entry.get('selected_theory_id', '(none)')}")
+
+
 if __name__ == "__main__":
     app()
