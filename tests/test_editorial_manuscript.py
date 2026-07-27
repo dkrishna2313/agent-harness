@@ -322,6 +322,7 @@ def test_to_dict_has_all_top_level_keys(manuscript_dict):
         "strategic_opportunities",
         "executive_confidence",
         "appendix",
+        "strategic_direction",  # PH11.4: optional strategy section scaffold
     }
     assert expected_keys == set(manuscript_dict.keys())
 

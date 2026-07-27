@@ -51,6 +51,7 @@ class MarkdownRenderer:
         lines += self._s2_strategic_context(manuscript, brief)
         lines += self._s3_strategic_recommendation(manuscript, brief)
         lines += self._s4_recommendation_rationale(manuscript)
+        lines += self._s_strategic_direction(manuscript, brief)
         lines += self._s5_decision_readiness(manuscript, brief)
         lines += self._s6_critical_assumptions(brief)
         lines += self._s7_key_risks(manuscript, brief)
@@ -213,6 +214,91 @@ class MarkdownRenderer:
         if len(bgs) > 1 and bgs[1]:
             lines += ["**Key Uncertainties:**"]
             for b in bgs[1]:
+                lines.append(f"- {b}")
+            lines.append("")
+
+        return lines
+
+    def _s_strategic_direction(
+        self,
+        ms: "EditorialManuscript",
+        brief: "EditorialBrief | None",
+    ) -> list[str]:
+        """Render the optional Strategic Direction section (PH11.4).
+
+        Returns an empty list when the section is absent or unpopulated,
+        preserving the existing report path unchanged.
+        """
+        sec = getattr(ms, "strategic_direction", None)
+        if not sec:
+            return []
+        has_content = bool(
+            getattr(sec, "paragraphs", None) or getattr(sec, "tables", None)
+        )
+        if not has_content:
+            return []
+
+        # Resolve strategy_narrative from brief for structured data
+        sn = getattr(brief, "strategy_narrative", None) if brief else None
+
+        lines: list[str] = ["---", "", "## Strategic Direction", ""]
+
+        # Header table: winner identity and scores
+        if sn is not None:
+            lines += ["| Field | Value |", "|---|---|"]
+            if sn.winner_option_title:
+                lines.append(f"| Recommended Strategy | {sn.winner_option_title} |")
+            lines.append(f"| Winner Score | {sn.winner_score:.2f} |")
+            if sn.overall_confidence:
+                lines.append(f"| Confidence | {sn.overall_confidence} |")
+            if sn.framework:
+                lines.append(f"| Framework | {sn.framework} |")
+            if sn.score_margin is not None:
+                lines.append(f"| Score Margin | {sn.score_margin:.3f} |")
+            if sn.tie_breaker_used:
+                lines.append(f"| Tie-breaker Used | {sn.tie_breaker_used} |")
+            lines.append("")
+
+        # Recommended Strategy subsection
+        lines += ["### Recommended Strategy", ""]
+        for para in (sec.paragraphs or []):
+            lines.append(para)
+            lines.append("")
+
+        # Why This Strategy Won: evaluation criteria
+        bgs = sec.bullet_groups or []
+        if len(bgs) > 0 and bgs[0]:
+            lines += ["### Why This Strategy Won", "", "**Evaluation Criteria Scores:**"]
+            for b in bgs[0]:
+                lines.append(f"- {b}")
+            lines.append("")
+
+        # Alternatives Considered
+        if sec.tables:
+            lines += ["### Alternatives Considered", ""]
+            for table in sec.tables:
+                lines += self._render_table(table)
+
+        # Assumptions and Conditions for Success
+        has_assumptions = len(bgs) > 1 and bgs[1]
+        has_conditions = len(bgs) > 2 and bgs[2]
+        if has_assumptions or has_conditions:
+            lines += ["### Assumptions and Conditions for Success", ""]
+            if has_assumptions:
+                lines += ["**Key Assumptions:**"]
+                for b in bgs[1]:
+                    lines.append(f"- {b}")
+                lines.append("")
+            if has_conditions:
+                lines += ["**Success Conditions:**"]
+                for b in bgs[2]:
+                    lines.append(f"- {b}")
+                lines.append("")
+
+        # Risks and Failure Modes
+        if len(bgs) > 3 and bgs[3]:
+            lines += ["### Risks and Failure Modes", ""]
+            for b in bgs[3]:
                 lines.append(f"- {b}")
             lines.append("")
 

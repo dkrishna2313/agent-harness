@@ -25,12 +25,16 @@ class EditorialWriter(ABC):
     Each subclass must define:
       section_name: ClassVar[str]   — the EditorialManuscript attribute this writer owns.
           Used by EditorialCoordinator for registry validation and completeness checks.
+      optional: ClassVar[bool]      — when True, the coordinator completeness check skips
+          this writer's section if it was not populated (e.g. optional content absent).
+          Defaults to False; subclasses override to True when the section is conditional.
 
     Subclasses implement write() to populate one manuscript section
     from the corresponding brief section. Provenance is always retained.
     """
 
     section_name: ClassVar[str]
+    optional: ClassVar[bool] = False
 
     @abstractmethod
     def write(

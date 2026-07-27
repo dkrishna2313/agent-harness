@@ -54,6 +54,7 @@ from .editorial_manuscript import (
     OpportunityManuscriptSection,
     ConfidenceManuscriptSection,
     AppendixManuscriptSection,
+    StrategyManuscriptSection,
 )
 from .editorial_coordinator import EditorialCoordinator, EditorialValidationError
 from .editorial_writer import EditorialWriter
@@ -64,6 +65,8 @@ from .risk_writer import RiskWriter
 from .opportunity_writer import OpportunityWriter
 from .confidence_writer import ConfidenceWriter
 from .appendix_writer import AppendixWriter
+from .strategy_writer import StrategyWriter
+from .strategy_narrative import StrategyAlternativeSummary, StrategyNarrative, build_strategy_narrative
 from .markdown_renderer import MarkdownRenderer
 
 __all__ = [
@@ -98,12 +101,13 @@ __all__ = [
     "OpportunityManuscriptSection",
     "ConfidenceManuscriptSection",
     "AppendixManuscriptSection",
+    "StrategyManuscriptSection",
     # Coordinator + validation
     "EditorialCoordinator",
     "EditorialValidationError",
     # Abstract base
     "EditorialWriter",
-    # Writers (PH6.4–PH6.10)
+    # Writers (PH6.4–PH6.10, PH11.4)
     "ExecutiveSummaryWriter",
     "DecisionAnalysisWriter",
     "RecommendationWriter",
@@ -111,6 +115,11 @@ __all__ = [
     "OpportunityWriter",
     "ConfidenceWriter",
     "AppendixWriter",
+    "StrategyWriter",
+    # Strategy narrative model (PH11.4)
+    "StrategyAlternativeSummary",
+    "StrategyNarrative",
+    "build_strategy_narrative",
     # Renderer (PH7)
     "MarkdownRenderer",
 ]

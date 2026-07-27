@@ -216,6 +216,7 @@ def test_all_top_level_sections_present(brief):
         "recommendations", "strategic_assumptions", "strategic_risks",
         "strategic_opportunities", "executive_confidence", "validation_priorities",
         "appendix",
+        "strategy_narrative",  # PH11.4: optional strategy section
     }
     assert set(d.keys()) == expected
 

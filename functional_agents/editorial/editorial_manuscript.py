@@ -103,6 +103,15 @@ class AppendixManuscriptSection(ManuscriptSection):
     """Manuscript section for evidence provenance and citations."""
 
 
+@dataclass
+class StrategyManuscriptSection(ManuscriptSection):
+    """Manuscript section for the Strategy Layer reasoning narrative (PH11.4).
+
+    Optional section — populated by StrategyWriter only when a StrategyTrace
+    is available. Rendered by MarkdownRenderer as ## Strategic Direction.
+    """
+
+
 # ---------------------------------------------------------------------------
 # Manuscript metadata
 # ---------------------------------------------------------------------------
@@ -144,6 +153,7 @@ class EditorialManuscript:
     strategic_opportunities: OpportunityManuscriptSection
     executive_confidence: ConfidenceManuscriptSection
     appendix: AppendixManuscriptSection
+    strategic_direction: "StrategyManuscriptSection | None" = field(default=None)
 
     def to_dict(self) -> dict[str, Any]:
         return dataclasses.asdict(self)

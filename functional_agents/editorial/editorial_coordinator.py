@@ -59,11 +59,13 @@ from .editorial_manuscript import (
     OpportunityManuscriptSection,
     RecommendationManuscriptSection,
     RiskManuscriptSection,
+    StrategyManuscriptSection,
 )
+from .strategy_narrative import build_strategy_narrative
 
 if TYPE_CHECKING:
     from ..context import AgentContext
-    from ..strategy import StrategicPosition
+    from ..strategy import StrategicPosition, StrategyTrace
 
 LOGGER = logging.getLogger(__name__)
 
@@ -96,12 +98,22 @@ def _section_populated(section: Any) -> bool:
 class EditorialCoordinator:
     """Maps a StrategicPosition to an EditorialBrief and persists it (PH8)."""
 
-    def build(self, position: "StrategicPosition | AgentContext") -> EditorialBrief:
+    def build(
+        self,
+        position: "StrategicPosition | AgentContext",
+        *,
+        strategy_trace: "StrategyTrace | None" = None,
+    ) -> EditorialBrief:
         """Produce an EditorialBrief from a StrategicPosition.
 
         PH8 canonical path: accepts StrategicPosition.
         Backward-compatible path: accepts AgentContext, converts via
         StrategyCoordinator first so all code follows the same path.
+
+        When strategy_trace is provided, the brief's strategy_narrative field
+        is populated from the trace for downstream strategy section rendering.
+        When strategy_trace is None, strategy_narrative is None and the
+        existing report path is preserved unchanged.
 
         Does not mutate the input. Does not call an LLM. Does not generate prose.
         """
@@ -109,6 +121,12 @@ class EditorialCoordinator:
         if not isinstance(position, _SP):
             # Backward compat — AgentContext passed directly (tests, legacy callers)
             position = StrategyCoordinator().build(position)  # type: ignore[arg-type]
+
+        narrative = (
+            build_strategy_narrative(strategy_trace)
+            if strategy_trace is not None
+            else None
+        )
 
         return EditorialBrief(
             metadata=self._build_metadata(position),
@@ -122,6 +140,7 @@ class EditorialCoordinator:
             executive_confidence=self._build_confidence(position),
             validation_priorities=self._build_validation_priorities(position),
             appendix=self._build_appendix(position),
+            strategy_narrative=narrative,
         )
 
     def persist(
@@ -481,6 +500,17 @@ class EditorialCoordinator:
                 source_section_ids=["appendix"],
                 provenance=self._manuscript_provenance(brief, "appendix"),
             ),
+            strategic_direction=StrategyManuscriptSection(
+                title="Strategic Direction",
+                subtitle="",
+                source_section_ids=["strategy_narrative"],
+                provenance=ManuscriptProvenance(
+                    brief_id=meta.brief_id,
+                    brief_section_key="strategy_narrative",
+                    decision_model_id=meta.decision_model_id,
+                    research_object_id=brief.appendix.research_object_id,
+                ),
+            ),
         )
 
     def run_writers(
@@ -506,6 +536,7 @@ class EditorialCoordinator:
         from .opportunity_writer import OpportunityWriter
         from .confidence_writer import ConfidenceWriter
         from .appendix_writer import AppendixWriter
+        from .strategy_writer import StrategyWriter
 
         _registry = [
             ExecutiveSummaryWriter(client=client),
@@ -515,10 +546,12 @@ class EditorialCoordinator:
             OpportunityWriter(client=client),
             ConfidenceWriter(client=client),
             AppendixWriter(client=client),
+            StrategyWriter(client=client),
         ]
 
         # Pre-flight: verify no duplicate section_names and all writers declare one.
         seen: dict[str, str] = {}  # section_name → writer class name
+        optional_sections: set[str] = set()  # sections declared optional by their writer
         for writer in _registry:
             sn = getattr(writer, "section_name", None)
             if not sn:
@@ -534,15 +567,18 @@ class EditorialCoordinator:
                     f"{type(writer).__name__}.section_name='{sn}' has no matching manuscript attribute"
                 )
             seen[sn] = type(writer).__name__
+            if getattr(writer, "optional", False):
+                optional_sections.add(sn)
 
         # Execute writers in order.
         for writer in _registry:
             writer.write(brief, manuscript)
 
-        # Post-flight: verify every registered section is populated.
+        # Post-flight: verify every non-optional registered section is populated.
         unpopulated = [
             sn for sn in seen
             if not _section_populated(getattr(manuscript, sn))
+            and sn not in optional_sections
         ]
         if unpopulated:
             raise EditorialValidationError(

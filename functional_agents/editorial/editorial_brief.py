@@ -11,7 +11,10 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .strategy_narrative import StrategyNarrative
 
 
 # ---------------------------------------------------------------------------
@@ -312,6 +315,11 @@ class EditorialBrief:
     executive_confidence: ConfidenceSection
     validation_priorities: ValidationPrioritiesSection
     appendix: AppendixSection
+    strategy_narrative: "StrategyNarrative | None" = field(default=None)
 
     def to_dict(self) -> dict[str, Any]:
-        return dataclasses.asdict(self)
+        d = dataclasses.asdict(self)
+        # strategy_narrative is a Pydantic model — serialize it explicitly
+        sn = self.strategy_narrative
+        d["strategy_narrative"] = sn.model_dump(mode="json") if sn is not None else None
+        return d
