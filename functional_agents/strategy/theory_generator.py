@@ -65,13 +65,8 @@ class TheoryGenerator:
         success_conditions = list(ec.get("confidence_drivers", []))
         assumptions = list(getattr(research, "assumptions", None) or [])
 
-        # Extract theory index from choice set ID (format: "SCS-{index}-{timestamp}")
-        # so evidence distribution varies per theory, enabling score differentiation.
-        _parts = choice_set.id.split("-")
-        _theory_index = int(_parts[1]) if len(_parts) > 1 and _parts[1].isdigit() else 0
-
         choice_keywords = self._extract_choice_keywords(choice_set)
-        evidence = self._filter_evidence(research, choice_keywords, _theory_index=_theory_index)
+        evidence = self._filter_evidence(research, choice_keywords)
         failure_modes = self._filter_failure_modes(research, choice_keywords)
 
         strategic_choices = [c.to_dict() for c in choice_set.choices]
@@ -137,31 +132,27 @@ class TheoryGenerator:
     def _filter_evidence(
         research: Any,
         keywords: list[str],
-        *,
-        _theory_index: int = 0,
     ) -> list[str]:
-        """Return evidence items relevant to the given keywords.
+        """Return evidence items relevant to the theory's strategic choices.
 
-        Filters citations from research_object by keyword presence.
-        Falls back to evidence_ids when citations is empty (PH12.0 fix).
-        Uses _theory_index to distribute different evidence volumes across
-        theories, enabling evidence_quality score differentiation.
+        Algorithm:
+        1. Collect citation strings from research_object.citations.
+        2. When citations is empty, fall back to evidence_ids (strings).
+        3. If keywords are present, filter to items containing any keyword.
+        4. When keyword filtering yields results, return those (up to
+           _EVIDENCE_PER_THEORY). When it yields nothing, return the first
+           _EVIDENCE_PER_THEORY items from the full pool (symmetric fallback).
+
+        The symmetric fallback assigns the same evidence set to all theories
+        that cannot be distinguished by keyword relevance — candidate position
+        never influences which evidence or how much evidence a theory receives.
         """
         ro = getattr(research, "research_object", None) or {}
         if isinstance(ro, dict):
-            citations_raw = ro.get("citations", []) or []
+            citations_raw: list = ro.get("citations", []) or []
             if not citations_raw:
-                # PH12.0: fallback to evidence_ids when citations list is empty.
-                # Distribute a decreasing slice per theory index so that theories
-                # receive different evidence counts and produce differentiated scores.
-                evidence_ids = ro.get("evidence_ids", []) or []
-                if evidence_ids:
-                    # Descend by 1 per theory so each crosses a scoring threshold:
-                    # idx=0 → 3 items (1.0), idx=1 → 2 items (0.67), idx=2 → 1 item (0.33).
-                    max_items = max(1, 3 - _theory_index)
-                    start = (_theory_index * max_items) % len(evidence_ids)
-                    window = evidence_ids[start : start + max_items]
-                    citations_raw = window if window else evidence_ids[:max_items]
+                # Symmetric fallback: use evidence_ids as opaque string tokens.
+                citations_raw = list(ro.get("evidence_ids", []) or [])
         else:
             citations_raw = []
 
@@ -180,6 +171,8 @@ class TheoryGenerator:
             c for c in all_citations
             if any(kw in c.lower() for kw in keywords)
         ]
+        # Symmetric fallback: when no keyword match, every theory gets the same
+        # leading slice rather than a position-dependent window.
         return matching[:_EVIDENCE_PER_THEORY] if matching else all_citations[:_EVIDENCE_PER_THEORY]
 
     @staticmethod

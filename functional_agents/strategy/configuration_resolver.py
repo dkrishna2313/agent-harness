@@ -33,6 +33,7 @@ import logging
 from typing import Any
 
 from .framework_defaults import FrameworkDefaults
+from .theory_evaluator import SUPPORTED_CRITERIA
 from .strategy_config import (
     ChoiceConfig,
     DimensionConfig,
@@ -278,6 +279,14 @@ class ConfigurationResolver:
                 weights[str(crit_name)] = float(crit_cfg.get("weight", 1.0))
             elif isinstance(crit_cfg, (int, float)):
                 weights[str(crit_name)] = float(crit_cfg)
+
+        unsupported = sorted(set(weights) - SUPPORTED_CRITERIA)
+        if unsupported:
+            raise ValueError(
+                f"Engagement evaluation configuration contains unsupported "
+                f"criterion name(s): {unsupported}. "
+                f"Supported criteria: {sorted(SUPPORTED_CRITERIA)}."
+            )
 
         return StrategyEvaluation(
             method=str(eval_raw.get("method", "multi_criteria")),

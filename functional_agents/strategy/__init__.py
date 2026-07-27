@@ -24,7 +24,7 @@ from .strategic_choice_generator import StrategicChoiceGenerator
 from .strategic_choice_set import StrategicChoiceSet
 from .strategy_selector import StrategySelection, StrategySelector
 from .theory_evaluation import CriterionScore, TheoryEvaluation
-from .theory_evaluator import TheoryEvaluator
+from .theory_evaluator import TheoryEvaluator, SUPPORTED_CRITERIA
 from .theory_generator import TheoryGenerator
 from .strategy_plan import (
     EvaluationModel,
@@ -92,6 +92,7 @@ __all__ = [
     "StrategySelector",
     "TheoryEvaluation",
     "TheoryEvaluator",
+    "SUPPORTED_CRITERIA",
     "TheoryGenerator",
     "TheoryOfWinning",
     "StrategyTrace",

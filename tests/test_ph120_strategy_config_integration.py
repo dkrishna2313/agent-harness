@@ -740,12 +740,11 @@ class TestTheoryEvaluatorNewCriteria:
         assert ev1.criteria_scores["opportunity_capture"].score == pytest.approx(0.6)
         assert ev3.criteria_scores["opportunity_capture"].score == pytest.approx(1.0)
 
-    def test_unsupported_criterion_gets_fallback_score(self):
+    def test_unsupported_criterion_raises_not_fallback(self):
         plan = self._make_plan_with_weights({"nonexistent_criterion": 1.0})
         theory = self._make_theory()
-        ev = TheoryEvaluator().build(theory, plan, None)
-        cs = ev.criteria_scores["nonexistent_criterion"]
-        assert cs.score == pytest.approx(0.5)
+        with pytest.raises(ValueError, match="nonexistent_criterion"):
+            TheoryEvaluator().build(theory, plan, None)
 
     def test_configured_weights_used_in_overall_score(self):
         # Use 1 evidence item → evidence_quality = 0.33 (partial); strategic_fit = 1.0
@@ -1041,3 +1040,355 @@ class TestFullPipelineIntegration:
         position = coord.build(research)
         assert position is not None
         assert coord._trace is not None
+
+
+# ---------------------------------------------------------------------------
+# PH12.0a — Evidence Relevance and Criterion Validation
+# ---------------------------------------------------------------------------
+
+class _MockResearchWithEvidence:
+    """Minimal research mock with controlled evidence_ids for relevance tests."""
+
+    def __init__(self, evidence_ids=None, citations=None, risks=None):
+        self.run_id = "TEST-RUN"
+        self.question = "Test question"
+        self.profiles = []
+        self.execution_profile = ""
+        self.decision_model = {}
+        self.engagement = {}
+        self.preferred_option = {}
+        self.research_object = {
+            "id": "RO-EVTEST",
+            "evidence_ids": evidence_ids or [],
+            "citations": citations or [],
+        }
+        self.executive_confidence = {}
+        self.decision_analysis = {}
+        self.strategic_options = []
+        self.assumptions = []
+        self.risks = risks or []
+        self.recommendations = []
+        self.opportunities = []
+
+
+def _make_configured_choice_sets():
+    """Return 3 configured StrategicChoiceSet objects with distinct dimensions."""
+    from functional_agents.strategy.strategic_choice import StrategicChoice
+    from functional_agents.strategy.strategic_choice_set import StrategicChoiceSet
+
+    postures = [
+        ("concentrated", "grid_first", "accelerate"),
+        ("diversified", "btm_first", "milestone_gated"),
+        ("staged", "hybrid", "wait_and_monitor"),
+    ]
+    dims = ["geographic_portfolio", "power_pathway", "market_timing"]
+    dim_titles = {
+        "geographic_portfolio": "Geographic Portfolio",
+        "power_pathway": "Power Pathway",
+        "market_timing": "Market Timing",
+    }
+    choice_titles = {
+        "concentrated": "Concentrated", "diversified": "Diversified", "staged": "Staged Portfolio",
+        "grid_first": "Grid First", "btm_first": "Behind-the-Meter First", "hybrid": "Hybrid",
+        "accelerate": "Accelerate", "milestone_gated": "Milestone Gated",
+        "wait_and_monitor": "Wait and Monitor",
+    }
+    sets = []
+    for i, posture_choices in enumerate(postures):
+        choices = [
+            StrategicChoice(
+                dimension=dim,
+                selected_value=choice_val,
+                confidence="High",
+                metadata={
+                    "choice_title": choice_titles[choice_val],
+                    "dimension_title": dim_titles[dim],
+                    "dimension_description": f"Choose the {dim.replace('_', ' ')}.",
+                },
+            )
+            for dim, choice_val in zip(dims, posture_choices)
+        ]
+        sets.append(StrategicChoiceSet(
+            id=f"SCS-{i}-20260101T000000",
+            posture=["aggressive", "balanced", "conservative"][i],
+            choices=choices,
+            overall_confidence="High",
+            completeness=1.0,
+            rationale=f"Posture {i} rationale",
+        ))
+    return sets
+
+
+class TestEvidenceRelevancePH12a:
+    """PH12.0a — Evidence must be assigned by relevance, not by candidate index."""
+
+    def _gen(self):
+        from functional_agents.strategy.theory_generator import TheoryGenerator
+        return TheoryGenerator()
+
+    def test_no_index_based_evidence_allocation(self):
+        """Reordering choice sets must not change the total evidence assignment pattern."""
+        evidence_ids = ["EV-001", "EV-002", "EV-003", "EV-004", "EV-005"]
+        research = _MockResearchWithEvidence(evidence_ids=evidence_ids)
+        sets = _make_configured_choice_sets()
+        gen = self._gen()
+
+        theories_original = [gen.build(cs, research) for cs in sets]
+        theories_reversed = [gen.build(cs, research) for cs in reversed(sets)]
+
+        # A theory built from the same choice set must produce the same evidence
+        # regardless of what position it occupies in the generation list.
+        orig_by_id = {t.source_choice_set_id: t.evidence for t in theories_original}
+        rev_by_id = {t.source_choice_set_id: t.evidence for t in theories_reversed}
+        for cs_id in orig_by_id:
+            assert orig_by_id[cs_id] == rev_by_id[cs_id], (
+                f"Choice set {cs_id} produced different evidence when its position changed: "
+                f"original={orig_by_id[cs_id]}, reversed={rev_by_id[cs_id]}"
+            )
+
+    def test_evidence_assignment_independent_of_choice_set_order(self):
+        """Swap two choice sets — each theory's evidence must follow the choice set."""
+        evidence_ids = ["EV-A", "EV-B", "EV-C"]
+        research = _MockResearchWithEvidence(evidence_ids=evidence_ids)
+        sets = _make_configured_choice_sets()
+        gen = self._gen()
+
+        t0_first_run = gen.build(sets[0], research)
+        t0_second_run = gen.build(sets[0], research)
+        assert t0_first_run.evidence == t0_second_run.evidence
+
+    def test_symmetric_fallback_when_no_keyword_matches(self):
+        """When no citation keyword matches, all theories get the same leading slice."""
+        # Evidence IDs contain no keywords that appear in choice titles
+        evidence_ids = ["OPAQUE-1", "OPAQUE-2", "OPAQUE-3"]
+        research = _MockResearchWithEvidence(evidence_ids=evidence_ids)
+        sets = _make_configured_choice_sets()
+        gen = self._gen()
+
+        theories = [gen.build(cs, research) for cs in sets]
+        # Symmetric fallback: all theories get the same slice
+        assert theories[0].evidence == theories[1].evidence == theories[2].evidence
+
+    def test_symmetric_fallback_does_not_manufacture_score_differences(self):
+        """When evidence is assigned symmetrically, evidence_quality scores must be equal."""
+        from functional_agents.strategy.theory_evaluator import TheoryEvaluator
+        from functional_agents.strategy.strategy_plan import StrategyPlan, EvaluationModel, ValidationPolicy, GenerationPolicy, SearchBudget
+
+        evidence_ids = ["OPAQUE-1", "OPAQUE-2", "OPAQUE-3"]
+        research = _MockResearchWithEvidence(evidence_ids=evidence_ids)
+        sets = _make_configured_choice_sets()
+        gen = self._gen()
+        theories = [gen.build(cs, research) for cs in sets]
+
+        plan = StrategyPlan(
+            plan_id="TEST",
+            framework="executive",
+            active_dimensions=["geographic_portfolio", "power_pathway", "market_timing"],
+            evaluation_model=EvaluationModel(weights={"evidence_quality": 1.0}),
+            validation_policy=ValidationPolicy(),
+            generation_policy=GenerationPolicy(),
+            search_budget=SearchBudget(),
+        )
+        evaluator = TheoryEvaluator()
+        scores = [evaluator.build(t, plan, None).criteria_scores["evidence_quality"].score
+                  for t in theories]
+        # All theories must receive the same evidence_quality score under symmetric fallback
+        assert scores[0] == scores[1] == scores[2], (
+            f"Symmetric fallback produced different evidence_quality scores: {scores}"
+        )
+
+    def test_no_evidence_invented(self):
+        """Theory evidence must be a subset of available evidence IDs."""
+        evidence_ids = ["EV-X1", "EV-X2", "EV-X3", "EV-X4"]
+        research = _MockResearchWithEvidence(evidence_ids=evidence_ids)
+        sets = _make_configured_choice_sets()
+        gen = self._gen()
+        for cs in sets:
+            theory = gen.build(cs, research)
+            for ev_item in theory.evidence:
+                assert ev_item in evidence_ids, (
+                    f"Theory evidence {ev_item!r} is not in available evidence_ids"
+                )
+
+    def test_require_evidence_true_fails_when_no_evidence_available(self):
+        """When require_evidence=True and no evidence exists, score must be 0.0."""
+        from functional_agents.strategy.theory_evaluator import TheoryEvaluator
+        from functional_agents.strategy.strategy_plan import StrategyPlan, EvaluationModel, ValidationPolicy, GenerationPolicy, SearchBudget
+
+        research = _MockResearchWithEvidence(evidence_ids=[], citations=[])
+        sets = _make_configured_choice_sets()
+        gen = self._gen()
+        theory = gen.build(sets[0], research)
+        assert theory.evidence == []
+
+        plan = StrategyPlan(
+            plan_id="TEST",
+            framework="executive",
+            active_dimensions=[],
+            evaluation_model=EvaluationModel(weights={"evidence_quality": 1.0}),
+            validation_policy=ValidationPolicy(require_evidence=True),
+            generation_policy=GenerationPolicy(),
+            search_budget=SearchBudget(),
+        )
+        ev = TheoryEvaluator().build(theory, plan, None)
+        assert ev.criteria_scores["evidence_quality"].score == 0.0
+
+    def test_evidence_list_reordering_does_not_change_scores(self):
+        """Shuffling the evidence_ids list must not change the resulting theory scores."""
+        from functional_agents.strategy.theory_evaluator import TheoryEvaluator
+        from functional_agents.strategy.strategy_plan import StrategyPlan, EvaluationModel, ValidationPolicy, GenerationPolicy, SearchBudget
+
+        evidence_ids = ["EV-A", "EV-B", "EV-C", "EV-D", "EV-E"]
+        research_orig = _MockResearchWithEvidence(evidence_ids=evidence_ids)
+        research_reversed = _MockResearchWithEvidence(evidence_ids=list(reversed(evidence_ids)))
+
+        sets = _make_configured_choice_sets()
+        gen = self._gen()
+
+        plan = StrategyPlan(
+            plan_id="TEST",
+            framework="executive",
+            active_dimensions=["geographic_portfolio", "power_pathway", "market_timing"],
+            evaluation_model=EvaluationModel(weights={"evidence_quality": 1.0}),
+            validation_policy=ValidationPolicy(),
+            generation_policy=GenerationPolicy(),
+            search_budget=SearchBudget(),
+        )
+        evaluator = TheoryEvaluator()
+
+        for cs in sets:
+            t_orig = gen.build(cs, research_orig)
+            t_rev = gen.build(cs, research_reversed)
+            sc_orig = evaluator.build(t_orig, plan, None).criteria_scores["evidence_quality"].score
+            sc_rev = evaluator.build(t_rev, plan, None).criteria_scores["evidence_quality"].score
+            assert sc_orig == sc_rev, (
+                f"Evidence list reordering changed evidence_quality score for {cs.id}: "
+                f"{sc_orig} vs {sc_rev}"
+            )
+
+
+class TestCriterionValidationPH12a:
+    """PH12.0a — Unsupported criteria must fail clearly; no neutral fallback."""
+
+    def test_unsupported_criterion_raises_value_error(self):
+        from functional_agents.strategy.theory_evaluator import TheoryEvaluator
+        from functional_agents.strategy.theory_generator import TheoryGenerator
+        from functional_agents.strategy.strategy_plan import StrategyPlan, EvaluationModel, ValidationPolicy, GenerationPolicy, SearchBudget
+
+        sets = _make_configured_choice_sets()
+        theory = TheoryGenerator().build(sets[0], _MockResearchWithEvidence())
+        plan = StrategyPlan(
+            plan_id="T",
+            framework="executive",
+            active_dimensions=[],
+            evaluation_model=EvaluationModel(weights={"totally_unknown_criterion": 1.0}),
+            validation_policy=ValidationPolicy(),
+            generation_policy=GenerationPolicy(),
+            search_budget=SearchBudget(),
+        )
+        with pytest.raises(ValueError, match="totally_unknown_criterion"):
+            TheoryEvaluator().build(theory, plan, None)
+
+    def test_error_message_names_the_unsupported_criterion(self):
+        from functional_agents.strategy.theory_evaluator import TheoryEvaluator
+        from functional_agents.strategy.theory_generator import TheoryGenerator
+        from functional_agents.strategy.strategy_plan import StrategyPlan, EvaluationModel, ValidationPolicy, GenerationPolicy, SearchBudget
+
+        sets = _make_configured_choice_sets()
+        theory = TheoryGenerator().build(sets[0], _MockResearchWithEvidence())
+        plan = StrategyPlan(
+            plan_id="T",
+            framework="executive",
+            active_dimensions=[],
+            evaluation_model=EvaluationModel(weights={"my_custom_kpi": 2.0}),
+            validation_policy=ValidationPolicy(),
+            generation_policy=GenerationPolicy(),
+            search_budget=SearchBudget(),
+        )
+        with pytest.raises(ValueError) as exc_info:
+            TheoryEvaluator().build(theory, plan, None)
+        assert "my_custom_kpi" in str(exc_info.value)
+
+    def test_resolver_rejects_unsupported_criterion_at_parse_time(self):
+        """ConfigurationResolver._parse_evaluation must reject unknown criteria early."""
+        from functional_agents.strategy.configuration_resolver import ConfigurationResolver
+        resolver = ConfigurationResolver()
+        with pytest.raises(ValueError, match="unknown_kpi"):
+            resolver._parse_evaluation({
+                "method": "multi_criteria",
+                "criteria": {"unknown_kpi": {"weight": 1.0}},
+            })
+
+    def test_resolver_error_names_criterion_and_lists_supported(self):
+        from functional_agents.strategy.configuration_resolver import ConfigurationResolver
+        resolver = ConfigurationResolver()
+        with pytest.raises(ValueError) as exc_info:
+            resolver._parse_evaluation({
+                "criteria": {"bad_criterion": {"weight": 1.5}},
+            })
+        msg = str(exc_info.value)
+        assert "bad_criterion" in msg
+        assert "strategic_fit" in msg  # one of the supported names
+
+    def test_supported_configured_criteria_still_resolve(self):
+        from functional_agents.strategy.configuration_resolver import ConfigurationResolver
+        resolver = ConfigurationResolver()
+        result = resolver._parse_evaluation({
+            "method": "multi_criteria",
+            "criteria": {
+                "strategic_fit": {"weight": 2.0},
+                "evidence_quality": {"weight": 1.5},
+            },
+        })
+        assert result.weights["strategic_fit"] == 2.0
+        assert result.weights["evidence_quality"] == 1.5
+
+    def test_default_mode_evaluation_unchanged(self):
+        """Default mode (no weights) still evaluates the 7 built-in criteria."""
+        from functional_agents.strategy.theory_evaluator import TheoryEvaluator
+        from functional_agents.strategy.theory_generator import TheoryGenerator
+        from functional_agents.strategy.strategy_plan import StrategyPlan, EvaluationModel, ValidationPolicy, GenerationPolicy, SearchBudget
+
+        sets = _make_configured_choice_sets()
+        theory = TheoryGenerator().build(sets[0], _MockResearchWithEvidence())
+        plan = StrategyPlan(
+            plan_id="T",
+            framework="executive",
+            active_dimensions=[],
+            evaluation_model=EvaluationModel(weights={}),  # default mode
+            validation_policy=ValidationPolicy(),
+            generation_policy=GenerationPolicy(),
+            search_budget=SearchBudget(),
+        )
+        ev = TheoryEvaluator().build(theory, plan, None)
+        assert len(ev.criteria_scores) == 7
+
+    def test_no_neutral_fallback_path_for_unknown_criterion(self):
+        """Confirm there is no code path that returns score=0.5 for unknown names."""
+        from functional_agents.strategy.theory_evaluator import TheoryEvaluator, SUPPORTED_CRITERIA
+        from functional_agents.strategy.theory_generator import TheoryGenerator
+        from functional_agents.strategy.strategy_plan import StrategyPlan, EvaluationModel, ValidationPolicy, GenerationPolicy, SearchBudget
+
+        sets = _make_configured_choice_sets()
+        theory = TheoryGenerator().build(sets[0], _MockResearchWithEvidence())
+
+        for bad_name in ["custom_kpi", "foo_bar", "mystery_metric"]:
+            plan = StrategyPlan(
+                plan_id="T",
+                framework="executive",
+                active_dimensions=[],
+                evaluation_model=EvaluationModel(weights={bad_name: 1.0}),
+                validation_policy=ValidationPolicy(),
+                generation_policy=GenerationPolicy(),
+                search_budget=SearchBudget(),
+            )
+            with pytest.raises(ValueError):
+                TheoryEvaluator().build(theory, plan, None)
+
+    def test_supported_criteria_set_is_accessible(self):
+        """SUPPORTED_CRITERIA must be importable and contain the expected names."""
+        from functional_agents.strategy.theory_evaluator import SUPPORTED_CRITERIA
+        for name in ["strategic_fit", "evidence_quality", "option_identified",
+                     "assumption_robustness", "execution_feasibility",
+                     "risk_resilience", "opportunity_capture"]:
+            assert name in SUPPORTED_CRITERIA, f"{name!r} missing from SUPPORTED_CRITERIA"

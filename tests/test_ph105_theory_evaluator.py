@@ -831,35 +831,32 @@ class TestConfiguredModeSelection:
         }
         assert set(ev.criteria_scores.keys()) == expected
 
-    def test_unknown_configured_criterion_gets_fallback_score(self):
-        # Unrecognised name → _FALLBACK_SCORE = 0.5
-        ev = TheoryEvaluator().build(
-            _theory(), _plan(weights={"custom_alignment_score": 1.0}), None
-        )
-        assert ev.criteria_scores["custom_alignment_score"].score == 0.5
+    def test_unknown_configured_criterion_raises(self):
+        # Unrecognised name → ValueError identifying the criterion
+        with pytest.raises(ValueError, match="custom_alignment_score"):
+            TheoryEvaluator().build(
+                _theory(), _plan(weights={"custom_alignment_score": 1.0}), None
+            )
 
-    def test_unknown_configured_criterion_gets_fallback_rationale(self):
-        # Unrecognised name → rationale = "Criterion not recognized..."
-        ev = TheoryEvaluator().build(
-            _theory(), _plan(weights={"custom_alignment_score": 1.0}), None
-        )
-        rationale = ev.criteria_scores["custom_alignment_score"].rationale
-        assert "not recognized" in rationale.lower()
+    def test_unknown_configured_criterion_error_lists_supported(self):
+        # Error message must name at least one supported criterion
+        with pytest.raises(ValueError, match="option_identified"):
+            TheoryEvaluator().build(
+                _theory(), _plan(weights={"completely_unknown": 1.0}), None
+            )
 
-    def test_unknown_configured_criterion_uses_configured_weight(self):
-        # The weight from the plan must be honoured even for unknown criteria
-        ev = TheoryEvaluator().build(
-            _theory(), _plan(weights={"custom_alignment_score": 3.5}), None
-        )
-        assert ev.criteria_scores["custom_alignment_score"].weight == 3.5
+    def test_unknown_configured_criterion_error_names_the_bad_key(self):
+        # Error message must contain the offending criterion name
+        with pytest.raises(ValueError, match="bespoke_score"):
+            TheoryEvaluator().build(
+                _theory(), _plan(weights={"bespoke_score": 3.5}), None
+            )
 
-    def test_mixed_known_and_unknown_criteria(self):
-        # Known criterion scores normally; unknown gets fallback
-        weights = {"option_identified": 2.0, "bespoke_dimension": 1.0}
-        ev = TheoryEvaluator().build(_theory(), _plan(weights=weights), None)
-        assert set(ev.criteria_scores.keys()) == {"option_identified", "bespoke_dimension"}
-        assert ev.criteria_scores["option_identified"].score == 1.0  # OPT-A present
-        assert ev.criteria_scores["bespoke_dimension"].score == 0.5  # fallback
+    def test_mixed_known_and_unknown_criteria_raises(self):
+        # Even one unknown criterion in the weight set must fail
+        with pytest.raises(ValueError, match="bespoke_dimension"):
+            weights = {"option_identified": 2.0, "bespoke_dimension": 1.0}
+            TheoryEvaluator().build(_theory(), _plan(weights=weights), None)
 
     def test_configured_mode_weight_is_honored_for_known_criterion(self):
         # Custom weight for a recognised criterion is stored correctly
@@ -868,12 +865,12 @@ class TestConfiguredModeSelection:
         )
         assert ev.criteria_scores["risk_awareness"].weight == 9.9
 
-    def test_configured_mode_unknown_criterion_is_neutral_in_overall_score(self):
-        # Unknown criterion at 0.5 contributes proportionally; overall between 0 and 1
-        ev = TheoryEvaluator().build(
-            _theory(), _plan(weights={"mystery": 1.0}), None
-        )
-        assert ev.overall_score == 0.5
+    def test_configured_mode_unknown_criterion_raises_not_neutral(self):
+        # Unknown criterion must raise, not silently contribute a neutral 0.5 score
+        with pytest.raises(ValueError, match="mystery"):
+            TheoryEvaluator().build(
+                _theory(), _plan(weights={"mystery": 1.0}), None
+            )
 
 
 # ---------------------------------------------------------------------------

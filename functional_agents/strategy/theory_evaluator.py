@@ -144,11 +144,7 @@ _STRENGTH_THRESHOLD = 0.75
 # Score strictly below this threshold → weakness candidate
 _WEAKNESS_THRESHOLD = 0.50
 
-# Fallback for unrecognised configured criteria
-_FALLBACK_SCORE = 0.5
-_FALLBACK_RATIONALE = (
-    "Criterion not recognized by this evaluator; neutral score assigned."
-)
+SUPPORTED_CRITERIA: frozenset[str] = frozenset(_ALL_CRITERION_META)
 
 
 class TheoryEvaluator:
@@ -270,10 +266,10 @@ class TheoryEvaluator:
         (_FALLBACK_SCORE, _FALLBACK_RATIONALE) with the configured weight.
         """
         if name not in _ALL_CRITERION_META:
-            return CriterionScore(
-                score=_FALLBACK_SCORE,
-                rationale=_FALLBACK_RATIONALE,
-                weight=weight,
+            raise ValueError(
+                f"[TheoryEvaluator] unsupported evaluation criterion {name!r}. "
+                f"Supported criteria: {sorted(SUPPORTED_CRITERIA)}. "
+                f"Remove {name!r} from the engagement evaluation configuration."
             )
         score, detail = TheoryEvaluator._raw_score(name, theory, vp, n_dims)
         return TheoryEvaluator._make_score(name, score, weight, detail)
