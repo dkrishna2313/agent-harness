@@ -59,8 +59,8 @@ def _choice_set(set_id: str) -> StrategicChoiceSet:
     )
 
 
-def _theory(tid: str, oid: str = "OPT-A") -> TheoryOfWinning:
-    return TheoryOfWinning(theory_id=tid, recommended_option_id=oid)
+def _theory(tid: str, oid: str = "OPT-A", scid: str = "SCS-X") -> TheoryOfWinning:
+    return TheoryOfWinning(theory_id=tid, recommended_option_id=oid, source_choice_set_id=scid)
 
 
 def _eval(tid: str, score: float = 0.8) -> TheoryEvaluation:
@@ -104,7 +104,7 @@ def _valid_trace(n: int = 3, plan_id: str = "P-TEST") -> StrategyTrace:
     """Build a minimal valid StrategyTrace with n theories."""
     plan = _plan(plan_id)
     choice_sets = [_choice_set(f"SCS-{i}") for i in range(n)]
-    theories = [_theory(f"TH-SCS-{i}") for i in range(n)]
+    theories = [_theory(f"TH-SCS-{i}", scid=f"SCS-{i}") for i in range(n)]
     evaluations = [_eval(f"TH-SCS-{i}", 0.8 - i * 0.1) for i in range(n)]
     winner_theory = theories[0]
     sel = _selection(winner_theory.theory_id)
@@ -280,7 +280,7 @@ class TestStrategyTraceValidationRules:
     # Rule 6: duplicate theory_ids in theories
     def test_rule6_duplicate_theory_ids_rejected(self):
         kw = self._base_kwargs()
-        t_dup = _theory("TH-SCS-0")  # duplicate of theories[0]
+        t_dup = _theory("TH-SCS-0", scid="SCS-0")  # duplicate of theories[0]
         kw["theories"] = [kw["theories"][0], t_dup, kw["theories"][2]]
         with pytest.raises(ValidationError, match="duplicate theory_id"):
             StrategyTrace(**kw)
@@ -315,7 +315,7 @@ class TestStrategyTraceValidationRules:
     def test_rule10_position_winner_mismatch_rejected(self):
         kw = self._base_kwargs()
         # Build a position whose theory_of_winning.theory_id != winner
-        wrong_theory = _theory("TH-SCS-1")  # exists but is not the winner
+        wrong_theory = _theory("TH-SCS-1", scid="SCS-1")  # exists but is not the winner
         kw["strategic_position"] = _position(wrong_theory)
         # selection.winner_theory_id is "TH-SCS-0" (from base_kwargs)
         with pytest.raises(ValidationError, match="does not match"):
@@ -503,7 +503,7 @@ class TestStrategyTraceRunnerUpValidation:
 
     def test_single_theory_with_no_runner_up_accepted(self):
         # Only one theory → runner_up is always None; must not raise
-        t = _theory("TH-ONLY")
+        t = _theory("TH-ONLY", scid="SCS-ONLY")
         ev = _eval("TH-ONLY")
         cs = _choice_set("SCS-ONLY")
         pos = _position(t)

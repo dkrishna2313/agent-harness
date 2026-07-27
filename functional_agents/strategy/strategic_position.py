@@ -24,7 +24,7 @@ class TheoryOfWinning(BaseModel):
     """How the organisation wins given what is strategically true."""
 
     theory_id: str
-    source_choice_set_id: str = ""  # PH11.2 — explicit provenance to StrategicChoiceSet
+    source_choice_set_id: str  # PH11.2a — required, non-empty
     recommended_option_id: str = ""
     recommended_option_title: str = ""
     winning_position: str = ""
@@ -43,6 +43,13 @@ class TheoryOfWinning(BaseModel):
     def _theory_id_nonempty(cls, v: str) -> str:
         if not v or not v.strip():
             raise ValueError("theory_id must be a non-empty, non-whitespace string.")
+        return v
+
+    @field_validator("source_choice_set_id")
+    @classmethod
+    def _source_choice_set_id_nonempty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("source_choice_set_id must be a non-empty, non-whitespace string.")
         return v
 
 

@@ -38,8 +38,8 @@ def _plan() -> StrategyPlan:
     return StrategyPlan(plan_id="P-TEST", framework="executive", active_dimensions=[])
 
 
-def _theory(tid: str, oid: str = "OPT-A") -> TheoryOfWinning:
-    return TheoryOfWinning(theory_id=tid, recommended_option_id=oid)
+def _theory(tid: str, oid: str = "OPT-A", scid: str = "SCS-X") -> TheoryOfWinning:
+    return TheoryOfWinning(theory_id=tid, recommended_option_id=oid, source_choice_set_id=scid)
 
 
 def _eval(tid: str, score: float = 0.8, confidence: str = "High") -> TheoryEvaluation:
@@ -112,24 +112,24 @@ class TestTheoryOfWinningRequiredField:
             TheoryOfWinning(theory_id="\n", recommended_option_id="OPT-A")
 
     def test_valid_theory_id_accepted(self):
-        t = TheoryOfWinning(theory_id="TH-SCS-0", recommended_option_id="OPT-A")
+        t = TheoryOfWinning(theory_id="TH-SCS-0", recommended_option_id="OPT-A", source_choice_set_id="SCS-0")
         assert t.theory_id == "TH-SCS-0"
 
     def test_single_char_theory_id_accepted(self):
-        t = TheoryOfWinning(theory_id="X")
+        t = TheoryOfWinning(theory_id="X", source_choice_set_id="SCS-X")
         assert t.theory_id == "X"
 
     def test_theory_id_value_preserved_unchanged(self):
-        t = TheoryOfWinning(theory_id="TH-SCS-0-20260101-120000")
+        t = TheoryOfWinning(theory_id="TH-SCS-0-20260101-120000", source_choice_set_id="SCS-0")
         assert t.theory_id == "TH-SCS-0-20260101-120000"
 
     def test_recommended_option_id_remains_optional(self):
-        # recommended_option_id keeps its default; theory_id is the new requirement
-        t = TheoryOfWinning(theory_id="TH-TEST")
+        # recommended_option_id keeps its default; theory_id and source_choice_set_id are required
+        t = TheoryOfWinning(theory_id="TH-TEST", source_choice_set_id="SCS-X")
         assert t.recommended_option_id == ""
 
     def test_serialization_round_trip_intact(self):
-        t = TheoryOfWinning(theory_id="TH-SCS-7", recommended_option_id="OPT-B", confidence="High")
+        t = TheoryOfWinning(theory_id="TH-SCS-7", recommended_option_id="OPT-B", confidence="High", source_choice_set_id="SCS-7")
         d = t.model_dump(mode="json")
         t2 = TheoryOfWinning.model_validate(d)
         assert t2.theory_id == "TH-SCS-7"
@@ -206,8 +206,8 @@ class TestStrategySelectorRejectionCases:
             StrategySelector().select([_theory("TH-A")], [_eval("TH-A"), _eval("TH-B")], _plan())
 
     def test_duplicate_theory_ids_raises(self):
-        t1 = TheoryOfWinning(theory_id="TH-SAME", recommended_option_id="OPT-A")
-        t2 = TheoryOfWinning(theory_id="TH-SAME", recommended_option_id="OPT-B")
+        t1 = TheoryOfWinning(theory_id="TH-SAME", recommended_option_id="OPT-A", source_choice_set_id="SCS-X")
+        t2 = TheoryOfWinning(theory_id="TH-SAME", recommended_option_id="OPT-B", source_choice_set_id="SCS-X")
         with pytest.raises(ValueError, match="duplicate theory_id='TH-SAME' in theories"):
             StrategySelector().select([t1, t2], [_eval("TH-SAME"), _eval("TH-X")], _plan())
 

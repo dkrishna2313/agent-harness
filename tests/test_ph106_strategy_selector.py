@@ -52,9 +52,11 @@ def _theory(
     winning_mechanism: str = "A mechanism.",
     failure_modes: list | None = None,
     confidence: str = "High",
+    source_choice_set_id: str = "SCS-X",
 ) -> TheoryOfWinning:
     return TheoryOfWinning(
         theory_id=theory_id or option_id,
+        source_choice_set_id=source_choice_set_id,
         recommended_option_id=option_id,
         recommended_option_title=title or option_id,
         winning_position=winning_position,

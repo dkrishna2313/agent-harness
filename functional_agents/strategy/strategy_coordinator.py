@@ -168,7 +168,12 @@ class StrategyCoordinator:
         # PH11.0/PH11.2 — build StrategyTrace with full lineage chain
         _trace_id = f"STRAT-{self._plan.plan_id}"
         _ro = ctx.research_object or {}
-        _research_id = _ro.get("id") or _ro.get("research_id") or ctx.run_id or "unknown"
+        _research_id = _ro.get("id") or _ro.get("research_id") or ctx.run_id or None
+        if not _research_id:
+            raise ValueError(
+                "StrategyCoordinator: no valid research or run identifier available "
+                "for StrategyTrace lineage."
+            )
         _lineage = build_strategy_lineage(
             research_id=_research_id,
             plan=self._plan,
@@ -276,6 +281,7 @@ class StrategyCoordinator:
 
         return TheoryOfWinning(
             theory_id=f"TH-legacy-{recommended_id or 'unknown'}",
+            source_choice_set_id="coordinator-legacy",
             recommended_option_id=recommended_id,
             recommended_option_title=recommended_title,
             winning_position=winning_position,

@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from functional_agents.context import AgentContext
 from functional_agents.strategy import (
@@ -61,7 +62,7 @@ def _choice_set(sid: str) -> StrategicChoiceSet:
     )
 
 
-def _theory(tid: str, scid: str = "") -> TheoryOfWinning:
+def _theory(tid: str, scid: str = "SCS-X") -> TheoryOfWinning:
     return TheoryOfWinning(theory_id=tid, source_choice_set_id=scid)
 
 
@@ -389,12 +390,12 @@ class TestBuildStrategyLineage:
 
 class TestSourceChoiceSetId:
     def test_field_exists_on_theory_of_winning(self):
-        t = TheoryOfWinning(theory_id="TH-X")
+        t = TheoryOfWinning(theory_id="TH-X", source_choice_set_id="SCS-X")
         assert hasattr(t, "source_choice_set_id")
 
-    def test_field_defaults_to_empty_string(self):
-        t = TheoryOfWinning(theory_id="TH-X")
-        assert t.source_choice_set_id == ""
+    def test_construction_without_source_choice_set_id_raises(self):
+        with pytest.raises(ValidationError):
+            TheoryOfWinning(theory_id="TH-X")
 
     def test_field_can_be_set_explicitly(self):
         t = TheoryOfWinning(theory_id="TH-X", source_choice_set_id="SCS-0")
@@ -453,15 +454,15 @@ class TestStrategyTraceLineageRules:
             metadata={},
         )
 
-    def test_empty_lineage_skips_rules_13_to_16(self):
-        # StrategyTrace without lineage — rules 13-16 not triggered even with no scid
+    def test_empty_lineage_skips_rules_15_to_18(self):
+        # StrategyTrace without lineage — rules 15-18 not triggered
         plan = _plan()
         cs = _choice_set("SCS-0")
-        t = _theory("TH-SCS-0")  # source_choice_set_id is ""
+        t = _theory("TH-SCS-0", "SCS-0")  # scid matches choice_set (required by rule 14)
         ev = _eval("TH-SCS-0")
         sel = _selection("TH-SCS-0")
         pos = _position(t)
-        # This must NOT raise: rules 13-16 are gated on self.lineage being non-empty
+        # Rules 15-18 are gated on self.lineage being non-empty — must not raise
         trace = StrategyTrace(
             trace_id="STRAT-P-TEST", created_at="2026-07-26T00:00:00+00:00",
             plan=plan, choice_sets=[cs], theories=[t], evaluations=[ev],
@@ -470,23 +471,9 @@ class TestStrategyTraceLineageRules:
         assert trace.lineage == []
 
     def test_rule_13_empty_source_choice_set_id_rejected(self):
-        kwargs = self._base_trace_kwargs(n=2)
-        # Replace first theory's source_choice_set_id with ""
-        theories = list(kwargs["theories"])
-        theories[0] = TheoryOfWinning(
-            theory_id=theories[0].theory_id,
-            source_choice_set_id="",  # violates rule 13
-        )
-        kwargs["theories"] = theories
-        # Build lineage with valid scid first (using the original theories)
-        plan, cs_list, orig_theories, evals, sel, pos, trace_id = _make_lineage_inputs(2)
-        lineage = build_strategy_lineage(
-            research_id="R-TEST", plan=plan, choice_sets=cs_list,
-            theories=orig_theories, evaluations=evals, selection=sel,
-            strategic_position=pos, trace_id=trace_id,
-        )
-        with pytest.raises(ValueError, match="source_choice_set_id"):
-            StrategyTrace(**{**kwargs, "lineage": lineage})
+        # After PH11.2a: empty scid rejected at TheoryOfWinning construction, not StrategyTrace
+        with pytest.raises(ValidationError, match="source_choice_set_id"):
+            TheoryOfWinning(theory_id="TH-X", source_choice_set_id="")
 
     def test_rule_14_unknown_source_choice_set_id_rejected(self):
         kwargs = self._base_trace_kwargs(n=2)

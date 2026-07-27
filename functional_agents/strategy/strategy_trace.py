@@ -48,12 +48,14 @@ class StrategyTrace(BaseModel):
       10. strategic_position.theory_of_winning.theory_id == winner_theory_id
       11. selection.runner_up_theory_id, when present, references a known theory
       12. selection.runner_up_theory_id must differ from winner_theory_id
-      Rules 13-16 apply only when lineage is non-empty:
-      13. every theory.source_choice_set_id is non-empty
+      Rule 14 applies always (PH11.2a):
       14. every theory.source_choice_set_id resolves to a known choice_set
+      Rules 15-18 apply only when lineage is non-empty:
       15. no duplicate lineage links (by full composite key)
       16. lineage targets of type theory_of_winning / strategic_choice_set /
           theory_evaluation resolve to known trace members
+      17. no "unknown" sentinel in any lineage source_id or target_id
+      18. metadata["research_id"] equals the research_object lineage link's source_id
     """
 
     trace_id: str
@@ -154,25 +156,19 @@ class StrategyTrace(BaseModel):
                     "StrategyTrace: runner-up theory ID must differ from winner theory ID."
                 )
 
-        # Rules 13-16: lineage integrity (applied only when lineage is provided)
+        # Rule 14 (always): source_choice_set_id must resolve to a known choice_set
+        cs_ids: set[str] = {cs.id for cs in choice_sets}
+        for t in theories:
+            scid = t.source_choice_set_id  # required, non-empty — enforced by TheoryOfWinning
+            if scid not in cs_ids:
+                raise ValueError(
+                    f"StrategyTrace: theory_id={t.theory_id!r} "
+                    f"source_choice_set_id={scid!r} not found in choice_sets. "
+                    f"Available: {sorted(cs_ids)}"
+                )
+
+        # Rules 15-18: lineage integrity (applied only when lineage is provided)
         if self.lineage:
-            cs_ids: set[str] = {cs.id for cs in choice_sets}
-
-            # Rules 13-14: source_choice_set_id must be non-empty and resolve to a choice_set
-            for t in theories:
-                scid = getattr(t, "source_choice_set_id", "")
-                if not scid or not scid.strip():
-                    raise ValueError(
-                        f"StrategyTrace: theory_id={t.theory_id!r} has no "
-                        f"source_choice_set_id (required when lineage is present)."
-                    )
-                if scid not in cs_ids:
-                    raise ValueError(
-                        f"StrategyTrace: theory_id={t.theory_id!r} "
-                        f"source_choice_set_id={scid!r} not found in choice_sets. "
-                        f"Available: {sorted(cs_ids)}"
-                    )
-
             # Rule 15: no duplicate lineage links
             seen_links: set[tuple] = set()
             for link in self.lineage:
@@ -203,6 +199,25 @@ class StrategyTrace(BaseModel):
                     raise ValueError(
                         f"StrategyTrace: lineage target theory_evaluation "
                         f"id={link.target_id!r} not found in evaluations."
+                    )
+
+            # Rule 17: no "unknown" sentinel identifiers in lineage
+            for link in self.lineage:
+                if link.source_id == "unknown" or link.target_id == "unknown":
+                    raise ValueError(
+                        f"StrategyTrace: lineage link contains forbidden sentinel "
+                        f"'unknown' (source_id={link.source_id!r}, "
+                        f"target_id={link.target_id!r})."
+                    )
+
+            # Rule 18: metadata["research_id"] must equal the research_object link's source_id
+            ro_links = [lk for lk in self.lineage if lk.source_type == "research_object"]
+            if ro_links:
+                meta_rid = self.metadata.get("research_id", "")
+                if meta_rid != ro_links[0].source_id:
+                    raise ValueError(
+                        f"StrategyTrace: metadata['research_id']={meta_rid!r} does not match "
+                        f"lineage research_object source_id={ro_links[0].source_id!r}."
                     )
 
         return self

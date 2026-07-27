@@ -55,8 +55,8 @@ def _choice_set(sid: str) -> StrategicChoiceSet:
     )
 
 
-def _theory(tid: str) -> TheoryOfWinning:
-    return TheoryOfWinning(theory_id=tid)
+def _theory(tid: str, scid: str = "SCS-X") -> TheoryOfWinning:
+    return TheoryOfWinning(theory_id=tid, source_choice_set_id=scid)
 
 
 def _eval(tid: str, score: float = 0.8) -> TheoryEvaluation:
@@ -92,7 +92,7 @@ def _position(theory: TheoryOfWinning) -> StrategicPosition:
 def _make_trace(n: int = 3, plan_id: str = "P-TEST") -> StrategyTrace:
     plan = _plan(plan_id)
     choice_sets = [_choice_set(f"SCS-{i}") for i in range(n)]
-    theories = [_theory(f"TH-SCS-{i}") for i in range(n)]
+    theories = [_theory(f"TH-SCS-{i}", f"SCS-{i}") for i in range(n)]
     evaluations = [_eval(f"TH-SCS-{i}", 0.9 - i * 0.1) for i in range(n)]
     winner = theories[0]
     runner_up = theories[1].theory_id if n > 1 else None

@@ -152,7 +152,7 @@ def _full_ctx() -> AgentContext:
 
 class TestTheoryOfWinningTheoryId:
     def test_theory_of_winning_has_theory_id_field(self):
-        theory = TheoryOfWinning(theory_id="TH-TEST")
+        theory = TheoryOfWinning(theory_id="TH-TEST", source_choice_set_id="SCS-X")
         assert hasattr(theory, "theory_id")
 
     def test_theory_id_is_required(self):
@@ -163,6 +163,7 @@ class TestTheoryOfWinningTheoryId:
     def test_theory_id_is_distinct_from_recommended_option_id(self):
         theory = TheoryOfWinning(
             theory_id="TH-SCS-001",
+            source_choice_set_id="SCS-001",
             recommended_option_id="OPT-A",
         )
         assert theory.theory_id != theory.recommended_option_id
@@ -170,6 +171,7 @@ class TestTheoryOfWinningTheoryId:
     def test_theory_id_can_be_set_independently(self):
         theory = TheoryOfWinning(
             theory_id="TH-XYZ",
+            source_choice_set_id="SCS-X",
             recommended_option_id="OPT-A",
         )
         assert theory.theory_id == "TH-XYZ"
@@ -228,19 +230,19 @@ class TestTheoryGeneratorTheoryId:
 
 class TestTheoryEvaluatorTheoryId:
     def test_evaluator_propagates_theory_id(self):
-        theory = TheoryOfWinning(theory_id="TH-SCS-MY-SET", recommended_option_id="OPT-B")
+        theory = TheoryOfWinning(theory_id="TH-SCS-MY-SET", source_choice_set_id="SCS-MY-SET", recommended_option_id="OPT-B")
         ev = TheoryEvaluator().build(theory, _plan(), None)
         assert ev.theory_id == "TH-SCS-MY-SET"
 
     def test_evaluator_does_not_use_recommended_option_id(self):
-        theory = TheoryOfWinning(theory_id="TH-CUSTOM", recommended_option_id="OPT-DIFFERENT")
+        theory = TheoryOfWinning(theory_id="TH-CUSTOM", source_choice_set_id="SCS-X", recommended_option_id="OPT-DIFFERENT")
         ev = TheoryEvaluator().build(theory, _plan(), None)
         assert ev.theory_id == "TH-CUSTOM"
         assert ev.theory_id != theory.recommended_option_id
 
     def test_evaluator_theory_id_distinct_from_option_id_with_matching_name(self):
         # theory_id and recommended_option_id can have different values independently
-        theory = TheoryOfWinning(theory_id="TH-SCS-99", recommended_option_id="OPT-A")
+        theory = TheoryOfWinning(theory_id="TH-SCS-99", source_choice_set_id="SCS-99", recommended_option_id="OPT-A")
         ev = TheoryEvaluator().build(theory, _plan(), None)
         assert ev.theory_id == "TH-SCS-99"
         assert ev.theory_id != theory.recommended_option_id
@@ -253,8 +255,8 @@ class TestTheoryEvaluatorTheoryId:
 class TestStrategySelectorStrictMatching:
     def test_matches_by_theory_id_not_option_id(self):
         # option_ids are the same; theory_ids are different — selector must use theory_id
-        t1 = TheoryOfWinning(theory_id="TH-SCS-0", recommended_option_id="OPT-A")
-        t2 = TheoryOfWinning(theory_id="TH-SCS-1", recommended_option_id="OPT-A")
+        t1 = TheoryOfWinning(theory_id="TH-SCS-0", source_choice_set_id="SCS-0", recommended_option_id="OPT-A")
+        t2 = TheoryOfWinning(theory_id="TH-SCS-1", source_choice_set_id="SCS-1", recommended_option_id="OPT-A")
         evals = [
             _eval(theory_id="TH-SCS-0", overall_score=0.6),
             _eval(theory_id="TH-SCS-1", overall_score=0.9),
@@ -264,9 +266,9 @@ class TestStrategySelectorStrictMatching:
 
     def test_same_option_id_no_positional_fallback(self):
         # Previously would hit positional fallback; now must use theory_id
-        t1 = TheoryOfWinning(theory_id="TH-SCS-0", recommended_option_id="OPT-A")
-        t2 = TheoryOfWinning(theory_id="TH-SCS-1", recommended_option_id="OPT-A")
-        t3 = TheoryOfWinning(theory_id="TH-SCS-2", recommended_option_id="OPT-A")
+        t1 = TheoryOfWinning(theory_id="TH-SCS-0", source_choice_set_id="SCS-0", recommended_option_id="OPT-A")
+        t2 = TheoryOfWinning(theory_id="TH-SCS-1", source_choice_set_id="SCS-1", recommended_option_id="OPT-A")
+        t3 = TheoryOfWinning(theory_id="TH-SCS-2", source_choice_set_id="SCS-2", recommended_option_id="OPT-A")
         evals = [
             _eval(theory_id="TH-SCS-0", overall_score=0.7),
             _eval(theory_id="TH-SCS-1", overall_score=0.5),
@@ -278,8 +280,8 @@ class TestStrategySelectorStrictMatching:
 
 class TestStrategySelectorDuplicateRejection:
     def test_duplicate_theory_ids_raises(self):
-        t1 = TheoryOfWinning(theory_id="TH-SAME", recommended_option_id="OPT-A")
-        t2 = TheoryOfWinning(theory_id="TH-SAME", recommended_option_id="OPT-B")
+        t1 = TheoryOfWinning(theory_id="TH-SAME", source_choice_set_id="SCS-X", recommended_option_id="OPT-A")
+        t2 = TheoryOfWinning(theory_id="TH-SAME", source_choice_set_id="SCS-X", recommended_option_id="OPT-B")
         evals = [
             _eval(theory_id="TH-SAME", overall_score=0.8),
             _eval(theory_id="TH-SAME", overall_score=0.5),
@@ -288,8 +290,8 @@ class TestStrategySelectorDuplicateRejection:
             StrategySelector().select([t1, t2], evals, _plan())
 
     def test_unique_theory_ids_does_not_raise(self):
-        t1 = TheoryOfWinning(theory_id="TH-A", recommended_option_id="OPT-A")
-        t2 = TheoryOfWinning(theory_id="TH-B", recommended_option_id="OPT-A")
+        t1 = TheoryOfWinning(theory_id="TH-A", source_choice_set_id="SCS-A", recommended_option_id="OPT-A")
+        t2 = TheoryOfWinning(theory_id="TH-B", source_choice_set_id="SCS-B", recommended_option_id="OPT-A")
         evals = [
             _eval(theory_id="TH-A", overall_score=0.8),
             _eval(theory_id="TH-B", overall_score=0.5),

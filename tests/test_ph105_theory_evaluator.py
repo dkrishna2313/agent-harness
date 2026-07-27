@@ -88,9 +88,11 @@ def _theory(
     assumptions: list[dict] | None = None,
     evidence: list[str] | None = None,
     confidence: str = "High",
+    source_choice_set_id: str = "SCS-X",
 ) -> TheoryOfWinning:
     return TheoryOfWinning(
         theory_id=theory_id or f"TH-{recommended_option_id}",
+        source_choice_set_id=source_choice_set_id,
         recommended_option_id=recommended_option_id,
         recommended_option_title=recommended_option_title,
         winning_position=winning_position,
