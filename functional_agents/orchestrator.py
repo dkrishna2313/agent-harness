@@ -1062,6 +1062,20 @@ class Orchestrator:
             # PH7 — make manuscript and brief available to MarkdownRenderer
             result_ctx.trace["_editorial_manuscript"] = _em
             result_ctx.trace["_editorial_brief"] = _eb
+            # PH12.0 — re-render the report now that the editorial manuscript
+            # is available.  ReportAgent ran earlier (before strategy/editorial),
+            # so the on-disk report was produced via the legacy fallback path and
+            # lacks sections written by the editorial writers (e.g. StrategicDirection).
+            # Re-generating here ensures the final report reflects the full manuscript.
+            try:
+                from .deliverables.markdown_report import MarkdownReportGenerator
+                _rpt_path_str = result_ctx.artifacts.get("report_path")
+                if _rpt_path_str:
+                    _rpt_path = Path(_rpt_path_str)
+                    MarkdownReportGenerator().generate(result_ctx, _rpt_path)
+                    print(f"Report (editorial) → {_rpt_path}")
+            except Exception as _rpt_exc:
+                LOGGER.warning("[Orchestrator] editorial report re-render failed: %s", _rpt_exc)
         except Exception as exc:
             LOGGER.warning("[Orchestrator] editorial build/persist failed: %s", exc)
 
