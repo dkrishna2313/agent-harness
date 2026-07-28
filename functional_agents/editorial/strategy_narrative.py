@@ -98,6 +98,17 @@ class StrategyNarrative(BaseModel):
     content_homogenization_detected: bool = False
     winner_rationale: str = ""             # why selected theory won vs runner-up
 
+    # PH12.2b — discrimination fields for winner theory
+    distinctive_assumption_ids: list[str] = Field(default_factory=list)
+    shared_assumption_ids: list[str] = Field(default_factory=list)
+    distinctive_recommendation_ids: list[str] = Field(default_factory=list)
+    shared_recommendation_ids: list[str] = Field(default_factory=list)
+    distinctive_evidence_ids: list[str] = Field(default_factory=list)
+    shared_evidence_ids: list[str] = Field(default_factory=list)
+    homogenization_state: str = "none"     # none | partial | substantial | full
+    # Differentiation summary for all theories: {theory_id: {"distinctive_count": int, ...}}
+    alternative_differentiation: dict[str, Any] = Field(default_factory=dict)
+
     model_config = {"frozen": True}
 
 
@@ -303,10 +314,13 @@ def build_strategy_narrative(trace: Any) -> "StrategyNarrative":
     # PH12.2 — extract theory content for winner from trace
     theory_content_list = getattr(trace, "theory_content", []) or []
     winner_content: dict = {}
+    all_theory_contents: dict[str, dict] = {}
     for tc in theory_content_list:
-        if isinstance(tc, dict) and tc.get("theory_id") == sel.winner_theory_id:
-            winner_content = tc
-            break
+        if isinstance(tc, dict):
+            tid = tc.get("theory_id", "")
+            all_theory_contents[tid] = tc
+            if tid == sel.winner_theory_id:
+                winner_content = tc
 
     content_assumption_ids = winner_content.get("assumption_ids", [])
     content_risk_ids       = winner_content.get("risk_ids", [])
@@ -321,6 +335,38 @@ def build_strategy_narrative(trace: Any) -> "StrategyNarrative":
     theory_diff = getattr(trace, "theory_differentiation", {}) or {}
     homogenization = getattr(trace, "content_homogenization", {}) or {}
     content_homogenization_detected = bool(homogenization.get("detected", False))
+
+    # PH12.2b — discrimination fields for winner theory
+    distinctive_assumption_ids = winner_content.get("distinctive_assumption_ids", [])
+    shared_assumption_ids = winner_content.get("shared_assumption_ids", [])
+    distinctive_recommendation_ids = winner_content.get("distinctive_recommendation_ids", [])
+    shared_recommendation_ids = winner_content.get("shared_recommendation_ids", [])
+    distinctive_evidence_ids = winner_content.get("distinctive_evidence_ids", [])
+    shared_evidence_ids = winner_content.get("shared_evidence_ids", [])
+    homogenization_state = winner_content.get("homogenization_state", "none") or "none"
+
+    # Build alternative_differentiation summary for all non-winner theories
+    alternative_differentiation: dict[str, Any] = {}
+    for theory in trace.theories:
+        tid = theory.theory_id
+        tc = all_theory_contents.get(tid, {})
+        if not tc:
+            continue
+        d_assumptions = len(tc.get("distinctive_assumption_ids", []))
+        d_recs = len(tc.get("distinctive_recommendation_ids", []))
+        d_ev = len(tc.get("distinctive_evidence_ids", []))
+        ev = eval_by_id.get(tid)
+        alternative_differentiation[tid] = {
+            "theory_id": tid,
+            "recommended_option_title": theory.recommended_option_title,
+            "score": ev.overall_score if ev else 0.0,
+            "distinctive_assumption_count": d_assumptions,
+            "distinctive_recommendation_count": d_recs,
+            "distinctive_evidence_count": d_ev,
+            "homogenization_state": tc.get("homogenization_state", "none"),
+            "coverage_status": (tc.get("coverage") or {}).get("status", ""),
+            "confidence_level": (tc.get("confidence") or {}).get("level", ""),
+        }
 
     # Build why-winner rationale from content-specific evidence
     winner_rationale = _build_winner_rationale(
@@ -376,4 +422,13 @@ def build_strategy_narrative(trace: Any) -> "StrategyNarrative":
         theory_differentiation=theory_diff,
         content_homogenization_detected=content_homogenization_detected,
         winner_rationale=winner_rationale,
+        # PH12.2b — discrimination fields
+        distinctive_assumption_ids=distinctive_assumption_ids,
+        shared_assumption_ids=shared_assumption_ids,
+        distinctive_recommendation_ids=distinctive_recommendation_ids,
+        shared_recommendation_ids=shared_recommendation_ids,
+        distinctive_evidence_ids=distinctive_evidence_ids,
+        shared_evidence_ids=shared_evidence_ids,
+        homogenization_state=homogenization_state,
+        alternative_differentiation=alternative_differentiation,
     )

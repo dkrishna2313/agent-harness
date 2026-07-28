@@ -1,8 +1,11 @@
-"""PH12.2 — TheoryContent: models for theory-specific content, coverage, confidence.
+"""PH12.2/PH12.2b — TheoryContent: models for theory-specific content, coverage, confidence.
 
 TheoryContent carries a theory's assigned assumptions, risks, opportunities,
 evidence, success conditions, and recommendations — all with canonical source IDs
 and assignment lineage.
+
+PH12.2b adds discrimination fields: relationship classification, discrimination scores,
+distinctive/shared splits per category, and multi-state homogenization tracking.
 
 Backward-compatible defaults throughout (empty lists/dicts, None for optional fields).
 """
@@ -29,6 +32,14 @@ class ContentLineageEntry(BaseModel):
     relevance_score: float = 0.0
     rationale: str = ""
 
+    # PH12.2b — discrimination fields (set by discrimination_calculator)
+    relationship_classification: str = ""  # explicit_discriminating | explicit_shared |
+    #                                         posture_discriminating | semantic_discriminating |
+    #                                         sensitivity | fallback
+    discrimination_score: float = 0.0     # 1.0 - (shared_count / total_theories)
+    relationship_scope: str = ""           # theory_unique | theory_subset | global_shared
+    shared_across_theory_ids: list[str] = Field(default_factory=list)
+
     model_config = {"extra": "allow"}
 
 
@@ -41,6 +52,12 @@ class EvidenceLineageEntry(BaseModel):
     rationale: str = ""
     lineage_paths: list[dict[str, str]] = Field(default_factory=list)
     # Each path: {"source_type": "assumption", "source_id": "A-001"}
+
+    # PH12.2b — discrimination fields (set by discrimination_calculator)
+    relationship_classification: str = ""
+    discrimination_score: float = 0.0
+    relationship_scope: str = ""
+    shared_across_theory_ids: list[str] = Field(default_factory=list)
 
     model_config = {"extra": "allow"}
 
@@ -74,6 +91,12 @@ class ContentCoverage(BaseModel):
     status: str = "insufficient"  # sufficient | partial | fallback_heavy | insufficient
     fallback_count: int = 0
     explicit_count: int = 0
+
+    # PH12.2b — discrimination-aware coverage fractions (set post-hoc by discrimination_calculator)
+    canonical: float = 0.0            # fraction of total assigned items that are canonical (explicit/posture)
+    distinctive: float = 0.0          # fraction of assigned that are theory-distinctive (discrimination_score > 0)
+    shared_context: float = 0.0       # fraction of assigned that are globally shared (discrimination_score == 0)
+    evidence_distinctive: float = 0.0 # fraction of evidence that is theory-distinctive
 
     model_config = {"extra": "allow"}
 
@@ -151,6 +174,12 @@ class ContentConfidence(BaseModel):
     contradiction_share: float = 0.0
     rationale: str = ""
 
+    # PH12.2b — discrimination-aware shares (set by discrimination_calculator)
+    explicit_discriminating_share: float = 0.0  # explicit items that are theory-distinctive
+    explicit_shared_share: float = 0.0           # explicit items that are globally shared
+    posture_discriminating_share: float = 0.0   # posture items that are theory-distinctive
+    distinctive_evidence_share: float = 0.0     # evidence items that are theory-distinctive
+
     model_config = {"extra": "allow"}
 
     @classmethod
@@ -162,6 +191,12 @@ class ContentConfidence(BaseModel):
         contradiction_count: int,
         mapping_confidence: str,
         evidence_coverage: float,
+        # PH12.2b optional discrimination params
+        explicit_discriminating_count: int = 0,
+        explicit_shared_count: int = 0,
+        posture_discriminating_count: int = 0,
+        distinctive_evidence_count: int = 0,
+        total_evidence_count: int = 0,
     ) -> "ContentConfidence":
         total = explicit_count + fallback_count + posture_match_count
         if total == 0:
@@ -172,9 +207,21 @@ class ContentConfidence(BaseModel):
         posture_share  = posture_match_count / total
         contra_share   = contradiction_count / total if total > 0 else 0.0
 
-        # Confidence matrix
+        # PH12.2b discrimination-aware shares
+        explicit_disc_share = explicit_discriminating_count / total if total > 0 else 0.0
+        explicit_sh_share   = explicit_shared_count / total if total > 0 else 0.0
+        posture_disc_share  = posture_discriminating_count / total if total > 0 else 0.0
+        dist_ev_share       = (distinctive_evidence_count / total_evidence_count
+                               if total_evidence_count > 0 else 0.0)
+
+        # Confidence matrix — PH12.2b: High requires discriminating explicit share >= 0.40
+        # and mapping must not be None
+        discriminating_share = explicit_disc_share + posture_disc_share
+        has_discrimination_data = explicit_discriminating_count + explicit_shared_count > 0
+
         if (explicit_share >= 0.60 and mapping_confidence in ("High", "Medium")
-                and evidence_coverage >= 0.50 and fallback_share <= 0.20):
+                and evidence_coverage >= 0.50 and fallback_share <= 0.20
+                and (not has_discrimination_data or discriminating_share >= 0.40)):
             level = "High"
         elif (explicit_share + posture_share >= 0.40
               and fallback_share <= 0.50
@@ -199,6 +246,10 @@ class ContentConfidence(BaseModel):
             posture_match_share=round(posture_share, 4),
             contradiction_share=round(contra_share, 4),
             rationale=rationale,
+            explicit_discriminating_share=round(explicit_disc_share, 4),
+            explicit_shared_share=round(explicit_sh_share, 4),
+            posture_discriminating_share=round(posture_disc_share, 4),
+            distinctive_evidence_share=round(dist_ev_share, 4),
         )
 
 
@@ -223,6 +274,21 @@ class TheoryContent(BaseModel):
     risk_ids: list[str] = Field(default_factory=list)
     opportunity_ids: list[str] = Field(default_factory=list)
     evidence_ids: list[str] = Field(default_factory=list)
+
+    # PH12.2b — distinctive/shared splits (set by discrimination_calculator)
+    distinctive_assumption_ids: list[str] = Field(default_factory=list)
+    shared_assumption_ids: list[str] = Field(default_factory=list)
+    distinctive_risk_ids: list[str] = Field(default_factory=list)
+    shared_risk_ids: list[str] = Field(default_factory=list)
+    distinctive_opportunity_ids: list[str] = Field(default_factory=list)
+    shared_opportunity_ids: list[str] = Field(default_factory=list)
+    distinctive_recommendation_ids: list[str] = Field(default_factory=list)
+    shared_recommendation_ids: list[str] = Field(default_factory=list)
+    distinctive_evidence_ids: list[str] = Field(default_factory=list)
+    shared_evidence_ids: list[str] = Field(default_factory=list)
+
+    # PH12.2b — homogenization state for this theory (set by content_differentiation)
+    homogenization_state: str = "none"  # none | partial | substantial | full
 
     # Structured success conditions
     success_conditions: list[SuccessConditionEntry] = Field(default_factory=list)

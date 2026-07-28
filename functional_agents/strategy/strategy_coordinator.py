@@ -51,6 +51,7 @@ from .strategy_trace import StrategyTrace
 from .content_graph import ContentGraph                   # PH12.2
 from .content_resolver import ContentResolver              # PH12.2
 from .content_differentiation import compute_differentiation  # PH12.2
+from .discrimination_calculator import enrich_with_discrimination  # PH12.2b
 from .theory_evaluator import TheoryEvaluator
 from .theory_generator import TheoryGenerator
 
@@ -146,30 +147,14 @@ class StrategyCoordinator:
         self._constraint_results = {
             t.theory_id: ce.evaluate(t, self._plan) for t in self._theories
         }
-        # PH12.1a / PH12.2: map ALL theories to options before scoring.
-        # Moved before TheoryEvaluator so theory_content can inform scores.
-        mapper = OptionMapper()
-        all_mappings = {t.theory_id: mapper.map(t, ctx) for t in self._theories}
-
-        # PH12.2 — build ContentGraph and resolve theory-specific content
-        content_cfg = getattr(self._plan, "content_config", None)
-        _content_graph = ContentGraph().build(ctx)
-        _content_resolver = ContentResolver(_content_graph, content_cfg)
-        all_theory_contents: dict = {}
-        for t in self._theories:
-            t_mapping = all_mappings[t.theory_id]
-            tc = _content_resolver.resolve(
-                t, t_mapping.mapped_option_id, t_mapping.mapping_confidence
-            )
-            all_theory_contents[t.theory_id] = tc
-
-        # PH10.5: evaluate each theory with theory-specific content (PH12.2)
+        # PH12.2b: evaluate theories WITHOUT content (content resolved after selection).
+        # Restores PH12.1b ordering: evaluate → select → map → content_resolve.
         evaluator = TheoryEvaluator()
         self._evaluations = [
             evaluator.build(
                 t, self._plan, ctx,
                 self._constraint_results.get(t.theory_id),
-                all_theory_contents.get(t.theory_id),
+                None,
             )
             for t in self._theories
         ]
@@ -181,6 +166,10 @@ class StrategyCoordinator:
             self._theories, self._evaluations, self._plan
         )
         self._selection = selector._last_selection
+
+        # PH12.2b: map ALL theories after selection (does not affect scores)
+        mapper = OptionMapper()
+        all_mappings = {t.theory_id: mapper.map(t, ctx) for t in self._theories}
         winner_mapping = all_mappings[self._selection.winner_theory_id]
 
         ap = getattr(self._plan, "alignment_policy", None)
@@ -207,6 +196,61 @@ class StrategyCoordinator:
             mapped_option_id=winner_mapping.mapped_option_id,
             saturation_detected=sat_detected,
         )
+
+        # PH12.2b: resolve theory content after selection
+        content_cfg = getattr(self._plan, "content_config", None)
+        _content_graph = ContentGraph().build(ctx)
+        _content_resolver = ContentResolver(_content_graph, content_cfg)
+        all_theory_contents: dict = {}
+        for t in self._theories:
+            t_mapping = all_mappings[t.theory_id]
+            tc = _content_resolver.resolve(
+                t, t_mapping.mapped_option_id, t_mapping.mapping_confidence
+            )
+            all_theory_contents[t.theory_id] = tc
+
+        # PH12.2b: enrich content with per-item discrimination scores
+        _tc_list_raw = [tc for tc in all_theory_contents.values() if tc is not None]
+        _min_disc = getattr(content_cfg, "minimum_discrimination_score", 0.20) if content_cfg else 0.20
+        try:
+            _tc_list_raw = enrich_with_discrimination(
+                _tc_list_raw, min_discrimination_score=_min_disc
+            )
+            all_theory_contents = {tc.theory_id: tc for tc in _tc_list_raw}
+        except Exception as _disc_err:
+            LOGGER.warning(
+                "[StrategyCoordinator] discrimination enrichment skipped: %s", _disc_err
+            )
+
+        # PH12.2b: consistency guard — selection.mapped_option_id == winner theory_content
+        winner_tc = all_theory_contents.get(self._selection.winner_theory_id)
+        _consistency_guard: dict = {"passed": True, "rationale": "no winner theory_content"}
+        if winner_tc is not None:
+            tc_option = getattr(winner_tc, "mapped_option_id", None)
+            sel_option = self._selection.mapped_option_id
+            if tc_option and sel_option and tc_option != sel_option:
+                _consistency_guard = {
+                    "passed": False,
+                    "winner_theory_id": self._selection.winner_theory_id,
+                    "selection_mapped_option_id": sel_option,
+                    "theory_content_mapped_option_id": tc_option,
+                    "rationale": (
+                        f"Mapping mismatch: selection says {sel_option!r} "
+                        f"but winner theory_content says {tc_option!r}."
+                    ),
+                }
+                LOGGER.error(
+                    "[StrategyCoordinator] consistency guard FAILED: %s",
+                    _consistency_guard["rationale"],
+                )
+            else:
+                _consistency_guard = {
+                    "passed": True,
+                    "rationale": (
+                        f"winner({self._selection.winner_theory_id}) "
+                        f"maps to {sel_option!r} in both selection and theory_content."
+                    ),
+                }
 
         created_at = datetime.now(timezone.utc).isoformat()
         position_id = f"SP-{created_at[:10].replace('-', '')}-{(ctx.run_id or 'unknown')[:8]}"
@@ -321,6 +365,18 @@ class StrategyCoordinator:
                     "success_conditions": [sc.model_dump() for sc in tc.success_conditions],
                     "coverage": tc.coverage.model_dump(),
                     "confidence": tc.confidence.level,
+                    # PH12.2b — distinctive/shared content split
+                    "distinctive_assumption_ids": getattr(tc, "distinctive_assumption_ids", []),
+                    "shared_assumption_ids": getattr(tc, "shared_assumption_ids", []),
+                    "distinctive_risk_ids": getattr(tc, "distinctive_risk_ids", []),
+                    "shared_risk_ids": getattr(tc, "shared_risk_ids", []),
+                    "distinctive_opportunity_ids": getattr(tc, "distinctive_opportunity_ids", []),
+                    "shared_opportunity_ids": getattr(tc, "shared_opportunity_ids", []),
+                    "distinctive_recommendation_ids": getattr(tc, "distinctive_recommendation_ids", []),
+                    "shared_recommendation_ids": getattr(tc, "shared_recommendation_ids", []),
+                    "distinctive_evidence_ids": getattr(tc, "distinctive_evidence_ids", []),
+                    "shared_evidence_ids": getattr(tc, "shared_evidence_ids", []),
+                    "homogenization_state": getattr(tc, "homogenization_state", ""),
                 })
                 _theory_content_lineage[t.theory_id] = {
                     k: [e.model_dump() for e in v]
@@ -331,10 +387,30 @@ class StrategyCoordinator:
                 _theory_content_confidence[t.theory_id] = tc.confidence.model_dump()
                 _all_content_fallbacks.extend(tc.content_fallbacks)
 
+        _partial_threshold = (
+            getattr(content_cfg, "partial_homogenization_threshold", 0.75)
+            if content_cfg else 0.75
+        )
+        _full_threshold = (
+            getattr(content_cfg, "full_homogenization_threshold", 0.95)
+            if content_cfg else 0.95
+        )
+        _max_identical_dims = (
+            getattr(content_cfg, "maximum_identical_dimensions", 2)
+            if content_cfg else 2
+        )
         _diff_result = compute_differentiation(
-            [tc for tc in all_theory_contents.values() if tc is not None]
+            [tc for tc in all_theory_contents.values() if tc is not None],
+            partial_threshold=_partial_threshold,
+            full_threshold=_full_threshold,
+            maximum_identical_dimensions=_max_identical_dims,
         )
         _homogenization = _diff_result.get("homogenization_details", {})
+
+        # PH12.2b: backfill homogenization_state into theory_content trace dicts
+        _overall_hom_state = _diff_result.get("homogenization_state", "none") or "none"
+        for _tc_dict in _theory_content_list:
+            _tc_dict["homogenization_state"] = _overall_hom_state
 
         self._trace = StrategyTrace(
             trace_id=_trace_id,
@@ -358,6 +434,13 @@ class StrategyCoordinator:
             theory_differentiation=_diff_result.get("theory_differentiation", {}),
             content_homogenization=_homogenization,
             content_fallbacks=_all_content_fallbacks,
+            # PH12.2b
+            content_differentiation_state={
+                "state": _overall_hom_state,
+                "detected": _homogenization.get("detected", False),
+                "identical_dimensions": _homogenization.get("identical_dimensions", []),
+                "pairwise_similarity": _homogenization.get("pairwise_similarity", {}),
+            },
             metadata={
                 "framework": self._plan.framework,
                 "plan_id": self._plan.plan_id,
@@ -374,6 +457,8 @@ class StrategyCoordinator:
                 "alignment_status": alignment.status,
                 "alignment_rationale": alignment.rationale,
                 "mapped_option_id": alignment.mapped_option_id,
+                # PH12.2b
+                "consistency_guard": _consistency_guard,
             },
         )
 
