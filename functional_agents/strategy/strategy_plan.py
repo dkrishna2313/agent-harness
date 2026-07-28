@@ -17,7 +17,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from .strategy_config import AlignmentPolicy, DimensionConfig, ScoringPolicy
+from .strategy_config import AlignmentPolicy, ContentConfig, DimensionConfig, ScoringPolicy
 
 
 # ---------------------------------------------------------------------------
@@ -99,6 +99,9 @@ class StrategyPlan(BaseModel):
     # PH12.1a — forwarded from StrategyConfig
     alignment_policy: AlignmentPolicy = Field(default_factory=AlignmentPolicy)
     scoring_policy: ScoringPolicy = Field(default_factory=ScoringPolicy)
+
+    # PH12.2 — content assignment configuration forwarded from StrategyConfig
+    content_config: ContentConfig = Field(default_factory=ContentConfig)
 
     model_config = {"extra": "allow"}
 

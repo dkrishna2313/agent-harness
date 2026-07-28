@@ -142,6 +142,42 @@ class StrategyWriter(EditorialWriter):
                 "notes": "",
             })
 
+        # Bullet group 5: PH12.2 theory-specific content IDs and coverage
+        content_bullets: list[str] = []
+        if sn.content_assumption_ids:
+            content_bullets.append(
+                "Key assumptions: " + ", ".join(sn.content_assumption_ids)
+            )
+        if sn.content_risk_ids:
+            content_bullets.append(
+                "Key risks: " + ", ".join(sn.content_risk_ids)
+            )
+        if sn.content_opportunity_ids:
+            content_bullets.append(
+                "Key opportunities: " + ", ".join(sn.content_opportunity_ids)
+            )
+        if sn.content_evidence_ids:
+            content_bullets.append(
+                "Supporting evidence: " + ", ".join(sn.content_evidence_ids)
+            )
+        if sn.content_coverage_status:
+            content_bullets.append(f"Content coverage: {sn.content_coverage_status}")
+        if sn.content_confidence_level:
+            content_bullets.append(f"Content confidence: {sn.content_confidence_level}")
+        if sn.content_fallback_used:
+            content_bullets.append(
+                "Note: some content was assigned via posture-relevance fallback "
+                "(no explicit canonical link)."
+            )
+        if sn.content_homogenization_detected:
+            content_bullets.append(
+                "Warning: high content overlap detected across theories "
+                "(homogenization guard triggered)."
+            )
+
+        if content_bullets:
+            bullet_groups.append(content_bullets)
+
         # Subtitle: key selection facts
         parts: list[str] = []
         if sn.winner_option_title:
@@ -149,6 +185,12 @@ class StrategyWriter(EditorialWriter):
         parts.append(f"Score: {sn.winner_score:.2f}")
         if sn.overall_confidence:
             parts.append(f"Confidence: {sn.overall_confidence}")
+        if sn.content_coverage_status:
+            parts.append(f"Coverage: {sn.content_coverage_status}")
+
+        # Append winner rationale as final paragraph if present
+        if sn.winner_rationale:
+            paragraphs.append(sn.winner_rationale)
 
         sec.paragraphs = paragraphs
         sec.bullet_groups = bullet_groups

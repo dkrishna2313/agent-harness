@@ -55,6 +55,7 @@ from .theory_evaluation import CriterionScore, TheoryEvaluation
 
 if TYPE_CHECKING:
     from .alignment import ConstraintResult
+    from .theory_content import TheoryContent
 
 LOGGER = logging.getLogger(__name__)
 
@@ -171,6 +172,7 @@ class TheoryEvaluator:
         plan: StrategyPlan,
         research: Any,
         constraint_results: list["ConstraintResult"] | None = None,
+        theory_content: "TheoryContent | None" = None,
     ) -> TheoryEvaluation:
         """Produce one TheoryEvaluation for a single TheoryOfWinning.
 
@@ -195,13 +197,24 @@ class TheoryEvaluator:
             Scores for each criterion, qualitative observations, an
             overall_score, and confidence in the evaluation.
         """
-        criteria_scores = self._score_criteria(theory, plan, constraint_results)
+        criteria_scores = self._score_criteria(theory, plan, constraint_results, theory_content)
         overall_score = self._compute_overall_score(criteria_scores)
         strengths = self._extract_strengths(criteria_scores, theory)
         weaknesses = self._extract_weaknesses(criteria_scores, theory)
         residual_risks = list(theory.failure_modes)
         confidence = self._derive_confidence(theory, overall_score)
         theory_id = theory.theory_id or ""
+
+        content_meta: dict[str, Any] = {}
+        if theory_content is not None:
+            content_meta = {
+                "content_assumption_ids": theory_content.assumption_ids,
+                "content_risk_ids": theory_content.risk_ids,
+                "content_opportunity_ids": theory_content.opportunity_ids,
+                "content_evidence_ids": theory_content.evidence_ids,
+                "content_coverage_status": theory_content.coverage.status,
+                "content_confidence_level": theory_content.confidence.level,
+            }
 
         evaluation = TheoryEvaluation(
             theory_id=theory_id,
@@ -218,6 +231,7 @@ class TheoryEvaluator:
                 "n_evidence": len(theory.evidence),
                 "n_assumptions": len(theory.assumptions),
                 "n_failure_modes": len(theory.failure_modes),
+                **content_meta,
             },
         )
         LOGGER.debug(
@@ -238,6 +252,7 @@ class TheoryEvaluator:
         theory: TheoryOfWinning,
         plan: StrategyPlan,
         constraint_results: list["ConstraintResult"] | None = None,
+        theory_content: "TheoryContent | None" = None,
     ) -> dict[str, CriterionScore]:
         """Return one CriterionScore per criterion in the active criterion set.
 
@@ -252,7 +267,7 @@ class TheoryEvaluator:
         if plan_weights:
             # CONFIGURED mode — criterion set is exactly the plan's weight keys
             return {
-                name: self._score_one(name, weight, theory, vp, n_dims, constraint_results, sp)
+                name: self._score_one(name, weight, theory, vp, n_dims, constraint_results, sp, theory_content)
                 for name, weight in plan_weights.items()
             }
         else:
@@ -271,6 +286,7 @@ class TheoryEvaluator:
         n_dims: int,
         constraint_results: list["ConstraintResult"] | None = None,
         scoring_policy: Any = None,
+        theory_content: "TheoryContent | None" = None,
     ) -> CriterionScore:
         """Score a single criterion by name.
 
@@ -285,7 +301,7 @@ class TheoryEvaluator:
                 f"Remove {name!r} from the engagement evaluation configuration."
             )
         score, detail = TheoryEvaluator._raw_score(
-            name, theory, vp, n_dims, constraint_results, scoring_policy
+            name, theory, vp, n_dims, constraint_results, scoring_policy, theory_content
         )
         return TheoryEvaluator._make_score(name, score, weight, detail)
 
@@ -297,6 +313,7 @@ class TheoryEvaluator:
         n_dims: int,
         constraint_results: list["ConstraintResult"] | None = None,
         scoring_policy: Any = None,
+        theory_content: "TheoryContent | None" = None,
     ) -> tuple[float, str | None]:
         """Return (score, detail) for a recognised criterion.
 
@@ -374,12 +391,18 @@ class TheoryEvaluator:
             return sc, detail
 
         if name == "assumption_robustness":
-            n = len(theory.assumptions)
+            # PH12.2: use theory-specific assumption count when available
+            if theory_content is not None and theory_content.assumption_ids:
+                n = len(theory_content.assumption_ids)
+                source = "theory-specific"
+            else:
+                n = len(theory.assumptions)
+                source = "global"
             if vp.require_assumptions and n == 0:
                 sc = 0.0
             else:
                 sc = min(float(n) / 3.0, 1.0)
-            detail = f"{n} assumption(s) documented" if n > 0 else None
+            detail = f"{n} assumption(s) ({source})" if n > 0 else None
             return sc, detail
 
         if name == "execution_feasibility":
@@ -408,7 +431,13 @@ class TheoryEvaluator:
             return sc, detail
 
         if name == "risk_resilience":
-            n = len(theory.failure_modes)
+            # PH12.2: use theory-specific risk count when available
+            if theory_content is not None and theory_content.risk_ids:
+                n = len(theory_content.risk_ids)
+                source = "theory-specific"
+            else:
+                n = len(theory.failure_modes)
+                source = "global"
             if n == 0:
                 base = 0.3
             elif n == 1:
@@ -422,13 +451,19 @@ class TheoryEvaluator:
             penalty = v_pen * n_violated + p_pen * n_partial
             sc = max(0.0, round(base - penalty, 6))
             detail = (
-                f"{n} failure mode(s); constraint penalty="
+                f"{n} risk(s) ({source}); constraint penalty="
                 f"{penalty:.2f} (violated={n_violated}, partial={n_partial})"
             )
             return sc, detail
 
         if name == "opportunity_capture":
-            n = len(theory.success_conditions)
+            # PH12.2: prefer theory-specific success conditions when available
+            if theory_content is not None and theory_content.success_conditions:
+                n = len(theory_content.success_conditions)
+                source = "theory-specific"
+            else:
+                n = len(theory.success_conditions)
+                source = "global"
             if n == 0:
                 base = 0.3
             elif n == 1:
@@ -449,7 +484,7 @@ class TheoryEvaluator:
             w_pen = getattr(scoring_policy, "wait_and_monitor_penalty", 0.15) if scoring_policy else 0.15
             sc = max(0.0, round(base - (w_pen if has_wait else 0.0), 6))
             detail = (
-                f"{n} success condition(s)"
+                f"{n} success condition(s) ({source})"
                 + ("; wait-and-monitor penalty applied" if has_wait else "")
             )
             return sc, detail

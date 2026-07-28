@@ -87,6 +87,7 @@ class StrategyPlanner:
             dimension_configs=list(config.dimension_configs),
             alignment_policy=config.alignment_policy,
             scoring_policy=config.scoring_policy,
+            content_config=config.content,
         )
 
         LOGGER.debug(

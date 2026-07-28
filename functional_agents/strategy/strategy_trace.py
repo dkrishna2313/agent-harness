@@ -75,6 +75,15 @@ class StrategyTrace(BaseModel):
     alignment: dict[str, Any] = Field(default_factory=dict)
     saturation: dict[str, Any] = Field(default_factory=dict)
 
+    # PH12.2 — theory content lineage (backward-compatible optional)
+    theory_content: list[dict[str, Any]] = Field(default_factory=list)
+    theory_content_lineage: dict[str, Any] = Field(default_factory=dict)
+    theory_content_coverage: dict[str, Any] = Field(default_factory=dict)
+    theory_content_confidence: dict[str, Any] = Field(default_factory=dict)
+    theory_differentiation: dict[str, Any] = Field(default_factory=dict)
+    content_homogenization: dict[str, Any] = Field(default_factory=dict)
+    content_fallbacks: list[dict[str, Any]] = Field(default_factory=list)
+
     model_config = {"frozen": True, "extra": "allow"}
 
     @model_validator(mode="after")

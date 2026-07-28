@@ -6,6 +6,7 @@ Frameworks provide defaults; engagements can override them in later phases.
 PH9.0 scope: canonical Pydantic model with sensible defaults.
 PH12.0 scope: ChoiceConfig, DimensionConfig, dimension_configs field on StrategyConfig.
 PH12.1a scope: AlignmentPolicy, ScoringPolicy — policy blocks for configured evaluation.
+PH12.2 scope: ContentConfig — theory content assignment configuration.
 Not in scope: YAML loading, framework plugins.
 """
 
@@ -13,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # Supported mapping confidence levels for AlignmentPolicy validation
 _SUPPORTED_MAPPING_CONFIDENCES: frozenset[str] = frozenset({"High", "Medium", "Low", "None"})
@@ -74,6 +75,49 @@ class DimensionConfig(BaseModel):
     choices: list[ChoiceConfig] = Field(default_factory=list)
 
     model_config = {"frozen": True, "extra": "allow"}
+
+
+# ---------------------------------------------------------------------------
+# PH12.2 — Theory content assignment configuration
+# ---------------------------------------------------------------------------
+
+class ContentConfig(BaseModel):
+    """Configuration for theory-specific content assignment (PH12.2).
+
+    All fields have sensible defaults so PH12.2 runs without explicit configuration.
+    Validation raises ValueError on out-of-range values — no silent clamping.
+    """
+
+    minimum_relevance_score: float = 0.20
+    maximum_assumptions_per_theory: int = 5
+    maximum_risks_per_theory: int = 5
+    maximum_opportunities_per_theory: int = 5
+    maximum_recommendations_per_theory: int = 5
+    maximum_evidence_per_theory: int = 12
+    allow_symmetric_fallback: bool = True
+    minimum_content_coverage: float = 0.50
+
+    model_config = {"frozen": True, "extra": "allow"}
+
+    @field_validator("minimum_relevance_score", "minimum_content_coverage")
+    @classmethod
+    def _validate_fraction(cls, v: float) -> float:
+        if not (0.0 <= v <= 1.0):
+            raise ValueError(f"Value must be between 0.0 and 1.0, got {v}")
+        return v
+
+    @field_validator(
+        "maximum_assumptions_per_theory",
+        "maximum_risks_per_theory",
+        "maximum_opportunities_per_theory",
+        "maximum_recommendations_per_theory",
+        "maximum_evidence_per_theory",
+    )
+    @classmethod
+    def _validate_positive_int(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError(f"Maximum count must be a positive integer, got {v}")
+        return v
 
 
 # ---------------------------------------------------------------------------
@@ -191,6 +235,9 @@ class StrategyConfig(BaseModel):
     # PH12.1a — policy blocks (optional; defaults preserve PH12.1 behavior)
     alignment_policy: AlignmentPolicy = Field(default_factory=AlignmentPolicy)
     scoring_policy: ScoringPolicy = Field(default_factory=ScoringPolicy)
+
+    # PH12.2 — theory content assignment configuration
+    content: ContentConfig = Field(default_factory=ContentConfig)
 
     model_config = {"extra": "allow"}
 

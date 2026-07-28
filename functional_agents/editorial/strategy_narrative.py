@@ -86,12 +86,53 @@ class StrategyNarrative(BaseModel):
     selection_status: str = "selected"
     constraint_outcomes: list[dict[str, Any]] = Field(default_factory=list)
 
+    # PH12.2 — theory-specific content fields
+    content_assumption_ids: list[str] = Field(default_factory=list)
+    content_risk_ids: list[str] = Field(default_factory=list)
+    content_opportunity_ids: list[str] = Field(default_factory=list)
+    content_evidence_ids: list[str] = Field(default_factory=list)
+    content_coverage_status: str = ""      # sufficient | partial | fallback_heavy | insufficient
+    content_confidence_level: str = ""     # High | Medium | Low
+    content_fallback_used: bool = False
+    theory_differentiation: dict[str, Any] = Field(default_factory=dict)
+    content_homogenization_detected: bool = False
+    winner_rationale: str = ""             # why selected theory won vs runner-up
+
     model_config = {"frozen": True}
 
 
 # ---------------------------------------------------------------------------
 # Alignment narrative builder (deterministic, status-driven)
 # ---------------------------------------------------------------------------
+
+def _build_winner_rationale(
+    sel: Any,
+    winner_content: dict,
+    alignment_status: str,
+    mapping_confidence: str,
+) -> str:
+    """Build a concise deterministic rationale for why the winning theory was selected."""
+    parts: list[str] = []
+    score = getattr(sel, "winner_score", None)
+    margin = getattr(sel, "score_margin", None)
+    runner_up = getattr(sel, "runner_up_theory_id", None)
+
+    if score is not None:
+        parts.append(f"Winner scored {score:+.3f}")
+    if margin is not None and runner_up:
+        parts.append(f"margin +{margin:.3f} over runner-up")
+    cov = (winner_content.get("coverage") or {}).get("status", "")
+    if cov:
+        parts.append(f"content coverage: {cov}")
+    conf_lvl = (winner_content.get("confidence") or {}).get("level", "")
+    if conf_lvl:
+        parts.append(f"content confidence: {conf_lvl}")
+    if alignment_status:
+        parts.append(f"alignment: {alignment_status}")
+    if mapping_confidence:
+        parts.append(f"mapping: {mapping_confidence}")
+    return "; ".join(parts) if parts else ""
+
 
 def _build_alignment_narrative(status: str, winner_theory_label: str) -> str:
     """Build a short deterministic authority narrative based on alignment status."""
@@ -259,6 +300,33 @@ def build_strategy_narrative(trace: Any) -> "StrategyNarrative":
 
     alignment_narrative = _build_alignment_narrative(alignment_status, winner_theory_label)
 
+    # PH12.2 — extract theory content for winner from trace
+    theory_content_list = getattr(trace, "theory_content", []) or []
+    winner_content: dict = {}
+    for tc in theory_content_list:
+        if isinstance(tc, dict) and tc.get("theory_id") == sel.winner_theory_id:
+            winner_content = tc
+            break
+
+    content_assumption_ids = winner_content.get("assumption_ids", [])
+    content_risk_ids       = winner_content.get("risk_ids", [])
+    content_opportunity_ids = winner_content.get("opportunity_ids", [])
+    content_evidence_ids   = winner_content.get("evidence_ids", [])
+    content_coverage = winner_content.get("coverage", {}) or {}
+    content_coverage_status = content_coverage.get("status", "")
+    content_confidence = winner_content.get("confidence", "")
+    content_fallbacks  = getattr(trace, "content_fallbacks", []) or []
+    content_fallback_used = bool(content_fallbacks)
+
+    theory_diff = getattr(trace, "theory_differentiation", {}) or {}
+    homogenization = getattr(trace, "content_homogenization", {}) or {}
+    content_homogenization_detected = bool(homogenization.get("detected", False))
+
+    # Build why-winner rationale from content-specific evidence
+    winner_rationale = _build_winner_rationale(
+        sel, winner_content, alignment_status, mapping_confidence
+    )
+
     return StrategyNarrative(
         trace_id=trace.trace_id,
         framework=framework,
@@ -293,4 +361,19 @@ def build_strategy_narrative(trace: Any) -> "StrategyNarrative":
         saturation_detected=saturation_detected,
         selection_status=selection_status,
         constraint_outcomes=constraint_outcomes,
+        # PH12.2 — theory-specific content fields
+        content_assumption_ids=content_assumption_ids,
+        content_risk_ids=content_risk_ids,
+        content_opportunity_ids=content_opportunity_ids,
+        content_evidence_ids=content_evidence_ids,
+        content_coverage_status=content_coverage_status,
+        content_confidence_level=(
+            content_confidence.get("level", "")
+            if isinstance(content_confidence, dict)
+            else str(content_confidence)
+        ),
+        content_fallback_used=content_fallback_used,
+        theory_differentiation=theory_diff,
+        content_homogenization_detected=content_homogenization_detected,
+        winner_rationale=winner_rationale,
     )
