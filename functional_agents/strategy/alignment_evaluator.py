@@ -1,13 +1,11 @@
 """PH12.1a — AlignmentEvaluator (updated to consume AlignmentPolicy).
-
-Determines the relationship between the upstream preferred option (from research)
-and the theory selected by the Strategy Layer.
+PH12.1b — Adds confirmed/refined distinction.
 
 Status values:
-  confirmed  — selected theory maps to the same option, strong margin
-  refined    — selected theory maps to same option but margin is narrow
-  challenged — selected theory maps to a different option with significant margin
-  unresolved — no preferred option, or tie, or mapping confidence too low
+  confirmed  — same option, High-confidence mapping, clear margin
+  refined    — same option, Medium-confidence mapping (theory adds specificity)
+  challenged — different option with significant margin and sufficient confidence
+  unresolved — no preferred option, tie, low confidence, or below margin
 """
 
 from __future__ import annotations
@@ -63,7 +61,7 @@ class AlignmentEvaluator:
         margin = selection.score_margin or 0.0
         conf = option_mapping.mapping_confidence
 
-        # No preferred option → unresolved
+        # No preferred option -> unresolved
         if not preferred_id:
             return AlignmentResult(
                 status="unresolved",
@@ -92,7 +90,7 @@ class AlignmentEvaluator:
                 ),
             )
 
-        # Tie → unresolved (when configured)
+        # Tie -> unresolved (when configured)
         if ap.unresolved_on_tie and (margin == 0.0 or (selection.tie_breaker_used is not None)):
             return AlignmentResult(
                 status="unresolved",
@@ -106,17 +104,23 @@ class AlignmentEvaluator:
         # Agreement vs disagreement
         min_margin = ap.minimum_challenge_margin
         if mapped_id == preferred_id:
-            status = "confirmed" if margin >= min_margin else "refined"
+            # PH12.1b: confirmed vs refined distinction.
+            # confirmed: High confidence (option covers all theory dimensions strongly)
+            # refined:   Medium confidence (theory adds specificity beyond option coverage)
+            if conf == "High" and margin >= min_margin:
+                status = "confirmed"
+            else:
+                status = "refined"
             rationale = (
                 f"Selected theory maps to upstream preferred option {preferred_id!r} "
-                f"(margin={margin:.3f})."
+                f"(margin={margin:.3f}, mapping_confidence={conf!r})."
             )
         else:
             if margin >= min_margin:
                 status = "challenged"
                 rationale = (
                     f"Selected theory maps to {mapped_id!r}, not the upstream preferred "
-                    f"option {preferred_id!r} (margin={margin:.3f} ≥ threshold={min_margin})."
+                    f"option {preferred_id!r} (margin={margin:.3f} >= threshold={min_margin})."
                 )
             else:
                 status = "unresolved"
@@ -126,8 +130,8 @@ class AlignmentEvaluator:
                 )
 
         LOGGER.debug(
-            "[AlignmentEvaluator] status=%s preferred=%s mapped=%s margin=%.3f",
-            status, preferred_id, mapped_id, margin,
+            "[AlignmentEvaluator] status=%s preferred=%s mapped=%s margin=%.3f conf=%s",
+            status, preferred_id, mapped_id, margin, conf,
         )
 
         return AlignmentResult(

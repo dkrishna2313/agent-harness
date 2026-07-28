@@ -1,4 +1,5 @@
 """StrategyWriter — PH11.4 Editorial Writer.
+PH12.1b — sentence-safe truncation replacing bare [:N] slices.
 
 Consumes EditorialBrief.strategy_narrative (when present) and populates
 EditorialManuscript.strategic_direction with presentation-ready content.
@@ -21,6 +22,25 @@ from .editorial_manuscript import EditorialManuscript
 from .editorial_writer import EditorialWriter
 
 LOGGER = logging.getLogger(__name__)
+
+
+def truncate_sentence_safe(text: str, limit: int = 300) -> str:
+    """Truncate text at a sentence or clause boundary, never mid-word."""
+    if len(text) <= limit:
+        return text
+    # Find last sentence-ending punctuation before limit
+    for i in range(min(limit, len(text)) - 1, max(0, limit - 100), -1):
+        if text[i] in ".!?" and (i + 1 >= len(text) or text[i + 1] in " \n\t\"'"):
+            return text[: i + 1]
+    # Find last clause boundary
+    for i in range(min(limit, len(text)) - 1, max(0, limit - 80), -1):
+        if text[i] in ",;:" and i + 1 < len(text) and text[i + 1] == " ":
+            return text[: i + 1]
+    # Find last word boundary
+    for i in range(min(limit, len(text)) - 1, max(0, limit - 40), -1):
+        if text[i] == " ":
+            return text[:i]
+    return text
 
 
 class StrategyWriter(EditorialWriter):
@@ -77,19 +97,19 @@ class StrategyWriter(EditorialWriter):
             criteria_bullets.append(f"{crit}: {score:.2f}")
         # Append evaluation strengths to criteria group
         for s in sn.winner_evaluation_strengths[:4]:
-            criteria_bullets.append(f"+ {s[:180]}")
+            criteria_bullets.append(f"+ {truncate_sentence_safe(s, 180)}")
 
         # Bullet group 1: key assumptions (up to 8)
-        assumption_bullets = [a[:200] for a in sn.assumptions[:8]]
+        assumption_bullets = [truncate_sentence_safe(a, 300) for a in sn.assumptions[:8]]
 
         # Bullet group 2: success conditions (up to 6)
-        condition_bullets = [c[:200] for c in sn.success_conditions[:6]]
+        condition_bullets = [truncate_sentence_safe(c, 300) for c in sn.success_conditions[:6]]
 
         # Bullet group 3: failure modes (up to 6)
-        failure_bullets = [fm[:200] for fm in sn.failure_modes[:6]]
+        failure_bullets = [truncate_sentence_safe(fm, 300) for fm in sn.failure_modes[:6]]
 
         # Bullet group 4: strategic choices (up to 6), if any
-        choices_bullets = [sc[:200] for sc in sn.winner_strategic_choices[:6]]
+        choices_bullets = [truncate_sentence_safe(sc, 300) for sc in sn.winner_strategic_choices[:6]]
 
         bullet_groups: list[list[str]] = [
             criteria_bullets,
