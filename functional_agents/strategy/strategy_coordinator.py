@@ -110,9 +110,14 @@ class StrategyCoordinator:
     reflects the selected theory rather than the legacy extraction path.
     """
 
-    def __init__(self, config: StrategyConfig | None = None) -> None:
+    def __init__(
+        self,
+        config: StrategyConfig | None = None,
+        raw_strategy_yaml: dict | None = None,
+    ) -> None:
         raw = config if config is not None else StrategyConfig()
         self._config = ConfigurationResolver().resolve(raw)
+        self._raw_strategy_yaml: dict = raw_strategy_yaml or {}
         self._plan = StrategyPlanner().build(self._config)
         self._choice_sets: list = []                   # set in build()
         self._theories: list = []                      # set in build()
@@ -200,8 +205,7 @@ class StrategyCoordinator:
 
         # PH12.2b: resolve theory content after selection
         content_cfg = getattr(self._plan, "content_config", None)
-        _raw_strategy_yaml = getattr(self._plan, "_raw_strategy_yaml", None)
-        _resolved_cfg = resolve_strategy_config(_raw_strategy_yaml or {})
+        _resolved_cfg = resolve_strategy_config(self._raw_strategy_yaml)
         _content_graph = ContentGraph().build(ctx)
         _content_resolver = ContentResolver(_content_graph, content_cfg)
         all_theory_contents: dict = {}
