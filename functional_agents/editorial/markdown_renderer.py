@@ -333,11 +333,10 @@ class MarkdownRenderer:
                     lines.append(f"- {b}")
                 lines.append("")
 
-        # Alternatives Considered
-        if sec.tables:
+        # Alternatives Considered — table[0] only; table[1] is PH12.2b Alternative Differentiation
+        if sec.tables and sec.tables[0].get("rows"):
             lines += ["### Alternatives Considered", ""]
-            for table in sec.tables:
-                lines += self._render_table(table)
+            lines += self._render_table(sec.tables[0])
 
         # Strategic Choices (when present — bullet group 4)
         if len(bgs) > 4 and bgs[4]:
@@ -464,17 +463,17 @@ class MarkdownRenderer:
                     lines.append(f"**Content Confidence:** {sn.content_confidence_level}")
                 lines.append("")
 
-        # PH12.2b — Alternative Differentiation table (tables[1])
-        if sn is not None and len(tables) > 1 and tables[1].get("rows"):
+        # PH12.2b — Alternative Differentiation table (sec.tables[1])
+        if sn is not None and len(sec.tables) > 1 and sec.tables[1].get("rows"):
             lines += ["### Alternative Differentiation", ""]
             lines.append(
                 "*Distinctive items are unique to each theory; shared items appear in all theories.*"
             )
             lines.append("")
-            hdrs = tables[1]["headers"]
+            hdrs = sec.tables[1]["headers"]
             lines.append("| " + " | ".join(hdrs) + " |")
             lines.append("|" + "|".join(["---"] * len(hdrs)) + "|")
-            for row in tables[1]["rows"]:
+            for row in sec.tables[1]["rows"]:
                 lines.append("| " + " | ".join(str(c).replace("|", "\\|") for c in row) + " |")
             lines.append("")
 

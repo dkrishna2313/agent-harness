@@ -452,12 +452,13 @@ class TestComputeDifferentiation:
         # Jaccard of identical sets = 1.0 in all dims → homogenization
         assert result["content_homogenization_detected"] is True
 
-    def test_homogenization_suppressed_when_explicit_links_justify_overlap(self):
-        # Same content but explicit_count > 0 → justified overlap
+    def test_homogenization_detected_regardless_of_explicit_links(self):
+        # PH12.2b: explicit-link exemption removed — full overlap detected even when explicit_count > 0
         tc1 = self._make_tc("TH-001", ["A-001"], ["RSK-001"], ["OPP-001"], ["EV-001"], ["REC-001"], explicit_count=5)
         tc2 = self._make_tc("TH-002", ["A-001"], ["RSK-001"], ["OPP-001"], ["EV-001"], ["REC-001"], explicit_count=5)
         result = compute_differentiation([tc1, tc2])
-        assert result["content_homogenization_detected"] is False
+        assert result["content_homogenization_detected"] is True
+        assert result["homogenization_state"] == "full"
 
     def test_overall_similarity_is_mean_of_five_dims(self):
         tc1 = self._make_tc("TH-001", ["A-001"], [], [], [], [])
@@ -1091,7 +1092,7 @@ class TestMarkdownRendererPH122:
 
     def test_why_winner_section_rendered(self):
         output = self._render()
-        assert "Why This Theory Won" in output
+        assert "Why This Strategy Won" in output
 
     def test_theory_specific_content_section_rendered(self):
         output = self._render()
