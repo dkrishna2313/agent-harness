@@ -178,6 +178,79 @@ class StrategyWriter(EditorialWriter):
         if content_bullets:
             bullet_groups.append(content_bullets)
 
+        # Bullet group 6: PH12.2b — Distinctive Strategic Content
+        distinctive_bullets: list[str] = []
+        if sn.distinctive_assumption_ids:
+            distinctive_bullets.append(
+                "Distinctive assumptions: " + ", ".join(sn.distinctive_assumption_ids)
+            )
+        if sn.distinctive_recommendation_ids:
+            distinctive_bullets.append(
+                "Distinctive recommendations: " + ", ".join(sn.distinctive_recommendation_ids)
+            )
+        if sn.distinctive_evidence_ids:
+            distinctive_bullets.append(
+                "Distinctive evidence: " + ", ".join(sn.distinctive_evidence_ids)
+            )
+        state = sn.homogenization_state
+        if state and state != "none":
+            distinctive_bullets.append(
+                f"Content overlap across theories: {state.capitalize()}."
+            )
+        if distinctive_bullets:
+            bullet_groups.append(distinctive_bullets)
+
+        # Bullet group 7: PH12.2b — Shared Strategic Context
+        shared_bullets: list[str] = []
+        if sn.shared_assumption_ids:
+            shared_bullets.append(
+                "Shared assumptions (across all theories): " + ", ".join(sn.shared_assumption_ids)
+            )
+        if sn.shared_recommendation_ids:
+            shared_bullets.append(
+                "Shared recommendations (across all theories): " + ", ".join(sn.shared_recommendation_ids)
+            )
+        if sn.shared_evidence_ids:
+            shared_bullets.append(
+                "Shared evidence (across all theories): " + ", ".join(sn.shared_evidence_ids)
+            )
+        if shared_bullets:
+            bullet_groups.append(shared_bullets)
+
+        # Table 1: PH12.2b — Alternative Differentiation table
+        if sn.alternative_differentiation:
+            diff_rows = []
+            for tid, info in sn.alternative_differentiation.items():
+                label = info.get("recommended_option_title") or tid
+                d_a = info.get("distinctive_assumption_count", 0)
+                d_r = info.get("distinctive_recommendation_count", 0)
+                d_e = info.get("distinctive_evidence_count", 0)
+                hom = info.get("homogenization_state", "none")
+                cov = info.get("coverage_status", "—")
+                conf = info.get("confidence_level", "—")
+                score = info.get("score", 0.0)
+                diff_rows.append([
+                    tid,
+                    label,
+                    f"{score:.2f}",
+                    str(d_a),
+                    str(d_r),
+                    str(d_e),
+                    hom.capitalize(),
+                    cov,
+                    conf,
+                ])
+            tables.append({
+                "title": "",
+                "headers": [
+                    "Theory ID", "Option", "Score",
+                    "Dist. Assumptions", "Dist. Recs", "Dist. Evidence",
+                    "Overlap", "Coverage", "Confidence"
+                ],
+                "rows": diff_rows,
+                "notes": "",
+            })
+
         # Subtitle: key selection facts
         parts: list[str] = []
         if sn.winner_option_title:

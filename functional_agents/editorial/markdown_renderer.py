@@ -333,11 +333,10 @@ class MarkdownRenderer:
                     lines.append(f"- {b}")
                 lines.append("")
 
-        # Alternatives Considered
-        if sec.tables:
+        # Alternatives Considered — table[0] only; table[1] is PH12.2b Alternative Differentiation
+        if sec.tables and sec.tables[0].get("rows"):
             lines += ["### Alternatives Considered", ""]
-            for table in sec.tables:
-                lines += self._render_table(table)
+            lines += self._render_table(sec.tables[0])
 
         # Strategic Choices (when present — bullet group 4)
         if len(bgs) > 4 and bgs[4]:
@@ -423,8 +422,59 @@ class MarkdownRenderer:
 
         # PH12.2 §25 — Why the winner won (rationale paragraph)
         if sn is not None and sn.winner_rationale:
-            lines += ["### Why This Theory Won", ""]
+            lines += ["### Why This Strategy Won", ""]
             lines.append(sn.winner_rationale)
+            lines.append("")
+
+        # PH12.2b — Distinctive Strategic Content
+        if sn is not None and len(bgs) > 6 and bgs[6]:
+            lines += ["### Distinctive Strategic Content", ""]
+            for b in bgs[6]:
+                lines.append(f"- {b}")
+            lines.append("")
+
+        # PH12.2b — Shared Strategic Context
+        if sn is not None and len(bgs) > 7 and bgs[7]:
+            lines += ["### Shared Strategic Context", ""]
+            lines.append(
+                "*The following content is shared across all theories and represents "
+                "common strategic ground regardless of which theory is selected.*"
+            )
+            lines.append("")
+            for b in bgs[7]:
+                lines.append(f"- {b}")
+            lines.append("")
+
+        # PH12.2b — Content Quality (homogenization state)
+        if sn is not None:
+            hom_state = getattr(sn, "homogenization_state", "none") or "none"
+            if hom_state != "none":
+                state_map = {
+                    "partial": "Partial overlap (≥75% similarity on at least one dimension)",
+                    "substantial": "Substantial overlap (multiple dimensions at high similarity)",
+                    "full": "Full overlap (all content identical across theories — differentiation failed)",
+                }
+                state_msg = state_map.get(hom_state, hom_state.capitalize())
+                lines += ["### Content Quality", ""]
+                lines.append(f"**Homogenization State:** {state_msg}")
+                if sn.content_coverage_status:
+                    lines.append(f"**Coverage Status:** {sn.content_coverage_status.replace('_', ' ').title()}")
+                if sn.content_confidence_level:
+                    lines.append(f"**Content Confidence:** {sn.content_confidence_level}")
+                lines.append("")
+
+        # PH12.2b — Alternative Differentiation table (sec.tables[1])
+        if sn is not None and len(sec.tables) > 1 and sec.tables[1].get("rows"):
+            lines += ["### Alternative Differentiation", ""]
+            lines.append(
+                "*Distinctive items are unique to each theory; shared items appear in all theories.*"
+            )
+            lines.append("")
+            hdrs = sec.tables[1]["headers"]
+            lines.append("| " + " | ".join(hdrs) + " |")
+            lines.append("|" + "|".join(["---"] * len(hdrs)) + "|")
+            for row in sec.tables[1]["rows"]:
+                lines.append("| " + " | ".join(str(c).replace("|", "\\|") for c in row) + " |")
             lines.append("")
 
         return lines

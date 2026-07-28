@@ -84,6 +84,12 @@ class StrategyTrace(BaseModel):
     content_homogenization: dict[str, Any] = Field(default_factory=dict)
     content_fallbacks: list[dict[str, Any]] = Field(default_factory=list)
 
+    # PH12.2b — discrimination fields (backward-compatible optional)
+    # theory_discrimination: {theory_id: {"distinctive_*_ids": [...], "shared_*_ids": [...], ...}}
+    theory_discrimination: dict[str, Any] = Field(default_factory=dict)
+    # content_differentiation_state: {"state": "none"|"partial"|"substantial"|"full", ...}
+    content_differentiation_state: dict[str, Any] = Field(default_factory=dict)
+
     model_config = {"frozen": True, "extra": "allow"}
 
     @model_validator(mode="after")

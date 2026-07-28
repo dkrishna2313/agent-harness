@@ -7,6 +7,7 @@ PH9.0 scope: canonical Pydantic model with sensible defaults.
 PH12.0 scope: ChoiceConfig, DimensionConfig, dimension_configs field on StrategyConfig.
 PH12.1a scope: AlignmentPolicy, ScoringPolicy — policy blocks for configured evaluation.
 PH12.2 scope: ContentConfig — theory content assignment configuration.
+PH12.2b scope: ContentConfig extended with discrimination controls.
 Not in scope: YAML loading, framework plugins.
 """
 
@@ -14,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 # Supported mapping confidence levels for AlignmentPolicy validation
 _SUPPORTED_MAPPING_CONFIDENCES: frozenset[str] = frozenset({"High", "Medium", "Low", "None"})
@@ -97,9 +98,24 @@ class ContentConfig(BaseModel):
     allow_symmetric_fallback: bool = True
     minimum_content_coverage: float = 0.50
 
+    # PH12.2b — discrimination controls
+    minimum_discrimination_score: float = 0.20
+    maximum_shared_assumptions: int = 5
+    maximum_shared_recommendations: int = 5
+    maximum_shared_evidence: int = 12
+    partial_homogenization_threshold: float = 0.75
+    full_homogenization_threshold: float = 0.95
+    maximum_identical_dimensions: int = 2
+
     model_config = {"frozen": True, "extra": "allow"}
 
-    @field_validator("minimum_relevance_score", "minimum_content_coverage")
+    @field_validator(
+        "minimum_relevance_score",
+        "minimum_content_coverage",
+        "minimum_discrimination_score",
+        "partial_homogenization_threshold",
+        "full_homogenization_threshold",
+    )
     @classmethod
     def _validate_fraction(cls, v: float) -> float:
         if not (0.0 <= v <= 1.0):
@@ -112,12 +128,31 @@ class ContentConfig(BaseModel):
         "maximum_opportunities_per_theory",
         "maximum_recommendations_per_theory",
         "maximum_evidence_per_theory",
+        "maximum_shared_assumptions",
+        "maximum_shared_recommendations",
+        "maximum_shared_evidence",
     )
     @classmethod
     def _validate_positive_int(cls, v: int) -> int:
         if v <= 0:
             raise ValueError(f"Maximum count must be a positive integer, got {v}")
         return v
+
+    @field_validator("maximum_identical_dimensions")
+    @classmethod
+    def _validate_non_negative_int(cls, v: int) -> int:
+        if v < 0:
+            raise ValueError(f"Value must be a non-negative integer, got {v}")
+        return v
+
+    @model_validator(mode="after")
+    def _validate_homogenization_thresholds(self) -> "ContentConfig":
+        if self.full_homogenization_threshold < self.partial_homogenization_threshold:
+            raise ValueError(
+                f"full_homogenization_threshold ({self.full_homogenization_threshold}) "
+                f"must be >= partial_homogenization_threshold ({self.partial_homogenization_threshold})"
+            )
+        return self
 
 
 # ---------------------------------------------------------------------------
