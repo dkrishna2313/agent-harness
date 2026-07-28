@@ -22,6 +22,23 @@ if TYPE_CHECKING:
 
 LOGGER = logging.getLogger(__name__)
 
+
+def _truncate_sentence_safe(text: str, limit: int = 300) -> str:
+    """Truncate text at sentence/clause boundary, never mid-word."""
+    if len(text) <= limit:
+        return text
+    for i in range(min(limit, len(text)) - 1, max(0, limit - 100), -1):
+        if text[i] in ".!?" and (i + 1 >= len(text) or text[i + 1] in " \n\t\"'"):
+            return text[: i + 1]
+    for i in range(min(limit, len(text)) - 1, max(0, limit - 80), -1):
+        if text[i] in ",;:" and i + 1 < len(text) and text[i + 1] == " ":
+            return text[: i + 1]
+    for i in range(min(limit, len(text)) - 1, max(0, limit - 40), -1):
+        if text[i] == " ":
+            return text[:i]
+    return text
+
+
 _TIMEFRAME_DISPLAY: dict[str, str] = {
     "near_term": "Near-term (3–12 months)",
     "medium_term": "Medium-term (1–3 years)",
@@ -243,26 +260,53 @@ class MarkdownRenderer:
 
         lines: list[str] = ["---", "", "## Strategic Direction", ""]
 
-        # Header table: winner identity and scores
+        # PH12.1b — authority table with full selection and alignment context
         if sn is not None:
+            # Resolve option titles for display (brief carries the options list)
+            def _opt_title(opt_id: str | None) -> str:
+                if not opt_id:
+                    return "—"
+                if brief:
+                    for o in (getattr(brief.strategic_options, "options", None) or []):
+                        if getattr(o, "option_id", None) == opt_id:
+                            return getattr(o, "title", opt_id)
+                return opt_id
+
+            preferred_title = _opt_title(sn.preferred_option_id or None)
+            mapped_title = _opt_title(sn.mapped_option_id)
+            saturation_display = "Yes" if sn.saturation_detected else "No"
+            selection_display = (sn.selection_status or "selected").replace("_", " ").title()
+
             lines += ["| Field | Value |", "|---|---|"]
-            lines.append(f"| Selected Theory | {sn.winner_theory_id} |")
-            if sn.winner_option_title:
-                lines.append(f"| Recommended Strategy | {sn.winner_option_title} |")
+            lines.append(f"| Upstream Preferred Option | {preferred_title} |")
+            lines.append(
+                f"| Selected Theory | "
+                f"{(sn.winner_theory_label or sn.winner_theory_id)} |"
+            )
+            lines.append(f"| Mapped Strategic Option | {mapped_title} |")
+            if sn.alignment_status:
+                lines.append(f"| Alignment Status | {sn.alignment_status.title()} |")
+            lines.append(f"| Selection Status | {selection_display} |")
             lines.append(f"| Winner Score | {sn.winner_score:.3f} |")
-            if sn.runner_up_theory_id:
-                lines.append(f"| Runner-up Theory | {sn.runner_up_theory_id} |")
             if sn.runner_up_score is not None:
                 lines.append(f"| Runner-up Score | {sn.runner_up_score:.3f} |")
             if sn.score_margin is not None:
                 lines.append(f"| Score Margin | {sn.score_margin:.3f} |")
+            if sn.mapping_confidence:
+                lines.append(f"| Mapping Confidence | {sn.mapping_confidence} |")
+            lines.append(f"| Saturation Status | {saturation_display} |")
             if sn.overall_confidence:
-                lines.append(f"| Confidence | {sn.overall_confidence} |")
+                lines.append(f"| Evaluation Confidence | {sn.overall_confidence} |")
             if sn.framework:
                 lines.append(f"| Framework | {sn.framework} |")
             if sn.tie_breaker_used:
                 lines.append(f"| Tie-breaker Used | {sn.tie_breaker_used} |")
             lines.append("")
+
+            # Alignment narrative paragraph
+            if sn.alignment_narrative:
+                lines.append(f"*{sn.alignment_narrative}*")
+                lines.append("")
 
         # Recommended Strategy subsection
         lines += ["### Recommended Strategy", ""]
@@ -323,6 +367,22 @@ class MarkdownRenderer:
             lines += ["### Risks and Failure Modes", ""]
             for b in bgs[3]:
                 lines.append(f"- {b}")
+            lines.append("")
+
+        # PH12.1b — Constraint Assessment table (winner theory only)
+        if sn is not None and sn.constraint_outcomes:
+            lines += ["### Constraint Assessment", ""]
+            lines += [
+                "| Constraint | Status | Score | Rationale |",
+                "|---|---|---|---|",
+            ]
+            for co in sn.constraint_outcomes:
+                constraint = str(co.get("constraint", "—")).replace("|", "\\|")
+                status = str(co.get("status", "—")).replace("_", " ").title()
+                score_raw = co.get("score", "")
+                score_str = f"{score_raw:.2f}" if isinstance(score_raw, (int, float)) else str(score_raw)
+                rationale = _truncate_sentence_safe(str(co.get("rationale", "—")), 200).replace("|", "\\|")
+                lines.append(f"| {constraint} | {status} | {score_str} | {rationale} |")
             lines.append("")
 
         return lines

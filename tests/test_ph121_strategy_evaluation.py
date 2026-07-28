@@ -317,11 +317,11 @@ class TestOptionMapper:
         assert result.mapping_confidence == "None"
 
     def test_confidence_tiers(self):
-        # Direct test of _confidence static method
-        assert OptionMapper._confidence(0.80) == "High"
-        assert OptionMapper._confidence(0.50) == "Medium"
-        assert OptionMapper._confidence(0.20) == "Low"
-        assert OptionMapper._confidence(0.00) == "None"
+        # Direct test of _confidence static method (PH12.1b: takes score, separation, has_contradictions)
+        assert OptionMapper._confidence(0.80, 0.30, False) == "High"
+        assert OptionMapper._confidence(0.30, 0.10, False) == "Medium"
+        assert OptionMapper._confidence(0.10, 0.05, False) == "Low"
+        assert OptionMapper._confidence(0.00, 0.00, False) == "None"
 
     def test_no_keywords_returns_none_confidence(self):
         research = self._make_research_with_options([

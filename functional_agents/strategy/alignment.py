@@ -1,4 +1,5 @@
 """PH12.1 — alignment models for theory-specific evaluation.
+PH12.1b — OptionMapping extended with option_scores and theory_postures.
 
 ConstraintResult: outcome of checking one plan constraint against a theory.
 OptionMapping:    best upstream strategic option the theory maps to.
@@ -6,6 +7,8 @@ AlignmentResult:  relationship between upstream recommendation and selected theo
 """
 
 from __future__ import annotations
+
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -30,6 +33,9 @@ class OptionMapping(BaseModel):
     mapping_rationale: str = ""
     # "High" | "Medium" | "Low" | "None"
     mapping_confidence: str = "Low"
+    # PH12.1b — full per-option scoring diagnostics (backward-compatible optional)
+    option_scores: list[dict[str, Any]] = Field(default_factory=list)
+    theory_postures: dict[str, str] = Field(default_factory=dict)
 
     model_config = {"frozen": True, "extra": "allow"}
 

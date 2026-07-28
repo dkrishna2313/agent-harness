@@ -1,6 +1,8 @@
 """StrategyNarrative — presentation-focused editorial model for Strategy content (PH11.4).
+PH12.1b — Added authority fields: alignment_status, alignment_narrative, mapped_option_id,
+preferred_option_id, mapping_confidence, saturation_detected, selection_status,
+constraint_outcomes, winner_theory_label.
 
-Carries selected Strategy reasoning into the editorial layer.
 Produced by build_strategy_narrative() from a StrategyTrace.
 Consumed by StrategyWriter and MarkdownRenderer.
 
@@ -71,10 +73,49 @@ class StrategyNarrative(BaseModel):
     # Alternatives (non-winner theories, sorted by score descending)
     alternatives: list[StrategyAlternativeSummary] = Field(default_factory=list)
 
+    # PH12.1b — authority fields (backward-compatible optional)
+    winner_theory_label: str = ""          # "Diversified / BTM First / Milestone Gated"
+    alignment_status: str = ""
+    alignment_narrative: str = ""
+    mapped_option_id: str | None = None
+    mapped_option_title: str = ""
+    preferred_option_id: str = ""
+    preferred_option_title: str = ""
+    mapping_confidence: str = ""
+    saturation_detected: bool = False
+    selection_status: str = "selected"
+    constraint_outcomes: list[dict[str, Any]] = Field(default_factory=list)
+
     model_config = {"frozen": True}
 
 
-def build_strategy_narrative(trace: Any) -> StrategyNarrative:
+# ---------------------------------------------------------------------------
+# Alignment narrative builder (deterministic, status-driven)
+# ---------------------------------------------------------------------------
+
+def _build_alignment_narrative(status: str, winner_theory_label: str) -> str:
+    """Build a short deterministic authority narrative based on alignment status."""
+    if status == "confirmed":
+        return "The configured Strategy evaluation confirms the upstream preferred option."
+    if status == "refined":
+        posture = f" through a {winner_theory_label.lower()} execution posture" if winner_theory_label else ""
+        return (
+            f"The configured Strategy evaluation reinforces the upstream preferred option"
+            f"{posture}."
+        )
+    if status == "challenged":
+        return (
+            "The configured Strategy evaluation selects a different option and exceeds "
+            "the upstream preferred option by the required challenge margin."
+        )
+    # unresolved or empty
+    return (
+        "The configured Strategy evaluation did not establish a sufficiently reliable "
+        "option mapping. The upstream preferred option remains authoritative."
+    )
+
+
+def build_strategy_narrative(trace: Any) -> "StrategyNarrative":
     """Build a StrategyNarrative from a StrategyTrace.
 
     Pure function: no LLM calls, no file I/O, no mutations to the trace.
@@ -146,6 +187,16 @@ def build_strategy_narrative(trace: Any) -> StrategyNarrative:
         else:
             winner_strategic_choices.append(str(sc))
 
+    # PH12.1b — winner theory label (human-readable choice summary)
+    winner_theory_label_parts: list[str] = []
+    for sc in winner_theory.strategic_choices:
+        if isinstance(sc, dict):
+            meta = sc.get("metadata") or {}
+            title = meta.get("choice_title") or sc.get("selected_value", "")
+            if title:
+                winner_theory_label_parts.append(str(title).title())
+    winner_theory_label = " / ".join(winner_theory_label_parts)
+
     # Build alternatives (non-winner theories), sorted by score descending
     eval_by_id = {ev.theory_id: ev for ev in trace.evaluations}
     alternatives: list[StrategyAlternativeSummary] = []
@@ -153,7 +204,6 @@ def build_strategy_narrative(trace: Any) -> StrategyNarrative:
         if theory.theory_id == sel.winner_theory_id:
             continue
         ev = eval_by_id.get(theory.theory_id)
-        # Extract residual risk descriptions
         residual_risk_descs: list[str] = []
         if ev:
             for rr in ev.residual_risks:
@@ -181,6 +231,34 @@ def build_strategy_narrative(trace: Any) -> StrategyNarrative:
 
     framework = trace.metadata.get("framework", "") or getattr(trace.plan, "framework", "")
 
+    # PH12.1b — extract authority fields from trace
+    alignment_block = getattr(trace, "alignment", {}) or {}
+    saturation_block = getattr(trace, "saturation", {}) or {}
+
+    alignment_status = alignment_block.get("status", "")
+    mapped_option_id = alignment_block.get("mapped_option_id")
+    preferred_option_id = alignment_block.get("preferred_option_id", "")
+
+    # mapping_confidence: look up from theory_option_mappings for the winner
+    mapping_confidence = ""
+    for tom in (getattr(trace, "theory_option_mappings", None) or []):
+        if isinstance(tom, dict) and tom.get("theory_id") == sel.winner_theory_id:
+            mapping_confidence = tom.get("mapping_confidence", "")
+            break
+
+    saturation_detected = bool(saturation_block.get("detected", False))
+    selection_status = getattr(sel, "selection_status", "selected") or "selected"
+
+    # constraint_outcomes for winner theory
+    constraint_results = getattr(trace, "constraint_results", {}) or {}
+    raw_constraints = constraint_results.get(sel.winner_theory_id, [])
+    constraint_outcomes: list[dict[str, Any]] = []
+    for cr in raw_constraints:
+        if isinstance(cr, dict):
+            constraint_outcomes.append(cr)
+
+    alignment_narrative = _build_alignment_narrative(alignment_status, winner_theory_label)
+
     return StrategyNarrative(
         trace_id=trace.trace_id,
         framework=framework,
@@ -203,4 +281,16 @@ def build_strategy_narrative(trace: Any) -> StrategyNarrative:
         failure_modes=failure_modes,
         winner_strategic_choices=winner_strategic_choices,
         alternatives=alternatives,
+        # PH12.1b authority fields
+        winner_theory_label=winner_theory_label,
+        alignment_status=alignment_status,
+        alignment_narrative=alignment_narrative,
+        mapped_option_id=mapped_option_id,
+        mapped_option_title="",       # title lookup deferred to renderer via brief
+        preferred_option_id=preferred_option_id,
+        preferred_option_title="",    # title lookup deferred to renderer via brief
+        mapping_confidence=mapping_confidence,
+        saturation_detected=saturation_detected,
+        selection_status=selection_status,
+        constraint_outcomes=constraint_outcomes,
     )

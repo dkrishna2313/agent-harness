@@ -268,6 +268,8 @@ class StrategyCoordinator:
                 "mapping_score": all_mappings[t.theory_id].mapping_score,
                 "mapping_confidence": all_mappings[t.theory_id].mapping_confidence,
                 "mapping_rationale": all_mappings[t.theory_id].mapping_rationale,
+                "option_scores": all_mappings[t.theory_id].option_scores,
+                "theory_postures": all_mappings[t.theory_id].theory_postures,
             }
             for t in self._theories
         ]
