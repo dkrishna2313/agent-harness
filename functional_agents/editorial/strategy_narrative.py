@@ -132,10 +132,12 @@ def _build_winner_rationale(
         parts.append(f"Winner scored {score:+.3f}")
     if margin is not None and runner_up:
         parts.append(f"margin +{margin:.3f} over runner-up")
-    cov = (winner_content.get("coverage") or {}).get("status", "")
+    _cov = winner_content.get("coverage") or {}
+    cov = _cov.get("status", "") if isinstance(_cov, dict) else ""
     if cov:
         parts.append(f"content coverage: {cov}")
-    conf_lvl = (winner_content.get("confidence") or {}).get("level", "")
+    _conf = winner_content.get("confidence")
+    conf_lvl = (_conf.get("level", "") if isinstance(_conf, dict) else str(_conf or ""))
     if conf_lvl:
         parts.append(f"content confidence: {conf_lvl}")
     if alignment_status:
@@ -364,8 +366,10 @@ def build_strategy_narrative(trace: Any) -> "StrategyNarrative":
             "distinctive_recommendation_count": d_recs,
             "distinctive_evidence_count": d_ev,
             "homogenization_state": tc.get("homogenization_state", "none"),
-            "coverage_status": (tc.get("coverage") or {}).get("status", ""),
-            "confidence_level": (tc.get("confidence") or {}).get("level", ""),
+            "coverage_status": (tc.get("coverage") or {}).get("status", "")
+            if isinstance(tc.get("coverage"), dict) else "",
+            "confidence_level": (tc.get("confidence") or {}).get("level", "")
+            if isinstance(tc.get("confidence"), dict) else str(tc.get("confidence") or ""),
         }
 
     # Build why-winner rationale from content-specific evidence
