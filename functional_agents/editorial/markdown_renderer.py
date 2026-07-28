@@ -385,6 +385,48 @@ class MarkdownRenderer:
                 lines.append(f"| {constraint} | {status} | {score_str} | {rationale} |")
             lines.append("")
 
+        # PH12.2 §24 — Theory-Specific Content (linked IDs + coverage)
+        # bullet_groups[5] holds the content IDs and coverage bullets
+        if sn is not None and len(bgs) > 5 and bgs[5]:
+            lines += ["### Theory-Specific Content", ""]
+            for b in bgs[5]:
+                lines.append(f"- {b}")
+            lines.append("")
+
+        # PH12.2 §24 — Content Differentiation table (pairwise Jaccard)
+        if sn is not None:
+            diff_block = sn.theory_differentiation.get("theory_differentiation", {}) if sn.theory_differentiation else {}
+            if diff_block:
+                lines += ["### Content Differentiation", ""]
+                lines += [
+                    "| Theory Pair | Assumptions | Risks | Opportunities | Evidence | Recommendations | Overall |",
+                    "|---|---|---|---|---|---|---|",
+                ]
+                for pair_key, metrics in diff_block.items():
+                    pair_display = pair_key.replace("::", " vs ")
+                    asm = f"{metrics.get('assumption_similarity', 0.0):.2f}"
+                    rsk = f"{metrics.get('risk_similarity', 0.0):.2f}"
+                    opp = f"{metrics.get('opportunity_similarity', 0.0):.2f}"
+                    ev  = f"{metrics.get('evidence_similarity', 0.0):.2f}"
+                    rec = f"{metrics.get('recommendation_similarity', 0.0):.2f}"
+                    ovr = f"{metrics.get('overall_similarity', 0.0):.2f}"
+                    lines.append(
+                        f"| {pair_display} | {asm} | {rsk} | {opp} | {ev} | {rec} | {ovr} |"
+                    )
+                lines.append("")
+
+            if sn.content_homogenization_detected:
+                hom_details = sn.theory_differentiation.get("homogenization_details", {})
+                msg = hom_details.get("message", "Content homogenization detected.")
+                lines.append(f"> **Homogenization Warning:** {msg}")
+                lines.append("")
+
+        # PH12.2 §25 — Why the winner won (rationale paragraph)
+        if sn is not None and sn.winner_rationale:
+            lines += ["### Why This Theory Won", ""]
+            lines.append(sn.winner_rationale)
+            lines.append("")
+
         return lines
 
     def _s5_decision_readiness(

@@ -48,6 +48,9 @@ from .strategy_planner import StrategyPlanner
 from .strategy_selector import StrategySelection, StrategySelector
 from .strategy_lineage import build_strategy_lineage  # PH11.2
 from .strategy_trace import StrategyTrace
+from .content_graph import ContentGraph                   # PH12.2
+from .content_resolver import ContentResolver              # PH12.2
+from .content_differentiation import compute_differentiation  # PH12.2
 from .theory_evaluator import TheoryEvaluator
 from .theory_generator import TheoryGenerator
 
@@ -143,10 +146,31 @@ class StrategyCoordinator:
         self._constraint_results = {
             t.theory_id: ce.evaluate(t, self._plan) for t in self._theories
         }
-        # PH10.5: evaluate each theory independently, passing constraint results
+        # PH12.1a / PH12.2: map ALL theories to options before scoring.
+        # Moved before TheoryEvaluator so theory_content can inform scores.
+        mapper = OptionMapper()
+        all_mappings = {t.theory_id: mapper.map(t, ctx) for t in self._theories}
+
+        # PH12.2 — build ContentGraph and resolve theory-specific content
+        content_cfg = getattr(self._plan, "content_config", None)
+        _content_graph = ContentGraph().build(ctx)
+        _content_resolver = ContentResolver(_content_graph, content_cfg)
+        all_theory_contents: dict = {}
+        for t in self._theories:
+            t_mapping = all_mappings[t.theory_id]
+            tc = _content_resolver.resolve(
+                t, t_mapping.mapped_option_id, t_mapping.mapping_confidence
+            )
+            all_theory_contents[t.theory_id] = tc
+
+        # PH10.5: evaluate each theory with theory-specific content (PH12.2)
         evaluator = TheoryEvaluator()
         self._evaluations = [
-            evaluator.build(t, self._plan, ctx, self._constraint_results.get(t.theory_id))
+            evaluator.build(
+                t, self._plan, ctx,
+                self._constraint_results.get(t.theory_id),
+                all_theory_contents.get(t.theory_id),
+            )
             for t in self._theories
         ]
         # PH12.1: detect score saturation before selection
@@ -157,9 +181,6 @@ class StrategyCoordinator:
             self._theories, self._evaluations, self._plan
         )
         self._selection = selector._last_selection
-        # PH12.1a: map ALL theories then evaluate alignment with policy
-        mapper = OptionMapper()
-        all_mappings = {t.theory_id: mapper.map(t, ctx) for t in self._theories}
         winner_mapping = all_mappings[self._selection.winner_theory_id]
 
         ap = getattr(self._plan, "alignment_policy", None)
@@ -280,6 +301,41 @@ class StrategyCoordinator:
         _alignment_block = alignment.model_dump()
         _saturation_block = {"detected": sat_detected, "message": sat_msg}
 
+        # PH12.2 — theory content trace blocks
+        _theory_content_list = []
+        _theory_content_lineage: dict = {}
+        _theory_content_coverage: dict = {}
+        _theory_content_confidence: dict = {}
+        _all_content_fallbacks: list = []
+        for t in self._theories:
+            tc = all_theory_contents.get(t.theory_id)
+            if tc is not None:
+                _theory_content_list.append({
+                    "theory_id": tc.theory_id,
+                    "mapped_option_id": tc.mapped_option_id,
+                    "recommendation_ids": tc.recommendation_ids,
+                    "assumption_ids": tc.assumption_ids,
+                    "risk_ids": tc.risk_ids,
+                    "opportunity_ids": tc.opportunity_ids,
+                    "evidence_ids": tc.evidence_ids,
+                    "success_conditions": [sc.model_dump() for sc in tc.success_conditions],
+                    "coverage": tc.coverage.model_dump(),
+                    "confidence": tc.confidence.level,
+                })
+                _theory_content_lineage[t.theory_id] = {
+                    k: [e.model_dump() for e in v]
+                    for k, v in tc.content_lineage.items()
+                    if isinstance(v, list)
+                }
+                _theory_content_coverage[t.theory_id] = tc.coverage.model_dump()
+                _theory_content_confidence[t.theory_id] = tc.confidence.model_dump()
+                _all_content_fallbacks.extend(tc.content_fallbacks)
+
+        _diff_result = compute_differentiation(
+            [tc for tc in all_theory_contents.values() if tc is not None]
+        )
+        _homogenization = _diff_result.get("homogenization_details", {})
+
         self._trace = StrategyTrace(
             trace_id=_trace_id,
             created_at=created_at,
@@ -294,6 +350,14 @@ class StrategyCoordinator:
             constraint_results=_constraint_results_structured,
             alignment=_alignment_block,
             saturation=_saturation_block,
+            # PH12.2
+            theory_content=_theory_content_list,
+            theory_content_lineage=_theory_content_lineage,
+            theory_content_coverage=_theory_content_coverage,
+            theory_content_confidence=_theory_content_confidence,
+            theory_differentiation=_diff_result.get("theory_differentiation", {}),
+            content_homogenization=_homogenization,
+            content_fallbacks=_all_content_fallbacks,
             metadata={
                 "framework": self._plan.framework,
                 "plan_id": self._plan.plan_id,
