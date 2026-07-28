@@ -121,6 +121,7 @@ _CHOICE_CANONICAL: dict[str, tuple[str, str]] = {
 
 # ---------------------------------------------------------------------------
 # Contradiction table: (theory_cat, theory_val, option_cat, option_val) -> penalty
+# Hard contradictions: opposite strategic postures.
 # ---------------------------------------------------------------------------
 CONTRADICTIONS: dict[tuple[str, str, str, str], float] = {
     ("geographic", "diversified",  "geographic", "concentrated"):     0.35,
@@ -131,6 +132,26 @@ CONTRADICTIONS: dict[tuple[str, str, str, str], float] = {
     ("timing",     "accelerate",   "timing",     "milestone_gated"):  0.20,
     ("power",      "btm_first",    "power",      "grid_first"):       0.25,
     ("power",      "grid_first",   "power",      "btm_first"):        0.25,
+}
+
+# Soft mismatch table: same category, different but non-contradicting postures.
+# Applied when theory and option express different postures in the same dimension
+# without full contradiction (e.g. diversified vs staged, staged vs diversified).
+# Penalty is lower than hard contradictions to reflect partial incompatibility.
+SOFT_MISMATCHES: dict[tuple[str, str, str, str], float] = {
+    # Geographic: staged is different from both concentrated and diversified
+    ("geographic", "diversified",  "geographic", "staged"):       0.12,
+    ("geographic", "staged",       "geographic", "diversified"):  0.12,
+    ("geographic", "concentrated", "geographic", "staged"):       0.12,
+    ("geographic", "staged",       "geographic", "concentrated"): 0.12,
+    # Timing: wait_and_monitor vs milestone_gated — different caution levels
+    ("timing", "wait_and_monitor", "timing", "milestone_gated"):  0.10,
+    ("timing", "milestone_gated",  "timing", "wait_and_monitor"): 0.10,
+    # Power: hybrid is different from both grid_first and btm_first
+    ("power", "grid_first", "power", "hybrid"): 0.08,
+    ("power", "btm_first",  "power", "hybrid"): 0.08,
+    ("power", "hybrid",     "power", "grid_first"): 0.08,
+    ("power", "hybrid",     "power", "btm_first"):  0.08,
 }
 
 

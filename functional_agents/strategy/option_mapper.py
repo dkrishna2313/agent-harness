@@ -27,7 +27,7 @@ import logging
 from typing import Any
 
 from .alignment import OptionMapping
-from .posture_normalizer import CONTRADICTIONS, POSTURE_CATEGORIES, PostureNormalizer
+from .posture_normalizer import CONTRADICTIONS, POSTURE_CATEGORIES, SOFT_MISMATCHES, PostureNormalizer
 from .strategic_position import TheoryOfWinning
 
 LOGGER = logging.getLogger(__name__)
@@ -190,6 +190,7 @@ class OptionMapper:
                     "source": "title" if in_title else "description",
                 })
             else:
+                # Hard contradiction — opposite postures
                 penalty = CONTRADICTIONS.get((t_cat, t_val, t_cat, o_val), 0.0)
                 if penalty > 0.0:
                     posture_score -= penalty
@@ -203,6 +204,21 @@ class OptionMapper:
                             f"theory={t_val!r} vs option={o_val!r}."
                         ),
                     })
+                else:
+                    # Soft mismatch — same category, different but non-contradicting posture
+                    soft_penalty = SOFT_MISMATCHES.get((t_cat, t_val, t_cat, o_val), 0.0)
+                    if soft_penalty > 0.0:
+                        posture_score -= soft_penalty
+                        contradictions.append({
+                            "category": t_cat,
+                            "theory_value": t_val,
+                            "option_value": o_val,
+                            "penalty": soft_penalty,
+                            "rationale": (
+                                f"{t_cat.title()} posture mismatch (soft): "
+                                f"theory={t_val!r} vs option={o_val!r}."
+                            ),
+                        })
 
         # Generic overlap — very low weight, strictly bounded
         all_opt_text = " ".join(
