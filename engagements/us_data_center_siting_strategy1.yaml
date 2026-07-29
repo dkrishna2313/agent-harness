@@ -79,6 +79,9 @@ engagement:
     - Community opposition intensity by county or metropolitan area
 
 strategy:
+  enabled: true
+  config_version: ph12.2a-v1
+
   framework: executive
 
   objectives:
@@ -170,3 +173,65 @@ strategy:
   constraints:
     - Avoid strategies dependent on unvalidated single-state concentration without a fallback market
     - Preserve at least one alternative state for contingency development
+
+  # PH12.2a policy blocks — all defaults reproduce PH12.2b production behavior.
+  # The existing evaluation/generation/validation blocks above drive ConfigurationResolver.
+  # These blocks configure the new PH12.2a layer and are captured in StrategyTrace.
+
+  evaluation_config:
+    weight_policy: strict
+    criteria:
+      strategic_fit:
+        weight: 0.21
+        enabled: true
+      evidence_quality:
+        weight: 0.16
+        enabled: true
+      assumption_robustness:
+        weight: 0.16
+        enabled: true
+      execution_feasibility:
+        weight: 0.16
+        enabled: true
+      risk_resilience:
+        weight: 0.16
+        enabled: true
+      opportunity_capture:
+        weight: 0.15
+        enabled: true
+    minimum_winner_margin: 0.05
+    saturation_threshold: 0.95
+
+  mapping_config:
+    enabled: true
+    unresolved_policy: preserve_upstream
+    authority:
+      single_pass: true
+      fail_on_mapping_mismatch: true
+      allow_content_resolution_remap: false
+
+  alignment_config:
+    enabled: true
+    minimum_challenge_margin: 0.10
+    minimum_challenge_confidence: Medium
+    unresolved_authority: upstream_preferred
+
+  content:
+    minimum_relevance_score: 0.20
+    minimum_discrimination_score: 0.20
+    maximum_assumptions_per_theory: 5
+    maximum_risks_per_theory: 5
+    maximum_opportunities_per_theory: 5
+    maximum_recommendations_per_theory: 5
+    maximum_evidence_per_theory: 12
+    allow_symmetric_fallback: true
+    minimum_content_coverage: 0.50
+    partial_homogenization_threshold: 0.75
+    full_homogenization_threshold: 0.99
+
+  diagnostics_config:
+    unknown_reference: error
+    mapping_mismatch: error
+    invalid_weight_sum: error
+    low_mapping_confidence: warning
+    partial_homogenization: warning

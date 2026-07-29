@@ -90,6 +90,10 @@ class StrategyTrace(BaseModel):
     # content_differentiation_state: {"state": "none"|"partial"|"substantial"|"full", ...}
     content_differentiation_state: dict[str, Any] = Field(default_factory=dict)
 
+    # PH12.2a — resolved strategy configuration snapshot
+    strategy_configuration: dict[str, Any] = Field(default_factory=dict)
+    strategy_config_fingerprint: str = ""
+
     model_config = {"frozen": True, "extra": "allow"}
 
     @model_validator(mode="after")

@@ -996,7 +996,7 @@ class Orchestrator:
                 _strategy_config = ConfigurationResolver().resolve_from_engagement(
                     _strategy_config, _strategy_raw
                 )
-            _sc = StrategyCoordinator(config=_strategy_config)
+            _sc = StrategyCoordinator(config=_strategy_config, raw_strategy_yaml=_strategy_raw or {})
             _sp = _sc.build(result_ctx)
             _sp_path = _sc.persist(_sp)
             print(f"Strategic position → {_sp_path}")

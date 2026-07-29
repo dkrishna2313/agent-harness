@@ -2534,6 +2534,171 @@ strategy_app = typer.Typer(
 )
 app.add_typer(strategy_app, name="strategy")
 
+# config sub-app (PH12.2a) — strategy config inspection
+config_app = typer.Typer(no_args_is_help=True, help="Strategy config inspection.")
+strategy_app.add_typer(config_app, name="config")
+
+
+@config_app.command("show")
+def strategy_config_show_cmd(
+    engagement: Annotated[
+        Path,
+        typer.Option("--engagement", help="Engagement YAML path."),
+    ],
+    format: Annotated[
+        str,
+        typer.Option("--format", help="Output format: text or json. Default: text."),
+    ] = "text",
+) -> None:
+    """Show resolved strategy configuration for an engagement.
+
+    Loads the engagement YAML, resolves the strategy block against defaults,
+    and prints the active configuration in either text or JSON format.
+
+    Example:
+
+    \b
+        python3 -m functional_agents.cli strategy config show \\
+            --engagement engagements/us_data_center_siting_strategy1.yaml
+
+        python3 -m functional_agents.cli strategy config show \\
+            --engagement engagements/us_data_center_siting_strategy1.yaml \\
+            --format json
+    """
+    import yaml
+    from functional_agents.strategy.strategy_config_resolver import resolve_strategy_config
+
+    if format not in ("text", "json"):
+        typer.echo(f"Error: --format must be 'text' or 'json', got {format!r}.", err=True)
+        raise typer.Exit(code=1)
+
+    if not engagement.exists():
+        typer.echo(f"Error: engagement file not found: {engagement}", err=True)
+        raise typer.Exit(code=1)
+
+    try:
+        with open(engagement) as f:
+            raw = yaml.safe_load(f) or {}
+    except Exception as exc:
+        typer.echo(f"Error: could not read engagement file: {exc}", err=True)
+        raise typer.Exit(code=1)
+
+    strategy_raw = raw.get("strategy", {})
+
+    try:
+        resolved = resolve_strategy_config(strategy_raw)
+    except Exception as exc:
+        typer.echo(f"Error: could not resolve strategy config: {exc}", err=True)
+        raise typer.Exit(code=1)
+
+    if format == "json":
+        typer.echo(json.dumps({
+            "config_version": resolved.config_version,
+            "fingerprint": resolved.fingerprint,
+            "source": resolved.source,
+            "resolved": resolved.resolved.model_dump(mode="json"),
+            "defaults_applied": resolved.defaults_applied,
+            "deprecations": resolved.deprecations,
+            "warnings": resolved.warnings,
+        }, indent=2))
+        return
+
+    r = resolved.resolved
+    typer.echo("Strategy Configuration")
+    typer.echo(f"  Version:     {resolved.config_version}")
+    typer.echo(f"  Source:      {resolved.source}")
+    typer.echo(f"  Fingerprint: {resolved.fingerprint}")
+    typer.echo(f"  Enabled:     {r.enabled}")
+    typer.echo("")
+    typer.echo("  Evaluation:")
+    typer.echo(f"    weight_policy: {r.evaluation_config.weight_policy}")
+    for name, crit in r.evaluation_config.criteria.items():
+        status = "enabled" if crit.enabled else "disabled"
+        typer.echo(f"    {name}: weight={crit.weight}, {status}")
+    typer.echo("")
+    typer.echo("  Mapping:")
+    typer.echo(f"    enabled: {r.mapping_config.enabled}")
+    typer.echo(f"    unresolved_policy: {r.mapping_config.unresolved_policy}")
+    typer.echo("")
+    typer.echo("  Alignment:")
+    typer.echo(f"    enabled: {r.alignment_config.enabled}")
+    typer.echo(f"    minimum_challenge_margin: {r.alignment_config.minimum_challenge_margin}")
+    typer.echo("")
+    typer.echo("  Content:")
+    typer.echo(f"    minimum_relevance_score: {r.content.minimum_relevance_score}")
+    typer.echo(f"    minimum_discrimination_score: {r.content.minimum_discrimination_score}")
+    hom = r.content.homogenization_policy
+    typer.echo("")
+    typer.echo("  Homogenization:")
+    typer.echo(f"    partial_threshold: {hom.partial_threshold}")
+    typer.echo(f"    full_threshold: {hom.full_threshold}")
+    if resolved.defaults_applied:
+        typer.echo("")
+        typer.echo(f"  Defaults applied: {len(resolved.defaults_applied)} fields")
+    if resolved.deprecations:
+        typer.echo("")
+        typer.echo(f"  Deprecations:")
+        for d in resolved.deprecations:
+            typer.echo(f"    {d}")
+    if resolved.warnings:
+        typer.echo("")
+        typer.echo(f"  Warnings:")
+        for w in resolved.warnings:
+            typer.echo(f"    {w}")
+
+
+@config_app.command("validate")
+def strategy_config_validate_cmd(
+    engagement: Annotated[
+        Path,
+        typer.Option("--engagement", help="Engagement YAML path."),
+    ],
+) -> None:
+    """Validate strategy configuration without running the pipeline.
+
+    Loads and resolves the strategy block from the engagement YAML.
+    Exits with code 0 if valid, code 1 if invalid.
+
+    Example:
+
+    \b
+        python3 -m functional_agents.cli strategy config validate \\
+            --engagement engagements/us_data_center_siting_strategy1.yaml
+    """
+    import sys
+    import yaml
+    from functional_agents.strategy.strategy_config_resolver import resolve_strategy_config
+    from pydantic import ValidationError
+
+    if not engagement.exists():
+        typer.echo(f"Error: engagement file not found: {engagement}", err=True)
+        raise typer.Exit(code=1)
+
+    try:
+        with open(engagement) as f:
+            raw = yaml.safe_load(f) or {}
+        strategy_raw = raw.get("strategy", {})
+        resolved = resolve_strategy_config(strategy_raw)
+        typer.echo("Strategy configuration valid")
+        if resolved.warnings:
+            for w in resolved.warnings:
+                typer.echo(f"  Warning: {w}")
+        if resolved.deprecations:
+            for d in resolved.deprecations:
+                typer.echo(f"  Deprecation: {d}")
+        raise typer.Exit(code=0)
+    except typer.Exit:
+        raise
+    except ValidationError as e:
+        typer.echo("Strategy configuration invalid:")
+        for err in e.errors():
+            loc = ".".join(str(x) for x in err["loc"])
+            typer.echo(f"  [{loc}] {err['msg']}")
+        raise typer.Exit(code=1)
+    except Exception as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(code=1)
+
 
 def _strategy_format_error(fmt: str) -> None:
     """Exit with code 1 if *fmt* is not a supported output format."""

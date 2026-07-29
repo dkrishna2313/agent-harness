@@ -1,0 +1,463 @@
+{
+  "schema_version": "ph12.2a-v1",
+  "description": "StrategyConfig field catalogue for UI generation and validation tooling.",
+  "field_count": 37,
+  "fields": [
+    {
+      "path": "enabled",
+      "title": "Strategy Layer Enabled",
+      "description": "When False the entire strategy pipeline is bypassed.",
+      "type": "boolean",
+      "default": true,
+      "required": false,
+      "category": "root",
+      "unsafe_to_hide": true
+    },
+    {
+      "path": "config_version",
+      "title": "Config Version",
+      "description": "Schema version tag for this configuration object.",
+      "type": "string",
+      "default": "ph12.2a-v1",
+      "required": false,
+      "category": "root",
+      "unsafe_to_hide": false
+    },
+    {
+      "path": "framework",
+      "title": "Strategy Framework",
+      "description": "Named framework variant to apply (e.g. 'executive').",
+      "type": "string",
+      "default": "executive",
+      "required": false,
+      "category": "root",
+      "unsafe_to_hide": false,
+      "allowed_values": [
+        "executive"
+      ]
+    },
+    {
+      "path": "evaluation_config.weight_policy",
+      "title": "Weight Policy",
+      "description": "How criterion weights are enforced. 'strict' requires enabled weights to sum to 1.0 ± 0.001; 'normalize' normalises at runtime.",
+      "type": "string",
+      "default": "normalize",
+      "required": false,
+      "category": "evaluation",
+      "unsafe_to_hide": false,
+      "allowed_values": [
+        "strict",
+        "normalize"
+      ]
+    },
+    {
+      "path": "evaluation_config.score_precision",
+      "title": "Score Precision",
+      "description": "Decimal places used when rounding theory scores.",
+      "type": "integer",
+      "default": 6,
+      "required": false,
+      "category": "evaluation",
+      "unsafe_to_hide": false,
+      "minimum": 1
+    },
+    {
+      "path": "evaluation_config.minimum_winner_margin",
+      "title": "Minimum Winner Margin",
+      "description": "Score gap required to declare a clear winner over the runner-up.",
+      "type": "number",
+      "default": 0.05,
+      "required": false,
+      "category": "evaluation",
+      "unsafe_to_hide": false,
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    {
+      "path": "evaluation_config.saturation_threshold",
+      "title": "Saturation Threshold",
+      "description": "Score above which a theory is considered saturated.",
+      "type": "number",
+      "default": 0.95,
+      "required": false,
+      "category": "evaluation",
+      "unsafe_to_hide": false,
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    {
+      "path": "evaluation_config.tie_tolerance",
+      "title": "Tie Tolerance",
+      "description": "Maximum absolute score difference that is treated as a tie.",
+      "type": "number",
+      "default": 1e-06,
+      "required": false,
+      "category": "evaluation",
+      "unsafe_to_hide": false,
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    {
+      "path": "constraint_config.required_violation_policy",
+      "title": "Required Violation Policy",
+      "description": "How hard constraint violations are handled.",
+      "type": "string",
+      "default": "penalize",
+      "required": false,
+      "category": "constraint",
+      "unsafe_to_hide": true,
+      "allowed_values": [
+        "penalize",
+        "disqualify",
+        "warn"
+      ]
+    },
+    {
+      "path": "constraint_config.default_required_penalty",
+      "title": "Required Constraint Penalty",
+      "description": "Score deduction applied when a required constraint is violated.",
+      "type": "number",
+      "default": 0.15,
+      "required": false,
+      "category": "constraint",
+      "unsafe_to_hide": false,
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    {
+      "path": "constraint_config.default_preferred_penalty",
+      "title": "Preferred Constraint Penalty",
+      "description": "Score deduction applied when a preferred constraint is violated.",
+      "type": "number",
+      "default": 0.05,
+      "required": false,
+      "category": "constraint",
+      "unsafe_to_hide": false,
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    {
+      "path": "constraint_config.maximum_total_penalty",
+      "title": "Maximum Total Penalty",
+      "description": "Cap on cumulative constraint penalties per theory.",
+      "type": "number",
+      "default": 0.5,
+      "required": false,
+      "category": "constraint",
+      "unsafe_to_hide": false,
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    {
+      "path": "constraint_config.fail_on_unknown_constraint_reference",
+      "title": "Fail on Unknown Constraint Reference",
+      "description": "Raise an error if a constraint references an unknown theory or option.",
+      "type": "boolean",
+      "default": true,
+      "required": false,
+      "category": "constraint",
+      "unsafe_to_hide": true
+    },
+    {
+      "path": "mapping_config.enabled",
+      "title": "Option Mapping Enabled",
+      "description": "When False the option-mapping pass is skipped entirely.",
+      "type": "boolean",
+      "default": true,
+      "required": false,
+      "category": "mapping",
+      "unsafe_to_hide": true
+    },
+    {
+      "path": "mapping_config.unresolved_policy",
+      "title": "Unresolved Mapping Policy",
+      "description": "Behaviour when a theory cannot be mapped to any upstream option.",
+      "type": "string",
+      "default": "preserve_upstream",
+      "required": false,
+      "category": "mapping",
+      "unsafe_to_hide": true,
+      "allowed_values": [
+        "preserve_upstream",
+        "report_unresolved",
+        "fail"
+      ]
+    },
+    {
+      "path": "mapping_config.authority.fail_on_mapping_mismatch",
+      "title": "Fail on Mapping Mismatch",
+      "description": "Raise an error when the mapped option does not match the upstream option.",
+      "type": "boolean",
+      "default": true,
+      "required": false,
+      "category": "mapping",
+      "unsafe_to_hide": true
+    },
+    {
+      "path": "mapping_config.confidence.high_score_threshold",
+      "title": "High Confidence Score Threshold",
+      "description": "Minimum score to qualify for High mapping confidence.",
+      "type": "number",
+      "default": 0.4,
+      "required": false,
+      "category": "mapping",
+      "unsafe_to_hide": false,
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    {
+      "path": "mapping_config.confidence.high_margin_threshold",
+      "title": "High Confidence Margin Threshold",
+      "description": "Minimum margin over runner-up to qualify for High mapping confidence.",
+      "type": "number",
+      "default": 0.15,
+      "required": false,
+      "category": "mapping",
+      "unsafe_to_hide": false,
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    {
+      "path": "alignment_config.enabled",
+      "title": "Alignment Enabled",
+      "description": "When False the alignment pass is skipped entirely.",
+      "type": "boolean",
+      "default": true,
+      "required": false,
+      "category": "alignment",
+      "unsafe_to_hide": true
+    },
+    {
+      "path": "alignment_config.minimum_challenge_margin",
+      "title": "Minimum Challenge Margin",
+      "description": "Score advantage the strategy selection must have over the upstream option to register as a 'challenged' alignment.",
+      "type": "number",
+      "default": 0.1,
+      "required": false,
+      "category": "alignment",
+      "unsafe_to_hide": false,
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    {
+      "path": "alignment_config.minimum_challenge_confidence",
+      "title": "Minimum Challenge Confidence",
+      "description": "Minimum mapping confidence required to declare a challenge.",
+      "type": "string",
+      "default": "Medium",
+      "required": false,
+      "category": "alignment",
+      "unsafe_to_hide": false,
+      "allowed_values": [
+        "Low",
+        "Medium",
+        "High"
+      ]
+    },
+    {
+      "path": "alignment_config.unresolved_authority",
+      "title": "Unresolved Authority",
+      "description": "Which recommendation is authoritative when alignment is unresolved.",
+      "type": "string",
+      "default": "upstream_preferred",
+      "required": false,
+      "category": "alignment",
+      "unsafe_to_hide": true,
+      "allowed_values": [
+        "upstream_preferred",
+        "strategy_selected",
+        "none"
+      ]
+    },
+    {
+      "path": "content.minimum_relevance_score",
+      "title": "Minimum Relevance Score",
+      "description": "Minimum score for a content item to be assigned to a theory.",
+      "type": "number",
+      "default": 0.2,
+      "required": false,
+      "category": "content",
+      "unsafe_to_hide": false,
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    {
+      "path": "content.minimum_content_coverage",
+      "title": "Minimum Content Coverage",
+      "description": "Fraction of available content items that must be assigned.",
+      "type": "number",
+      "default": 0.5,
+      "required": false,
+      "category": "content",
+      "unsafe_to_hide": true,
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    {
+      "path": "content.minimum_distinctive_coverage",
+      "title": "Minimum Distinctive Coverage",
+      "description": "Fraction of content that must be distinctive (not shared) per theory.",
+      "type": "number",
+      "default": 0.2,
+      "required": false,
+      "category": "content",
+      "unsafe_to_hide": false,
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    {
+      "path": "content.allow_symmetric_fallback",
+      "title": "Allow Symmetric Fallback",
+      "description": "When True, shared content may be symmetric across theories.",
+      "type": "boolean",
+      "default": true,
+      "required": false,
+      "category": "content",
+      "unsafe_to_hide": false
+    },
+    {
+      "path": "content.partial_homogenization_threshold",
+      "title": "Partial Homogenization Threshold",
+      "description": "Shared-content fraction above which partial homogenization is flagged.",
+      "type": "number",
+      "default": 0.75,
+      "required": false,
+      "category": "content",
+      "unsafe_to_hide": true,
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    {
+      "path": "reporting_config.enabled",
+      "title": "Reporting Enabled",
+      "description": "When False the report assembly pass is skipped.",
+      "type": "boolean",
+      "default": true,
+      "required": false,
+      "category": "reporting",
+      "unsafe_to_hide": false
+    },
+    {
+      "path": "reporting_config.mandatory.challenged_alignment",
+      "title": "Mandate Challenged Alignment Disclosure",
+      "description": "When True, challenged alignment must always appear in the report.",
+      "type": "boolean",
+      "default": true,
+      "required": false,
+      "category": "reporting",
+      "unsafe_to_hide": true
+    },
+    {
+      "path": "reporting_config.mandatory.substantial_homogenization",
+      "title": "Mandate Homogenization Disclosure",
+      "description": "When True, substantial homogenization must always appear in the report.",
+      "type": "boolean",
+      "default": true,
+      "required": false,
+      "category": "reporting",
+      "unsafe_to_hide": true
+    },
+    {
+      "path": "reporting_config.limits.maximum_assumptions",
+      "title": "Maximum Assumptions per Report",
+      "description": "Maximum number of assumption items shown per theory in the report.",
+      "type": "integer",
+      "default": 5,
+      "required": false,
+      "category": "reporting",
+      "unsafe_to_hide": false,
+      "minimum": 1
+    },
+    {
+      "path": "reporting_config.limits.maximum_risks",
+      "title": "Maximum Risks per Report",
+      "description": "Maximum number of risk items shown per theory in the report.",
+      "type": "integer",
+      "default": 5,
+      "required": false,
+      "category": "reporting",
+      "unsafe_to_hide": false,
+      "minimum": 1
+    },
+    {
+      "path": "diagnostics_config.unknown_reference",
+      "title": "Unknown Reference Severity",
+      "description": "Diagnostic severity when an unknown theory/option reference is encountered.",
+      "type": "string",
+      "default": "error",
+      "required": false,
+      "category": "diagnostics",
+      "unsafe_to_hide": true,
+      "allowed_values": [
+        "ignore",
+        "info",
+        "warning",
+        "error"
+      ]
+    },
+    {
+      "path": "diagnostics_config.low_mapping_confidence",
+      "title": "Low Mapping Confidence Severity",
+      "description": "Diagnostic severity when mapping confidence falls below the minimum.",
+      "type": "string",
+      "default": "warning",
+      "required": false,
+      "category": "diagnostics",
+      "unsafe_to_hide": false,
+      "allowed_values": [
+        "ignore",
+        "info",
+        "warning",
+        "error"
+      ]
+    },
+    {
+      "path": "diagnostics_config.partial_homogenization",
+      "title": "Partial Homogenization Severity",
+      "description": "Diagnostic severity when partial content homogenization is detected.",
+      "type": "string",
+      "default": "warning",
+      "required": false,
+      "category": "diagnostics",
+      "unsafe_to_hide": false,
+      "allowed_values": [
+        "ignore",
+        "info",
+        "warning",
+        "error"
+      ]
+    },
+    {
+      "path": "diagnostics_config.fallback_heavy",
+      "title": "Fallback-Heavy Severity",
+      "description": "Diagnostic severity when a theory relies heavily on fallback content.",
+      "type": "string",
+      "default": "warning",
+      "required": false,
+      "category": "diagnostics",
+      "unsafe_to_hide": false,
+      "allowed_values": [
+        "ignore",
+        "info",
+        "warning",
+        "error"
+      ]
+    },
+    {
+      "path": "diagnostics_config.insufficient_coverage",
+      "title": "Insufficient Coverage Severity",
+      "description": "Diagnostic severity when coverage falls below the configured minimum.",
+      "type": "string",
+      "default": "warning",
+      "required": false,
+      "category": "diagnostics",
+      "unsafe_to_hide": true,
+      "allowed_values": [
+        "ignore",
+        "info",
+        "warning",
+        "error"
+      ]
+    }
+  ]
+}

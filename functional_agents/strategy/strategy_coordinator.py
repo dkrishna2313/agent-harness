@@ -44,6 +44,7 @@ from .option_mapper import OptionMapper
 from .saturation_detector import SaturationDetector
 from .strategic_choice_generator import StrategicChoiceGenerator
 from .strategy_config import StrategyConfig
+from .strategy_config_resolver import resolve_strategy_config
 from .strategy_planner import StrategyPlanner
 from .strategy_selector import StrategySelection, StrategySelector
 from .strategy_lineage import build_strategy_lineage  # PH11.2
@@ -109,9 +110,14 @@ class StrategyCoordinator:
     reflects the selected theory rather than the legacy extraction path.
     """
 
-    def __init__(self, config: StrategyConfig | None = None) -> None:
+    def __init__(
+        self,
+        config: StrategyConfig | None = None,
+        raw_strategy_yaml: dict | None = None,
+    ) -> None:
         raw = config if config is not None else StrategyConfig()
         self._config = ConfigurationResolver().resolve(raw)
+        self._raw_strategy_yaml: dict = raw_strategy_yaml or {}
         self._plan = StrategyPlanner().build(self._config)
         self._choice_sets: list = []                   # set in build()
         self._theories: list = []                      # set in build()
@@ -199,6 +205,7 @@ class StrategyCoordinator:
 
         # PH12.2b: resolve theory content after selection
         content_cfg = getattr(self._plan, "content_config", None)
+        _resolved_cfg = resolve_strategy_config(self._raw_strategy_yaml)
         _content_graph = ContentGraph().build(ctx)
         _content_resolver = ContentResolver(_content_graph, content_cfg)
         all_theory_contents: dict = {}
@@ -387,6 +394,17 @@ class StrategyCoordinator:
                 _theory_content_confidence[t.theory_id] = tc.confidence.model_dump()
                 _all_content_fallbacks.extend(tc.content_fallbacks)
 
+        # PH12.2a — build strategy configuration snapshot for trace
+        _strategy_config_snapshot = {
+            "config_version": _resolved_cfg.config_version,
+            "source": _resolved_cfg.source,
+            "fingerprint": _resolved_cfg.fingerprint,
+            "resolved": _resolved_cfg.resolved.model_dump(mode="json"),
+            "defaults_applied": _resolved_cfg.defaults_applied,
+            "deprecations": _resolved_cfg.deprecations,
+            "warnings": _resolved_cfg.warnings,
+        }
+
         _partial_threshold = (
             getattr(content_cfg, "partial_homogenization_threshold", 0.75)
             if content_cfg else 0.75
@@ -441,6 +459,9 @@ class StrategyCoordinator:
                 "identical_dimensions": _homogenization.get("identical_dimensions", []),
                 "pairwise_similarity": _homogenization.get("pairwise_similarity", {}),
             },
+            # PH12.2a — resolved strategy configuration snapshot
+            strategy_configuration=_strategy_config_snapshot,
+            strategy_config_fingerprint=_resolved_cfg.fingerprint,
             metadata={
                 "framework": self._plan.framework,
                 "plan_id": self._plan.plan_id,
