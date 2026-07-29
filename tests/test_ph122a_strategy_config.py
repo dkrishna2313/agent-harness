@@ -590,3 +590,76 @@ class TestCLIIntegration:
         assert "resolved" in parsed
         assert "config_version" in parsed
         assert "source" in parsed
+
+
+class TestYAMLDiscovery:
+    """§25 — StrategyCoordinator correctly receives raw_strategy_yaml from engagement YAML."""
+
+    def test_coordinator_raw_yaml_from_engagement(self):
+        """Coordinator built via the orchestrator pattern returns source=engagement_yaml."""
+        import yaml
+        from functional_agents.engagement_spec import load_engagement_spec
+        from functional_agents.strategy import StrategyCoordinator, StrategyConfig, ConfigurationResolver
+        from functional_agents.strategy.strategy_config_resolver import resolve_strategy_config
+
+        spec = load_engagement_spec(str(_WORKTREE / "engagements" / "us_data_center_siting_strategy1.yaml"))
+        strategy_raw = getattr(spec, "strategy", None)
+
+        assert strategy_raw is not None, "engagement_spec.strategy must be non-None"
+        assert isinstance(strategy_raw, dict), "engagement_spec.strategy must be a dict"
+        assert len(strategy_raw) > 0, "engagement_spec.strategy must be non-empty"
+
+        strategy_config = StrategyConfig()
+        if strategy_raw:
+            strategy_config = ConfigurationResolver().resolve_from_engagement(strategy_config, strategy_raw)
+
+        sc = StrategyCoordinator(config=strategy_config, raw_strategy_yaml=strategy_raw or {})
+
+        assert len(sc._raw_strategy_yaml) > 0, "_raw_strategy_yaml must be non-empty"
+
+        resolved = resolve_strategy_config(sc._raw_strategy_yaml)
+        assert resolved.source == "engagement_yaml", (
+            f"Expected source=engagement_yaml, got source={resolved.source!r}. "
+            "This means raw_strategy_yaml threading is broken."
+        )
+        assert resolved.fingerprint == "8498505c723b6e87", (
+            f"Expected fingerprint 8498505c723b6e87, got {resolved.fingerprint!r}."
+        )
+        assert len(resolved.defaults_applied) <= 10, (
+            f"Expected ≤10 defaults, got {len(resolved.defaults_applied)}: {resolved.defaults_applied}"
+        )
+
+    def test_coordinator_defaults_only_without_engagement(self):
+        """Coordinator built without raw_strategy_yaml returns source=defaults_only."""
+        from functional_agents.strategy import StrategyCoordinator
+        from functional_agents.strategy.strategy_config_resolver import resolve_strategy_config
+
+        sc = StrategyCoordinator()
+        resolved = resolve_strategy_config(sc._raw_strategy_yaml)
+        assert resolved.source == "defaults_only"
+
+
+class TestVersionGate:
+    """Version gate — unknown config_version values emit a warning."""
+
+    def test_known_version_no_warning(self):
+        """Known config_version produces no version warning."""
+        from functional_agents.strategy.strategy_config_resolver import resolve_strategy_config
+        result = resolve_strategy_config({"config_version": "ph12.2a-v1", "enabled": True})
+        version_warns = [w for w in result.warnings if "not recognised" in w]
+        assert version_warns == []
+
+    def test_unknown_version_emits_warning(self):
+        """Unknown config_version produces a warning in the warnings list."""
+        from functional_agents.strategy.strategy_config_resolver import resolve_strategy_config
+        result = resolve_strategy_config({"config_version": "ph99.0-unknown", "enabled": True})
+        version_warns = [w for w in result.warnings if "not recognised" in w]
+        assert len(version_warns) == 1
+        assert "ph99.0-unknown" in version_warns[0]
+
+    def test_no_version_no_warning(self):
+        """Missing config_version (defaults path) produces no version warning."""
+        from functional_agents.strategy.strategy_config_resolver import resolve_strategy_config
+        result = resolve_strategy_config({"enabled": True})
+        version_warns = [w for w in result.warnings if "not recognised" in w]
+        assert version_warns == []

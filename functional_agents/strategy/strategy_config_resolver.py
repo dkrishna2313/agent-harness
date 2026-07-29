@@ -36,6 +36,7 @@ from .strategy_config import (
 # ---------------------------------------------------------------------------
 
 _CONFIG_VERSION = "ph12.2a-v1"
+_KNOWN_CONFIG_VERSIONS: frozenset[str] = frozenset({"ph12.2a-v1"})
 
 # Top-level fields that exist on StrategyConfig — used for default tracking.
 # We only track the fields added in PH12.2a and the major policy blocks; the
@@ -242,6 +243,15 @@ def resolve_strategy_config(raw_yaml_dict: dict[str, Any] | None) -> ResolvedStr
 
     # Deep-copy so we never mutate the caller's dict
     data: dict[str, Any] = deepcopy(raw)
+
+    # 0. Version gate — warn on unrecognised config_version values
+    raw_version = raw.get("config_version")
+    if raw_version and raw_version not in _KNOWN_CONFIG_VERSIONS:
+        warnings.append(
+            f"config_version {raw_version!r} is not recognised; "
+            f"known versions: {sorted(_KNOWN_CONFIG_VERSIONS)}. "
+            "Config will be processed as-is but some fields may be unsupported."
+        )
 
     # 1. Apply deprecated-field migrations (order matters: alignment before scoring)
     data = _migrate_alignment_policy(data, deprecations, warnings)
