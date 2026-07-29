@@ -1,0 +1,15 @@
+engagement_id: invalid-ph122a-config
+
+strategy:
+  config_version: ph12.2a-v1
+  enabled: true
+
+  evaluation_config:
+    weight_policy: strict
+    criteria:
+      evidence_quality:
+        enabled: true
+        weight: 0.80
+      risk_resilience:
+        enabled: true
+        weight: 0.80

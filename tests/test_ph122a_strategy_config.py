@@ -50,7 +50,7 @@ from functional_agents.strategy.strategy_config_resolver import (
 
 _WORKTREE = Path(__file__).parent.parent  # .../ph5x-exec-lang-hotfix/
 _VALID_ENGAGEMENT = str(_WORKTREE / "engagements" / "ENG-002_go_no_go.yaml")
-_INVALID_ENGAGEMENT = str(_WORKTREE / "engagements" / "us_data_center_siting_strategy1.yaml")
+_INVALID_ENGAGEMENT = str(_WORKTREE / "engagements" / "invalid_strategy_config_ph122a_test.yaml")
 
 
 # ---------------------------------------------------------------------------
