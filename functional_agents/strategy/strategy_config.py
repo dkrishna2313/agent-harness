@@ -1101,4 +1101,23 @@ class StrategyConfig(BaseModel):
         normalized: dict[str, Any] = {
             _FIELD_RENAMES.get(k, k): v for k, v in data.items()
         }
+
+        # Engagement YAMLs store objectives/dimensions/constraints as lists.
+        # StrategyObjectives/StrategyDimensions/StrategyConstraints expect dicts.
+        # Coerce list shapes here so old engagement files continue to validate.
+        if isinstance(normalized.get("objectives"), list):
+            normalized["objectives"] = {"primary": normalized["objectives"]}
+
+        if isinstance(normalized.get("dimensions"), list):
+            # Convert [{id, title, ...}, ...] → {id: {title, ...}, ...}
+            raw_dims: list[dict] = normalized["dimensions"]
+            normalized["dimensions"] = {
+                d["id"]: {k: v for k, v in d.items() if k != "id"}
+                for d in raw_dims
+                if isinstance(d, dict) and "id" in d
+            }
+
+        if isinstance(normalized.get("constraints"), list):
+            normalized["constraints"] = {"required_conditions": normalized["constraints"]}
+
         return cls.model_validate(normalized)
