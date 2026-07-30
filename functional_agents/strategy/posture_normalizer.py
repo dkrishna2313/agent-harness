@@ -65,6 +65,8 @@ _TMG_MILESTONE_GATED: frozenset[str] = frozenset([
     "gated-deploy", "gated deploy", "proceed-with-condition", "proceed with condition",
     "milestone-based", "milestone based", "gated-capital", "gated capital",
     "capital-on-milestone",
+    "staged commit", "staged-commit",  # phased/gated capital deployment
+    "at each gate", "assumption-gate", "gate before commit",
 ])
 _TMG_WAIT_AND_MONITOR: frozenset[str] = frozenset([
     "wait-and-monitor", "wait and monitor", "preserve-optionality",

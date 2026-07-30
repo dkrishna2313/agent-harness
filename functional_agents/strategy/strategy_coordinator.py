@@ -143,9 +143,14 @@ class StrategyCoordinator:
         _resolved_cfg = resolve_strategy_config(self._raw_strategy_yaml)
 
         # Wire evaluation_config criteria weights into the plan's evaluation model.
-        _eval_cfg = _resolved_cfg.resolved.evaluation_config
-        if _eval_cfg and _eval_cfg.criteria:
-            _new_weights = {k: v.weight for k, v in _eval_cfg.criteria.items() if v.enabled}
+        # Weights are normalized to sum 1.0 (resolved_weight) for correct scoring.
+        _eval_criteria = _resolved_cfg.canonical_snapshot.get("evaluation", {}).get("criteria", {})
+        if _eval_criteria:
+            _new_weights = {
+                k: v["resolved_weight"]
+                for k, v in _eval_criteria.items()
+                if v.get("enabled", True) and v.get("resolved_weight", 0.0) > 0
+            }
             if _new_weights:
                 _new_em = self._plan.evaluation_model.model_copy(update={"weights": _new_weights})
                 self._plan = self._plan.model_copy(update={"evaluation_model": _new_em})
@@ -185,7 +190,7 @@ class StrategyCoordinator:
         self._selection = selector._last_selection
 
         # PH12.2b: map ALL theories after selection (does not affect scores)
-        mapper = OptionMapper()
+        mapper = OptionMapper(mapping_config=_resolved_cfg.resolved.mapping_config)
         all_mappings = {t.theory_id: mapper.map(t, ctx) for t in self._theories}
         winner_mapping = all_mappings[self._selection.winner_theory_id]
 
@@ -409,11 +414,12 @@ class StrategyCoordinator:
                 _all_content_fallbacks.extend(tc.content_fallbacks)
 
         # PH12.2a — build strategy configuration snapshot for trace
+        # resolved uses the canonical short-name snapshot (same form used for fingerprinting)
         _strategy_config_snapshot = {
             "config_version": _resolved_cfg.config_version,
             "source": _resolved_cfg.source,
             "fingerprint": _resolved_cfg.fingerprint,
-            "resolved": _resolved_cfg.resolved.model_dump(mode="json"),
+            "resolved": _resolved_cfg.canonical_snapshot,
             "defaults_applied": _resolved_cfg.defaults_applied,
             "deprecations": _resolved_cfg.deprecations,
             "warnings": _resolved_cfg.warnings,

@@ -59,8 +59,16 @@ class OptionMapper:
     Generic keyword overlap is bounded and cannot overcome posture signals.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, mapping_config: Any = None) -> None:
         self._normalizer = PostureNormalizer()
+        self._mapping_config = mapping_config
+        # Resolve confidence thresholds from config or fall back to module constants
+        conf = getattr(mapping_config, "confidence", None) if mapping_config is not None else None
+        self._high_threshold = getattr(conf, "high_score_threshold", _HIGH_THRESHOLD)
+        self._high_sep = getattr(conf, "high_margin_threshold", _SEPARATION_HIGH)
+        self._med_threshold = getattr(conf, "minimum_authoritative_score", _MEDIUM_THRESHOLD)
+        self._med_sep = getattr(conf, "minimum_authoritative_margin", _SEPARATION_MED)
+        self._disallow_high_contradiction = getattr(conf, "disallow_high_with_contradiction", True)
 
     def map(self, theory: TheoryOfWinning, research: Any) -> OptionMapping:
         """Return an OptionMapping for the given theory and research context."""
@@ -248,13 +256,13 @@ class OptionMapper:
     # Confidence and rationale helpers
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _confidence(score: float, separation: float, has_contradictions: bool) -> str:
+    def _confidence(self, score: float, separation: float, has_contradictions: bool) -> str:
+        disallow_high = self._disallow_high_contradiction and has_contradictions
         if score <= 0.0:
             return "None"
-        if score >= _HIGH_THRESHOLD and separation >= _SEPARATION_HIGH and not has_contradictions:
+        if score >= self._high_threshold and separation >= self._high_sep and not disallow_high:
             return "High"
-        if score >= _MEDIUM_THRESHOLD and separation >= _SEPARATION_MED:
+        if score >= self._med_threshold and separation >= self._med_sep:
             return "Medium"
         if score > 0.0:
             return "Low"

@@ -11,6 +11,7 @@ PH12.2a scope:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from copy import deepcopy
@@ -86,6 +87,7 @@ class ResolvedStrategyConfig(BaseModel):
 
     raw: dict[str, Any]
     resolved: StrategyConfig
+    canonical_snapshot: dict[str, Any]
     defaults_applied: list[str]
     deprecations: list[str]
     warnings: list[str]
@@ -217,6 +219,53 @@ def _migrate_evaluation_weights(
 
 
 # ---------------------------------------------------------------------------
+# Canonical snapshot and fingerprinting
+# ---------------------------------------------------------------------------
+
+def _build_canonical_snapshot(resolved: "StrategyConfig") -> dict[str, Any]:
+    """Build the canonical short-name resolved snapshot for trace storage and fingerprinting.
+
+    All seven sections are always present (populated from defaults if YAML omits them).
+    Evaluation criteria expose both ``configured_weight`` (raw YAML value) and
+    ``resolved_weight`` (normalized to sum 1.0 over enabled criteria).
+    """
+    full = resolved.model_dump(mode="json")
+
+    eval_cfg: dict[str, Any] = full.get("evaluation_config") or {}
+    raw_criteria: dict[str, Any] = eval_cfg.get("criteria") or {}
+    total_weight: float = sum(
+        v.get("weight", 0.0)
+        for v in raw_criteria.values()
+        if v.get("enabled", True)
+    )
+    normalized_criteria: dict[str, Any] = {}
+    for name, crit in raw_criteria.items():
+        raw_w: float = crit.get("weight", 0.0)
+        normalized_criteria[name] = {
+            **crit,
+            "configured_weight": raw_w,
+            "resolved_weight": raw_w / total_weight if total_weight > 0 else raw_w,
+        }
+    eval_section = {**eval_cfg, "criteria": normalized_criteria}
+
+    return {
+        "evaluation": eval_section,
+        "constraints": full.get("constraint_config") or {},
+        "mapping": full.get("mapping_config") or {},
+        "alignment": full.get("alignment_config") or {},
+        "content": full.get("content") or {},
+        "reporting": full.get("reporting_config") or {},
+        "diagnostics": full.get("diagnostics_config") or {},
+    }
+
+
+def _fingerprint_from_snapshot(snapshot: dict[str, Any]) -> str:
+    """Return the first 16 hex chars of SHA-256 of the canonical snapshot."""
+    canonical = json.dumps(snapshot, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()[:16]
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -266,12 +315,16 @@ def resolve_strategy_config(raw_yaml_dict: dict[str, Any] | None) -> ResolvedStr
     # 3. Build and validate the resolved config
     resolved: StrategyConfig = StrategyConfig.from_yaml_dict(data)
 
-    # 4. Compute fingerprint from the resolved (fully-defaulted) model
-    fingerprint: str = resolved.compute_fingerprint()
+    # 4. Build the canonical short-name snapshot (used for fingerprinting and trace storage)
+    canonical_snapshot: dict[str, Any] = _build_canonical_snapshot(resolved)
+
+    # 5. Compute fingerprint from the canonical snapshot (same form written into the trace)
+    fingerprint: str = _fingerprint_from_snapshot(canonical_snapshot)
 
     return ResolvedStrategyConfig(
         raw=raw,
         resolved=resolved,
+        canonical_snapshot=canonical_snapshot,
         defaults_applied=defaults_applied,
         deprecations=deprecations,
         warnings=warnings,

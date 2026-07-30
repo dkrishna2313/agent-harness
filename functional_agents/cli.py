@@ -2596,7 +2596,7 @@ def strategy_config_show_cmd(
             "config_version": resolved.config_version,
             "fingerprint": resolved.fingerprint,
             "source": resolved.source,
-            "resolved": resolved.resolved.model_dump(mode="json"),
+            "resolved": resolved.canonical_snapshot,
             "defaults_applied": resolved.defaults_applied,
             "deprecations": resolved.deprecations,
             "warnings": resolved.warnings,
