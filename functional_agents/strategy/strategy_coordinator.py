@@ -43,7 +43,7 @@ from .constraint_evaluator import ConstraintEvaluator
 from .option_mapper import OptionMapper
 from .saturation_detector import SaturationDetector
 from .strategic_choice_generator import StrategicChoiceGenerator
-from .strategy_config import StrategyConfig
+from .strategy_config import AlignmentPolicy, StrategyConfig
 from .strategy_config_resolver import resolve_strategy_config
 from .strategy_planner import StrategyPlanner
 from .strategy_selector import StrategySelection, StrategySelector
@@ -139,6 +139,22 @@ class StrategyCoordinator:
 
         Does not mutate ctx. Does not call an LLM. Does not generate prose.
         """
+        # PH12.2a: resolve engagement strategy config upfront so all subsystems use it.
+        _resolved_cfg = resolve_strategy_config(self._raw_strategy_yaml)
+
+        # Wire evaluation_config criteria weights into the plan's evaluation model.
+        # Weights are normalized to sum 1.0 (resolved_weight) for correct scoring.
+        _eval_criteria = _resolved_cfg.canonical_snapshot.get("evaluation", {}).get("criteria", {})
+        if _eval_criteria:
+            _new_weights = {
+                k: v["resolved_weight"]
+                for k, v in _eval_criteria.items()
+                if v.get("enabled", True) and v.get("resolved_weight", 0.0) > 0
+            }
+            if _new_weights:
+                _new_em = self._plan.evaluation_model.model_copy(update={"weights": _new_weights})
+                self._plan = self._plan.model_copy(update={"evaluation_model": _new_em})
+
         # PH10.2/PH12.0: generate StrategicChoiceSets (posture or configured)
         self._choice_sets = StrategicChoiceGenerator().build(self._plan, ctx)
         # PH10.3: generate one TheoryOfWinning per StrategicChoiceSet
@@ -174,11 +190,15 @@ class StrategyCoordinator:
         self._selection = selector._last_selection
 
         # PH12.2b: map ALL theories after selection (does not affect scores)
-        mapper = OptionMapper()
+        mapper = OptionMapper(mapping_config=_resolved_cfg.resolved.mapping_config)
         all_mappings = {t.theory_id: mapper.map(t, ctx) for t in self._theories}
         winner_mapping = all_mappings[self._selection.winner_theory_id]
 
-        ap = getattr(self._plan, "alignment_policy", None)
+        _align_cfg = _resolved_cfg.resolved.alignment_config
+        ap = AlignmentPolicy(
+            minimum_challenge_margin=_align_cfg.minimum_challenge_margin,
+            minimum_mapping_confidence=_align_cfg.minimum_challenge_confidence,
+        )
         alignment = AlignmentEvaluator().evaluate(
             self._selected_theory, winner_mapping, self._selection, ctx, policy=ap
         )
@@ -204,8 +224,7 @@ class StrategyCoordinator:
         )
 
         # PH12.2b: resolve theory content after selection
-        content_cfg = getattr(self._plan, "content_config", None)
-        _resolved_cfg = resolve_strategy_config(self._raw_strategy_yaml)
+        content_cfg = _resolved_cfg.resolved.content
         _content_graph = ContentGraph().build(ctx)
         _content_resolver = ContentResolver(_content_graph, content_cfg)
         all_theory_contents: dict = {}
@@ -218,7 +237,7 @@ class StrategyCoordinator:
 
         # PH12.2b: enrich content with per-item discrimination scores
         _tc_list_raw = [tc for tc in all_theory_contents.values() if tc is not None]
-        _min_disc = getattr(content_cfg, "minimum_discrimination_score", 0.20) if content_cfg else 0.20
+        _min_disc = content_cfg.minimum_discrimination_score
         try:
             _tc_list_raw = enrich_with_discrimination(
                 _tc_list_raw, min_discrimination_score=_min_disc
@@ -395,28 +414,20 @@ class StrategyCoordinator:
                 _all_content_fallbacks.extend(tc.content_fallbacks)
 
         # PH12.2a — build strategy configuration snapshot for trace
+        # resolved uses the canonical short-name snapshot (same form used for fingerprinting)
         _strategy_config_snapshot = {
             "config_version": _resolved_cfg.config_version,
             "source": _resolved_cfg.source,
             "fingerprint": _resolved_cfg.fingerprint,
-            "resolved": _resolved_cfg.resolved.model_dump(mode="json"),
+            "resolved": _resolved_cfg.canonical_snapshot,
             "defaults_applied": _resolved_cfg.defaults_applied,
             "deprecations": _resolved_cfg.deprecations,
             "warnings": _resolved_cfg.warnings,
         }
 
-        _partial_threshold = (
-            getattr(content_cfg, "partial_homogenization_threshold", 0.75)
-            if content_cfg else 0.75
-        )
-        _full_threshold = (
-            getattr(content_cfg, "full_homogenization_threshold", 0.95)
-            if content_cfg else 0.95
-        )
-        _max_identical_dims = (
-            getattr(content_cfg, "maximum_identical_dimensions", 2)
-            if content_cfg else 2
-        )
+        _partial_threshold = content_cfg.partial_homogenization_threshold
+        _full_threshold = content_cfg.full_homogenization_threshold
+        _max_identical_dims = content_cfg.maximum_identical_dimensions
         _diff_result = compute_differentiation(
             [tc for tc in all_theory_contents.values() if tc is not None],
             partial_threshold=_partial_threshold,

@@ -590,3 +590,310 @@ class TestCLIIntegration:
         assert "resolved" in parsed
         assert "config_version" in parsed
         assert "source" in parsed
+
+
+class TestYAMLDiscovery:
+    """§25 — StrategyCoordinator correctly receives raw_strategy_yaml from engagement YAML."""
+
+    def test_coordinator_raw_yaml_from_engagement(self):
+        """Coordinator built via the orchestrator pattern returns source=engagement_yaml."""
+        import yaml
+        from functional_agents.engagement_spec import load_engagement_spec
+        from functional_agents.strategy import StrategyCoordinator, StrategyConfig, ConfigurationResolver
+        from functional_agents.strategy.strategy_config_resolver import resolve_strategy_config
+
+        spec = load_engagement_spec(str(_WORKTREE / "engagements" / "us_data_center_siting_strategy1.yaml"))
+        strategy_raw = getattr(spec, "strategy", None)
+
+        assert strategy_raw is not None, "engagement_spec.strategy must be non-None"
+        assert isinstance(strategy_raw, dict), "engagement_spec.strategy must be a dict"
+        assert len(strategy_raw) > 0, "engagement_spec.strategy must be non-empty"
+
+        strategy_config = StrategyConfig()
+        if strategy_raw:
+            strategy_config = ConfigurationResolver().resolve_from_engagement(strategy_config, strategy_raw)
+
+        sc = StrategyCoordinator(config=strategy_config, raw_strategy_yaml=strategy_raw or {})
+
+        assert len(sc._raw_strategy_yaml) > 0, "_raw_strategy_yaml must be non-empty"
+
+        resolved = resolve_strategy_config(sc._raw_strategy_yaml)
+        assert resolved.source == "engagement_yaml", (
+            f"Expected source=engagement_yaml, got source={resolved.source!r}. "
+            "This means raw_strategy_yaml threading is broken."
+        )
+        assert len(resolved.fingerprint) == 16, (
+            f"Expected 16-char fingerprint, got {resolved.fingerprint!r} ({len(resolved.fingerprint)} chars)."
+        )
+        assert len(resolved.defaults_applied) <= 10, (
+            f"Expected ≤10 defaults, got {len(resolved.defaults_applied)}: {resolved.defaults_applied}"
+        )
+
+    def test_coordinator_defaults_only_without_engagement(self):
+        """Coordinator built without raw_strategy_yaml returns source=defaults_only."""
+        from functional_agents.strategy import StrategyCoordinator
+        from functional_agents.strategy.strategy_config_resolver import resolve_strategy_config
+
+        sc = StrategyCoordinator()
+        resolved = resolve_strategy_config(sc._raw_strategy_yaml)
+        assert resolved.source == "defaults_only"
+
+
+class TestVersionGate:
+    """Version gate — unknown config_version values emit a warning."""
+
+    def test_known_version_no_warning(self):
+        """Known config_version produces no version warning."""
+        from functional_agents.strategy.strategy_config_resolver import resolve_strategy_config
+        result = resolve_strategy_config({"config_version": "ph12.2a-v1", "enabled": True})
+        version_warns = [w for w in result.warnings if "not recognised" in w]
+        assert version_warns == []
+
+    def test_unknown_version_emits_warning(self):
+        """Unknown config_version produces a warning in the warnings list."""
+        from functional_agents.strategy.strategy_config_resolver import resolve_strategy_config
+        result = resolve_strategy_config({"config_version": "ph99.0-unknown", "enabled": True})
+        version_warns = [w for w in result.warnings if "not recognised" in w]
+        assert len(version_warns) == 1
+        assert "ph99.0-unknown" in version_warns[0]
+
+    def test_no_version_no_warning(self):
+        """Missing config_version (defaults path) produces no version warning."""
+        from functional_agents.strategy.strategy_config_resolver import resolve_strategy_config
+        result = resolve_strategy_config({"enabled": True})
+        version_warns = [w for w in result.warnings if "not recognised" in w]
+        assert version_warns == []
+
+
+# ---------------------------------------------------------------------------
+# PH12.2a — Canonical snapshot, normalized weights, and fingerprint consistency
+# ---------------------------------------------------------------------------
+
+_PROD_ENGAGEMENT = str(_WORKTREE / "engagements" / "us_data_center_siting_strategy1.yaml")
+
+
+def _prod_resolved():
+    from functional_agents.engagement_spec import load_engagement_spec
+    from functional_agents.strategy.strategy_config_resolver import resolve_strategy_config
+    spec = load_engagement_spec(_PROD_ENGAGEMENT)
+    return resolve_strategy_config(spec.strategy)
+
+
+class TestCanonicalSnapshot:
+    """Canonical snapshot structure, normalized weights, and fingerprint consistency."""
+
+    def test_all_sections_present_and_populated(self):
+        """Every required section in canonical_snapshot is a non-empty dict."""
+        r = _prod_resolved()
+        snap = r.canonical_snapshot
+        for section in ("evaluation", "constraints", "mapping", "alignment", "content", "reporting", "diagnostics"):
+            val = snap.get(section)
+            assert isinstance(val, dict), f"section {section!r} is not a dict: {val!r}"
+            assert val, f"section {section!r} is empty"
+
+    def test_no_section_is_null(self):
+        """No resolved section is null when using production engagement YAML."""
+        r = _prod_resolved()
+        for section, val in r.canonical_snapshot.items():
+            assert val is not None, f"section {section!r} is None"
+
+    def test_normalized_weights_sum_to_one(self):
+        """resolved_weight values for enabled criteria sum to 1.0."""
+        r = _prod_resolved()
+        criteria = r.canonical_snapshot["evaluation"]["criteria"]
+        weights = [v["resolved_weight"] for v in criteria.values() if v.get("enabled", True)]
+        assert weights, "No enabled criteria found"
+        assert abs(sum(weights) - 1.0) <= 0.001, f"Weights sum to {sum(weights)}, expected 1.0"
+
+    def test_configured_and_resolved_weight_present(self):
+        """Each criterion exposes both configured_weight and resolved_weight."""
+        r = _prod_resolved()
+        criteria = r.canonical_snapshot["evaluation"]["criteria"]
+        for name, crit in criteria.items():
+            assert "configured_weight" in crit, f"criterion {name!r} missing configured_weight"
+            assert "resolved_weight" in crit, f"criterion {name!r} missing resolved_weight"
+
+    def test_mapping_section_populated_without_yaml(self):
+        """mapping section is populated even when omitted from YAML."""
+        from functional_agents.strategy.strategy_config_resolver import resolve_strategy_config
+        r = resolve_strategy_config({"config_version": "ph12.2a-v1"})
+        mapping = r.canonical_snapshot.get("mapping")
+        assert isinstance(mapping, dict), f"mapping should be dict, got {mapping!r}"
+        assert mapping, "mapping should be non-empty (filled from defaults)"
+
+    def test_alignment_section_populated_without_yaml(self):
+        """alignment section is populated even when omitted from YAML."""
+        from functional_agents.strategy.strategy_config_resolver import resolve_strategy_config
+        r = resolve_strategy_config({"config_version": "ph12.2a-v1"})
+        alignment = r.canonical_snapshot.get("alignment")
+        assert isinstance(alignment, dict), f"alignment should be dict, got {alignment!r}"
+        assert alignment, "alignment should be non-empty (filled from defaults)"
+
+    def test_reporting_section_populated_without_yaml(self):
+        """reporting section is populated even when omitted from YAML."""
+        from functional_agents.strategy.strategy_config_resolver import resolve_strategy_config
+        r = resolve_strategy_config({"config_version": "ph12.2a-v1"})
+        reporting = r.canonical_snapshot.get("reporting")
+        assert isinstance(reporting, dict), f"reporting should be dict, got {reporting!r}"
+        assert reporting, "reporting should be non-empty (filled from defaults)"
+
+    def test_diagnostics_section_populated_without_yaml(self):
+        """diagnostics section is populated even when omitted from YAML."""
+        from functional_agents.strategy.strategy_config_resolver import resolve_strategy_config
+        r = resolve_strategy_config({"config_version": "ph12.2a-v1"})
+        diagnostics = r.canonical_snapshot.get("diagnostics")
+        assert isinstance(diagnostics, dict), f"diagnostics should be dict, got {diagnostics!r}"
+        assert diagnostics, "diagnostics should be non-empty (filled from defaults)"
+
+    def test_fingerprint_consistent_across_calls(self):
+        """Same engagement YAML always produces the same fingerprint."""
+        r1 = _prod_resolved()
+        r2 = _prod_resolved()
+        assert r1.fingerprint == r2.fingerprint, "Fingerprint is not deterministic"
+
+    def test_cli_and_resolver_fingerprint_match(self):
+        """CLI config show --format json fingerprint matches resolve_strategy_config() fingerprint."""
+        import subprocess
+        result = subprocess.run(
+            ["python3", "-m", "functional_agents.cli", "strategy", "config", "show",
+             "--format", "json", "--engagement", _PROD_ENGAGEMENT],
+            capture_output=True, text=True, cwd=str(_WORKTREE),
+        )
+        assert result.returncode == 0, f"CLI error: {result.stderr}"
+        cli_out = json.loads(result.stdout)
+        r = _prod_resolved()
+        assert cli_out["fingerprint"] == r.fingerprint, (
+            f"CLI fingerprint {cli_out['fingerprint']!r} != resolver fingerprint {r.fingerprint!r}"
+        )
+
+    def test_cli_resolved_matches_canonical_snapshot(self):
+        """CLI --format json resolved dict is structurally equal to canonical_snapshot."""
+        import subprocess
+        result = subprocess.run(
+            ["python3", "-m", "functional_agents.cli", "strategy", "config", "show",
+             "--format", "json", "--engagement", _PROD_ENGAGEMENT],
+            capture_output=True, text=True, cwd=str(_WORKTREE),
+        )
+        assert result.returncode == 0
+        cli_resolved = json.loads(result.stdout)["resolved"]
+        r = _prod_resolved()
+        # Keys must match
+        assert set(cli_resolved.keys()) == set(r.canonical_snapshot.keys()), (
+            f"CLI resolved keys {sorted(cli_resolved)} != canonical_snapshot keys {sorted(r.canonical_snapshot)}"
+        )
+
+
+class TestAlignmentRegression:
+    """Alignment evaluator unit tests for PH12.2a policy compliance."""
+
+    def _make_ctx(self, preferred_option_id: str, strategic_options: list | None = None):
+        """Build a minimal AgentContext-like namespace for alignment testing."""
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            preferred_option={"option_id": preferred_option_id},
+            strategic_options=strategic_options or [],
+        )
+
+    def _make_theory(self, theory_id: str = "TH-SCS-1"):
+        from functional_agents.strategy.strategic_position import TheoryOfWinning
+        return TheoryOfWinning(
+            theory_id=theory_id,
+            source_choice_set_id="SCS-1",
+            recommended_option_id="OPT-B",
+            recommended_option_title="Option B",
+        )
+
+    def _make_mapping(self, mapped_option_id: str, confidence: str = "Medium"):
+        from functional_agents.strategy.alignment import OptionMapping
+        return OptionMapping(
+            mapped_option_id=mapped_option_id,
+            mapping_score=0.45,
+            mapping_confidence=confidence,
+            mapping_rationale="test",
+        )
+
+    def _make_selection(self, margin: float = 0.15):
+        from functional_agents.strategy.strategy_selector import StrategySelection
+        return StrategySelection(
+            winner_theory_id="TH-SCS-1",
+            winner_score=0.72,
+            runner_up_theory_id="TH-SCS-2",
+            runner_up_score=0.72 - margin,
+            score_margin=margin,
+            tie_breaker_used=None,
+        )
+
+    def test_same_preferred_and_mapped_medium_confidence_yields_refined(self):
+        """preferred==mapped==OPT-B + Medium confidence → alignment_status=refined (not challenged)."""
+        from functional_agents.strategy.alignment_evaluator import AlignmentEvaluator
+        from functional_agents.strategy.strategy_config import AlignmentPolicy
+
+        ap = AlignmentPolicy(minimum_challenge_margin=0.10, minimum_mapping_confidence="Medium")
+        ctx = self._make_ctx("OPT-B")
+        theory = self._make_theory()
+        mapping = self._make_mapping("OPT-B", "Medium")
+        selection = self._make_selection(margin=0.15)
+
+        result = AlignmentEvaluator().evaluate(theory, mapping, selection, ctx, policy=ap)
+        assert result.status in {"refined", "confirmed"}, (
+            f"Expected refined/confirmed, got {result.status!r}. "
+            f"preferred={result.preferred_option_id!r} mapped={result.mapped_option_id!r}"
+        )
+
+    def test_different_option_with_high_margin_yields_challenged(self):
+        """preferred=OPT-A, mapped=OPT-B, margin=0.20 → challenged."""
+        from functional_agents.strategy.alignment_evaluator import AlignmentEvaluator
+        from functional_agents.strategy.strategy_config import AlignmentPolicy
+
+        ap = AlignmentPolicy(minimum_challenge_margin=0.10, minimum_mapping_confidence="Medium")
+        ctx = self._make_ctx("OPT-A")
+        theory = self._make_theory()
+        mapping = self._make_mapping("OPT-B", "High")
+        selection = self._make_selection(margin=0.20)
+
+        result = AlignmentEvaluator().evaluate(theory, mapping, selection, ctx, policy=ap)
+        assert result.status == "challenged", (
+            f"Expected challenged, got {result.status!r}"
+        )
+
+    def test_resolved_alignment_policy_reaches_evaluator(self):
+        """AlignmentPolicy built from resolved alignment_config reaches AlignmentEvaluator correctly."""
+        from functional_agents.strategy.strategy_config_resolver import resolve_strategy_config
+        from functional_agents.strategy.alignment_evaluator import AlignmentEvaluator
+        from functional_agents.strategy.strategy_config import AlignmentPolicy
+
+        r = resolve_strategy_config({
+            "config_version": "ph12.2a-v1",
+            "alignment_config": {
+                "minimum_challenge_margin": 0.05,
+                "minimum_challenge_confidence": "Low",
+            },
+        })
+        _align_cfg = r.resolved.alignment_config
+        ap = AlignmentPolicy(
+            minimum_challenge_margin=_align_cfg.minimum_challenge_margin,
+            minimum_mapping_confidence=_align_cfg.minimum_challenge_confidence,
+        )
+        assert ap.minimum_challenge_margin == 0.05
+        assert ap.minimum_mapping_confidence == "Low"
+
+        ctx = self._make_ctx("OPT-B")
+        theory = self._make_theory()
+        mapping = self._make_mapping("OPT-B", "Low")
+        selection = self._make_selection(margin=0.10)
+
+        result = AlignmentEvaluator().evaluate(theory, mapping, selection, ctx, policy=ap)
+        assert result.status in {"refined", "confirmed"}, (
+            f"Low-confidence medium-margin same-option should be refined/confirmed, got {result.status!r}"
+        )
+
+    def test_resolved_mapping_policy_reaches_option_mapper(self):
+        """OptionMapper constructed with mapping_config uses configured thresholds."""
+        from functional_agents.strategy.strategy_config_resolver import resolve_strategy_config
+        from functional_agents.strategy.option_mapper import OptionMapper
+
+        r = resolve_strategy_config({"config_version": "ph12.2a-v1"})
+        mapper = OptionMapper(mapping_config=r.resolved.mapping_config)
+
+        assert mapper._high_threshold == r.resolved.mapping_config.confidence.high_score_threshold
+        assert mapper._med_threshold == r.resolved.mapping_config.confidence.minimum_authoritative_score
