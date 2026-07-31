@@ -507,9 +507,9 @@ strategy:
     maximum_shared_opportunities: 5
     maximum_shared_recommendations: 5
     maximum_shared_evidence: 12
-    partial_homogenization_threshold: 0.92
+    partial_homogenization_threshold: 0.94
     full_homogenization_threshold: 0.95
-    maximum_identical_dimensions: 3
+    maximum_identical_dimensions: 4
     relationship_priorities:
       explicit_option_link: 1.0
       explicit_recommendation_link: 0.8
