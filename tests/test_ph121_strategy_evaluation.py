@@ -335,6 +335,244 @@ class TestOptionMapper:
 
 
 # ---------------------------------------------------------------------------
+# PostureNormalizer regression — production OPT-B vs OPT-D wording
+# Reproduces the merged-main regression where TH-SCS-1 (diversified+btm_first+
+# milestone_gated) mapped to OPT-D instead of OPT-B because:
+#   1. OPT-B "staged, tiered portfolio" → geographic:staged (wrong; "tiered portfolio"
+#      should fire geographic:diversified from the title first)
+#   2. OPT-B "to accelerate permitting" → timing:accelerate before "go/no-go gates"
+#      could fire timing:milestone_gated (wrong ordering in POSTURE_CATEGORIES)
+# ---------------------------------------------------------------------------
+
+_PROD_OPT_B = {
+    "option_id": "OPT-B",
+    "title": "Balanced Tiered Portfolio: Texas Anchor, Indiana Secondary, Virginia Conditional",
+    "description": (
+        "Execute a staged, tiered portfolio strategy in which Texas (ERCOT) is the "
+        "primary near-term anchor — capturing queue positions and committing construction "
+        "capital immediately — Indiana (MISO) is a secondary platform with active state "
+        "engagement to accelerate permitting, and Virginia (PJM) is maintained as a "
+        "conditional medium-term position contingent on measurable interconnection queue "
+        "improvement. New Hampshire and California are treated as niche or optionality "
+        "markets only. Capital is allocated in proportion to risk-adjusted grid headroom "
+        "and regulatory confidence, with explicit go/no-go gates at each tier."
+    ),
+    "strategic_objective": (
+        "Build a diversified, risk-stratified AI data center portfolio that captures "
+        "near-term capacity in the most accessible markets while preserving optionality "
+        "in higher-risk, higher-upside markets."
+    ),
+    "advantages": [
+        "Diversified across three RTOs (ERCOT, MISO, PJM) reduces single-point-of-failure exposure",
+        "Staged capital deployment with explicit gates preserves financial flexibility",
+        "Implements all four research-derived recommendations",
+    ],
+    "disadvantages": [
+        "More complex to execute than a single-state or dual-state focus",
+        "Virginia conditional position may create organizational indecision if the go/no-go gate is not enforced with discipline",
+        "Medium capital intensity means it may underperform the aggressive option",
+    ],
+    "expected_outcomes": [
+        "ERCOT anchor campus operational by 2027-2028",
+        "Indiana secondary campus advancing through permitting by 2028",
+        "Virginia conditional position activated or deactivated by 2027 based on PJM queue clearance milestones",
+    ],
+    "recommended": True,
+}
+
+_PROD_OPT_D = {
+    "option_id": "OPT-D",
+    "title": "Opportunistic Diversification: Include New Hampshire and California as Hedges",
+    "description": (
+        "Pursue a broad five-state portfolio by actively evaluating New Hampshire and "
+        "California alongside Texas, Indiana, and Virginia, treating the former two as "
+        "regulatory and grid-diversity hedges rather than primary platforms. Capital is "
+        "allocated opportunistically as site-specific conditions emerge, with no "
+        "pre-committed tier structure."
+    ),
+    "strategic_objective": (
+        "Maximize geographic and regulatory diversification across five states to reduce "
+        "correlated risk across RTOs, load-growth scenarios, and state policy environments."
+    ),
+    "advantages": [
+        "Broadest geographic diversification reduces exposure to any single state",
+        "Preserves optionality in California's large renewable energy and demand market, "
+        "which could prove valuable if regulatory reform accelerates",
+        "Low early-stage capital commitment per state allows reallocation as evidence accumulates",
+    ],
+    "disadvantages": [
+        "Lack of strategic focus risks spreading organizational bandwidth too thin",
+        "Opportunistic capital allocation without explicit gates increases the risk of "
+        "capital being deployed in suboptimal markets due to short-term tactical pressure",
+    ],
+    "recommended": False,
+}
+
+
+class TestProductionOptionMappingRegression:
+    """Regression suite for the merged-main OPT-D-over-OPT-B mapping defect.
+
+    Root causes fixed:
+    1. _GEO_DIVERSIFIED: added 'tiered portfolio' so OPT-B title fires geo:diversified
+       before description 'staged' can fire geo:staged.
+    2. _TMG_MILESTONE_GATED: added 'go/no-go' and 'with explicit gate'.
+    3. POSTURE_CATEGORIES timing: milestone_gated checked before accelerate so
+       'go/no-go gates' wins over incidental 'to accelerate permitting'.
+    """
+
+    def _research(self, opts):
+        class R:
+            strategic_options = opts
+        return R()
+
+    def _theory_diversified_btm_milestone(self):
+        """TH-SCS-1 posture: diversified + btm_first + milestone_gated."""
+        return _make_theory(choices=[
+            {"dimension": "geographic_portfolio", "selected_value": "diversified", "metadata": {}},
+            {"dimension": "power_pathway",        "selected_value": "btm_first",   "metadata": {}},
+            {"dimension": "entry_timing",         "selected_value": "milestone_gated", "metadata": {}},
+        ])
+
+    # ------------------------------------------------------------------
+    # Posture-detection correctness for production wording
+    # ------------------------------------------------------------------
+
+    def test_opt_b_title_fires_geographic_diversified(self):
+        from functional_agents.strategy.posture_normalizer import PostureNormalizer
+        norm = PostureNormalizer()
+        postures = norm.option_postures(_PROD_OPT_B)
+        assert postures.get("geographic") == "diversified", (
+            f"OPT-B 'tiered portfolio' title should detect geographic:diversified, got {postures}"
+        )
+
+    def test_opt_b_description_fires_timing_milestone_gated(self):
+        from functional_agents.strategy.posture_normalizer import PostureNormalizer
+        norm = PostureNormalizer()
+        postures = norm.option_postures(_PROD_OPT_B)
+        assert postures.get("timing") == "milestone_gated", (
+            f"OPT-B 'go/no-go gates' should fire timing:milestone_gated before "
+            f"'to accelerate permitting' fires timing:accelerate, got {postures}"
+        )
+
+    def test_opt_d_retains_timing_accelerate(self):
+        from functional_agents.strategy.posture_normalizer import PostureNormalizer
+        norm = PostureNormalizer()
+        postures = norm.option_postures(_PROD_OPT_D)
+        assert postures.get("timing") == "accelerate", (
+            f"OPT-D has no milestone-gate language; should stay timing:accelerate, got {postures}"
+        )
+
+    def test_without_explicit_gates_does_not_trigger_milestone_gated(self):
+        """'without explicit gates' (OPT-D disadvantage) must NOT fire milestone_gated."""
+        from functional_agents.strategy.posture_normalizer import PostureNormalizer
+        norm = PostureNormalizer()
+        opt = {
+            "option_id": "x",
+            "title": "Opportunistic Spread",
+            "description": "Capital allocated opportunistically without explicit gates.",
+        }
+        postures = norm.option_postures(opt)
+        assert postures.get("timing") != "milestone_gated", (
+            "'without explicit gates' must not trigger milestone_gated"
+        )
+
+    # ------------------------------------------------------------------
+    # Score-breakdown comparison: OPT-B beats OPT-D
+    # ------------------------------------------------------------------
+
+    def test_opt_b_score_exceeds_opt_d_for_diversified_btm_milestone_theory(self):
+        theory = self._theory_diversified_btm_milestone()
+        research = self._research([_PROD_OPT_B, _PROD_OPT_D])
+        mapper = OptionMapper()
+
+        result = mapper.map(theory, research)
+        scores = {s["option_id"]: s["score"] for s in result.option_scores}
+
+        assert scores["OPT-B"] > scores["OPT-D"], (
+            f"OPT-B should outscore OPT-D for diversified+milestone_gated theory. "
+            f"OPT-B={scores['OPT-B']:.3f} OPT-D={scores['OPT-D']:.3f}"
+        )
+
+    def test_opt_b_mapped_with_medium_or_high_confidence(self):
+        """Production reproducer: exact wording from the merged-main pipeline run."""
+        prod_opts = [
+            _PROD_OPT_B,
+            _PROD_OPT_D,
+            {
+                "option_id": "OPT-A",
+                "title": "Aggressive Multi-State Buildout: Texas and Indiana First",
+                "description": "Immediately commit capital to securing anchor interconnection queue positions in ERCOT (Texas) and MISO (Indiana) simultaneously.",
+                "strategic_objective": "Maximize total deployable capacity by 2030 by front-loading capital into the two highest-throughput states.",
+                "advantages": ["Maximizes total capacity footprint and first-mover queue positioning"],
+                "disadvantages": ["Highest capital exposure — failure creates large stranded-cost scenario"],
+            },
+            {
+                "option_id": "OPT-C",
+                "title": "Conservative PJM-Centric Approach: Virginia Anchor with Selective Expansion",
+                "description": "Anchor development in Virginia (PJM), leveraging its mature data center ecosystem.",
+                "strategic_objective": "Minimize execution risk by concentrating initial development in the most operationally mature market.",
+                "advantages": ["Virginia's mature ecosystem reduces greenfield execution risk"],
+                "disadvantages": ["Foregoes first-mover queue positioning in ERCOT and MISO"],
+            },
+        ]
+        theory = self._theory_diversified_btm_milestone()
+        research = self._research(prod_opts)
+
+        result = OptionMapper().map(theory, research)
+
+        assert result.mapped_option_id == "OPT-B", (
+            f"Production wording must map TH-SCS-1 (diversified+btm_first+milestone_gated) "
+            f"to OPT-B, got {result.mapped_option_id} "
+            f"(confidence={result.mapping_confidence}, score={result.mapping_score})"
+        )
+        assert result.mapping_confidence in ("Medium", "High"), (
+            f"Mapping confidence must be Medium or High, got {result.mapping_confidence}"
+        )
+
+    def test_opt_d_cannot_win_by_geographic_match_alone(self):
+        """OPT-D geographic:diversified match must not overcome timing contradiction.
+
+        When OPT-B (with matching timing:milestone_gated) is available, OPT-D cannot
+        win because its timing contradiction reduces its score below OPT-B's.
+        Verifies that the timing contradiction penalty is applied to OPT-D.
+        """
+        theory = self._theory_diversified_btm_milestone()
+        research = self._research([_PROD_OPT_B, _PROD_OPT_D])
+        mapper = OptionMapper()
+        result = mapper.map(theory, research)
+
+        scores = {s["option_id"]: s["score"] for s in result.option_scores}
+        # OPT-D timing contradiction (milestone_gated vs accelerate) = -0.20
+        # OPT-D geographic match = +0.35 → net ≈ 0.15+generic
+        # OPT-B geographic+timing matches = +0.35+0.25 → net ≈ 0.60+generic
+        assert scores["OPT-D"] < scores["OPT-B"], (
+            f"OPT-D timing contradiction must keep its score below OPT-B. "
+            f"OPT-D={scores['OPT-D']:.3f} OPT-B={scores['OPT-B']:.3f}"
+        )
+        # OPT-D must not be selected over OPT-B
+        assert result.mapped_option_id != "OPT-D", (
+            "OPT-D must not beat OPT-B when theory is diversified+milestone_gated"
+        )
+
+    def test_score_breakdown_opt_b_geographic_and_timing_match(self):
+        """OPT-B should show both geographic:diversified AND timing:milestone_gated matches."""
+        theory = self._theory_diversified_btm_milestone()
+        research = self._research([_PROD_OPT_B, _PROD_OPT_D])
+        mapper = OptionMapper()
+        result = mapper.map(theory, research)
+
+        opt_b_entry = next(s for s in result.option_scores if s["option_id"] == "OPT-B")
+        matched_cats = {m["category"] for m in opt_b_entry.get("posture_matches", [])}
+        assert "geographic" in matched_cats, "OPT-B must show geographic posture match"
+        assert "timing" in matched_cats, "OPT-B must show timing posture match"
+        assert not opt_b_entry.get("contradictions"), "OPT-B must have zero contradictions"
+
+        opt_d_entry = next(s for s in result.option_scores if s["option_id"] == "OPT-D")
+        contra_cats = {c["category"] for c in opt_d_entry.get("contradictions", [])}
+        assert "timing" in contra_cats, "OPT-D must show timing contradiction"
+
+
+# ---------------------------------------------------------------------------
 # AlignmentEvaluator
 # ---------------------------------------------------------------------------
 
