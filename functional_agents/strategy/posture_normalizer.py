@@ -23,6 +23,7 @@ _GEO_DIVERSIFIED: frozenset[str] = frozenset([
     "portfolio hedge", "three-state", "three state", "four-state", "distribut",
     "geographic-resilience", "geographic resilience", "multiple state",
     "spread investment", "multiple market",
+    "tiered portfolio", "multi-tier",  # tiered portfolio = multi-tier = diversified geographic spread
 ])
 _GEO_STAGED: frozenset[str] = frozenset([
     "staged", "phased", "optionality", "conditional-commit", "conditional commit",
@@ -67,6 +68,8 @@ _TMG_MILESTONE_GATED: frozenset[str] = frozenset([
     "capital-on-milestone",
     "staged commit", "staged-commit",  # phased/gated capital deployment
     "at each gate", "assumption-gate", "gate before commit",
+    "go/no-go", "go-no-go",  # explicit decision gates (OPT-B: "explicit go/no-go gates")
+    "with explicit gate",    # "with explicit gates" — NOTE: does NOT match "without explicit gates"
 ])
 _TMG_WAIT_AND_MONITOR: frozenset[str] = frozenset([
     "wait-and-monitor", "wait and monitor", "preserve-optionality",
@@ -90,9 +93,12 @@ POSTURE_CATEGORIES: dict[str, dict[str, frozenset[str]]] = {
         "hybrid":      _PWR_HYBRID,
     },
     "timing": {
-        "accelerate":       _TMG_ACCELERATE,
+        # milestone_gated checked before accelerate: "go/no-go" and gate language is more
+        # specific than "accelerat" which can appear as an incidental verb in option descriptions
+        # (e.g. "to accelerate permitting" inside a milestone-gated strategy).
         "milestone_gated":  _TMG_MILESTONE_GATED,
         "wait_and_monitor": _TMG_WAIT_AND_MONITOR,
+        "accelerate":       _TMG_ACCELERATE,
     },
 }
 
