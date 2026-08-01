@@ -160,12 +160,33 @@ class MarkdownRenderer:
             lines.append("")
             return lines
 
-        rec_opt = next(
-            (o for o in brief.strategic_options.options if o.recommended),
-            None,
-        )
+        # PH12.2f: prefer strategy-mapped option when available (source-of-truth hierarchy)
+        _mapped_id = getattr(brief, "recommended_option", "") or ""
+        if _mapped_id:
+            rec_opt = next(
+                (o for o in brief.strategic_options.options if getattr(o, "option_id", "") == _mapped_id),
+                None,
+            )
+        else:
+            rec_opt = next(
+                (o for o in brief.strategic_options.options if o.recommended),
+                None,
+            )
         if rec_opt is None and brief.strategic_options.options:
             rec_opt = brief.strategic_options.options[0]
+
+        # When strategy layer has mapped option, prefer its title display
+        _mapped_title = getattr(brief, "mapped_option_title", "") or ""
+        if _mapped_id and _mapped_title and rec_opt and getattr(rec_opt, "option_id", "") != _mapped_id:
+            # Mapped option not found in options list — use the title from brief
+            class _SyntheticOpt:
+                title = _mapped_title
+                option_id = _mapped_id
+                recommended = True
+                advantages: list = []
+                estimated_time_horizon = getattr(rec_opt, "estimated_time_horizon", "")
+                description = ""
+            rec_opt = _SyntheticOpt()  # type: ignore[assignment]
 
         conf = brief.executive_confidence
 
@@ -308,6 +329,77 @@ class MarkdownRenderer:
                 lines.append(f"*{sn.alignment_narrative}*")
                 lines.append("")
 
+            # PH12.2f — Mapped Strategic Option subsection
+            if sn.mapped_option_id:
+                lines += ["### Mapped Strategic Option", ""]
+                # Resolve option title: prefer StrategyNarrative.mapped_option_title if set,
+                # then fall back to brief lookup
+                mapped_display = sn.mapped_option_title or _opt_title(sn.mapped_option_id)
+                confidence_display = sn.mapping_confidence
+                score_display = ""
+                _ms = getattr(sn, "mapping_score", None)
+                _mm = getattr(sn, "mapping_margin", None)
+                if _ms is not None:
+                    score_display = f"{_ms:.2f}"
+                    if _mm is not None:
+                        score_display += f" (margin +{_mm:.3f})"
+                lines.append(f"**{mapped_display}**")
+                if sn.mapped_option_id:
+                    lines.append(f"*(Mapped option: {sn.mapped_option_id})*")
+                if confidence_display:
+                    lines.append(f"*Mapping confidence: {confidence_display}*" +
+                                 (f" | Score: {score_display}" if score_display else ""))
+                lines.append("")
+                _rationale = getattr(sn, "mapping_rationale", "")
+                if _rationale:
+                    lines.append(f"**Mapping rationale:** {_rationale}")
+                    lines.append("")
+
+            # PH12.2f — Alignment Result subsection
+            if sn.alignment_status:
+                lines += ["### Alignment Result", ""]
+                _alignment_labels = {
+                    "confirmed": "Confirmed",
+                    "refined": "Refined",
+                    "challenged": "Challenged",
+                    "partially_aligned": "Partially Aligned",
+                    "unresolved": "Unresolved",
+                }
+                _alignment_explanations = {
+                    "confirmed": (
+                        "The Strategy Layer analysis confirms the upstream preferred option. "
+                        "The selected theory directly maps to the option identified by the "
+                        "decision analysis, reinforcing confidence in the direction."
+                    ),
+                    "refined": (
+                        "The Strategy Layer analysis reinforces the upstream preferred option "
+                        "with a more specific execution posture. The winning theory maps to "
+                        "the same option with added specificity on how to execute."
+                    ),
+                    "challenged": (
+                        "The Strategy Layer analysis selects a different option than the "
+                        "upstream preference. The winning theory maps to an alternative "
+                        "option with sufficient evidence to warrant reconsideration."
+                    ),
+                    "partially_aligned": (
+                        "The Strategy Layer analysis partially aligns with the upstream "
+                        "preferred option. The winning theory shares strategic intent but "
+                        "differs on specific execution dimensions."
+                    ),
+                    "unresolved": (
+                        "The alignment between the Strategy Layer result and the upstream "
+                        "preferred option could not be determined with sufficient confidence."
+                    ),
+                }
+                status_key = sn.alignment_status.lower().replace(" ", "_").replace("-", "_")
+                status_label = _alignment_labels.get(status_key, sn.alignment_status.title())
+                status_explain = _alignment_explanations.get(status_key, "")
+                lines.append(f"**Alignment Status: {status_label}**")
+                if status_explain:
+                    lines.append("")
+                    lines.append(status_explain)
+                lines.append("")
+
         # Recommended Strategy subsection
         lines += ["### Recommended Strategy", ""]
         for para in (sec.paragraphs or []):
@@ -338,12 +430,42 @@ class MarkdownRenderer:
             lines += ["### Alternatives Considered", ""]
             lines += self._render_table(sec.tables[0])
 
-        # Strategic Choices (when present — bullet group 4)
-        if len(bgs) > 4 and bgs[4]:
+        # PH12.2f — Choice Cascade (replaces raw "Strategic Choices" bullet group 4)
+        # Prefer structured choice_cascade from narrative; fall back to bullet group 4
+        _cascade_rendered = False
+        if sn is not None and sn.choice_cascade:
+            lines += ["### Choice Cascade", ""]
+            for entry in sn.choice_cascade:
+                if isinstance(entry, dict):
+                    dim_title = entry.get("dimension_title") or entry.get("dimension_id", "")
+                    choice_title = entry.get("choice_title") or entry.get("choice_id", "")
+                    if dim_title and choice_title:
+                        lines.append(f"**{dim_title}:** {choice_title}")
+            lines.append("")
+            _cascade_rendered = True
+
+        # Fallback: raw Strategic Choices bullets (bullet group 4) — only if cascade not rendered
+        if not _cascade_rendered and len(bgs) > 4 and bgs[4]:
             lines += ["**Strategic Choices:**"]
             for b in bgs[4]:
                 lines.append(f"- {b}")
             lines.append("")
+
+        # PH12.2f — Execution Implications
+        if sn is not None:
+            from ..strategy.strategy_output_view import build_strategy_output_view
+            _sov = build_strategy_output_view(
+                sn,
+                strategic_options=[
+                    {"option_id": getattr(o, "option_id", ""), "title": getattr(o, "title", "")}
+                    for o in (getattr(getattr(brief, "strategic_options", None), "options", None) or [])
+                ] if brief else [],
+            )
+            if _sov and _sov.execution_implications:
+                lines += ["### Execution Implications", ""]
+                for impl in _sov.execution_implications:
+                    lines.append(f"- {impl}")
+                lines.append("")
 
         # Assumptions and Conditions for Success
         has_assumptions = len(bgs) > 1 and bgs[1]

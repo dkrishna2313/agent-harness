@@ -317,6 +317,16 @@ class EditorialBrief:
     appendix: AppendixSection
     strategy_narrative: "StrategyNarrative | None" = field(default=None)
 
+    # PH12.2f — top-level strategy summary fields (optional, backward compatible)
+    # Populated by EditorialCoordinator.build() when strategy_narrative is present.
+    strategic_direction: str = field(default="")   # winning_position executive statement
+    core_thesis: str = field(default="")           # winning_mechanism (the "how")
+    recommended_option: str = field(default="")    # mapped_option_id
+    mapped_option_title: str = field(default="")   # human-readable option name
+    alignment: str = field(default="")             # alignment_status
+    execution_implications: list[str] = field(default_factory=list)
+    strategy_provenance: dict[str, Any] = field(default_factory=dict)
+
     def to_dict(self) -> dict[str, Any]:
         d = dataclasses.asdict(self)
         # strategy_narrative is a Pydantic model — serialize it explicitly

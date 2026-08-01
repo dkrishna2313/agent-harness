@@ -63,6 +63,11 @@ from .strategy_config import (
 from .strategy_artifact_reader import StrategyArtifactReader  # PH11.3
 from .strategy_coordinator import StrategyCoordinator
 from .strategy_lineage import StrategyLineageLink  # PH11.2
+from .strategy_output_view import (  # PH12.2f
+    StrategyChoiceCascadeItem,
+    StrategyOutputView,
+    build_strategy_output_view,
+)
 from .strategy_trace import StrategyTrace
 
 __all__ = [
@@ -112,4 +117,7 @@ __all__ = [
     "TheoryGenerator",
     "TheoryOfWinning",
     "StrategyTrace",
+    "StrategyChoiceCascadeItem",
+    "StrategyOutputView",
+    "build_strategy_output_view",
 ]
