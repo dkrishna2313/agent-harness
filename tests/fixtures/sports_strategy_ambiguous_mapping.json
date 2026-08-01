@@ -1,0 +1,81 @@
+{
+  "run_id": "test-deterministic-ambiguous-mapping",
+  "question": "Which sports analytics strategy should we pursue?",
+  "execution_profile": "standard",
+  "profiles": ["sports"],
+  "preferred_option": {},
+  "decision_analysis": {},
+  "strategic_options": [
+    {
+      "option_id": "OPT-ALPHA",
+      "title": "Alpha Strategy",
+      "description": "First sports analytics option with no clear distinguishing evidence",
+      "strategic_objective": "Pursue alpha opportunities in sports analytics",
+      "advantages": ["Option A advantage"],
+      "disadvantages": ["Option A disadvantage"],
+      "supporting_assumption_ids": [],
+      "associated_risk_ids": []
+    },
+    {
+      "option_id": "OPT-BETA",
+      "title": "Beta Strategy",
+      "description": "Second sports analytics option with equivalent evidence profile",
+      "strategic_objective": "Pursue beta opportunities in sports analytics",
+      "advantages": ["Option B advantage"],
+      "disadvantages": ["Option B disadvantage"],
+      "supporting_assumption_ids": [],
+      "associated_risk_ids": []
+    },
+    {
+      "option_id": "OPT-GAMMA",
+      "title": "Gamma Strategy",
+      "description": "Third sports analytics option with equivalent evidence profile",
+      "strategic_objective": "Pursue gamma opportunities in sports analytics",
+      "advantages": ["Option C advantage"],
+      "disadvantages": ["Option C disadvantage"],
+      "supporting_assumption_ids": [],
+      "associated_risk_ids": []
+    }
+  ],
+  "assumptions": [
+    {
+      "text": "Sports analytics market is growing rapidly",
+      "category": "market",
+      "impact": "high"
+    },
+    {
+      "text": "Technology investment is required for competitive positioning",
+      "category": "capability",
+      "impact": "medium"
+    }
+  ],
+  "risks": [
+    {
+      "text": "Market conditions may shift before strategy is executed",
+      "category": "strategic",
+      "severity": "medium",
+      "mitigation": "Regular strategy review cadence"
+    }
+  ],
+  "recommendations": [
+    {
+      "text": "Further analysis required before committing to a strategic direction"
+    }
+  ],
+  "opportunities": [
+    {
+      "text": "Multiple viable strategic paths exist pending further research",
+      "statement": "Strategic optionality across multiple viable directions",
+      "impact": "medium"
+    }
+  ],
+  "strategic_synthesis": "Insufficient differentiation between options to make a clear strategic recommendation at this time.",
+  "decision_model": {},
+  "engagement": {},
+  "research_object": {},
+  "executive_confidence": {
+    "confidence_level": "low",
+    "confidence_drivers": []
+  },
+  "trace": {}
+}

@@ -1,0 +1,118 @@
+{
+  "run_id": "test-deterministic-clear-mapping",
+  "question": "Which sports analytics strategy should we pursue?",
+  "execution_profile": "standard",
+  "profiles": ["sports"],
+  "preferred_option": {
+    "option_id": "OPT-WINNER",
+    "title": "Category Leadership Strategy"
+  },
+  "decision_analysis": {
+    "recommended_option_id": "OPT-WINNER",
+    "rationale": "Category leadership provides the strongest competitive advantage in sports analytics"
+  },
+  "strategic_options": [
+    {
+      "option_id": "OPT-WINNER",
+      "title": "Category Leadership Strategy",
+      "description": "Concentrate resources to become the dominant category leader in sports analytics through aggressive investment and accelerated execution.",
+      "strategic_objective": "Win category leadership through concentrated focus and accelerated growth investment",
+      "advantages": ["Strong competitive moat", "Clear market positioning", "Economies of scale"],
+      "disadvantages": ["High concentration risk", "Capital intensity"],
+      "expected_outcomes": ["Category leadership within 3 years"],
+      "implementation_complexity": "medium",
+      "time_horizon": "3-5 years",
+      "supporting_assumption_ids": ["A-001", "A-002", "A-003"],
+      "associated_risk_ids": ["R-001", "R-002"]
+    },
+    {
+      "option_id": "OPT-DIVERSIFIED",
+      "title": "Diversified Portfolio Strategy",
+      "description": "Spread investment across multiple sports categories to reduce concentration risk and capture broad market exposure.",
+      "strategic_objective": "Portfolio diversification across sports verticals for risk-adjusted returns",
+      "advantages": ["Risk reduction", "Broad market exposure"],
+      "disadvantages": ["Diluted resources", "No category leadership"],
+      "expected_outcomes": ["Moderate returns across multiple categories"],
+      "implementation_complexity": "high",
+      "time_horizon": "2-4 years",
+      "supporting_assumption_ids": [],
+      "associated_risk_ids": []
+    },
+    {
+      "option_id": "OPT-MONITOR",
+      "title": "Wait and Monitor Strategy",
+      "description": "Monitor market conditions before committing to a strategic direction, preserving optionality.",
+      "strategic_objective": "Preserve strategic optionality through staged commitment and market monitoring",
+      "advantages": ["Flexibility", "Lower near-term risk", "Option preservation"],
+      "disadvantages": ["Lost first-mover advantage", "Delayed returns"],
+      "expected_outcomes": ["Preserved optionality with deferred commitment"],
+      "implementation_complexity": "low",
+      "time_horizon": "1-2 years",
+      "supporting_assumption_ids": [],
+      "associated_risk_ids": []
+    }
+  ],
+  "assumptions": [
+    {
+      "assumption_id": "A-001",
+      "text": "Category concentration in sports analytics delivers superior risk-adjusted returns compared to diversification",
+      "category": "market",
+      "impact": "high",
+      "status": "validated"
+    },
+    {
+      "assumption_id": "A-002",
+      "text": "Sports data infrastructure can be built at scale within the available capital budget",
+      "category": "capability",
+      "impact": "high",
+      "status": "open"
+    },
+    {
+      "assumption_id": "A-003",
+      "text": "Category leadership is achievable within a 3-year investment horizon given current market fragmentation",
+      "category": "competitive",
+      "impact": "medium",
+      "status": "open"
+    }
+  ],
+  "risks": [
+    {
+      "risk_id": "R-001",
+      "text": "Category concentration risk if the primary sports analytics vertical declines unexpectedly",
+      "statement": "Concentration in one category creates vulnerability to sector downturns",
+      "category": "strategic",
+      "severity": "high",
+      "mitigation": "Maintain option value in secondary categories"
+    },
+    {
+      "risk_id": "R-002",
+      "text": "Execution complexity in scaling sports analytics operations across markets",
+      "statement": "Operational scaling requires significant talent and infrastructure investment",
+      "category": "operational",
+      "severity": "high",
+      "mitigation": "Phased execution with milestone gates"
+    }
+  ],
+  "recommendations": [
+    {
+      "text": "Prioritize category leadership initiatives in sports analytics with concentrated investment",
+      "priority": "high"
+    }
+  ],
+  "opportunities": [
+    {
+      "text": "Growing sports analytics market with limited category leaders presents first-mover advantage",
+      "statement": "Category leadership opportunity in fragmented sports analytics market",
+      "impact": "high"
+    }
+  ],
+  "strategic_synthesis": "The analysis supports a category leadership approach in sports analytics, with strong evidence for concentrated investment and accelerated execution.",
+  "decision_model": {},
+  "engagement": {},
+  "research_object": {},
+  "executive_confidence": {
+    "confidence_level": "medium",
+    "confidence_drivers": ["Strong market data supports category thesis", "Proven execution model in adjacent markets"]
+  },
+  "trace": {}
+}
