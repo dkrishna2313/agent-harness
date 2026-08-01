@@ -109,6 +109,17 @@ class StrategyNarrative(BaseModel):
     # Differentiation summary for all theories: {theory_id: {"distinctive_count": int, ...}}
     alternative_differentiation: dict[str, Any] = Field(default_factory=dict)
 
+    # PH12.2f — mapping metadata (from StrategySelection.model_extra)
+    mapping_score: float | None = None
+    mapping_margin: float | None = None
+    mapping_rationale: str = ""
+    mapping_status: str = ""
+
+    # PH12.2f — structured choice cascade with human-readable labels
+    # Each entry: {dimension_id, dimension_title, choice_id, choice_title,
+    #              choice_description, execution_complexity}
+    choice_cascade: list[dict[str, Any]] = Field(default_factory=list)
+
     model_config = {"frozen": True}
 
 
@@ -230,14 +241,25 @@ def build_strategy_narrative(trace: Any) -> "StrategyNarrative":
     winner_evaluation_strengths = list(winner_eval.strengths)
 
     # Extract strategic choices as readable strings (list[dict] on TheoryOfWinning)
+    # PH12.2f: use metadata.dimension_title and metadata.choice_title for human-readable labels
     winner_strategic_choices: list[str] = []
+    choice_cascade: list[dict] = []
     for sc in winner_theory.strategic_choices:
         if isinstance(sc, dict):
-            dim = sc.get("dimension", sc.get("id", ""))
-            val = sc.get("selected_value", "")
+            meta = sc.get("metadata") or {}
+            dim_title = meta.get("dimension_title") or sc.get("dimension", sc.get("id", ""))
+            choice_title = meta.get("choice_title") or sc.get("selected_value", "")
             conf = sc.get("confidence", "")
-            label = f"{dim}: {val}" + (f" ({conf} confidence)" if conf else "")
+            label = f"{dim_title}: {choice_title}" + (f" ({conf} confidence)" if conf else "")
             winner_strategic_choices.append(label)
+            choice_cascade.append({
+                "dimension_id": sc.get("dimension") or sc.get("id", ""),
+                "dimension_title": dim_title,
+                "choice_id": sc.get("selected_value", ""),
+                "choice_title": choice_title,
+                "choice_description": meta.get("choice_description") or sc.get("rationale", ""),
+                "execution_complexity": meta.get("execution_complexity", ""),
+            })
         else:
             winner_strategic_choices.append(str(sc))
 
@@ -312,6 +334,13 @@ def build_strategy_narrative(trace: Any) -> "StrategyNarrative":
             constraint_outcomes.append(cr)
 
     alignment_narrative = _build_alignment_narrative(alignment_status, winner_theory_label)
+
+    # PH12.2f — extract mapping metadata from StrategySelection.model_extra
+    _sel_extras = getattr(sel, "model_extra", {}) or {}
+    _mapping_score: float | None = _sel_extras.get("mapping_score")
+    _mapping_margin: float | None = _sel_extras.get("mapping_margin")
+    _mapping_rationale: str = _sel_extras.get("mapping_rationale") or ""
+    _mapping_status: str = _sel_extras.get("mapping_status") or ""
 
     # PH12.2 — extract theory content for winner from trace
     theory_content_list = getattr(trace, "theory_content", []) or []
@@ -404,9 +433,9 @@ def build_strategy_narrative(trace: Any) -> "StrategyNarrative":
         alignment_status=alignment_status,
         alignment_narrative=alignment_narrative,
         mapped_option_id=mapped_option_id,
-        mapped_option_title="",       # title lookup deferred to renderer via brief
+        mapped_option_title="",       # title lookup deferred to StrategyOutputView
         preferred_option_id=preferred_option_id,
-        preferred_option_title="",    # title lookup deferred to renderer via brief
+        preferred_option_title="",    # title lookup deferred to StrategyOutputView
         mapping_confidence=mapping_confidence,
         saturation_detected=saturation_detected,
         selection_status=selection_status,
@@ -435,4 +464,10 @@ def build_strategy_narrative(trace: Any) -> "StrategyNarrative":
         shared_evidence_ids=shared_evidence_ids,
         homogenization_state=homogenization_state,
         alternative_differentiation=alternative_differentiation,
+        # PH12.2f — mapping metadata and structured choice cascade
+        mapping_score=_mapping_score,
+        mapping_margin=_mapping_margin,
+        mapping_rationale=_mapping_rationale,
+        mapping_status=_mapping_status,
+        choice_cascade=choice_cascade,
     )

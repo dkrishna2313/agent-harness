@@ -128,6 +128,39 @@ class EditorialCoordinator:
             else None
         )
 
+        # PH12.2f — build shared strategy output view for top-level brief fields
+        from ..strategy.strategy_output_view import build_strategy_output_view
+        strategy_view = build_strategy_output_view(
+            narrative,
+            strategic_options=list(position.strategic_options or []),
+        )
+
+        # PH12.2f — extract top-level strategy summary fields
+        strategic_direction = ""
+        core_thesis = ""
+        recommended_option = ""
+        mapped_option_title_val = ""
+        alignment_val = ""
+        execution_implications: list[str] = []
+        strategy_provenance: dict = {}
+
+        if strategy_view is not None:
+            strategic_direction = strategy_view.strategic_position
+            core_thesis = strategy_view.strategic_mechanism
+            recommended_option = strategy_view.mapped_option_id
+            mapped_option_title_val = strategy_view.mapped_option_title
+            alignment_val = strategy_view.alignment_status
+            execution_implications = list(strategy_view.execution_implications)
+            strategy_provenance = {
+                "strategic_position_id": strategy_view.strategic_position_id,
+                "winning_theory_id": strategy_view.winning_theory_id,
+                "mapped_option_id": strategy_view.mapped_option_id,
+                "alignment_status": strategy_view.alignment_status,
+                "framework": strategy_view.framework,
+                "trace_id": strategy_view.trace_id,
+                "strategy_config_fingerprint": strategy_view.strategy_config_fingerprint,
+            }
+
         return EditorialBrief(
             metadata=self._build_metadata(position),
             executive_summary=self._build_executive_summary(position),
@@ -141,6 +174,14 @@ class EditorialCoordinator:
             validation_priorities=self._build_validation_priorities(position),
             appendix=self._build_appendix(position),
             strategy_narrative=narrative,
+            # PH12.2f — top-level strategy fields
+            strategic_direction=strategic_direction,
+            core_thesis=core_thesis,
+            recommended_option=recommended_option,
+            mapped_option_title=mapped_option_title_val,
+            alignment=alignment_val,
+            execution_implications=execution_implications,
+            strategy_provenance=strategy_provenance,
         )
 
     def persist(

@@ -217,6 +217,9 @@ def test_all_top_level_sections_present(brief):
         "strategic_opportunities", "executive_confidence", "validation_priorities",
         "appendix",
         "strategy_narrative",  # PH11.4: optional strategy section
+        # PH12.2f: top-level strategy summary fields (optional, backward compatible)
+        "strategic_direction", "core_thesis", "recommended_option", "mapped_option_title",
+        "alignment", "execution_implications", "strategy_provenance",
     }
     assert set(d.keys()) == expected
 
