@@ -987,21 +987,28 @@ class Orchestrator:
         # Runs before the canonical pipeline trace so _strategic_position is
         # available to write_canonical_trace for the strategy diagnostics section.
         # Best-effort: a failure must never block canonical trace or editorial.
+        # PH12.2e: enablement — skip when strategy block is absent or explicitly disabled.
         _sp = None
+        _sc = None
         try:
-            from .strategy import StrategyCoordinator, StrategyConfig, ConfigurationResolver
-            _strategy_config = StrategyConfig()
             _strategy_raw = getattr(engagement_spec, "strategy", None) if engagement_spec is not None else None
-            if _strategy_raw:
-                _strategy_config = ConfigurationResolver().resolve_from_engagement(
-                    _strategy_config, _strategy_raw
+            _strategy_enabled = (
+                _strategy_raw is not None
+                and _strategy_raw.get("enabled", True) is not False
+            )
+            if _strategy_enabled:
+                from .strategy import StrategyCoordinator
+                from .strategy.strategy_config_resolver import resolve_strategy_config
+                _resolved_cfg = resolve_strategy_config(_strategy_raw)
+                _sc = StrategyCoordinator(
+                    config=_resolved_cfg.resolved,
+                    raw_strategy_yaml=_strategy_raw,
                 )
-            _sc = StrategyCoordinator(config=_strategy_config, raw_strategy_yaml=_strategy_raw or {})
-            _sp = _sc.build(result_ctx)
-            _sp_path = _sc.persist(_sp)
-            print(f"Strategic position → {_sp_path}")
-            result_ctx.trace["_strategic_position"] = _sp
-            result_ctx.trace["_strategy_trace"] = _sc._trace  # PH11.0
+                _sp = _sc.build(result_ctx)
+                _sp_path = _sc.persist(_sp)
+                print(f"Strategic position → {_sp_path}")
+                result_ctx.trace["_strategic_position"] = _sp
+                result_ctx.trace["_strategy_trace"] = _sc._trace  # PH11.0
         except Exception as exc:
             LOGGER.warning("[Orchestrator] strategy build failed: %s", exc)
 
@@ -1040,6 +1047,35 @@ class Orchestrator:
                 LOGGER.warning("[Orchestrator] strategy trace persist failed: %s", exc)
         else:
             LOGGER.debug("[Orchestrator] no strategy trace available — skipping persist")
+
+        # PH12.2e — write stem-based strategy and context artifacts alongside the report.
+        # These mirror the --out report path so a single run produces a complete artifact set.
+        # Best-effort: failures must never block editorial or the caller.
+        import json as _json
+        _st_raw_e = result_ctx.trace.get("_strategy_trace")
+        if _st_raw_e is not None and self._out_path is not None:
+            _out_stem = Path(self._out_path).with_suffix("")
+            try:
+                _st_stem_path = Path(str(_out_stem) + ".strategy.trace.json")
+                _st_stem_path.parent.mkdir(parents=True, exist_ok=True)
+                _st_stem_path.write_text(
+                    _json.dumps(_st_raw_e.model_dump(mode="json"), indent=2, default=str),
+                    encoding="utf-8",
+                )
+                print(f"Strategy trace  → {_st_stem_path}")
+            except Exception as exc:
+                LOGGER.warning("[Orchestrator] stem strategy trace persist failed: %s", exc)
+            try:
+                from .context_snapshot import context_to_jsonable
+                _ctx_path = Path(str(_out_stem) + ".context.json")
+                _ctx_path.parent.mkdir(parents=True, exist_ok=True)
+                _ctx_path.write_text(
+                    _json.dumps(context_to_jsonable(result_ctx), indent=2, ensure_ascii=False),
+                    encoding="utf-8",
+                )
+                print(f"Context snapshot → {_ctx_path}")
+            except Exception as exc:
+                LOGGER.warning("[Orchestrator] stem context persist failed: %s", exc)
 
         # PH6.2a/PH6.3/PH6.4–PH6.8 — build EditorialBrief, scaffold EditorialManuscript,
         # run the ordered writer registry.

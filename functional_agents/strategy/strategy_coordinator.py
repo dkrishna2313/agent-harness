@@ -504,6 +504,11 @@ class StrategyCoordinator:
 
         return position
 
+    @property
+    def trace(self) -> "StrategyTrace | None":
+        """Public accessor for the StrategyTrace built by build()."""
+        return self._trace
+
     def persist(
         self,
         position: StrategicPosition,

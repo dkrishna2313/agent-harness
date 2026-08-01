@@ -864,8 +864,14 @@ class TestCoordinatorIntegration:
             f"alignment_status should not be 'unresolved'; got {sel.alignment_status!r}"
         )
 
-    def test_sports_context_maps_to_opt_c(self):
-        """Sports strategy context winner maps to OPT-C (the upstream recommended option)."""
+    def test_sports_context_maps_to_a_valid_option(self):
+        """Sports strategy context winner maps to a valid strategic option (not unresolved).
+
+        NOTE: The specific option depends on the LLM-generated context content, which
+        varies between runs. This test verifies mapping correctness, not a specific option.
+        (Previously named test_sports_context_maps_to_opt_c; relaxed in PH12.2e because
+        context.json is now a live artifact written by the CLI, not a frozen fixture.)
+        """
         import json
         from pathlib import Path
 
@@ -909,8 +915,15 @@ class TestCoordinatorIntegration:
         coord.build(ctx)
         sel = coord._selection
 
-        assert sel.mapped_option_id == "OPT-C", (
-            f"Expected OPT-C; got {sel.mapped_option_id!r}"
+        # Verify mapping is present (not unresolved) — specific option varies by context
+        valid_option_ids = {
+            opt.get("option_id")
+            for opt in (getattr(ctx, "strategic_options", None) or [])
+            if isinstance(opt, dict) and opt.get("option_id")
+        }
+        assert sel.mapped_option_id is not None, "mapped_option_id should not be None"
+        assert sel.mapped_option_id in valid_option_ids, (
+            f"mapped_option_id {sel.mapped_option_id!r} not in valid options {valid_option_ids}"
         )
 
 
