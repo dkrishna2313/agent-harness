@@ -805,54 +805,82 @@ class TestMultipleTheoriesMapped:
 
 
 # ---------------------------------------------------------------------------
+# Fixture helpers for TestCoordinatorIntegration
+# ---------------------------------------------------------------------------
+
+def _load_fixture_context(fixture_path):
+    """Load a committed JSON fixture as a SimpleNamespace mimicking AgentContext."""
+    import json
+    from pathlib import Path
+    from types import SimpleNamespace
+
+    path = Path(__file__).parent / "fixtures" / fixture_path
+    with path.open() as f:
+        data = json.load(f)
+    ctx = SimpleNamespace(**data)
+    for attr in ("run_id", "question", "execution_profile"):
+        if not hasattr(ctx, attr) or not isinstance(getattr(ctx, attr), str):
+            setattr(ctx, attr, "")
+    for attr in ("profiles",):
+        if not hasattr(ctx, attr):
+            setattr(ctx, attr, [])
+    for attr in ("decision_model", "engagement", "preferred_option",
+                 "research_object", "executive_confidence", "decision_analysis", "trace"):
+        if not hasattr(ctx, attr):
+            setattr(ctx, attr, {})
+    for attr in ("strategic_options", "assumptions", "risks", "recommendations", "opportunities"):
+        if not hasattr(ctx, attr):
+            setattr(ctx, attr, [])
+    return ctx
+
+
+def _load_sports_strategy_config():
+    """Load the sports engagement strategy config. Fails fast if YAML missing."""
+    import yaml
+    from pathlib import Path
+    from functional_agents.strategy.strategy_config_resolver import resolve_strategy_config
+
+    engagement_path = Path("engagements/sports_strategy_monitor_v1.yaml")
+    if not engagement_path.exists():
+        pytest.skip("Sports engagement YAML not available")
+    with engagement_path.open() as f:
+        engagement = yaml.safe_load(f)
+    raw_strategy = engagement.get("strategy", {}) or {}
+    return resolve_strategy_config(raw_strategy), raw_strategy
+
+
+# ---------------------------------------------------------------------------
 # 15. TestCoordinatorIntegration
 # ---------------------------------------------------------------------------
 
 class TestCoordinatorIntegration:
-    """End-to-end: sports context produces non-None mapped_option_id and resolved alignment."""
+    """End-to-end coordinator integration using committed deterministic fixtures.
 
-    def test_sports_context_produces_non_none_mapped_option(self):
-        """Sports-domain research context results in a valid mapped_option_id."""
-        import json
+    Fixtures live under tests/fixtures/ and are version-controlled.
+    No test in this class reads from outputs/ — all inputs are deterministic.
+    """
+
+    def test_no_outputs_dependency(self):
+        """Prove this test class does not depend on any outputs/ live artifact.
+
+        All fixture paths are resolved relative to tests/fixtures/, not outputs/.
+        """
         from pathlib import Path
-
-        context_path = Path("outputs/sports_strategy_monitor_v1.context.json")
-        engagement_path = Path("engagements/sports_strategy_monitor_v1.yaml")
-
-        if not context_path.exists() or not engagement_path.exists():
-            pytest.skip("Sports context/engagement files not available")
-
-        import yaml
-        from types import SimpleNamespace
-
-        from functional_agents.strategy import StrategyCoordinator
-        from functional_agents.strategy.strategy_config_resolver import resolve_strategy_config
-
-        with context_path.open() as f:
-            data = json.load(f)
-        ctx = SimpleNamespace(**data)
-        for attr in ("run_id", "question", "execution_profile"):
-            if not hasattr(ctx, attr) or not isinstance(getattr(ctx, attr), str):
-                setattr(ctx, attr, "")
-        for attr in ("profiles",):
-            if not hasattr(ctx, attr):
-                setattr(ctx, attr, [])
-        for attr in ("decision_model", "engagement", "preferred_option",
-                     "research_object", "executive_confidence", "decision_analysis", "trace"):
-            if not hasattr(ctx, attr):
-                setattr(ctx, attr, {})
-        for attr in ("strategic_options", "assumptions", "risks", "recommendations", "opportunities"):
-            if not hasattr(ctx, attr):
-                setattr(ctx, attr, [])
-
-        with engagement_path.open() as f:
-            engagement = yaml.safe_load(f)
-        raw_strategy = engagement.get("strategy", {}) or {}
-        resolved = resolve_strategy_config(raw_strategy)
-        coord = StrategyCoordinator(
-            config=resolved.resolved,
-            raw_strategy_yaml=raw_strategy,
+        fixture_dir = Path(__file__).parent / "fixtures"
+        assert (fixture_dir / "sports_strategy_clear_mapping.json").exists(), (
+            "Committed clear-mapping fixture must exist under tests/fixtures/"
         )
+        assert (fixture_dir / "sports_strategy_ambiguous_mapping.json").exists(), (
+            "Committed ambiguous-mapping fixture must exist under tests/fixtures/"
+        )
+
+    def test_clear_mapping_fixture_produces_non_none_mapped_option(self):
+        """Deterministic clear-mapping fixture produces a valid mapped_option_id."""
+        from functional_agents.strategy import StrategyCoordinator
+
+        ctx = _load_fixture_context("sports_strategy_clear_mapping.json")
+        resolved, raw_strategy = _load_sports_strategy_config()
+        coord = StrategyCoordinator(config=resolved.resolved, raw_strategy_yaml=raw_strategy)
         coord.build(ctx)
         sel = coord._selection
 
@@ -860,70 +888,182 @@ class TestCoordinatorIntegration:
         assert sel.mapped_option_id is not None, (
             f"mapped_option_id should not be None; alignment_status={sel.alignment_status}"
         )
-        assert sel.alignment_status != "unresolved", (
-            f"alignment_status should not be 'unresolved'; got {sel.alignment_status!r}"
-        )
 
-    def test_sports_context_maps_to_a_valid_option(self):
-        """Sports strategy context winner maps to a valid strategic option (not unresolved).
-
-        NOTE: The specific option depends on the LLM-generated context content, which
-        varies between runs. This test verifies mapping correctness, not a specific option.
-        (Previously named test_sports_context_maps_to_opt_c; relaxed in PH12.2e because
-        context.json is now a live artifact written by the CLI, not a frozen fixture.)
-        """
-        import json
-        from pathlib import Path
-
-        context_path = Path("outputs/sports_strategy_monitor_v1.context.json")
-        engagement_path = Path("engagements/sports_strategy_monitor_v1.yaml")
-
-        if not context_path.exists() or not engagement_path.exists():
-            pytest.skip("Sports context/engagement files not available")
-
-        import yaml
-        from types import SimpleNamespace
-
+    def test_clear_mapping_fixture_maps_to_valid_option(self):
+        """Deterministic clear-mapping fixture maps winner to a valid option in strategic_options."""
         from functional_agents.strategy import StrategyCoordinator
-        from functional_agents.strategy.strategy_config_resolver import resolve_strategy_config
 
-        with context_path.open() as f:
-            data = json.load(f)
-        ctx = SimpleNamespace(**data)
-        for attr in ("run_id", "question", "execution_profile"):
-            if not hasattr(ctx, attr) or not isinstance(getattr(ctx, attr), str):
-                setattr(ctx, attr, "")
-        for attr in ("profiles",):
-            if not hasattr(ctx, attr):
-                setattr(ctx, attr, [])
-        for attr in ("decision_model", "engagement", "preferred_option",
-                     "research_object", "executive_confidence", "decision_analysis", "trace"):
-            if not hasattr(ctx, attr):
-                setattr(ctx, attr, {})
-        for attr in ("strategic_options", "assumptions", "risks", "recommendations", "opportunities"):
-            if not hasattr(ctx, attr):
-                setattr(ctx, attr, [])
-
-        with engagement_path.open() as f:
-            engagement = yaml.safe_load(f)
-        raw_strategy = engagement.get("strategy", {}) or {}
-        resolved = resolve_strategy_config(raw_strategy)
-        coord = StrategyCoordinator(
-            config=resolved.resolved,
-            raw_strategy_yaml=raw_strategy,
-        )
+        ctx = _load_fixture_context("sports_strategy_clear_mapping.json")
+        resolved, raw_strategy = _load_sports_strategy_config()
+        coord = StrategyCoordinator(config=resolved.resolved, raw_strategy_yaml=raw_strategy)
         coord.build(ctx)
         sel = coord._selection
 
-        # Verify mapping is present (not unresolved) — specific option varies by context
-        valid_option_ids = {
+        valid_ids = {
             opt.get("option_id")
-            for opt in (getattr(ctx, "strategic_options", None) or [])
+            for opt in (ctx.strategic_options or [])
             if isinstance(opt, dict) and opt.get("option_id")
         }
-        assert sel.mapped_option_id is not None, "mapped_option_id should not be None"
-        assert sel.mapped_option_id in valid_option_ids, (
-            f"mapped_option_id {sel.mapped_option_id!r} not in valid options {valid_option_ids}"
+        assert sel.mapped_option_id in valid_ids, (
+            f"mapped_option_id {sel.mapped_option_id!r} not in valid options {valid_ids}"
+        )
+
+    def test_clear_mapping_fixture_produces_positive_margin(self):
+        """Deterministic clear-mapping fixture produces mapping_margin > 0.
+
+        OPT-WINNER has supporting_assumption_ids and associated_risk_ids that
+        overlap with theory assumption/risk IDs.  Other options have none.
+        Jaccard separation guarantees a positive mapping margin.
+        """
+        from functional_agents.strategy import StrategyCoordinator
+
+        ctx = _load_fixture_context("sports_strategy_clear_mapping.json")
+        resolved, raw_strategy = _load_sports_strategy_config()
+        coord = StrategyCoordinator(config=resolved.resolved, raw_strategy_yaml=raw_strategy)
+        coord.build(ctx)
+        sel = coord._selection
+
+        mapping_margin = sel.model_extra.get("mapping_margin") if sel else None
+        assert mapping_margin is not None, "mapping_margin should be present in StrategySelection extras"
+        assert mapping_margin > 0, (
+            f"mapping_margin should be > 0 for clear-mapping fixture; got {mapping_margin}"
+        )
+
+    def test_clear_mapping_fixture_alignment_is_not_unresolved(self):
+        """Deterministic clear-mapping fixture produces alignment_status != 'unresolved'.
+
+        Root cause of the original nondeterministic failure: live context.json
+        lacked assumption_id fields on theory assumptions and lacked a
+        decision_analysis.recommended_option_id, causing all options to score 0.0
+        → mapping_margin 0.0 → Low confidence → unresolved alignment.
+
+        The committed fixture provides explicit assumption_id fields and a
+        preferred_option so alignment resolves deterministically.
+        """
+        from functional_agents.strategy import StrategyCoordinator
+
+        ctx = _load_fixture_context("sports_strategy_clear_mapping.json")
+        resolved, raw_strategy = _load_sports_strategy_config()
+        coord = StrategyCoordinator(config=resolved.resolved, raw_strategy_yaml=raw_strategy)
+        coord.build(ctx)
+        sel = coord._selection
+
+        assert sel is not None
+        assert sel.alignment_status != "unresolved", (
+            f"alignment_status should not be 'unresolved'; got {sel.alignment_status!r}. "
+            f"mapping_margin={sel.model_extra.get('mapping_margin')}, "
+            f"mapped_option_id={sel.mapped_option_id}"
+        )
+
+    def test_ambiguous_fixture_allows_unresolved_alignment(self):
+        """Ambiguous fixture with no preferred_option legitimately produces unresolved alignment.
+
+        This proves that 'unresolved' is a valid outcome for genuinely ambiguous
+        contexts, not a defect in the mapping logic.  The ambiguous fixture has
+        no preferred_option and options with no overlapping assumption/risk IDs.
+        """
+        from functional_agents.strategy import StrategyCoordinator
+
+        ctx = _load_fixture_context("sports_strategy_ambiguous_mapping.json")
+        resolved, raw_strategy = _load_sports_strategy_config()
+        coord = StrategyCoordinator(config=resolved.resolved, raw_strategy_yaml=raw_strategy)
+        coord.build(ctx)
+        sel = coord._selection
+
+        assert sel is not None
+        # No preferred_option → AlignmentEvaluator returns "unresolved" (expected, not a defect)
+        assert sel.alignment_status == "unresolved", (
+            f"Ambiguous fixture with no preferred_option should produce unresolved alignment; "
+            f"got {sel.alignment_status!r}"
+        )
+
+    def test_determinism_same_fixture_twice(self):
+        """Running the same deterministic fixture twice produces identical results."""
+        from functional_agents.strategy import StrategyCoordinator
+
+        def _run():
+            ctx = _load_fixture_context("sports_strategy_clear_mapping.json")
+            resolved, raw_strategy = _load_sports_strategy_config()
+            coord = StrategyCoordinator(config=resolved.resolved, raw_strategy_yaml=raw_strategy)
+            coord.build(ctx)
+            sel = coord._selection
+            return (
+                sel.winner_theory_id,
+                sel.mapped_option_id,
+                sel.mapping_score,
+                sel.model_extra.get("mapping_margin"),
+                sel.alignment_status,
+            )
+
+        first = _run()
+        second = _run()
+        assert first == second, (
+            f"Two runs of the same fixture produced different results:\n"
+            f"  first:  {first}\n"
+            f"  second: {second}"
+        )
+
+    def test_option_reordering_preserves_clear_winner(self):
+        """Reordering strategic_options does not change the semantic mapping winner.
+
+        When one option has significantly higher content-ID overlap than others,
+        the stable sort in _content_id_map preserves the winner regardless of
+        the original list order.
+        """
+        import json
+        from pathlib import Path
+        from types import SimpleNamespace
+        from functional_agents.strategy import StrategyCoordinator
+
+        fixture_path = Path(__file__).parent / "fixtures" / "sports_strategy_clear_mapping.json"
+        with fixture_path.open() as f:
+            data = json.load(f)
+
+        # Run with original option order
+        ctx1 = SimpleNamespace(**data)
+        for attr in ("run_id", "question", "execution_profile"):
+            if not hasattr(ctx1, attr) or not isinstance(getattr(ctx1, attr), str):
+                setattr(ctx1, attr, "")
+        for attr in ("profiles",):
+            if not hasattr(ctx1, attr):
+                setattr(ctx1, attr, [])
+        for attr in ("decision_model", "engagement", "preferred_option",
+                     "research_object", "executive_confidence", "decision_analysis", "trace"):
+            if not hasattr(ctx1, attr):
+                setattr(ctx1, attr, {})
+        for attr in ("strategic_options", "assumptions", "risks", "recommendations", "opportunities"):
+            if not hasattr(ctx1, attr):
+                setattr(ctx1, attr, [])
+
+        # Run with reversed option order
+        data_reversed = dict(data)
+        data_reversed["strategic_options"] = list(reversed(data["strategic_options"]))
+        ctx2 = SimpleNamespace(**data_reversed)
+        for attr in ("run_id", "question", "execution_profile"):
+            if not hasattr(ctx2, attr) or not isinstance(getattr(ctx2, attr), str):
+                setattr(ctx2, attr, "")
+        for attr in ("profiles",):
+            if not hasattr(ctx2, attr):
+                setattr(ctx2, attr, [])
+        for attr in ("decision_model", "engagement", "preferred_option",
+                     "research_object", "executive_confidence", "decision_analysis", "trace"):
+            if not hasattr(ctx2, attr):
+                setattr(ctx2, attr, {})
+        for attr in ("strategic_options", "assumptions", "risks", "recommendations", "opportunities"):
+            if not hasattr(ctx2, attr):
+                setattr(ctx2, attr, [])
+
+        resolved, raw_strategy = _load_sports_strategy_config()
+
+        coord1 = StrategyCoordinator(config=resolved.resolved, raw_strategy_yaml=raw_strategy)
+        coord1.build(ctx1)
+
+        coord2 = StrategyCoordinator(config=resolved.resolved, raw_strategy_yaml=raw_strategy)
+        coord2.build(ctx2)
+
+        assert coord1._selection.mapped_option_id == coord2._selection.mapped_option_id, (
+            f"Mapped option changed with option reordering: "
+            f"{coord1._selection.mapped_option_id!r} vs {coord2._selection.mapped_option_id!r}"
         )
 
 
