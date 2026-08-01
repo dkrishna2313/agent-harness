@@ -24,6 +24,10 @@ from .strategy_config import (
 )
 
 # ---------------------------------------------------------------------------
+# Built-in: monitor_choice_cascade framework
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
 # Built-in: executive framework
 # ---------------------------------------------------------------------------
 
@@ -63,12 +67,49 @@ _EXECUTIVE = StrategyConfig(
     ),
 )
 
+_MONITOR_CHOICE_CASCADE = StrategyConfig(
+    version="1.0",
+    framework="monitor_choice_cascade",
+    objectives=StrategyObjectives(
+        primary=[
+            "Select one coherent, evidence-backed strategy posture.",
+            "Define a complete and mutually reinforcing Monitor Deloitte choice cascade.",
+        ],
+        secondary=[
+            "Surface evidence gaps, assumptions, risks, and unresolved choices.",
+        ],
+    ),
+    dimensions=StrategyDimensions(),  # derived from engagement dimension_configs at runtime
+    evaluation=StrategyEvaluation(
+        method="multi_criteria",
+        weights={},
+        min_score_threshold=0.0,
+    ),
+    generation=StrategyGeneration(
+        max_candidates=3,
+        diversity_required=True,
+    ),
+    constraints=StrategyConstraints(
+        excluded_options=[],
+        required_conditions=[],
+    ),
+    validation=StrategyValidation(
+        require_evidence=False,
+        min_confidence="",
+        require_assumptions=False,
+    ),
+    metadata=StrategyMetadata(
+        notes="Built-in Monitor Deloitte choice cascade framework defaults (PH12.2b)",
+    ),
+)
+
 # ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 
 _REGISTRY: dict[str, StrategyConfig] = {
     "executive": _EXECUTIVE,
+    "monitor_choice_cascade": _MONITOR_CHOICE_CASCADE,
 }
 
 

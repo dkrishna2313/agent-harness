@@ -4,6 +4,8 @@ PH10.1: returned one StrategicChoiceSet (pass-through).
 PH10.2: returns a list of exactly three StrategicChoiceSets, one per posture.
 PH12.0: configured mode — uses plan.dimension_configs to pick per-posture choices from
         the engagement-defined decision space. Validates unique signatures and coverage.
+PH12.2b: configured mode respects plan.generation_policy.max_candidates exactly;
+         posture keys are generated dynamically so any candidate count > 3 is supported.
 
 Each set:
   - contains one StrategicChoice per active plan dimension
@@ -39,6 +41,23 @@ _POSTURES: tuple[tuple[int, str, str], ...] = (
 )
 
 _POSTURE_KEYS = ("recommended", "alternative-a", "alternative-b")
+
+
+def _posture_key(posture_idx: int) -> str:
+    """Return a deterministic posture key for any non-negative index.
+
+    0 → 'recommended'
+    1 → 'alternative-a'
+    2 → 'alternative-b'
+    3 → 'alternative-c'
+    ...
+    25 → 'alternative-y'
+    26 → 'alternative-z'
+    """
+    if posture_idx == 0:
+        return "recommended"
+    suffix_idx = posture_idx - 1
+    return f"alternative-{chr(ord('a') + suffix_idx % 26)}"
 
 
 class StrategicChoiceGenerator:
@@ -95,7 +114,12 @@ class StrategicChoiceGenerator:
         research: Any,
         timestamp: str,
     ) -> list[StrategicChoiceSet]:
-        """Generate choice sets from plan.dimension_configs."""
+        """Generate choice sets from plan.dimension_configs.
+
+        PH12.2b: iterates up to max_candidates * 3 posture indices so that any
+        configured candidate count (including counts > 3) is satisfied as long as
+        enough distinct choice combinations are available across the dimensions.
+        """
         max_candidates = plan.generation_policy.max_candidates
         diversity_required = plan.generation_policy.diversity_required
         dims = plan.dimension_configs
@@ -104,11 +128,17 @@ class StrategicChoiceGenerator:
         seen_signatures: set[tuple] = set()
         sets: list[StrategicChoiceSet] = []
 
-        for posture_idx, posture_key in enumerate(_POSTURE_KEYS):
+        # Safety upper bound: stop after this many attempts even if we haven't
+        # reached max_candidates (prevents an infinite loop when all combinations
+        # are exhausted).
+        max_attempts = max(max_candidates * 3, 10)
+
+        for posture_idx in range(max_attempts):
             if len(sets) >= max_candidates:
                 break
 
-            choices = self._build_configured_choices(dims, posture_idx, posture_key, timestamp)
+            pk = _posture_key(posture_idx)
+            choices = self._build_configured_choices(dims, posture_idx, pk, timestamp)
             sig = self._compute_signature(choices)
 
             if sig in seen_signatures:
@@ -127,7 +157,7 @@ class StrategicChoiceGenerator:
                 f"{c.metadata.get('choice_title', c.selected_value)}"
                 for c in choices
             )
-            rationale = f"{posture_key.capitalize()} — {choice_labels}"
+            rationale = f"{pk.capitalize()} — {choice_labels}"
 
             cs = StrategicChoiceSet(
                 id=f"SCS-{posture_idx}-{timestamp}",
@@ -139,7 +169,17 @@ class StrategicChoiceGenerator:
             )
             sets.append(cs)
 
-        if diversity_required and len(sets) == 1:
+        if len(sets) < max_candidates:
+            LOGGER.warning(
+                "[StrategicChoiceGenerator] requested %d candidates but only %d distinct "
+                "strategy combinations are available across the configured dimensions; "
+                "returning %d.",
+                max_candidates,
+                len(sets),
+                len(sets),
+            )
+
+        if diversity_required and max_candidates > 1 and len(sets) == 1:
             raise ValueError(
                 "[StrategicChoiceGenerator] diversity_required=True but only one unique "
                 "choice set could be generated. Add more choices to each dimension."

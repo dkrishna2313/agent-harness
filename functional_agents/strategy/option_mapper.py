@@ -101,14 +101,7 @@ class OptionMapper:
             theory_postures = self._normalizer.normalize_text(theory_text)
 
         if not theory_postures:
-            return OptionMapping(
-                mapped_option_id=None,
-                mapping_score=0.0,
-                mapping_rationale="No posture keywords available for mapping.",
-                mapping_confidence="None",
-                option_scores=[],
-                theory_postures={},
-            )
+            return self._content_id_map(theory, options, research)
 
         # Score every option
         option_scores: list[dict[str, Any]] = []
@@ -320,3 +313,141 @@ class OptionMapper:
         if generic_score > 0:
             parts.append(f"generic overlap={generic_score:.2f}")
         return "; ".join(parts) or "no posture signal"
+
+    # ------------------------------------------------------------------
+    # Content-ID fallback (PH12.2d)
+    # ------------------------------------------------------------------
+
+    def _content_id_map(
+        self,
+        theory: TheoryOfWinning,
+        options: list[dict[str, Any]],
+        research: Any,
+    ) -> OptionMapping:
+        """Fallback: map via structured ID overlap when posture signals are absent.
+
+        Scores each upstream strategic option by Jaccard similarity of its
+        supporting assumption IDs and associated risk IDs against those carried
+        by the theory.  A small upstream-preference prior breaks ties
+        deterministically without overriding content evidence.
+        """
+        theory_assumption_ids: frozenset[str] = frozenset(
+            a["assumption_id"]
+            for a in (theory.assumptions or [])
+            if isinstance(a, dict) and a.get("assumption_id")
+        )
+        theory_risk_ids: frozenset[str] = frozenset(
+            fm["risk_id"]
+            for fm in (theory.failure_modes or [])
+            if isinstance(fm, dict) and fm.get("risk_id")
+        )
+
+        # Upstream preference prior: breaks ties, never overrides content evidence
+        da = getattr(research, "decision_analysis", None) or {}
+        upstream_id: str = (
+            da.get("recommended_option_id") or ""
+            if isinstance(da, dict) else ""
+        )
+        if not upstream_id:
+            pref = getattr(research, "preferred_option", None) or {}
+            if isinstance(pref, dict):
+                upstream_id = pref.get("option_id") or ""
+
+        _W_ASSUMPTION = 0.40
+        _W_RISK       = 0.35
+        _W_UPSTREAM   = 0.10
+
+        def _jaccard(a: frozenset[str], b: frozenset[str]) -> float:
+            if not a and not b:
+                return 0.0  # both empty → no shared signal
+            union = a | b
+            return len(a & b) / len(union) if union else 0.0
+
+        scored: list[dict[str, Any]] = []
+        for opt in options:
+            if not isinstance(opt, dict):
+                continue
+            oid = opt.get("option_id") or opt.get("id") or ""
+            opt_assumption_ids = frozenset(opt.get("supporting_assumption_ids") or [])
+            opt_risk_ids       = frozenset(opt.get("associated_risk_ids") or [])
+
+            ja = _jaccard(theory_assumption_ids, opt_assumption_ids)
+            jr = _jaccard(theory_risk_ids, opt_risk_ids)
+            upstream_prior = _W_UPSTREAM if (oid and oid == upstream_id) else 0.0
+            content_score  = _W_ASSUMPTION * ja + _W_RISK * jr + upstream_prior
+
+            scored.append({
+                "option_id": oid,
+                "score": round(content_score, 4),
+                "assumption_overlap": round(ja, 4),
+                "risk_overlap": round(jr, 4),
+                "upstream_prior": upstream_prior,
+                "assumption_ids_matched": sorted(theory_assumption_ids & opt_assumption_ids),
+                "risk_ids_matched": sorted(theory_risk_ids & opt_risk_ids),
+                # Diagnostic fields expected by downstream consumers
+                "posture_matches": [],
+                "contradictions": [],
+                "generic_matches": [],
+                "penalties": [],
+                "option_postures": {},
+                "rationale": (
+                    f"content_id: assumption_jaccard={ja:.3f}, risk_jaccard={jr:.3f}"
+                    + (f", upstream_prior={upstream_prior}" if upstream_prior else "")
+                ),
+            })
+
+        if not scored:
+            return OptionMapping(
+                mapped_option_id=None,
+                mapping_score=0.0,
+                mapping_rationale="No options to score in content-based mapping.",
+                mapping_confidence="None",
+                option_scores=[],
+                theory_postures={},
+            )
+
+        scored.sort(key=lambda e: -e["score"])
+        winner = scored[0]
+        runner_up_score = scored[1]["score"] if len(scored) > 1 else winner["score"] - 1.0
+        separation = round(winner["score"] - runner_up_score, 4)
+
+        confidence = self._confidence(winner["score"], separation, False)
+        mapped_id = winner["option_id"] if confidence != "None" else None
+
+        if mapped_id:
+            rationale = (
+                f"Content-based ID mapping: theory → {mapped_id!r} "
+                f"(score={winner['score']:.3f}, separation={separation:.3f}, "
+                f"confidence={confidence}). "
+                f"Assumption overlap: {winner['assumption_overlap']:.2f}, "
+                f"risk overlap: {winner['risk_overlap']:.2f}"
+                + (
+                    f", upstream prior applied (preferred={upstream_id!r})"
+                    if winner["upstream_prior"] else ""
+                )
+                + "."
+            )
+        else:
+            rationale = (
+                f"No authoritative content-based mapping: winner score "
+                f"{winner['score']:.3f} below minimum confidence threshold."
+            )
+
+        LOGGER.debug(
+            "[OptionMapper] content_id fallback: theory=%s mapped=%s score=%.3f conf=%s",
+            theory.theory_id, mapped_id, winner["score"], confidence,
+        )
+
+        return OptionMapping(
+            mapped_option_id=mapped_id,
+            mapping_score=round(winner["score"], 4),
+            mapping_confidence=confidence,
+            mapping_rationale=rationale,
+            option_scores=scored,
+            theory_postures={},
+            # Extra diagnostic fields (OptionMapping has extra="allow")
+            mapping_margin=separation,
+            runner_up_option_id=(scored[1]["option_id"] if len(scored) > 1 else None),
+            runner_up_score=round(runner_up_score, 4),
+            mapping_method="content_id_overlap",
+        )

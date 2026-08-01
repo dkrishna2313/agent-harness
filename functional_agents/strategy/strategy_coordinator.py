@@ -209,6 +209,7 @@ class StrategyCoordinator:
             f"Theory {self._selection.winner_theory_id} selected via "
             + (f"tie-breaker ({_tb})." if _tb else "highest score.")
         )
+        _wm_extras = winner_mapping.model_extra or {}
         self._selection = StrategySelection(
             winner_theory_id=self._selection.winner_theory_id,
             winner_score=self._selection.winner_score,
@@ -221,6 +222,13 @@ class StrategyCoordinator:
             alignment_status=alignment.status,
             mapped_option_id=winner_mapping.mapped_option_id,
             saturation_detected=sat_detected,
+            # PH12.2d: mapping metadata
+            mapping_score=winner_mapping.mapping_score,
+            mapping_confidence=winner_mapping.mapping_confidence,
+            mapping_rationale=winner_mapping.mapping_rationale,
+            mapping_status="mapped" if winner_mapping.mapped_option_id else "unmapped",
+            mapping_margin=_wm_extras.get("mapping_margin"),
+            runner_up_option_id=_wm_extras.get("runner_up_option_id"),
         )
 
         # PH12.2b: resolve theory content after selection
@@ -495,6 +503,11 @@ class StrategyCoordinator:
         )
 
         return position
+
+    @property
+    def trace(self) -> "StrategyTrace | None":
+        """Public accessor for the StrategyTrace built by build()."""
+        return self._trace
 
     def persist(
         self,
