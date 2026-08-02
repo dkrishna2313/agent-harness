@@ -125,23 +125,60 @@ class DecisionAnalysisWriter(EditorialWriter):
 
         return []
 
+    @staticmethod
+    def _resolve_dim(entry: "dict | object", label: str) -> str:
+        """Look up a dimension value from a flat or nested matrix entry.
+
+        Tries in order:
+        1. nested ``entry["dimensions"][label]`` (original nested schema)
+        2. flat ``entry[snake_case_label]`` (current flat schema from decision analysis)
+        3. Pydantic attribute access with the same snake_case fallback
+        """
+        snake = label.lower().replace(" ", "_")
+        if isinstance(entry, dict):
+            nested = (entry.get("dimensions") or {}).get(label)
+            if nested is not None:
+                return str(nested)
+            flat = entry.get(snake)
+            if flat is not None:
+                return str(flat)
+        else:
+            nested = (getattr(entry, "dimensions", None) or {}).get(label)
+            if nested is not None:
+                return str(nested)
+            flat = getattr(entry, snake, None)
+            if flat is not None:
+                return str(flat)
+        return "—"
+
     def _matrix_from_decision_matrix(self, matrix: list, dims: list[str]) -> dict[str, Any]:
-        """Convert decision_matrix list → structured table dict."""
+        """Convert decision_matrix list → structured table dict.
+
+        Rows are joined by option_id (not list position) so that reordering
+        the source list does not change which values appear in which row.
+        """
         headers = ["Option"] + dims + ["Overall"]
-        rows = []
+
+        # Index by option_id for id-based lookup, preserving list order for display.
+        matrix_by_id: dict[str, object] = {}
+        ordered_entries: list[object] = []
         for entry in matrix:
+            oid = entry.get("option_id", "") if isinstance(entry, dict) else getattr(entry, "option_id", "")
+            if oid and oid not in matrix_by_id:
+                matrix_by_id[oid] = entry
+            ordered_entries.append(entry)
+
+        rows = []
+        for entry in ordered_entries:
             if isinstance(entry, dict):
                 title = entry.get("option_title") or entry.get("title") or entry.get("option_id", "")
-                dimension_scores = entry.get("dimensions", {})
-                row = [title] + [str(dimension_scores.get(d, "—")) for d in dims]
-                row.append(str(entry.get("overall_score", "—")))
+                overall = str(entry.get("overall_score", "—"))
             else:
-                # Pydantic model
                 title = getattr(entry, "option_title", "") or getattr(entry, "title", "")
-                dim_scores = getattr(entry, "dimensions", {})
-                row = [title] + [str(dim_scores.get(d, "—")) for d in dims]
-                row.append(str(getattr(entry, "overall_score", "—")))
+                overall = str(getattr(entry, "overall_score", "—"))
+            row = [title] + [self._resolve_dim(entry, d) for d in dims] + [overall]
             rows.append(row)
+
         return {
             "title": "Strategic Option Comparison",
             "headers": headers,
