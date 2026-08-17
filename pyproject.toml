@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "dc-power-agent"
+name = "knowledge-layer"
 version = "0.1.0"
-description = "Local research harness for AI data center infrastructure documents."
+description = "Knowledge base builder and retrieval layer for AI research."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -18,6 +18,9 @@ dependencies = [
     "ddgs>=9.0",
     "requests>=2.31",
     "trafilatura>=1.9",
+    # MCP server
+    "mcp>=2.0",
+    "google-genai>=0.8",
 ]
 
 [project.optional-dependencies]
@@ -30,12 +33,11 @@ knowledge = [
 ]
 
 [project.scripts]
-dc-power-agent = "research_agent.cli:app"
-dc-power-agent-eval = "research_agent.eval_runner:app"
+knowledge-mcp = "knowledge.mcp_server:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["research_agent*", "knowledge*"]
+include = ["knowledge*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,0 +1,9 @@
+name: ai-research
+
+profiles:
+  - ai-research
+
+sources:
+  - /Users/dkrishna/Documents/Clients/Climate/ARI/AI-Apps/knowledge-layer/source/ai-research/articles
+  - /Users/dkrishna/Documents/Clients/Climate/ARI/AI-Apps/knowledge-layer/source/ai-research/youtube
+  - /Users/dkrishna/Documents/Clients/Climate/ARI/AI-Apps/knowledge-layer/source/ai-research/papers

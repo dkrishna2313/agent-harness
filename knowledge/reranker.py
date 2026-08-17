@@ -179,23 +179,68 @@ class PassthroughReranker(EvidenceReranker):
 
 
 # ---------------------------------------------------------------------------
+# LLM output normalization
+# ---------------------------------------------------------------------------
+
+
+def _normalize_llm_items(
+    items: list,
+    *,
+    required_fields: tuple[str, ...],
+    coerce_str_key: str,
+    component: str,
+) -> tuple[list[dict], dict]:
+    """Normalize raw LLM tool-use output to a list of dicts.
+
+    Bare strings are coerced to {coerce_str_key: value}. Items that are not
+    dicts or are missing a required field are dropped. Returns
+    (normalized_items, diagnostics_dict).
+    """
+    normalized: list[dict] = []
+    n_coerced = 0
+    n_dropped = 0
+
+    for item in items:
+        if isinstance(item, str):
+            item = {coerce_str_key: item}
+            n_coerced += 1
+        if not isinstance(item, dict):
+            n_dropped += 1
+            LOGGER.debug("%s: dropping non-dict item: %r", component, item)
+            continue
+        if not all(f in item for f in required_fields):
+            n_dropped += 1
+            LOGGER.debug("%s: dropping item missing required fields %s: %r", component, required_fields, item)
+            continue
+        normalized.append(item)
+
+    return normalized, {
+        "raw": len(items),
+        "coerced": n_coerced,
+        "dropped": n_dropped,
+        "normalized": len(normalized),
+    }
+
+
+# ---------------------------------------------------------------------------
 # LLMReranker — Claude Haiku via tool_use
 # ---------------------------------------------------------------------------
 
 _SYSTEM = """\
-You are an evidence selection assistant for nuclear energy investment research.
+You are an evidence ranking assistant for strategic research.
 
-Your task: given a user query and a set of candidate evidence items retrieved from a knowledge base, \
-select and rank the items that BEST answer the query.
+Your task: given a user query and a set of candidate evidence items, rank ALL top_k requested items \
+from the candidates — ordered best-first by relevance to the query.
 
-Selection criteria (in priority order):
+Ranking criteria (in priority order):
 1. Direct relevance — the statement directly addresses the query topic
 2. Specificity — specific facts, named claims, data, or quantified statements over vague generalisations
 3. Intent alignment — for risk queries prefer barrier/challenge/uncertainty/regulatory evidence; \
 for application queries prefer use-case evidence; for technical queries prefer specification evidence
-4. Non-redundancy — within the selected set, prefer items covering distinct aspects
+4. Non-redundancy — within the ranked set, prefer items covering distinct aspects
 
 Rules:
+- ALWAYS return exactly top_k items — rank the best available even if relevance is imperfect
 - Use only evidence_ids that appear verbatim in the candidates list
 - Never fabricate, truncate, or alter an evidence_id
 - Return a rationale of ≤ 15 words explaining relevance to the specific query\
@@ -204,7 +249,8 @@ Rules:
 _USER_TMPL = """\
 QUERY: {query}
 
-Select the {top_k} most relevant items from the {n} candidates below, ordered best-first.
+Rank the {top_k} most relevant items from the {n} candidates below, ordered best-first. \
+You MUST return exactly {top_k} items.
 
 CANDIDATES:
 {block}
@@ -214,28 +260,22 @@ Return rankings using the return_rankings tool.\
 
 
 class LLMReranker(EvidenceReranker):
-    """Claude-backed evidence reranker using tool_use structured output.
+    """LLM-backed evidence reranker using tool_use structured output.
 
     The model receives candidate statements and returns an ordered list of
     evidence_ids with relevance scores (0–1) and short rationales.
 
     Parameters
     ----------
-    client:
-        anthropic.Anthropic client. Created automatically if not provided.
     model:
-        Model for reranking. Haiku is recommended (fast, cheap, sufficient).
+        Model string — provider inferred from name prefix, e.g.:
+        "gemini-2.5-flash", "gpt-4o-mini", "claude-haiku-4-5-20251001"
     """
 
     def __init__(
         self,
-        client: object | None = None,
-        model: str = "claude-haiku-4-5-20251001",
+        model: str = "gemini-2.5-flash",
     ) -> None:
-        if client is None:
-            import anthropic  # type: ignore[import]
-            client = anthropic.Anthropic()
-        self._client = client
         self._model = model
 
     def rerank(
@@ -273,8 +313,7 @@ class LLMReranker(EvidenceReranker):
         # items; normalization coerces bare id-strings to objects and drops the
         # rest so the `.get()` below can never raise. Malformed output degrades to
         # the existing retrieval-order fallback (valid == 0).
-        from research_agent.llm_normalize import normalize_llm_items
-        normalized, norm_diag = normalize_llm_items(
+        normalized, norm_diag = _normalize_llm_items(
             raw,
             required_fields=("evidence_id",),
             coerce_str_key="evidence_id",
@@ -350,10 +389,14 @@ class LLMReranker(EvidenceReranker):
         return "\n\n".join(parts)
 
     def _call_llm(self, user_msg: str, top_k: int) -> list[dict]:
-        tool = {
-            "name": "return_rankings",
-            "description": "Return the ranked evidence selection",
-            "input_schema": {
+        from .llm_client import tool_use
+
+        result = tool_use(
+            self._model,
+            [{"role": "user", "content": user_msg}],
+            tool_name="return_rankings",
+            tool_description="Return the ranked evidence selection",
+            tool_parameters={
                 "type": "object",
                 "properties": {
                     "rankings": {
@@ -381,35 +424,17 @@ class LLMReranker(EvidenceReranker):
                 },
                 "required": ["rankings"],
             },
-        }
+            system=_SYSTEM,
+            max_tokens=2048,
+        )
 
-        try:
-            response = self._client.messages.create(  # type: ignore[attr-defined]
-                model=self._model,
-                max_tokens=2048,
-                system=_SYSTEM,
-                tools=[tool],
-                tool_choice={"type": "any"},
-                messages=[{"role": "user", "content": user_msg}],
-            )
-            for block in response.content:
-                if block.type == "tool_use" and block.name == "return_rankings":
-                    rankings = block.input.get("rankings", [])
-                    LOGGER.debug(
-                        "reranker: LLM returned %d raw rankings (top_k=%d  stop_reason=%s)",
-                        len(rankings), top_k, getattr(response, "stop_reason", "?"),
-                    )
-                    return rankings
+        if result is None:
             LOGGER.warning(
-                "reranker: model did not call return_rankings (stop_reason=%s) — returning empty. "
-                "All %d candidates will be dropped and retrieval-order fallback will apply.",
-                getattr(response, "stop_reason", "?"), top_k,
-            )
-            return []
-        except Exception as exc:
-            LOGGER.warning(
-                "reranker: LLM call failed (%s) — returning empty. "
+                "reranker: LLM call failed — returning empty. "
                 "All candidates will be dropped and retrieval-order fallback will apply.",
-                exc,
             )
             return []
+
+        rankings = result.get("rankings", [])
+        LOGGER.debug("reranker: LLM returned %d raw rankings (top_k=%d)", len(rankings), top_k)
+        return rankings

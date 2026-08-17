@@ -32,14 +32,6 @@ CredibilityLevel = Literal["HIGH", "MEDIUM", "LOW"]
 
 ReviewStatus = Literal["UNREVIEWED", "AUTO_REVIEWED", "HUMAN_REVIEWED"]
 
-ContradictionType = Literal["DIRECT", "SCOPE", "TEMPORAL", "METHODOLOGICAL"]
-
-DetectionMethod = Literal["AUTOMATED", "HUMAN"]
-
-ContradictionSeverity = Literal["HIGH", "MEDIUM", "LOW"]
-
-ResolutionStatus = Literal["OPEN", "RESOLVED", "ACCEPTED_AMBIGUITY"]
-
 RunStatus = Literal["RUNNING", "COMPLETED", "FAILED"]
 
 EvidenceType = Literal[
@@ -60,8 +52,6 @@ GroundingStrength = Literal["STRONG", "MODERATE", "WEAK"]
 RetrievalMode = Literal["lexical", "semantic", "hybrid"]
 
 RerankerType = Literal["passthrough", "llm", "none"]
-
-CompletenessStatus = Literal["COMPLETE", "PARTIAL", "INCOMPLETE", "UNKNOWN"]
 
 SourceType = Literal[
     "PDF",
@@ -261,43 +251,6 @@ class ExtractionRun(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Contradiction — first-class KB object (structure only for J8.1)
-# ---------------------------------------------------------------------------
-
-
-class Contradiction(BaseModel):
-    """A known conflict between two Evidence records.
-
-    Contradictions are computed offline and stored permanently.
-    Not regenerated on each research run.
-    Note: contradiction detection is implemented in J8.4.
-    This model is defined here so the store can hold them.
-    """
-
-    contradiction_id: str = Field(default_factory=lambda: str(uuid4()))
-    evidence_id_a: str
-    evidence_id_b: str
-    contradiction_type: ContradictionType
-    detection_method: DetectionMethod = "AUTOMATED"
-    severity: ContradictionSeverity = "MEDIUM"
-    resolution_status: ResolutionStatus = "OPEN"
-    resolution_notes: str | None = None
-    detected_at: datetime = Field(default_factory=datetime.utcnow)
-
-
-# ---------------------------------------------------------------------------
-# EvidenceProfile — join table
-# ---------------------------------------------------------------------------
-
-
-class EvidenceProfile(BaseModel):
-    evidence_id: str
-    profile_id: str
-    relevance_score: float = Field(default=3.0, ge=1.0, le=5.0)
-    tagged_by: Literal["AUTOMATED", "HUMAN"] = "AUTOMATED"
-
-
-# ---------------------------------------------------------------------------
 # RetrievalProvenance — runtime scoring record (v2, PH5.5a)
 # ---------------------------------------------------------------------------
 
@@ -355,58 +308,3 @@ class SourceManifestEntry(BaseModel):
     extraction_run_id: str = ""
 
 
-# ---------------------------------------------------------------------------
-# Assembly Completeness — per-subquestion and overall assessments (PH5.5d)
-# ---------------------------------------------------------------------------
-
-
-class SubquestionCompleteness(BaseModel):
-    """Deterministic completeness assessment for one subquestion (PH5.5d).
-
-    All fields are derived from existing evidence and mapping data —
-    nothing is inferred or fabricated.  When a value cannot be determined
-    the corresponding field is left at its default (0 / None / []).
-
-    supporting_evidence_count reflects all assigned evidence items until
-    contradiction detection is available (a future phase).
-    contradicting_evidence_count reflects validated contradictions only.
-    missing_area_count is always 0 at the subquestion level; investigation
-    area gaps are reported at AssemblyCompleteness level.
-    """
-
-    research_question_id: str | None = None
-    subquestion_id: str | None = None
-    subquestion_text: str
-    evidence_count: int = 0
-    supporting_evidence_count: int = 0
-    contradicting_evidence_count: int = 0
-    missing_area_count: int = 0
-    coverage_fraction: float = 0.0
-    completeness_score: float = 0.0
-    completeness_status: CompletenessStatus = "UNKNOWN"
-    gap_notes: list[str] = Field(default_factory=list)
-    evidence_ids: list[str] = Field(default_factory=list)
-
-
-class AssemblyCompleteness(BaseModel):
-    """Assembly-level completeness roll-up for one research question (PH5.5d).
-
-    Aggregates SubquestionCompleteness records and surfaces top-level gap
-    information to downstream reasoning agents.
-
-    overall_completeness_status is the weakest status across all subquestions:
-    COMPLETE only if every subquestion is COMPLETE; PARTIAL if any subquestion
-    has any coverage; INCOMPLETE if all subquestions have zero evidence;
-    UNKNOWN if no subquestions were defined.
-    """
-
-    question: str
-    research_question_id: str | None = None
-    total_subquestions: int = 0
-    covered_subquestions: int = 0
-    total_evidence_count: int = 0
-    missing_area_count: int = 0
-    overall_completeness_score: float = 0.0
-    overall_completeness_status: CompletenessStatus = "UNKNOWN"
-    subquestion_assessments: list[SubquestionCompleteness] = Field(default_factory=list)
-    gap_summary: list[str] = Field(default_factory=list)

@@ -179,9 +179,9 @@ def build(
         help="Path to the knowledge store directory.",
     ),
     model: str = typer.Option(
-        "claude-sonnet-4-6",
+        "gemini-2.5-flash",
         "--model",
-        help="Model identifier recorded in ExtractionRun provenance.",
+        help="Model for extraction. Provider is inferred from name: gemini-2.5-flash, gpt-4o-mini, claude-sonnet-5.",
     ),
     skip_extraction: bool = typer.Option(
         False,
@@ -261,19 +261,10 @@ def build(
             typer.echo("No source directories found. Specify --sources.", err=True)
             raise typer.Exit(1)
 
-    # Client — skip if --skip-extraction
-    client = None
-    if not skip_extraction:
-        try:
-            from research_agent.claude_client import ClaudeClient
-            client = ClaudeClient(model=model)
-        except Exception as exc:
-            typer.echo(f"Warning: could not initialise ClaudeClient — {exc}. Evidence extraction disabled.", err=True)
-
     store = KnowledgeStore(store_dir)
     builder = KnowledgeBuilder(
         store=store,
-        client=client,
+        model=None if skip_extraction else model,
         model_version=model,
         workers=workers,
     )
@@ -504,6 +495,11 @@ def retrieve(
         "--domain",
         help="Restrict to a specific domain (e.g. smr, ai_data_centers). Default: all.",
     ),
+    profile: Optional[str] = typer.Option(
+        None,
+        "--profile",
+        help="Restrict to evidence tagged with this profile (e.g. ai-research). Default: all.",
+    ),
     top_k: int = typer.Option(
         10,
         "--top-k",
@@ -544,9 +540,9 @@ def retrieve(
         help="Number of candidates to retrieve before reranking (default 40).",
     ),
     rerank_model: str = typer.Option(
-        "claude-haiku-4-5-20251001",
+        "gemini-2.5-flash",
         "--rerank-model",
-        help="Claude model to use for reranking.",
+        help="Model for reranking. Provider inferred from name: gemini-2.5-flash, gpt-4o-mini, claude-haiku-4-5-20251001.",
     ),
     show_rationale: bool = typer.Option(
         False,
@@ -565,6 +561,9 @@ def retrieve(
 
         # lexical retrieval, top 10
         python3 -m knowledge retrieve "deployment risks for SMRs" --domain smr
+
+        # restrict to a profile (logical tag)
+        python3 -m knowledge retrieve "GPU price growth" --profile ai-research
 
         # hybrid retrieval, top 10
         python3 -m knowledge retrieve "deployment risks for SMRs" --domain smr --mode hybrid
@@ -597,6 +596,7 @@ def retrieve(
         query,
         mode=mode,
         domain=domain,
+        profile=profile,
         top_k=retrieval_k,
         evidence_types=types_filter,
         retrieval_enabled_only=not all_evidence,

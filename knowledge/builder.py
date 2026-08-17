@@ -37,16 +37,10 @@ LOGGER = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 _DOMAIN_MAP: dict[str, str] = {
-    "smr_sources": "smr",
-    "smr": "smr",
-    "nvidia": "ai_data_centers",
     "ai_data_centers": "ai_data_centers",
     "infrastructure": "infrastructure",
     "market": "economics",
     "economics": "economics",
-    "networking": "networking",
-    "transmission": "transmission",
-    "nuclear_policy": "nuclear_policy",
     "sources": "general",
     "empty_sources": "empty",
 }
@@ -147,8 +141,9 @@ class KnowledgeBuilder:
     ----------
     store:
         KnowledgeStore instance. Defaults to knowledge_store/ in the CWD.
-    client:
-        ClaudeClient or MockClaudeClient for evidence extraction.
+    model:
+        Model for evidence extraction — provider inferred from name prefix, e.g.
+        "gemini-2.5-flash", "gpt-4o-mini", "claude-sonnet-5".
         If None, evidence extraction is skipped (source ingestion only).
     embedder:
         EmbeddingBackend. Defaults to best available (LocalEmbedder if
@@ -162,13 +157,13 @@ class KnowledgeBuilder:
     def __init__(
         self,
         store: KnowledgeStore | None = None,
-        client: object = None,
+        model: str | None = None,
         embedder: EmbeddingBackend | None = None,
-        model_version: str = "claude-sonnet-4-6",
+        model_version: str = "gemini-2.5-flash",
         workers: int = 1,
     ) -> None:
         self.store = store or KnowledgeStore()
-        self.client = client
+        self.model = model
         self.embedder: EmbeddingBackend = embedder if embedder is not None else get_default_embedder()
         self.model_version = model_version
         self.workers = max(1, workers)
@@ -395,7 +390,7 @@ class KnowledgeBuilder:
         LOGGER.info("builder: processing %s  source_id=%s", path.name, source_id)
 
         # Normalise source provenance (P1 PDF metadata → P2 text regex → P3 LLM)
-        norm = normalize_source(path, canonical_text, use_llm=(self.client is not None))
+        norm = normalize_source(path, canonical_text, use_llm=(self.model is not None))
 
         # Build Source record
         source = Source(
@@ -424,12 +419,12 @@ class KnowledgeBuilder:
         # Evidence extraction
         evidence_list: list[Evidence] = []
         duplicates = 0
-        if self.client is not None:
+        if self.model is not None:
             try:
                 ev_list, meta_list, duplicates = extract_evidence_from_source(
                     source,
                     extraction_run_id=run.run_id,
-                    client=self.client,
+                    model=self.model,
                     existing_fingerprints=existing_fingerprints,
                     profile_ids=profile_ids,
                 )
@@ -446,7 +441,7 @@ class KnowledgeBuilder:
                 LOGGER.error("builder: evidence extraction failed for %s — %s", path.name, exc)
                 report.errors.append(f"{path.name}: evidence extraction failed — {exc}")
         else:
-            LOGGER.debug("builder: no client configured — skipping evidence extraction for %s", path.name)
+            LOGGER.debug("builder: no model configured — skipping evidence extraction for %s", path.name)
 
         # Embedding generation
         embeddings_generated = self._generate_embeddings(evidence_list)

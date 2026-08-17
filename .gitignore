@@ -11,3 +11,5 @@ outputs/*.trace.json
 .cache/extraction/
 profile_editor/frontend/node_modules/
 profile_editor/frontend/dist/
+source/
+*.egg-info/

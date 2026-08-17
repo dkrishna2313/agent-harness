@@ -27,7 +27,6 @@ from pathlib import Path
 from typing import Iterator
 
 from .models import (
-    Contradiction,
     Evidence,
     ExtractionRun,
     KnowledgeMetadata,
@@ -319,36 +318,6 @@ class KnowledgeStore:
     def write_extraction_run(self, run: ExtractionRun) -> None:
         self._atomic_append_jsonl(self._runs_path(), run.model_dump())
         LOGGER.debug("knowledge_store: wrote extraction_run %s", run.run_id)
-
-    def iter_extraction_runs(self) -> Iterator[ExtractionRun]:
-        path = self._runs_path()
-        if not path.exists():
-            return
-        with open(path, encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    yield ExtractionRun.model_validate_json(line)
-                except Exception as exc:
-                    LOGGER.warning("knowledge_store: corrupt run line — %s", exc)
-
-    def latest_extraction_run(self) -> ExtractionRun | None:
-        last = None
-        for run in self.iter_extraction_runs():
-            last = run
-        return last
-
-    # ------------------------------------------------------------------
-    # Contradiction
-    # ------------------------------------------------------------------
-
-    def _contradictions_path(self) -> Path:
-        return self.root / "contradictions" / "contradictions.jsonl"
-
-    def write_contradiction(self, c: Contradiction) -> None:
-        self._atomic_append_jsonl(self._contradictions_path(), c.model_dump())
 
     # ------------------------------------------------------------------
     # Manifest

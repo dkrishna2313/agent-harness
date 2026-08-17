@@ -283,9 +283,8 @@ def _extract_text_metadata(canonical_text: str) -> SourceNormalization:
 
 def _extract_via_llm(first_page_text: str) -> SourceNormalization:
     try:
-        import anthropic as _anthropic
+        from .llm_client import DEFAULT_MODEL, chat_completion
 
-        client = _anthropic.Anthropic()
         fields_list = ", ".join(_LLM_FIELDS)
         prompt = (
             f"Extract document metadata. Return ONLY a JSON object with these keys "
@@ -293,12 +292,11 @@ def _extract_via_llm(first_page_text: str) -> SourceNormalization:
             f"publication_date must be YYYY-MM-DD or null.\n\n"
             f"Document text:\n{first_page_text[:2000]}"
         )
-        msg = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+        raw = chat_completion(
+            DEFAULT_MODEL,
+            [{"role": "user", "content": prompt}],
             max_tokens=400,
-            messages=[{"role": "user", "content": prompt}],
         )
-        raw = msg.content[0].text
         m = re.search(r"\{[\s\S]*?\}", raw)
         if not m:
             return SourceNormalization()
